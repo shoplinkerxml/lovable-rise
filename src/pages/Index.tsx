@@ -9,6 +9,9 @@ import { FAQSection } from "@/components/FAQSection"
 import { NewsletterSection } from "@/components/NewsletterSection"
 
 const Index = () => {
+  console.log('Index component rendering...')
+  console.log('Components loaded:', { HeroSection, ProblemsSection, SolutionsSection })
+  
   return (
     <div className="min-h-screen">
       <Header />
