@@ -1,19 +1,15 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Play, ArrowRight, TrendingUp } from "lucide-react"
-import heroImage from "@/assets/hero-business.jpg"
-import { useState, useEffect } from "react"
-
+import { Button } from "@/components/ui/button";
+import { Play, ArrowRight, TrendingUp } from "lucide-react";
+import heroImage from "@/assets/hero-business.jpg";
+import { useState, useEffect } from "react";
 export function HeroSection() {
-  const [isVisible, setIsVisible] = useState(false)
-
+  const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
-    setIsVisible(true)
-  }, [])
-
-  return (
-    <section className="relative py-20 lg:py-32 overflow-hidden bg-gradient-hero">
+    setIsVisible(true);
+  }, []);
+  return <section className="relative py-20 lg:py-32 overflow-hidden bg-gradient-hero">
       {/* Background decoration */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5" />
       <div className="absolute top-10 right-10 w-20 h-20 bg-success/10 rounded-full blur-xl" />
@@ -30,9 +26,7 @@ export function HeroSection() {
 
             <h1 className="text-4xl lg:text-6xl font-bold leading-tight">
               Помогаем бизнесу{" "}
-              <span className="bg-gradient-success bg-clip-text text-transparent">
-                зарабатывать больше
-              </span>{" "}
+              {" "}
               на маркетплейсах
             </h1>
 
@@ -70,13 +64,11 @@ export function HeroSection() {
           </div>
 
           {/* Image */}
-          <div className={`relative ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.3s' }}>
+          <div className={`relative ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{
+          animationDelay: '0.3s'
+        }}>
             <div className="relative">
-              <img
-                src={heroImage}
-                alt="Автоматизация бизнеса и рост продаж"
-                className="w-full h-auto rounded-2xl shadow-2xl"
-              />
+              <img src={heroImage} alt="Автоматизация бизнеса и рост продаж" className="w-full h-auto rounded-2xl shadow-2xl" />
               
               {/* Floating elements */}
               <div className="absolute -top-6 -right-6 bg-card p-4 rounded-xl shadow-lg animate-bounce-gentle">
@@ -86,7 +78,9 @@ export function HeroSection() {
                 </div>
               </div>
               
-              <div className="absolute -bottom-6 -left-6 bg-card p-4 rounded-xl shadow-lg animate-bounce-gentle" style={{ animationDelay: '1s' }}>
+              <div className="absolute -bottom-6 -left-6 bg-card p-4 rounded-xl shadow-lg animate-bounce-gentle" style={{
+              animationDelay: '1s'
+            }}>
                 <div className="flex items-center space-x-2">
                   <TrendingUp className="w-4 h-4 text-success" />
                   <span className="text-sm font-medium">Автопилот ON</span>
@@ -96,6 +90,5 @@ export function HeroSection() {
           </div>
         </div>
       </div>
-    </section>
-  )
+    </section>;
 }
