@@ -1,1 +1,13 @@
 project_id = "ehznqzaumsnjkrntaiox"
+
+[functions.auth-me]
+verify_jwt = true
+
+[functions.users]
+verify_jwt = true
+
+[functions.menu]
+verify_jwt = true
+
+[functions.permissions]
+verify_jwt = true

@@ -30,6 +30,9 @@ export function Header() {
           <a href="#services" className="text-muted-foreground hover:text-primary transition-colors">
             Услуги
           </a>
+          <a href="/docs" className="text-muted-foreground hover:text-primary transition-colors">
+            API Docs
+          </a>
           <a href="#contact" className="text-muted-foreground hover:text-primary transition-colors">
             Контакты
           </a>
@@ -71,6 +74,9 @@ export function Header() {
             </a>
             <a href="#services" className="text-muted-foreground">
               Услуги
+            </a>
+            <a href="/docs" className="text-muted-foreground">
+              API Docs
             </a>
             <a href="#contact" className="text-muted-foreground">
               Контакты
