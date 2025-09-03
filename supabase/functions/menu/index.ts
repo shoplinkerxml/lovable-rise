@@ -101,7 +101,8 @@ Deno.serve(async (req) => {
 
     const { user, profile } = userCheck
     const url = new URL(req.url)
-    const menuId = url.pathname.split('/').pop()
+    const pathParts = url.pathname.split('/').filter(p => p)
+    const menuId = pathParts.length > 1 ? pathParts[1] : null
 
     // GET /menu - получить меню для текущего пользователя
     if (req.method === 'GET' && !menuId) {

@@ -87,7 +87,8 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url)
-    const userId = url.pathname.split('/').pop()
+    const pathParts = url.pathname.split('/').filter(p => p)
+    const userId = pathParts.length > 1 ? pathParts[1] : null
 
     // GET /users - список всех пользователей
     if (req.method === 'GET' && !userId) {

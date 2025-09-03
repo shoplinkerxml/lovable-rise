@@ -94,8 +94,8 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/').filter(p => p)
-    const userId = pathParts[1] // /permissions/{userId}
-    const menuItemId = pathParts[2] // /permissions/{userId}/{menuItemId}
+    const userId = pathParts.length > 1 ? pathParts[1] : null
+    const menuItemId = pathParts.length > 2 ? pathParts[2] : null
 
     if (!userId) {
       return new Response(
