@@ -63,11 +63,11 @@ const endpoints: ApiEndpoint[] = [
     auth: true,
     adminOnly: true,
     requestBody: {
-      email: 'string (required)',
-      password: 'string (required)',
-      name: 'string (required)',
-      phone: 'string (optional)',
-      role: 'admin | manager (default: manager)'
+      email: 'test@example.com',
+      password: 'password123',
+      name: 'Тест Пользователь',
+      phone: '+380501234567',
+      role: 'manager'
     },
     responseBody: {
       user: {
@@ -90,10 +90,10 @@ const endpoints: ApiEndpoint[] = [
       { name: 'id', type: 'uuid', description: 'ID пользователя', required: true }
     ],
     requestBody: {
-      name: 'string (optional)',
-      phone: 'string (optional)',
-      role: 'admin | manager (optional)',
-      status: 'active | inactive (optional)'
+      name: 'Обновленное Имя',
+      phone: '+380509876543',
+      role: 'admin',
+      status: 'active'
     },
     responseBody: {
       user: {
@@ -146,10 +146,10 @@ const endpoints: ApiEndpoint[] = [
     auth: true,
     adminOnly: true,
     requestBody: {
-      title: 'string (required)',
-      path: 'string (required)',
-      parent_id: 'number (optional)',
-      order_index: 'number (optional)'
+      title: 'Новый пункт меню',
+      path: '/new-menu-item',
+      parent_id: null,
+      order_index: 100
     },
     responseBody: {
       menuItem: {
@@ -172,11 +172,11 @@ const endpoints: ApiEndpoint[] = [
       { name: 'id', type: 'number', description: 'ID пункта меню', required: true }
     ],
     requestBody: {
-      title: 'string (optional)',
-      path: 'string (optional)',
-      parent_id: 'number (optional)',
-      order_index: 'number (optional)',
-      is_active: 'boolean (optional)'
+      title: 'Обновленный пункт меню',
+      path: '/updated-menu-item',
+      parent_id: 1,
+      order_index: 50,
+      is_active: true
     }
   },
   {
@@ -225,9 +225,13 @@ const endpoints: ApiEndpoint[] = [
     ],
     requestBody: {
       permissions: [{
-        menu_item_id: 'number (required)',
-        can_view: 'boolean (default: true)',
-        can_edit: 'boolean (default: false)'
+        menu_item_id: 1,
+        can_view: true,
+        can_edit: false
+      }, {
+        menu_item_id: 2,
+        can_view: true,
+        can_edit: true
       }]
     }
   },
@@ -242,8 +246,8 @@ const endpoints: ApiEndpoint[] = [
       { name: 'menuItemId', type: 'number', description: 'ID пункта меню', required: true }
     ],
     requestBody: {
-      can_view: 'boolean (optional)',
-      can_edit: 'boolean (optional)'
+      can_view: true,
+      can_edit: true
     }
   }
 ];
