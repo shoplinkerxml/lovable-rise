@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
         .from('menu_items')
         .select('*')
         .eq('is_active', true)
+        .order('parent_id', { nullsFirst: true })
         .order('order_index')
 
       // Если не админ, фильтруем по правам доступа
@@ -146,8 +147,42 @@ Deno.serve(async (req) => {
         )
       }
 
+      // Структурируем меню с подменю
+      const structuredMenu = menu?.filter(item => !item.parent_id).map(parent => ({
+        ...parent,
+        children: menu?.filter(child => child.parent_id === parent.id) || []
+      })) || []
+
       return new Response(
-        JSON.stringify({ menu }),
+        JSON.stringify({ menu: structuredMenu }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // GET /menu/:id/children - получить подменю для конкретного пункта
+    if (req.method === 'GET' && menuId) {
+      const { data: children, error } = await supabaseClient
+        .from('menu_items')
+        .select('*')
+        .eq('parent_id', menuId)
+        .eq('is_active', true)
+        .order('order_index')
+
+      if (error) {
+        console.log('Submenu fetch error:', error)
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch submenu' }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
+      return new Response(
+        JSON.stringify({ children }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }

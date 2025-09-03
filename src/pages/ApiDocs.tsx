@@ -125,17 +125,46 @@ const endpoints: ApiEndpoint[] = [
   {
     method: 'GET',
     path: '/menu',
-    description: 'Получить меню для текущего пользователя (с учетом прав доступа)',
+    description: 'Получить структурированное меню для текущего пользователя (с учетом прав доступа)',
     auth: true,
     responseBody: {
       menu: [{
-        id: 'number',
-        title: 'string',
-        path: 'string',
-        parent_id: 'number | null',
-        order_index: 'number',
-        is_active: 'boolean',
-        created_at: 'timestamp'
+        id: 1,
+        title: 'Главное меню',
+        path: '/main',
+        parent_id: null,
+        order_index: 1,
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z',
+        children: [{
+          id: 2,
+          title: 'Подменю',
+          path: '/main/sub',
+          parent_id: 1,
+          order_index: 1,
+          is_active: true,
+          created_at: '2024-01-01T00:00:00Z'
+        }]
+      }]
+    }
+  },
+  {
+    method: 'GET',
+    path: '/menu/:id/children',
+    description: 'Получить подменю для конкретного пункта меню',
+    auth: true,
+    parameters: [
+      { name: 'id', type: 'number', description: 'ID родительского пункта меню', required: true }
+    ],
+    responseBody: {
+      children: [{
+        id: 2,
+        title: 'Подменю',
+        path: '/main/sub',
+        parent_id: 1,
+        order_index: 1,
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z'
       }]
     }
   },
@@ -153,12 +182,35 @@ const endpoints: ApiEndpoint[] = [
     },
     responseBody: {
       menuItem: {
-        id: 'number',
-        title: 'string',
-        path: 'string',
-        parent_id: 'number | null',
-        order_index: 'number',
-        is_active: 'boolean'
+        id: 3,
+        title: 'Новый пункт меню',
+        path: '/new-menu-item',
+        parent_id: null,
+        order_index: 100,
+        is_active: true
+      }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/menu',
+    description: 'Создать подменю (пункт меню с родителем)',
+    auth: true,
+    adminOnly: true,
+    requestBody: {
+      title: 'Подпункт меню',
+      path: '/parent/child',
+      parent_id: 1,
+      order_index: 1
+    },
+    responseBody: {
+      menuItem: {
+        id: 4,
+        title: 'Подпункт меню',
+        path: '/parent/child',
+        parent_id: 1,
+        order_index: 1,
+        is_active: true
       }
     }
   },
