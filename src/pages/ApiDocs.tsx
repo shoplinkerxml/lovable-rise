@@ -21,7 +21,7 @@ interface ApiEndpoint {
 const endpoints: ApiEndpoint[] = [
   {
     method: 'GET',
-    path: '/auth/me',
+    path: '/auth-me',
     description: 'Получить информацию о текущем пользователе',
     auth: true,
     responseBody: {
@@ -278,7 +278,7 @@ export default function ApiDocs() {
     });
   };
 
-  const baseUrl = `https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1`;
+  const getEndpointUrl = (path: string) => `https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1${path}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -293,7 +293,7 @@ export default function ApiDocs() {
             </p>
             <div className="flex flex-wrap justify-center gap-4 mb-8">
               <Badge variant="outline" className="text-sm px-3 py-1">
-                Base URL: {baseUrl}
+                Base URL: https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1
               </Badge>
               <Badge variant="outline" className="text-sm px-3 py-1">
                 Authentication: JWT Bearer Token
@@ -427,7 +427,7 @@ export default function ApiDocs() {
                                   size="sm"
                                   onClick={() => {
                                     const curlExample = `curl -X ${endpoint.method} \\
-  "${baseUrl}${endpoint.path}" \\
+  "${getEndpointUrl(endpoint.path)}" \\
   ${endpoint.auth ? '-H "Authorization: Bearer YOUR_JWT_TOKEN" \\' : ''}
   -H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`;
                                     copyToClipboard(curlExample);
@@ -440,7 +440,7 @@ export default function ApiDocs() {
                               <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
                                 <code>
                                   {`curl -X ${endpoint.method} \\
-  "${baseUrl}${endpoint.path}" \\
+  "${getEndpointUrl(endpoint.path)}" \\
   ${endpoint.auth ? '-H "Authorization: Bearer YOUR_JWT_TOKEN" \\' : ''}
 -H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`}
                                 </code>
