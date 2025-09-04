@@ -4,333 +4,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Copy, CheckCircle } from 'lucide-react';
+import { ChevronDown, Copy, CheckCircle, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ApiEndpoint {
+  name: string;
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
-  path: string;
+  endpoint: string;
   description: string;
-  auth: boolean;
-  adminOnly?: boolean;
-  requestBody?: any;
-  responseBody?: any;
-  parameters?: { name: string; type: string; description: string; required: boolean }[];
+  headers?: Record<string, string>;
+  body?: any;
+  response: any;
+  postmanScript?: string;
 }
-
-const endpoints: ApiEndpoint[] = [
-  {
-    method: 'POST',
-    path: '/auth/v1/token?grant_type=password',
-    description: 'Получить JWT токен для аутентификации',
-    auth: false,
-    requestBody: {
-      email: 'shoplinkerxml@gmail.com',
-      password: 'shoplinkerxml@gmail.com'
-    },
-    responseBody: {
-      access_token: 'string',
-      token_type: 'bearer',
-      expires_in: 'number',
-      refresh_token: 'string',
-      user: {
-        id: 'uuid',
-        email: 'string',
-        role: 'string'
-      }
-    }
-  },
-  {
-    method: 'GET',
-    path: '/auth-me',
-    description: 'Получить информацию о текущем пользователе',
-    auth: true,
-    responseBody: {
-      user: {
-        id: 'uuid',
-        email: 'string',
-        name: 'string',
-        phone: 'string | null',
-        role: 'admin | manager',
-        status: 'active | inactive',
-        created_at: 'timestamp',
-        updated_at: 'timestamp'
-      }
-    }
-  },
-  {
-    method: 'GET',
-    path: '/users',
-    description: 'Получить список всех пользователей',
-    auth: true,
-    adminOnly: true,
-    responseBody: {
-      users: [{
-        id: 'uuid',
-        email: 'string',
-        name: 'string',
-        phone: 'string | null',
-        role: 'admin | manager',
-        status: 'active | inactive',
-        created_at: 'timestamp',
-        updated_at: 'timestamp'
-      }]
-    }
-  },
-  {
-    method: 'POST',
-    path: '/users',
-    description: 'Создать нового пользователя',
-    auth: true,
-    adminOnly: true,
-    requestBody: {
-      email: 'test@example.com',
-      password: 'password123',
-      name: 'Тест Пользователь',
-      phone: '+380501234567',
-      role: 'manager'
-    },
-    responseBody: {
-      user: {
-        id: 'uuid',
-        email: 'string',
-        name: 'string',
-        phone: 'string | null',
-        role: 'admin | manager',
-        status: 'active | inactive'
-      }
-    }
-  },
-  {
-    method: 'PATCH',
-    path: '/users/:id',
-    description: 'Обновить пользователя',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'id', type: 'uuid', description: 'ID пользователя', required: true }
-    ],
-    requestBody: {
-      name: 'Обновленное Имя',
-      phone: '+380509876543',
-      role: 'admin',
-      status: 'active'
-    },
-    responseBody: {
-      user: {
-        id: 'uuid',
-        email: 'string',
-        name: 'string',
-        phone: 'string | null',
-        role: 'admin | manager',
-        status: 'active | inactive'
-      }
-    }
-  },
-  {
-    method: 'DELETE',
-    path: '/users/:id',
-    description: 'Деактивировать пользователя',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'id', type: 'uuid', description: 'ID пользователя', required: true }
-    ],
-    responseBody: {
-      user: {
-        id: 'uuid',
-        status: 'inactive'
-      }
-    }
-  },
-  {
-    method: 'GET',
-    path: '/menu',
-    description: 'Получить структурированное меню для текущего пользователя (с учетом прав доступа)',
-    auth: true,
-    responseBody: {
-      menu: [{
-        id: 1,
-        title: 'Главное меню',
-        path: '/main',
-        parent_id: null,
-        order_index: 1,
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-        children: [{
-          id: 2,
-          title: 'Подменю',
-          path: '/main/sub',
-          parent_id: 1,
-          order_index: 1,
-          is_active: true,
-          created_at: '2024-01-01T00:00:00Z'
-        }]
-      }]
-    }
-  },
-  {
-    method: 'GET',
-    path: '/menu/:id/children',
-    description: 'Получить подменю для конкретного пункта меню',
-    auth: true,
-    parameters: [
-      { name: 'id', type: 'number', description: 'ID родительского пункта меню', required: true }
-    ],
-    responseBody: {
-      children: [{
-        id: 2,
-        title: 'Подменю',
-        path: '/main/sub',
-        parent_id: 1,
-        order_index: 1,
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z'
-      }]
-    }
-  },
-  {
-    method: 'POST',
-    path: '/menu',
-    description: 'Создать новый пункт меню',
-    auth: true,
-    adminOnly: true,
-    requestBody: {
-      title: 'Новый пункт меню',
-      path: '/new-menu-item',
-      parent_id: null,
-      order_index: 100
-    },
-    responseBody: {
-      menuItem: {
-        id: 3,
-        title: 'Новый пункт меню',
-        path: '/new-menu-item',
-        parent_id: null,
-        order_index: 100,
-        is_active: true
-      }
-    }
-  },
-  {
-    method: 'POST',
-    path: '/menu',
-    description: 'Создать подменю (пункт меню с родителем)',
-    auth: true,
-    adminOnly: true,
-    requestBody: {
-      title: 'Подпункт меню',
-      path: '/parent/child',
-      parent_id: 1,
-      order_index: 1
-    },
-    responseBody: {
-      menuItem: {
-        id: 4,
-        title: 'Подпункт меню',
-        path: '/parent/child',
-        parent_id: 1,
-        order_index: 1,
-        is_active: true
-      }
-    }
-  },
-  {
-    method: 'PATCH',
-    path: '/menu/:id',
-    description: 'Обновить пункт меню',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'id', type: 'number', description: 'ID пункта меню', required: true }
-    ],
-    requestBody: {
-      title: 'Обновленный пункт меню',
-      path: '/updated-menu-item',
-      parent_id: 1,
-      order_index: 50,
-      is_active: true
-    }
-  },
-  {
-    method: 'DELETE',
-    path: '/menu/:id',
-    description: 'Деактивировать пункт меню',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'id', type: 'number', description: 'ID пункта меню', required: true }
-    ]
-  },
-  {
-    method: 'GET',
-    path: '/permissions/:userId',
-    description: 'Получить права доступа пользователя',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'userId', type: 'uuid', description: 'ID пользователя', required: true }
-    ],
-    responseBody: {
-      permissions: [{
-        id: 'number',
-        user_id: 'uuid',
-        menu_item_id: 'number',
-        can_view: 'boolean',
-        can_edit: 'boolean',
-        created_at: 'timestamp',
-        menu_items: {
-          id: 'number',
-          title: 'string',
-          path: 'string'
-        }
-      }]
-    }
-  },
-  {
-    method: 'POST',
-    path: '/permissions/:userId',
-    description: 'Назначить права доступа пользователю',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'userId', type: 'uuid', description: 'ID пользователя', required: true }
-    ],
-    requestBody: {
-      permissions: [{
-        menu_item_id: 1,
-        can_view: true,
-        can_edit: false
-      }, {
-        menu_item_id: 2,
-        can_view: true,
-        can_edit: true
-      }]
-    }
-  },
-  {
-    method: 'PATCH',
-    path: '/permissions/:userId/:menuItemId',
-    description: 'Изменить конкретное право доступа',
-    auth: true,
-    adminOnly: true,
-    parameters: [
-      { name: 'userId', type: 'uuid', description: 'ID пользователя', required: true },
-      { name: 'menuItemId', type: 'number', description: 'ID пункта меню', required: true }
-    ],
-    requestBody: {
-      can_view: true,
-      can_edit: true
-    }
-  }
-];
-
-const methodColors = {
-  GET: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  POST: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  PATCH: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  DELETE: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-};
 
 export default function ApiDocs() {
   const [openEndpoints, setOpenEndpoints] = useState<Set<string>>(new Set());
@@ -355,83 +41,377 @@ export default function ApiDocs() {
     });
   };
 
-  const getEndpointUrl = (path: string) => {
-    if (path.startsWith('/auth/v1/')) {
-      return `https://ehznqzaumsnjkrntaiox.supabase.co${path}`;
+  const endpoints: ApiEndpoint[] = [
+    // Токен endpoint
+    {
+      name: 'Get Auth Token',
+      method: 'POST',
+      endpoint: '/auth/v1/token?grant_type=password',
+      description: 'Получить JWT токен для аутентификации',
+      body: {
+        email: "user@example.com",
+        password: "your_password"
+      },
+      response: {
+        access_token: "jwt_token_here",
+        token_type: "bearer",
+        expires_in: 3600,
+        refresh_token: "refresh_token_here"
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+if (responseData.access_token) {
+    pm.collectionVariables.set("access_token", responseData.access_token);
+}`
+    },
+    
+    // Signup endpoint
+    {
+      name: 'Register User',
+      method: 'POST', 
+      endpoint: '/auth/v1/signup',
+      description: 'Регистрация нового пользователя',
+      body: {
+        email: "manager@testmail.com",
+        password: "ManagerPass123"
+      },
+      response: {
+        id: "uuid-here",
+        email: "manager@testmail.com"
+      },
+      postmanScript: `// Проверяем, что статус 200
+pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+// Парсим ответ
+let responseData = pm.response.json();
+
+// Сохраняем manager_id в переменную коллекции, если есть поле id
+if (responseData.id) {
+    pm.collectionVariables.set("manager_id", responseData.id);
+    console.log("manager_id сохранён:", responseData.id);
+} else {
+    console.warn("id пользователя не найден в ответе!");
+}`
+    },
+    
+    // Auth Me endpoint
+    {
+      name: 'Get Current User',
+      method: 'GET',
+      endpoint: '/functions/v1/auth-me',
+      description: 'Получить информацию о текущем пользователе',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      response: {
+        user: {
+          id: "uuid",
+          email: "user@example.com",
+          name: "Имя пользователя",
+          phone: "+380501234567",
+          role: "manager",
+          status: "active",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z"
+        }
+      }
+    },
+    
+    // Profiles endpoints
+    {
+      name: 'Update Profile',
+      method: 'PATCH',
+      endpoint: '/rest/v1/profiles?id=eq.{{manager_id}}',
+      description: 'Обновить профиль пользователя после регистрации',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      body: {
+        name: "Manager Name",
+        phone: "+380991112233"
+      },
+      response: {
+        id: "uuid",
+        email: "manager@testmail.com",
+        name: "Manager Name", 
+        phone: "+380991112233",
+        role: "manager",
+        status: "active",
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z"
+      }
+    },
+    
+    // Users endpoints
+    {
+      name: 'Get Users',
+      method: 'GET',
+      endpoint: '/functions/v1/users',
+      description: 'Получить список всех пользователей',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      response: {
+        users: [
+          {
+            id: "uuid",
+            email: "user@example.com",
+            name: "Имя пользователя",
+            phone: "+380501234567",
+            role: "manager",
+            status: "active",
+            created_at: "2024-01-01T00:00:00Z",
+            updated_at: "2024-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      name: 'Update User',
+      method: 'PATCH',
+      endpoint: '/functions/v1/users/{id}',
+      description: 'Обновить данные пользователя',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      body: {
+        name: "Новое имя",
+        phone: "+380987654321",
+        role: "admin",
+        status: "inactive"
+      },
+      response: {
+        user: {
+          id: "uuid",
+          email: "test@example.com",
+          name: "Новое имя",
+          phone: "+380987654321",
+          role: "admin", 
+          status: "inactive",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z"
+        }
+      }
+    },
+    {
+      name: 'Delete User',
+      method: 'DELETE',
+      endpoint: '/functions/v1/users/{id}',
+      description: 'Деактивировать пользователя',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      response: {
+        user: {
+          id: "uuid",
+          email: "test@example.com",
+          name: "Тест Пользователь",
+          phone: "+380501234567",
+          role: "manager",
+          status: "inactive",
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z"
+        }
+      }
+    },
+    
+    // Menu endpoints
+    {
+      name: 'Get Menu',
+      method: 'GET',
+      endpoint: '/functions/v1/menu',
+      description: 'Получить структурированное меню для текущего пользователя',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      response: {
+        menu: [
+          {
+            id: 1,
+            title: "Главное меню",
+            path: "/main",
+            parent_id: null,
+            order_index: 1,
+            is_active: true,
+            created_at: "2024-01-01T00:00:00Z",
+            children: [
+              {
+                id: 2,
+                title: "Подменю",
+                path: "/main/sub",
+                parent_id: 1,
+                order_index: 1,
+                is_active: true,
+                created_at: "2024-01-01T00:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    // Permissions endpoints
+    {
+      name: 'Get User Permissions',
+      method: 'GET', 
+      endpoint: '/functions/v1/permissions?user_id={user_id}',
+      description: 'Получить права доступа пользователя',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      response: {
+        permissions: [
+          {
+            id: 1,
+            user_id: "uuid",
+            menu_item_id: 1,
+            can_view: true,
+            can_edit: false,
+            created_at: "2024-01-01T00:00:00Z",
+            menu_items: {
+              id: 1,
+              title: "Главное меню",
+              path: "/main"
+            }
+          }
+        ]
+      }
+    },
+    {
+      name: 'Update User Permissions',
+      method: 'POST',
+      endpoint: '/functions/v1/permissions',
+      description: 'Обновить права доступа пользователя к пунктам меню',
+      headers: {
+        'Authorization': 'Bearer {{access_token}}'
+      },
+      body: {
+        user_id: "uuid",
+        permissions: [
+          {
+            menu_item_id: 1,
+            can_view: true,
+            can_edit: false
+          },
+          {
+            menu_item_id: 2,
+            can_view: true,
+            can_edit: true
+          }
+        ]
+      },
+      response: {
+        message: "Права доступа успешно обновлены",
+        updated_permissions: 2
+      }
     }
-    return `https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1${path}`;
+  ];
+
+  const methodColors = {
+    GET: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+    POST: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+    PATCH: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+    DELETE: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+  };
+
+  const generateCurlCommand = (endpoint: ApiEndpoint) => {
+    const baseUrl = 'https://ehznqzaumsnjkrntaiox.supabase.co';
+    const fullUrl = `${baseUrl}${endpoint.endpoint}`;
+    
+    let curlCmd = `curl -X ${endpoint.method} "${fullUrl}"`;
+    
+    if (endpoint.endpoint.includes('/auth/v1/')) {
+      curlCmd += ` \\\n  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0"`;
+    }
+    
+    if (endpoint.headers) {
+      Object.entries(endpoint.headers).forEach(([key, value]) => {
+        curlCmd += ` \\\n  -H "${key}: ${value.replace('{{access_token}}', 'YOUR_TOKEN_HERE')}"`;
+      });
+    }
+    
+    curlCmd += ` \\\n  -H "Content-Type: application/json"`;
+    
+    if (endpoint.body) {
+      curlCmd += ` \\\n  -d '${JSON.stringify(endpoint.body, null, 2)}'`;
+    }
+    
+    return curlCmd;
   };
 
   const generatePostmanCollection = () => {
+    const baseUrl = 'https://ehznqzaumsnjkrntaiox.supabase.co';
+    
     const collection = {
       info: {
         name: "API Documentation Collection",
         description: "Postman коллекция для тестирования API",
         schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
       },
-      auth: {
-        type: "bearer",
-        bearer: [{
-          key: "token",
-          value: "{{jwt_token}}",
+      variable: [
+        {
+          key: "base_url",
+          value: baseUrl
+        },
+        {
+          key: "access_token", 
+          value: "",
           type: "string"
-        }]
-      },
-      variable: [{
-        key: "base_url",
-        value: "https://ehznqzaumsnjkrntaiox.supabase.co"
-      }, {
-        key: "jwt_token",
-        value: "",
-        type: "string"
-      }],
-      item: endpoints.map(endpoint => {
-        const item: any = {
-          name: `${endpoint.method} ${endpoint.path} - ${endpoint.description}`,
-          request: {
-            method: endpoint.method,
-            header: [
-              {
-                key: "Content-Type",
-                value: "application/json"
-              }
-            ],
-            url: {
-              raw: `{{base_url}}${endpoint.path.startsWith('/auth/v1/') ? '' : '/functions/v1'}${endpoint.path}`,
-              host: ["{{base_url}}"],
-              path: endpoint.path.startsWith('/auth/v1/') 
-                ? endpoint.path.split('/').filter(p => p) 
-                : ['functions', 'v1', ...endpoint.path.split('/').filter(p => p)]
+        },
+        {
+          key: "manager_id",
+          value: "",
+          type: "string"
+        }
+      ],
+      item: endpoints.map((endpoint) => {
+        const requestData = {
+          name: endpoint.name,
+          url: `${baseUrl}${endpoint.endpoint}`,
+          method: endpoint.method,
+          header: [
+            {
+              key: 'Content-Type',
+              value: 'application/json'
+            },
+            ...(endpoint.headers ? Object.entries(endpoint.headers).map(([key, value]) => ({
+              key,
+              value: value.replace('{{jwt_token}}', '{{access_token}}')
+            })) : [])
+          ],
+          ...(endpoint.body && {
+            body: {
+              mode: 'raw',
+              raw: JSON.stringify(endpoint.body, null, 2)
             }
-          }
-        };
-
-        if (endpoint.auth && !endpoint.path.startsWith('/auth/v1/')) {
-          item.request.auth = {
-            type: "bearer",
-            bearer: [{
-              key: "token",
-              value: "{{jwt_token}}",
-              type: "string"
+          }),
+          ...(endpoint.postmanScript && {
+            event: [{
+              listen: "test",
+              script: {
+                exec: endpoint.postmanScript.split('\n')
+              }
             }]
-          };
+          })
         }
 
-        if (endpoint.path.startsWith('/auth/v1/')) {
-          item.request.header.push({
+        if (endpoint.endpoint.includes('/auth/v1/')) {
+          requestData.header.push({
             key: "apikey",
             value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0"
           });
         }
 
-        if (endpoint.requestBody) {
-          item.request.body = {
-            mode: "raw",
-            raw: JSON.stringify(endpoint.requestBody, null, 2)
-          };
-        }
-
-        return item;
+        return {
+          name: endpoint.name,
+          request: requestData
+        };
       })
     };
 
@@ -463,7 +443,7 @@ export default function ApiDocs() {
             </p>
             <div className="flex flex-wrap justify-center gap-4 mb-8">
               <Badge variant="outline" className="text-sm px-3 py-1">
-                Base URL: https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1
+                Base URL: https://ehznqzaumsnjkrntaiox.supabase.co
               </Badge>
               <Badge variant="outline" className="text-sm px-3 py-1">
                 Authentication: JWT Bearer Token
@@ -474,7 +454,7 @@ export default function ApiDocs() {
                 onClick={generatePostmanCollection}
                 className="text-sm"
               >
-                <CheckCircle className="w-4 h-4 mr-2" />
+                <Download className="w-4 h-4 mr-2" />
                 Скачать Postman коллекцию
               </Button>
             </div>
@@ -483,13 +463,13 @@ export default function ApiDocs() {
           <Tabs defaultValue="endpoints" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="endpoints">API Endpoints</TabsTrigger>
-              <TabsTrigger value="auth">Аутентификация</TabsTrigger>
+              <TabsTrigger value="workflow">Процесс работы</TabsTrigger>
               <TabsTrigger value="errors">Коды ошибок</TabsTrigger>
             </TabsList>
 
             <TabsContent value="endpoints" className="space-y-4">
               {endpoints.map((endpoint, index) => {
-                const endpointKey = `${endpoint.method}-${endpoint.path}`;
+                const endpointKey = `${endpoint.method}-${endpoint.endpoint}`;
                 const isOpen = openEndpoints.has(endpointKey);
 
                 return (
@@ -499,140 +479,90 @@ export default function ApiDocs() {
                       onOpenChange={() => toggleEndpoint(endpointKey)}
                     >
                       <CollapsibleTrigger asChild>
-                        <CardHeader className="hover:bg-muted/50 cursor-pointer">
+                        <CardHeader className="cursor-pointer hover:bg-muted/50">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <Badge className={methodColors[endpoint.method]}>
                                 {endpoint.method}
                               </Badge>
-                              <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                                {endpoint.path}
-                              </code>
-                              {endpoint.auth && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Auth
-                                </Badge>
-                              )}
-                              {endpoint.adminOnly && (
-                                <Badge variant="destructive" className="text-xs">
-                                  Admin
-                                </Badge>
-                              )}
+                              <div>
+                                <CardTitle className="text-lg">{endpoint.name}</CardTitle>
+                                <CardDescription className="font-mono text-sm">
+                                  {endpoint.endpoint}
+                                </CardDescription>
+                              </div>
                             </div>
-                            <ChevronDown
-                              className={`h-4 w-4 transition-transform ${
-                                isOpen ? 'transform rotate-180' : ''
-                              }`}
+                            <ChevronDown 
+                              className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                             />
                           </div>
-                          <CardDescription className="text-left">
-                            {endpoint.description}
-                          </CardDescription>
                         </CardHeader>
                       </CollapsibleTrigger>
-
+                      
                       <CollapsibleContent>
                         <CardContent className="pt-0">
                           <div className="space-y-6">
-                            {/* Parameters */}
-                            {endpoint.parameters && (
-                              <div>
-                                <h4 className="font-semibold mb-2">Параметры URL:</h4>
-                                <div className="space-y-2">
-                                  {endpoint.parameters.map((param, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-sm">
-                                      <code className="bg-muted px-2 py-1 rounded font-mono">
-                                        {param.name}
-                                      </code>
-                                      <span className="text-muted-foreground">({param.type})</span>
-                                      {param.required && (
-                                        <Badge variant="destructive" className="text-xs">
-                                          обязательный
-                                        </Badge>
-                                      )}
-                                      <span>- {param.description}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Request Body */}
-                            {endpoint.requestBody && (
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-semibold">Тело запроса:</h4>
+                            <p className="text-muted-foreground">{endpoint.description}</p>
+                            
+                            <Tabs defaultValue="curl" className="w-full">
+                              <TabsList>
+                                <TabsTrigger value="curl">cURL</TabsTrigger>
+                                <TabsTrigger value="response">Ответ</TabsTrigger>
+                                {endpoint.postmanScript && (
+                                  <TabsTrigger value="postman">Postman Script</TabsTrigger>
+                                )}
+                              </TabsList>
+                              
+                              <TabsContent value="curl">
+                                <div className="relative">
+                                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                                    <code>{generateCurlCommand(endpoint)}</code>
+                                  </pre>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => copyToClipboard(JSON.stringify(endpoint.requestBody, null, 2))}
+                                    className="absolute top-2 right-2"
+                                    onClick={() => copyToClipboard(generateCurlCommand(endpoint))}
                                   >
-                                    <Copy className="w-4 h-4 mr-1" />
-                                    Копировать
+                                    <Copy className="w-4 h-4" />
                                   </Button>
                                 </div>
-                                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-                                  <code>{JSON.stringify(endpoint.requestBody, null, 2)}</code>
-                                </pre>
-                              </div>
-                            )}
-
-                            {/* Response Body */}
-                            {endpoint.responseBody && (
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-semibold">Ответ (200 OK):</h4>
+                              </TabsContent>
+                              
+                              <TabsContent value="response">
+                                <div className="relative">
+                                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                                    <code>{JSON.stringify(endpoint.response, null, 2)}</code>
+                                  </pre>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => copyToClipboard(JSON.stringify(endpoint.responseBody, null, 2))}
+                                    className="absolute top-2 right-2"
+                                    onClick={() => copyToClipboard(JSON.stringify(endpoint.response, null, 2))}
                                   >
-                                    <Copy className="w-4 h-4 mr-1" />
-                                    Копировать
+                                    <Copy className="w-4 h-4" />
                                   </Button>
                                 </div>
-                                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-                                  <code>{JSON.stringify(endpoint.responseBody, null, 2)}</code>
-                                </pre>
-                              </div>
-                            )}
-
-                            {/* Example cURL */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-semibold">Пример запроса:</h4>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    let curlExample;
-                                    if (endpoint.path.startsWith('/auth/v1/')) {
-                                      curlExample = `curl -X ${endpoint.method} \\
-  "${getEndpointUrl(endpoint.path)}" \\
-  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0" \\
-  -H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`;
-                                    } else {
-                                      curlExample = `curl -X ${endpoint.method} \\
-  "${getEndpointUrl(endpoint.path)}" \\
-  ${endpoint.auth ? '-H "Authorization: Bearer YOUR_JWT_TOKEN" \\' : ''}
-  -H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`;
-                                    }
-                                    copyToClipboard(curlExample);
-                                  }}
-                                >
-                                  <Copy className="w-4 h-4 mr-1" />
-                                  Копировать cURL
-                                </Button>
-                              </div>
-                              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-                                <code>
-                                  {`curl -X ${endpoint.method} \\
-  "${getEndpointUrl(endpoint.path)}" \\
-  ${endpoint.auth ? '-H "Authorization: Bearer YOUR_JWT_TOKEN" \\' : ''}
--H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`}
-                                </code>
-                              </pre>
-                            </div>
+                              </TabsContent>
+                              
+                              {endpoint.postmanScript && (
+                                <TabsContent value="postman">
+                                  <div className="relative">
+                                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                                      <code>{endpoint.postmanScript}</code>
+                                    </pre>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="absolute top-2 right-2"
+                                      onClick={() => copyToClipboard(endpoint.postmanScript || '')}
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </TabsContent>
+                              )}
+                            </Tabs>
                           </div>
                         </CardContent>
                       </CollapsibleContent>
@@ -642,51 +572,47 @@ export default function ApiDocs() {
               })}
             </TabsContent>
 
-            <TabsContent value="auth" className="space-y-6">
+            <TabsContent value="workflow" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Аутентификация</CardTitle>
+                  <CardTitle>Процесс создания пользователя</CardTitle>
                   <CardDescription>
-                    API использует Supabase Auth с JWT токенами для аутентификации
+                    Правильная последовательность действий для создания нового пользователя
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">1. Регистрация пользователя</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Используйте Supabase Auth SDK для регистрации:
-                    </p>
-                    <pre className="bg-muted p-4 rounded-lg text-sm">
-                      <code>{`const { data, error } = await supabase.auth.signUp({
-  email: 'user@example.com',
-  password: 'password123'
-})`}</code>
-                    </pre>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Badge className="bg-blue-100 text-blue-800 shrink-0">1</Badge>
+                      <div>
+                        <h4 className="font-medium">Получить токен администратора</h4>
+                        <p className="text-sm text-muted-foreground">POST /auth/v1/token?grant_type=password с данными админа</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <Badge className="bg-blue-100 text-blue-800 shrink-0">2</Badge>
+                      <div>
+                        <h4 className="font-medium">Зарегистрировать пользователя</h4>
+                        <p className="text-sm text-muted-foreground">POST /auth/v1/signup с email и паролем нового пользователя</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <Badge className="bg-blue-100 text-blue-800 shrink-0">3</Badge>
+                      <div>
+                        <h4 className="font-medium">Обновить профиль</h4>
+                        <p className="text-sm text-muted-foreground">PATCH /rest/v1/profiles?id=eq.{'{{manager_id}}'} с дополнительными данными</p>
+                      </div>
+                    </div>
                   </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-2">2. Получение JWT токена</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      При успешной авторизации получите токен:
+                  
+                  <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <h5 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Важно!</h5>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      Создание пользователей через endpoint /functions/v1/users требует прав администратора. 
+                      Для публичной регистрации используйте /auth/v1/signup.
                     </p>
-                    <pre className="bg-muted p-4 rounded-lg text-sm">
-                      <code>{`const { data: { session }, error } = await supabase.auth.signInWithPassword({
-  email: 'user@example.com',
-  password: 'password123'
-})
-
-const token = session?.access_token`}</code>
-                    </pre>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-2">3. Использование токена</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Добавьте токен в заголовок Authorization:
-                    </p>
-                    <pre className="bg-muted p-4 rounded-lg text-sm">
-                      <code>{`Authorization: Bearer YOUR_JWT_TOKEN`}</code>
-                    </pre>
                   </div>
                 </CardContent>
               </Card>
@@ -695,58 +621,56 @@ const token = session?.access_token`}</code>
             <TabsContent value="errors" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Коды ошибок</CardTitle>
+                  <CardTitle>Коды состояния HTTP</CardTitle>
                   <CardDescription>
-                    Стандартные HTTP статус-коды и формат ошибок
+                    Стандартные коды ответов API
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">400 Bad Request</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Некорректные данные запроса
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">401 Unauthorized</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Отсутствует или недействительный токен
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">403 Forbidden</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Недостаточно прав доступа
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">404 Not Found</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Ресурс не найден
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">405 Method Not Allowed</h4>
-                        <p className="text-sm text-muted-foreground">
-                          HTTP метод не поддерживается
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">500 Internal Server Error</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Внутренняя ошибка сервера
-                        </p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-green-600">Успешные ответы</h4>
+                      <div className="space-y-1 text-sm">
+                        <div><code className="bg-muted px-1 py-0.5 rounded">200</code> OK - Запрос выполнен успешно</div>
+                        <div><code className="bg-muted px-1 py-0.5 rounded">201</code> Created - Ресурс создан</div>
                       </div>
                     </div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-red-600">Ошибки клиента</h4>
+                      <div className="space-y-1 text-sm">
+                        <div><code className="bg-muted px-1 py-0.5 rounded">400</code> Bad Request - Неверный запрос</div>
+                        <div><code className="bg-muted px-1 py-0.5 rounded">401</code> Unauthorized - Не авторизован</div>
+                        <div><code className="bg-muted px-1 py-0.5 rounded">403</code> Forbidden - Доступ запрещен</div>
+                        <div><code className="bg-muted px-1 py-0.5 rounded">404</code> Not Found - Ресурс не найден</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle>Примеры ошибок</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
                     <div>
-                      <h4 className="font-semibold mb-2">Формат ошибки:</h4>
-                      <pre className="bg-muted p-4 rounded-lg text-sm">
-                        <code>{JSON.stringify({
-                          error: "Описание ошибки"
-                        }, null, 2)}</code>
+                      <h5 className="font-medium mb-2">401 Unauthorized</h5>
+                      <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+{`{
+  "error": "Unauthorized",
+  "message": "JWT token is required"
+}`}
+                      </pre>
+                    </div>
+                    
+                    <div>
+                      <h5 className="font-medium mb-2">403 Forbidden</h5>
+                      <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+{`{
+  "error": "Forbidden - Admin access required"
+}`}
                       </pre>
                     </div>
                   </div>
