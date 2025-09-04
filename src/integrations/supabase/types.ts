@@ -44,6 +44,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_menu_items_parent_id"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "menu_items_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -135,6 +142,10 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      get_structured_menu: {
+        Args: { user_uuid: string }
+        Returns: Json
       }
       is_admin: {
         Args: Record<PropertyKey, never>
