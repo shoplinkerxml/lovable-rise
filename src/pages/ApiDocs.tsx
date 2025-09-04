@@ -20,6 +20,27 @@ interface ApiEndpoint {
 
 const endpoints: ApiEndpoint[] = [
   {
+    method: 'POST',
+    path: '/auth/v1/token?grant_type=password',
+    description: 'Получить JWT токен для аутентификации',
+    auth: false,
+    requestBody: {
+      email: 'shoplinkerxml@gmail.com',
+      password: 'shoplinkerxml@gmail.com'
+    },
+    responseBody: {
+      access_token: 'string',
+      token_type: 'bearer',
+      expires_in: 'number',
+      refresh_token: 'string',
+      user: {
+        id: 'uuid',
+        email: 'string',
+        role: 'string'
+      }
+    }
+  },
+  {
     method: 'GET',
     path: '/auth-me',
     description: 'Получить информацию о текущем пользователе',
@@ -334,7 +355,100 @@ export default function ApiDocs() {
     });
   };
 
-  const getEndpointUrl = (path: string) => `https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1${path}`;
+  const getEndpointUrl = (path: string) => {
+    if (path.startsWith('/auth/v1/')) {
+      return `https://ehznqzaumsnjkrntaiox.supabase.co${path}`;
+    }
+    return `https://ehznqzaumsnjkrntaiox.supabase.co/functions/v1${path}`;
+  };
+
+  const generatePostmanCollection = () => {
+    const collection = {
+      info: {
+        name: "API Documentation Collection",
+        description: "Postman коллекция для тестирования API",
+        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+      },
+      auth: {
+        type: "bearer",
+        bearer: [{
+          key: "token",
+          value: "{{jwt_token}}",
+          type: "string"
+        }]
+      },
+      variable: [{
+        key: "base_url",
+        value: "https://ehznqzaumsnjkrntaiox.supabase.co"
+      }, {
+        key: "jwt_token",
+        value: "",
+        type: "string"
+      }],
+      item: endpoints.map(endpoint => {
+        const item: any = {
+          name: `${endpoint.method} ${endpoint.path} - ${endpoint.description}`,
+          request: {
+            method: endpoint.method,
+            header: [
+              {
+                key: "Content-Type",
+                value: "application/json"
+              }
+            ],
+            url: {
+              raw: `{{base_url}}${endpoint.path.startsWith('/auth/v1/') ? '' : '/functions/v1'}${endpoint.path}`,
+              host: ["{{base_url}}"],
+              path: endpoint.path.startsWith('/auth/v1/') 
+                ? endpoint.path.split('/').filter(p => p) 
+                : ['functions', 'v1', ...endpoint.path.split('/').filter(p => p)]
+            }
+          }
+        };
+
+        if (endpoint.auth && !endpoint.path.startsWith('/auth/v1/')) {
+          item.request.auth = {
+            type: "bearer",
+            bearer: [{
+              key: "token",
+              value: "{{jwt_token}}",
+              type: "string"
+            }]
+          };
+        }
+
+        if (endpoint.path.startsWith('/auth/v1/')) {
+          item.request.header.push({
+            key: "apikey",
+            value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0"
+          });
+        }
+
+        if (endpoint.requestBody) {
+          item.request.body = {
+            mode: "raw",
+            raw: JSON.stringify(endpoint.requestBody, null, 2)
+          };
+        }
+
+        return item;
+      })
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(collection, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "api-collection.postman_collection.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    
+    toast({
+      title: "Коллекция скачана!",
+      description: "Postman коллекция готова к импорту",
+      duration: 3000,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -354,6 +468,15 @@ export default function ApiDocs() {
               <Badge variant="outline" className="text-sm px-3 py-1">
                 Authentication: JWT Bearer Token
               </Badge>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={generatePostmanCollection}
+                className="text-sm"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Скачать Postman коллекцию
+              </Button>
             </div>
           </div>
 
@@ -482,10 +605,18 @@ export default function ApiDocs() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => {
-                                    const curlExample = `curl -X ${endpoint.method} \\
+                                    let curlExample;
+                                    if (endpoint.path.startsWith('/auth/v1/')) {
+                                      curlExample = `curl -X ${endpoint.method} \\
+  "${getEndpointUrl(endpoint.path)}" \\
+  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0" \\
+  -H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`;
+                                    } else {
+                                      curlExample = `curl -X ${endpoint.method} \\
   "${getEndpointUrl(endpoint.path)}" \\
   ${endpoint.auth ? '-H "Authorization: Bearer YOUR_JWT_TOKEN" \\' : ''}
   -H "Content-Type: application/json"${endpoint.requestBody ? ' \\\n  -d \'' + JSON.stringify(endpoint.requestBody) + '\'' : ''}`;
+                                    }
                                     copyToClipboard(curlExample);
                                   }}
                                 >
