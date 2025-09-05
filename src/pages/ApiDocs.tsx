@@ -471,6 +471,9 @@ console.log("Права доступа обновлены:", responseData);`
   const generatePostmanCollection = () => {
     const baseUrl = 'https://ehznqzaumsnjkrntaiox.supabase.co';
     
+    // Отладка: проверяем какие скрипты у нас есть
+    console.log('Кастомные скрипты при генерации коллекции:', customScripts);
+    
     const collection = {
       info: {
         name: "API Documentation Collection",
@@ -512,6 +515,9 @@ console.log("Права доступа обновлены:", responseData);`
         const endpointKey = getEndpointKey(endpoint);
         const script = getPostmanScript(endpoint);
         
+        // Отладка: проверяем каждый скрипт
+        console.log(`Endpoint: ${endpoint.name}, Key: ${endpointKey}, Script exists: ${!!script}`);
+        
         const requestData = {
           name: endpoint.name,
           url: `${baseUrl}${endpoint.endpoint}`,
@@ -532,11 +538,11 @@ console.log("Права доступа обновлены:", responseData);`
               raw: JSON.stringify(endpoint.body, null, 2)
             }
           }),
-          ...(script && {
+          ...(script && script.trim() && {
             event: [{
               listen: "test",
               script: {
-                exec: script.split('\n')
+                exec: script.split('\n').filter(line => line.trim() !== '')
               }
             }]
           })
