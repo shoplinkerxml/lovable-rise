@@ -28,21 +28,32 @@ export default function ApiDocs() {
 
   // Загружаем сохранённые скрипты из localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('postman-scripts');
-    if (saved) {
-      setCustomScripts(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem('postman-scripts');
+      if (saved) {
+        setCustomScripts(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.warn('Не удалось загрузить скрипты из localStorage', e);
     }
   }, []);
 
-  // Сохраняем скрипты в localStorage
-  const saveScripts = (scripts: Record<string, string>) => {
-    localStorage.setItem('postman-scripts', JSON.stringify(scripts));
-    setCustomScripts(scripts);
+  // Сохраняем скрипты в localStorage (функциональное обновление во избежание потери данных)
+  const saveScripts = (updater: (prev: Record<string, string>) => Record<string, string>) => {
+    setCustomScripts(prev => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem('postman-scripts', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Не удалось сохранить скрипты в localStorage', e);
+      }
+      return next;
+    });
   };
 
+
   const updateScript = (endpointKey: string, script: string) => {
-    const newScripts = { ...customScripts, [endpointKey]: script };
-    saveScripts(newScripts);
+    saveScripts(prev => ({ ...prev, [endpointKey]: script }));
     toast({
       title: "Скрипт обновлён!",
       description: "Postman скрипт сохранён",
