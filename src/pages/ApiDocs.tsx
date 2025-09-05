@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Copy, CheckCircle, Download } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { ChevronDown, Copy, CheckCircle, Download, Edit, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ApiEndpoint {
@@ -20,7 +22,50 @@ interface ApiEndpoint {
 
 export default function ApiDocs() {
   const [openEndpoints, setOpenEndpoints] = useState<Set<string>>(new Set());
+  const [customScripts, setCustomScripts] = useState<Record<string, string>>({});
+  const [editingScript, setEditingScript] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Загружаем сохранённые скрипты из localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('postman-scripts');
+    if (saved) {
+      setCustomScripts(JSON.parse(saved));
+    }
+  }, []);
+
+  // Сохраняем скрипты в localStorage
+  const saveScripts = (scripts: Record<string, string>) => {
+    localStorage.setItem('postman-scripts', JSON.stringify(scripts));
+    setCustomScripts(scripts);
+  };
+
+  const updateScript = (endpointKey: string, script: string) => {
+    const newScripts = { ...customScripts, [endpointKey]: script };
+    saveScripts(newScripts);
+    toast({
+      title: "Скрипт обновлён!",
+      description: "Postman скрипт сохранён",
+      duration: 2000,
+    });
+  };
+
+  const getEndpointKey = (endpoint: ApiEndpoint) => {
+    return `${endpoint.method}-${endpoint.endpoint}`;
+  };
+
+  const getPostmanScript = (endpoint: ApiEndpoint) => {
+    const key = getEndpointKey(endpoint);
+    return customScripts[key] || endpoint.postmanScript || '';
+  };
+
+  const startEditingScript = (endpointKey: string) => {
+    setEditingScript(endpointKey);
+  };
+
+  const stopEditingScript = () => {
+    setEditingScript(null);
+  };
 
   const toggleEndpoint = (endpoint: string) => {
     const newOpen = new Set(openEndpoints);
@@ -120,7 +165,17 @@ if (responseData.id) {
           created_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:00:00Z"
         }
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+if (responseData.user && responseData.user.id) {
+    pm.collectionVariables.set("current_user_id", responseData.user.id);
+    console.log("current_user_id сохранён:", responseData.user.id);
+}`
     },
     
     // Profiles endpoints
@@ -145,7 +200,14 @@ if (responseData.id) {
         status: "active",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z"
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+console.log("Профиль пользователя обновлён:", responseData);`
     },
     
     // Users endpoints
@@ -170,7 +232,18 @@ if (responseData.id) {
             updated_at: "2024-01-01T00:00:00Z"
           }
         ]
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+// Сохраняем ID первого пользователя для дальнейшего использования
+if (responseData.users && responseData.users.length > 0) {
+    pm.collectionVariables.set("first_user_id", responseData.users[0].id);
+    console.log("first_user_id сохранён:", responseData.users[0].id);
+}`
     },
     {
       name: 'Update User',
@@ -197,7 +270,14 @@ if (responseData.id) {
           created_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:00:00Z"
         }
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+console.log("Пользователь обновлён:", responseData.user);`
     },
     {
       name: 'Delete User',
@@ -218,7 +298,14 @@ if (responseData.id) {
           created_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:00:00Z"
         }
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+console.log("Пользователь деактивирован:", responseData.user);`
     },
     
     // Menu endpoints
@@ -253,14 +340,25 @@ if (responseData.id) {
             ]
           }
         ]
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+// Сохраняем ID первого пункта меню
+if (responseData.menu && responseData.menu.length > 0) {
+    pm.collectionVariables.set("menu_item_id", responseData.menu[0].id);
+    console.log("menu_item_id сохранён:", responseData.menu[0].id);
+}`
     },
     
     // Permissions endpoints
     {
       name: 'Get User Permissions',
       method: 'GET', 
-      endpoint: '/functions/v1/permissions?user_id={user_id}',
+      endpoint: '/functions/v1/permissions?user_id={{current_user_id}}',
       description: 'Получить права доступа пользователя',
       headers: {
         'Authorization': 'Bearer {{access_token}}'
@@ -281,7 +379,14 @@ if (responseData.id) {
             }
           }
         ]
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+console.log("Получены права доступа:", responseData.permissions);`
     },
     {
       name: 'Update User Permissions',
@@ -292,7 +397,7 @@ if (responseData.id) {
         'Authorization': 'Bearer {{access_token}}'
       },
       body: {
-        user_id: "uuid",
+        user_id: "{{current_user_id}}",
         permissions: [
           {
             menu_item_id: 1,
@@ -309,7 +414,14 @@ if (responseData.id) {
       response: {
         message: "Права доступа успешно обновлены",
         updated_permissions: 2
-      }
+      },
+      postmanScript: `pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+let responseData = pm.response.json();
+
+console.log("Права доступа обновлены:", responseData);`
     }
   ];
 
@@ -359,18 +471,36 @@ if (responseData.id) {
           key: "base_url",
           value: baseUrl
         },
-        {
-          key: "access_token", 
-          value: "",
-          type: "string"
-        },
-        {
-          key: "manager_id",
-          value: "",
-          type: "string"
-        }
+          {
+            key: "access_token", 
+            value: "",
+            type: "string"
+          },
+          {
+            key: "manager_id",
+            value: "",
+            type: "string"
+          },
+          {
+            key: "current_user_id",
+            value: "",
+            type: "string"
+          },
+          {
+            key: "first_user_id",
+            value: "",
+            type: "string"
+          },
+          {
+            key: "menu_item_id",
+            value: "",
+            type: "string"
+          }
       ],
       item: endpoints.map((endpoint) => {
+        const endpointKey = getEndpointKey(endpoint);
+        const script = getPostmanScript(endpoint);
+        
         const requestData = {
           name: endpoint.name,
           url: `${baseUrl}${endpoint.endpoint}`,
@@ -391,11 +521,11 @@ if (responseData.id) {
               raw: JSON.stringify(endpoint.body, null, 2)
             }
           }),
-          ...(endpoint.postmanScript && {
+          ...(script && {
             event: [{
               listen: "test",
               script: {
-                exec: endpoint.postmanScript.split('\n')
+                exec: script.split('\n')
               }
             }]
           })
@@ -471,6 +601,8 @@ if (responseData.id) {
               {endpoints.map((endpoint, index) => {
                 const endpointKey = `${endpoint.method}-${endpoint.endpoint}`;
                 const isOpen = openEndpoints.has(endpointKey);
+                const currentScript = getPostmanScript(endpoint);
+                const isEditingCurrentScript = editingScript === endpointKey;
 
                 return (
                   <Card key={index}>
@@ -508,9 +640,7 @@ if (responseData.id) {
                               <TabsList>
                                 <TabsTrigger value="curl">cURL</TabsTrigger>
                                 <TabsTrigger value="response">Ответ</TabsTrigger>
-                                {endpoint.postmanScript && (
-                                  <TabsTrigger value="postman">Postman Script</TabsTrigger>
-                                )}
+                                <TabsTrigger value="postman">Postman Script</TabsTrigger>
                               </TabsList>
                               
                               <TabsContent value="curl">
@@ -545,23 +675,62 @@ if (responseData.id) {
                                 </div>
                               </TabsContent>
                               
-                              {endpoint.postmanScript && (
-                                <TabsContent value="postman">
-                                  <div className="relative">
-                                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-                                      <code>{endpoint.postmanScript}</code>
-                                    </pre>
+                              <TabsContent value="postman">
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <Label htmlFor={`script-${index}`} className="text-sm font-medium">
+                                      Postman Test Script
+                                    </Label>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="absolute top-2 right-2"
-                                      onClick={() => copyToClipboard(endpoint.postmanScript || '')}
+                                      onClick={() => isEditingCurrentScript ? stopEditingScript() : startEditingScript(endpointKey)}
                                     >
-                                      <Copy className="w-4 h-4" />
+                                      {isEditingCurrentScript ? (
+                                        <>
+                                          <Save className="w-4 h-4 mr-2" />
+                                          Готово
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Edit className="w-4 h-4 mr-2" />
+                                          Редактировать
+                                        </>
+                                      )}
                                     </Button>
                                   </div>
-                                </TabsContent>
-                              )}
+                                  
+                                  {isEditingCurrentScript ? (
+                                    <div className="space-y-2">
+                                      <Textarea
+                                        id={`script-${index}`}
+                                        value={currentScript}
+                                        onChange={(e) => updateScript(endpointKey, e.target.value)}
+                                        placeholder="Введите Postman тест скрипт..."
+                                        className="min-h-[200px] font-mono text-sm"
+                                      />
+                                      <p className="text-xs text-muted-foreground">
+                                        Здесь вы можете написать JavaScript код для тестирования ответа и сохранения переменных в Postman коллекции.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <div className="relative">
+                                      <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm min-h-[100px]">
+                                        <code>{currentScript || '// Postman скрипт не задан'}</code>
+                                      </pre>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="absolute top-2 right-2"
+                                        onClick={() => copyToClipboard(currentScript)}
+                                        disabled={!currentScript}
+                                      >
+                                        <Copy className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </TabsContent>
                             </Tabs>
                           </div>
                         </CardContent>
