@@ -537,14 +537,6 @@ console.log("Права доступа обновлены:", responseData);`
               mode: 'raw',
               raw: JSON.stringify(endpoint.body, null, 2)
             }
-          }),
-          ...(script && script.trim() && {
-            event: [{
-              listen: "test",
-              script: {
-                exec: script.split('\n').filter(line => line.trim() !== '')
-              }
-            }]
           })
         }
 
@@ -557,7 +549,15 @@ console.log("Права доступа обновлены:", responseData);`
 
         return {
           name: endpoint.name,
-          request: requestData
+          request: requestData,
+          ...(script && script.trim() && {
+            event: [{
+              listen: "test",
+              script: {
+                exec: script.split('\n').filter(line => line.trim() !== '')
+              }
+            }]
+          })
         };
       })
     };
