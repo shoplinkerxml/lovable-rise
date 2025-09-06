@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ChevronDown, Copy, CheckCircle, Download, Edit, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,17 +25,23 @@ export default function ApiDocs() {
   const [openEndpoints, setOpenEndpoints] = useState<Set<string>>(new Set());
   const [customScripts, setCustomScripts] = useState<Record<string, string>>({});
   const [editingScript, setEditingScript] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string>('');
   const { toast } = useToast();
 
-  // Загружаем сохранённые скрипты из localStorage
+  // Загружаем сохранённые скрипты и API ключ из localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem('postman-scripts');
       if (saved) {
         setCustomScripts(JSON.parse(saved));
       }
+      
+      const savedApiKey = localStorage.getItem('supabase-apikey');
+      if (savedApiKey) {
+        setApiKey(savedApiKey);
+      }
     } catch (e) {
-      console.warn('Не удалось загрузить скрипты из localStorage', e);
+      console.warn('Не удалось загрузить данные из localStorage', e);
     }
   }, []);
 
@@ -59,6 +66,20 @@ export default function ApiDocs() {
       description: "Postman скрипт сохранён",
       duration: 2000,
     });
+  };
+
+  const updateApiKey = (newApiKey: string) => {
+    setApiKey(newApiKey);
+    try {
+      localStorage.setItem('supabase-apikey', newApiKey);
+      toast({
+        title: "API ключ сохранён!",
+        description: "API ключ будет использоваться во всех запросах",
+        duration: 2000,
+      });
+    } catch (e) {
+      console.warn('Не удалось сохранить API ключ в localStorage', e);
+    }
   };
 
   const getEndpointKey = (endpoint: ApiEndpoint) => {
@@ -449,8 +470,10 @@ console.log("Права доступа обновлены:", responseData);`
     
     let curlCmd = `curl -X ${endpoint.method} "${fullUrl}"`;
     
-    if (endpoint.endpoint.includes('/auth/v1/')) {
-      curlCmd += ` \\\n  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0"`;
+    // Добавляем apikey для всех запросов к Supabase API
+    if (endpoint.endpoint.includes('/auth/v1/') || endpoint.endpoint.includes('/rest/v1/')) {
+      const apikeyValue = apiKey || 'YOUR_APIKEY_HERE';
+      curlCmd += ` \\\n  -H "apikey: ${apikeyValue}"`;
     }
     
     if (endpoint.headers) {
@@ -540,10 +563,12 @@ console.log("Права доступа обновлены:", responseData);`
           })
         }
 
-        if (endpoint.endpoint.includes('/auth/v1/')) {
+        // Добавляем apikey для всех запросов к Supabase API
+        if (endpoint.endpoint.includes('/auth/v1/') || endpoint.endpoint.includes('/rest/v1/')) {
+          const apikeyValue = apiKey || 'YOUR_APIKEY_HERE';
           requestData.header.push({
             key: "apikey",
-            value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0"
+            value: apikeyValue
           });
         }
 
@@ -605,6 +630,43 @@ console.log("Права доступа обновлены:", responseData);`
                 Скачать Postman коллекцию
               </Button>
             </div>
+
+            {/* Поле для API ключа */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Настройка API ключа</CardTitle>
+                <CardDescription>
+                  Введите ваш Supabase API ключ для автоматического добавления в запросы
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <Label htmlFor="apikey">Supabase API Key (anon)</Label>
+                    <Input
+                      id="apikey"
+                      type="text"
+                      value={apiKey}
+                      onChange={(e) => updateApiKey(e.target.value)}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(apiKey)}
+                    disabled={!apiKey}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Копировать
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  API ключ сохраняется в браузере и автоматически добавляется во все cURL команды и Postman коллекцию
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
           <Tabs defaultValue="endpoints" className="w-full">
