@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ChevronDown, Copy, CheckCircle, Download, Edit, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ApiEndpoint {
   name: string;
@@ -26,6 +27,8 @@ export default function ApiDocs() {
   const [customScripts, setCustomScripts] = useState<Record<string, string>>({});
   const [editingScript, setEditingScript] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string>('');
+  const [adminEmail, setAdminEmail] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState<string>('');
   const { toast } = useToast();
 
   // Загружаем сохранённые скрипты и API ключ из localStorage
@@ -39,6 +42,16 @@ export default function ApiDocs() {
       const savedApiKey = localStorage.getItem('supabase-apikey');
       if (savedApiKey) {
         setApiKey(savedApiKey);
+      }
+      
+      const savedEmail = localStorage.getItem('admin-email');
+      if (savedEmail) {
+        setAdminEmail(savedEmail);
+      }
+      
+      const savedPassword = localStorage.getItem('admin-password');
+      if (savedPassword) {
+        setAdminPassword(savedPassword);
       }
     } catch (e) {
       console.warn('Не удалось загрузить данные из localStorage', e);
@@ -79,6 +92,24 @@ export default function ApiDocs() {
       });
     } catch (e) {
       console.warn('Не удалось сохранить API ключ в localStorage', e);
+    }
+  };
+
+  const updateAdminEmail = (email: string) => {
+    setAdminEmail(email);
+    try {
+      localStorage.setItem('admin-email', email);
+    } catch (e) {
+      console.warn('Не удалось сохранить email в localStorage', e);
+    }
+  };
+
+  const updateAdminPassword = (password: string) => {
+    setAdminPassword(password);
+    try {
+      localStorage.setItem('admin-password', password);
+    } catch (e) {
+      console.warn('Не удалось сохранить password в localStorage', e);
     }
   };
 
@@ -485,7 +516,15 @@ console.log("Права доступа обновлены:", responseData);`
     curlCmd += ` \\\n  -H "Content-Type: application/json"`;
     
     if (endpoint.body) {
-      curlCmd += ` \\\n  -d '${JSON.stringify(endpoint.body, null, 2)}'`;
+      let body = { ...endpoint.body };
+      
+      // Подставляем admin email и password для auth токена
+      if (endpoint.name === 'Get Auth Token') {
+        body.email = adminEmail || "user@example.com";
+        body.password = adminPassword || "your_password";
+      }
+      
+      curlCmd += ` \\\n  -d '${JSON.stringify(body, null, 2)}'`;
     }
     
     return curlCmd;
@@ -558,7 +597,17 @@ console.log("Права доступа обновлены:", responseData);`
           ...(endpoint.body && {
             body: {
               mode: 'raw',
-              raw: JSON.stringify(endpoint.body, null, 2)
+              raw: (() => {
+                let body = { ...endpoint.body };
+                
+                // Подставляем admin email и password для auth токена
+                if (endpoint.name === 'Get Auth Token') {
+                  body.email = adminEmail || "user@example.com";
+                  body.password = adminPassword || "your_password";
+                }
+                
+                return JSON.stringify(body, null, 2);
+              })()
             }
           })
         }
@@ -620,53 +669,105 @@ console.log("Права доступа обновлены:", responseData);`
               <Badge variant="outline" className="text-sm px-3 py-1">
                 Authentication: JWT Bearer Token
               </Badge>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={generatePostmanCollection}
-                className="text-sm"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Скачать Postman коллекцию
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={generatePostmanCollection}
+                      className="text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Скачать Postman коллекцию</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
-            {/* Поле для API ключа */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle className="text-lg">Настройка API ключа</CardTitle>
-                <CardDescription>
-                  Введите ваш Supabase API ключ для автоматического добавления в запросы
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label htmlFor="apikey">Supabase API Key (anon)</Label>
-                    <Input
-                      id="apikey"
-                      type="text"
-                      value={apiKey}
-                      onChange={(e) => updateApiKey(e.target.value)}
-                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                      className="font-mono text-sm"
-                    />
+            {/* Поля конфигурации */}
+            <div className="grid gap-6 md:grid-cols-2 mb-8">
+              {/* API ключ */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">API ключ</CardTitle>
+                  <CardDescription>
+                    Supabase API ключ для запросов
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Label htmlFor="apikey">Supabase API Key (anon)</Label>
+                      <Input
+                        id="apikey"
+                        type="text"
+                        value={apiKey}
+                        onChange={(e) => updateApiKey(e.target.value)}
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(apiKey)}
+                            disabled={!apiKey}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Копировать API ключ</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(apiKey)}
-                    disabled={!apiKey}
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Копировать
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  API ключ сохраняется в браузере и автоматически добавляется во все cURL команды и Postman коллекцию
-                </p>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Email и Password */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Данные администратора</CardTitle>
+                  <CardDescription>
+                    Email и пароль для получения токена
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="admin-email">Email администратора</Label>
+                      <Input
+                        id="admin-email"
+                        type="email"
+                        value={adminEmail}
+                        onChange={(e) => updateAdminEmail(e.target.value)}
+                        placeholder="admin@example.com"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="admin-password">Пароль</Label>
+                      <Input
+                        id="admin-password"
+                        type="password"
+                        value={adminPassword}
+                        onChange={(e) => updateAdminPassword(e.target.value)}
+                        placeholder="password"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           <Tabs defaultValue="endpoints" className="w-full">
@@ -727,14 +828,23 @@ console.log("Права доступа обновлены:", responseData);`
                                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
                                     <code>{generateCurlCommand(endpoint)}</code>
                                   </pre>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="absolute top-2 right-2"
-                                    onClick={() => copyToClipboard(generateCurlCommand(endpoint))}
-                                  >
-                                    <Copy className="w-4 h-4" />
-                                  </Button>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="absolute top-2 right-2"
+                                          onClick={() => copyToClipboard(generateCurlCommand(endpoint))}
+                                        >
+                                          <Copy className="w-4 h-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Копировать cURL</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 </div>
                               </TabsContent>
                               
@@ -743,14 +853,23 @@ console.log("Права доступа обновлены:", responseData);`
                                   <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
                                     <code>{JSON.stringify(endpoint.response, null, 2)}</code>
                                   </pre>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="absolute top-2 right-2"
-                                    onClick={() => copyToClipboard(JSON.stringify(endpoint.response, null, 2))}
-                                  >
-                                    <Copy className="w-4 h-4" />
-                                  </Button>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="absolute top-2 right-2"
+                                          onClick={() => copyToClipboard(JSON.stringify(endpoint.response, null, 2))}
+                                        >
+                                          <Copy className="w-4 h-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Копировать ответ</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 </div>
                               </TabsContent>
                               
@@ -797,15 +916,24 @@ console.log("Права доступа обновлены:", responseData);`
                                       <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm min-h-[100px]">
                                         <code>{currentScript || '// Postman скрипт не задан'}</code>
                                       </pre>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="absolute top-2 right-2"
-                                        onClick={() => copyToClipboard(currentScript)}
-                                        disabled={!currentScript}
-                                      >
-                                        <Copy className="w-4 h-4" />
-                                      </Button>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="absolute top-2 right-2"
+                                              onClick={() => copyToClipboard(currentScript)}
+                                              disabled={!currentScript}
+                                            >
+                                              <Copy className="w-4 h-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Копировать скрипт</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     </div>
                                   )}
                                 </div>
