@@ -21,6 +21,7 @@ const Stat = ({ title, value }: { title: string; value: string }) => (
 const AdminDashboard = () => {
   const [email, setEmail] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [role, setRole] = useState<string>("Business");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [uploading, setUploading] = useState<boolean>(false);
 
@@ -30,14 +31,21 @@ const AdminDashboard = () => {
       const user = userData.user;
       setEmail(user?.email ?? "");
       if (user?.id) {
-        const { data: profiles } = await supabase
+        const { data: profiles, error } = await supabase
           .from("profiles")
-          .select("full_name,name,email,avatar_url,avater_url")
+          .select("name,email,avatar_url,role")
           .eq("id", user.id)
           .limit(1)
           .maybeSingle();
-        setName((profiles as any)?.full_name || (profiles as any)?.name || "");
-        setAvatarUrl((profiles as any)?.avatar_url || (profiles as any)?.avater_url || "");
+  
+        if (error) {
+          console.error("profiles select error:", error);
+          return;
+        }
+  
+        setName((profiles as any)?.name || "");
+        setAvatarUrl(((profiles as any)?.avatar_url || "").trim());
+        setRole((profiles as any)?.role || "Business");
       }
     };
     load();
@@ -56,7 +64,7 @@ const AdminDashboard = () => {
       await supabase.storage.from('avatars').upload(path, file, { upsert: true });
       const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
       const url = pub.publicUrl;
-      await supabase.from('profiles').update({ avatar_url: url, avater_url: url } as any).eq('id', user.id);
+      await supabase.from('profiles').update({ avatar_url: url } as any).eq('id', user.id);
       setAvatarUrl(url);
     } finally {
       setUploading(false);
@@ -117,12 +125,23 @@ const AdminDashboard = () => {
               </DropdownMenuContent>
             </DropdownMenu>
             <Sheet>
-              <SheetTrigger asChild>
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src={avatarUrl || "/placeholder.svg"} alt="Admin" />
-                  <AvatarFallback>AD</AvatarFallback>
-                </Avatar>
-              </SheetTrigger>
+  <SheetTrigger asChild>
+    <div
+      role="button"
+      className="pl-2 pr-3 py-1 h-auto rounded-lg border-l select-none"
+    >
+      <div className="flex items-center gap-2">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={avatarUrl || "/placeholder.svg"} alt="Admin" />
+          <AvatarFallback>AD</AvatarFallback>
+        </Avatar>
+        <div className="hidden sm:flex flex-col text-left leading-tight">
+          <span className="text-sm font-medium">{name || "Administrator"}</span>
+          <span className="text-xs text-muted-foreground">{role}</span>
+        </div>
+      </div>
+    </div>
+  </SheetTrigger>
               <SheetContent side="right" className="w-96">
                 <SheetHeader>
                   <SheetTitle>User Profile</SheetTitle>
@@ -135,6 +154,7 @@ const AdminDashboard = () => {
                     </Avatar>
                     <div className="flex-1">
                       <div className="font-semibold">{name || "Administrator"}</div>
+                      <div className="text-sm text-muted-foreground">{role}</div>
                       <div className="text-sm text-muted-foreground flex items-center gap-2"><Mail className="h-4 w-4" />{email}</div>
                     </div>
                   </div>
@@ -147,23 +167,23 @@ const AdminDashboard = () => {
                         <div className="text-xs text-muted-foreground">Account settings</div>
                       </div>
                     </Button>
-                    <Button variant="ghost" className="group w-full justify-start h-auto py-3 hover:bg-transparent">
-                      <StickyNote className="h-5 w-5 mr-3 text-emerald-600" />
-                      <div>
-                        <div className="font-medium group-hover:text-emerald-600 transition-colors">My Notes</div>
-                        <div className="text-xs text-muted-foreground">My Daily Notes</div>
-                      </div>
-                    </Button>
-                    <Button variant="ghost" className="group w-full justify-start h-auto py-3 hover:bg-transparent">
-                      <CheckSquare className="h-5 w-5 mr-3 text-emerald-600" />
-                      <div>
-                        <div className="font-medium group-hover:text-emerald-600 transition-colors">My Tasks</div>
-                        <div className="text-xs text-muted-foreground">To-do and Daily tasks</div>
-                      </div>
+                    
+                  </div>
+                  <div className="border-t pt-4">
+                    <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" onClick={signOut}>
+                      Logout
                     </Button>
                   </div>
-
-                  <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" onClick={signOut}>Logout</Button>
+                  
+                  <div className="border-t pt-4 space-y-3">
+                    <input id="avatar-file" type="file" accept="image/*" className="hidden" onChange={onAvatarChange} />
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onClick={() => document.getElementById("avatar-file")?.click()} disabled={uploading}>
+                        {uploading ? "Uploading…" : "Change avatar"}
+                      </Button>
+                      <Button className="bg-emerald-500 hover:bg-emerald-600 text-white flex-1" onClick={signOut}>Logout</Button>
+                    </div>
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>

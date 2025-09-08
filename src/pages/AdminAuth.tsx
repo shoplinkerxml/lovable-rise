@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Plug, FileSpreadsheet, Tags, Sparkles, UploadCloud, BarChart3 } from "lucide-react";
+import { TrendingUp, Plug, FileSpreadsheet, Tags, Sparkles, UploadCloud, BarChart3, Shield } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 
 const AdminAuth = () => {
@@ -42,7 +42,11 @@ const AdminAuth = () => {
   };
 
   return (
-    <div className="min-h-screen container mx-auto grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] items-center gap-4 md:gap-8">
+    <div className="relative min-h-screen flex">
+      <div className="absolute right-4 top-4 md:right-8 md:top-8 z-10">
+        <Button type="button" variant="ghost" onClick={() => setLang(lang === "uk" ? "en" : "uk")}>UA/EN</Button>
+      </div>
+      <div className="container mx-auto my-auto grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] items-center gap-4 md:gap-8">
       <div className="hidden md:flex flex-col justify-center md:items-end px-6 lg:px-10">
         <div className="max-w-xl">
           <div className="flex items-center space-x-3 mb-8">
@@ -53,27 +57,23 @@ const AdminAuth = () => {
           </div>
           <div className="inline-flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full text-sm mb-4">
             <span>↗</span>
-            <span>Збільшуємо прибуток на 30–50%</span>
+            <span>{t("hero_badge")}</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Допомагаємо бізнесу на маркетплейсах</h1>
-          <p className="text-muted-foreground mb-8">
-            Перетворюємо складні прайси постачальників на акуратний каталог. 
-            Автоматизуємо обробку Excel/CSV/XML, пришвидшуємо запуск карток і 
-            підвищуємо продажі завдяки якісним даним.
-          </p>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">{t("hero_title")}</h1>
+          <p className="text-muted-foreground mb-8">{t("hero_desc")}</p>
           <Card className="bg-emerald-50 border-emerald-100">
             <CardHeader>
-              <CardTitle className="text-base">Що всередині</CardTitle>
-              <CardDescription className="text-emerald-900/80">Ключові можливості платформи</CardDescription>
+              <CardTitle className="text-base">{t("features_title")}</CardTitle>
+              <CardDescription className="text-emerald-900/80">{t("features_subtitle")}</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               <ul className="space-y-2 text-sm text-emerald-900/90">
-                <li className="flex items-start gap-2"><Plug className="h-4 w-4 mt-0.5" /> Інтеграції з постачальниками</li>
-                <li className="flex items-start gap-2"><FileSpreadsheet className="h-4 w-4 mt-0.5" /> Конвертація Excel/CSV/XML</li>
-                <li className="flex items-start gap-2"><Tags className="h-4 w-4 mt-0.5" /> Автозіставлення категорій</li>
-                <li className="flex items-start gap-2"><Sparkles className="h-4 w-4 mt-0.5" /> Збагачення та чистка даних</li>
-                <li className="flex items-start gap-2"><UploadCloud className="h-4 w-4 mt-0.5" /> Експорт на маркетплейси</li>
-                <li className="flex items-start gap-2"><BarChart3 className="h-4 w-4 mt-0.5" /> Єдина аналітика</li>
+                <li className="flex items-start gap-2"><Plug className="h-4 w-4 mt-0.5" /> {t("feat_integrations")}</li>
+                <li className="flex items-start gap-2"><FileSpreadsheet className="h-4 w-4 mt-0.5" /> {t("feat_convert")}</li>
+                <li className="flex items-start gap-2"><Tags className="h-4 w-4 mt-0.5" /> {t("feat_mapping")}</li>
+                <li className="flex items-start gap-2"><Sparkles className="h-4 w-4 mt-0.5" /> {t("feat_enrichment")}</li>
+                <li className="flex items-start gap-2"><UploadCloud className="h-4 w-4 mt-0.5" /> {t("feat_export")}</li>
+                <li className="flex items-start gap-2"><BarChart3 className="h-4 w-4 mt-0.5" /> {t("feat_analytics")}</li>
               </ul>
             </CardContent>
           </Card>
@@ -83,13 +83,12 @@ const AdminAuth = () => {
       <div className="flex items-center md:items-start justify-center md:justify-start p-6 md:p-0">
         <Card className="w-full max-w-md shadow-sm">
           <CardHeader className="text-center">
-            <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mb-2">✓</div>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>{t("login_title")}</CardTitle>
-                <CardDescription>{t("login_desc")}</CardDescription>
-              </div>
-              <Button type="button" variant="ghost" onClick={() => setLang(lang === "uk" ? "en" : "uk")}>UA/EN</Button>
+            <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mb-2">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-center">{t("login_title")}</CardTitle>
+              <CardDescription className="text-center">{t("login_desc")}</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -126,6 +125,7 @@ const AdminAuth = () => {
             </form>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

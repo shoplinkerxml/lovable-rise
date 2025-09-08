@@ -16,6 +16,20 @@ const dictionary: Dictionary = {
   sidebar_forms: { uk: "Форми", en: "Forms" },
   search: { uk: "Пошук", en: "Search" },
   logout: { uk: "Вийти", en: "Logout" },
+  hero_badge: { uk: "Збільшуємо прибуток на 30–50%", en: "Increase profit by 30–50%" },
+  hero_title: { uk: "Допомагаємо бізнесу на маркетплейсах", en: "We help businesses on marketplaces" },
+  hero_desc: {
+    uk: "Перетворюємо складні прайси постачальників на акуратний каталог. Автоматизуємо обробку Excel/CSV/XML, пришвидшуємо запуск карток і підвищуємо продажі завдяки якісним даним.",
+    en: "We turn complex supplier price lists into a clean catalog. We automate Excel/CSV/XML processing, speed up product launches, and increase sales with high‑quality data."
+  },
+  features_title: { uk: "Що всередині", en: "What’s inside" },
+  features_subtitle: { uk: "Ключові можливості платформи", en: "Key platform capabilities" },
+  feat_integrations: { uk: "Інтеграції з постачальниками", en: "Supplier integrations" },
+  feat_convert: { uk: "Конвертація Excel/CSV/XML", en: "Excel/CSV/XML conversion" },
+  feat_mapping: { uk: "Автозіставлення категорій", en: "Automatic category mapping" },
+  feat_enrichment: { uk: "Збагачення та чистка даних", en: "Data enrichment and cleaning" },
+  feat_export: { uk: "Експорт на маркетплейси", en: "Export to marketplaces" },
+  feat_analytics: { uk: "Єдина аналітика", en: "Unified analytics" },
 };
 
 type I18nContextType = {

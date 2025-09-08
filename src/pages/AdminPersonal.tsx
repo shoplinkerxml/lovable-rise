@@ -17,7 +17,7 @@ const AdminPersonal = () => {
       const user = userData.user;
       setEmail(user?.email ?? "");
       if (user?.id) {
-        const { data } = await supabase.from("profiles").select("full_name,name,avatar_url").eq("id", user.id).maybeSingle();
+        const { data } = await supabase.from("profiles").select("name,avatar_url").eq("id", user.id).maybeSingle();
         setName((data as any)?.full_name || (data as any)?.name || "");
         setAvatarUrl((data as any)?.avatar_url || "");
       }
