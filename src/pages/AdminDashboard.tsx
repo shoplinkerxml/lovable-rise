@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import AdminSidebar from "@/components/AdminSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/providers/i18n-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sun, Moon, AlignJustify, User2, StickyNote, CheckSquare, Mail } from "lucide-react";
+import { Sun, Moon, AlignJustify, User2, Mail } from "lucide-react";
 const Stat = ({
   title,
   value
@@ -89,21 +90,8 @@ const AdminDashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const toggleLang = () => setLang(lang === "uk" ? "en" : "uk");
   return <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
-      {/* Sidebar */}
-      <aside className={`hidden md:flex ${collapsed ? "w-20" : "w-64"} transition-all shrink-0 border-r bg-background p-4 flex-col gap-6`}>
-        <div className="text-xl font-semibold">{collapsed ? "MG" : "MarketGrow"}</div>
-        <nav className="space-y-2">
-          <div className="text-xs text-muted-foreground px-2">{t("sidebar_dashboard")}</div>
-          <Button variant="secondary" className="w-full justify-start">{collapsed ? "" : "Сучасна"}</Button>
-          <div className="text-xs text-muted-foreground mt-4 px-2">{t("sidebar_forms")}</div>
-          <Button variant="ghost" className="w-full justify-start">{collapsed ? "" : "Елементи форм"}</Button>
-          <Button variant="ghost" className="w-full justify-start">{collapsed ? "" : "Макети форм"}</Button>
-          <Button variant="ghost" className="w-full justify-start">{collapsed ? "" : "Горизонтальні форми"}</Button>
-          <Button variant="ghost" className="w-full justify-start">{collapsed ? "" : "Вертикальні форми"}</Button>
-          <Button variant="ghost" className="w-full justify-start">{collapsed ? "" : "Кастомні форми"}</Button>
-          <Button variant="ghost" className="w-full justify-start">{collapsed ? "" : "Валідація форм"}</Button>
-        </nav>
-      </aside>
+      {/* Sidebar from DB */}
+      <AdminSidebar />
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
@@ -147,7 +135,7 @@ const AdminDashboard = () => {
   </SheetTrigger>
               <SheetContent side="right" className="w-96">
                 <SheetHeader>
-                  <SheetTitle>User Profile</SheetTitle>
+                  <SheetTitle>{t("user_profile")}</SheetTitle>
                 </SheetHeader>
                 <div className="mt-4 space-y-6">
                   <div className="flex items-center gap-3 border-b pb-4">
@@ -163,16 +151,15 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <Button variant="ghost" className="group w-full justify-start h-auto py-3 hover:bg-transparent" onClick={() => {
-                    window.location.href = "/admin/personal";
-                  }}>
-                      <User2 className="h-5 w-5 mr-3 text-emerald-600" />
+                    <Button variant="ghost" className="w-full justify-start h-auto py-3 hover:bg-transparent" onClick={() => { window.location.href = "/admin/personal"; }}>
+                      <div className="h-8 w-8 mr-3 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                        <User2 className="h-5 w-5" />
+                      </div>
                       <div>
-                        <div className="font-medium group-hover:text-emerald-600 transition-colors">My Profile</div>
-                        <div className="text-xs text-muted-foreground">Account settings</div>
+                        <div className="font-medium">{t("menu_profile")}</div>
+                        <div className="text-xs text-muted-foreground">{t("menu_profile_desc")}</div>
                       </div>
                     </Button>
-                    
                   </div>
                   <div className="border-t pt-4">
                     <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" onClick={signOut}>

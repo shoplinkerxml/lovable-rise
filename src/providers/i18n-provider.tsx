@@ -16,6 +16,9 @@ const dictionary: Dictionary = {
   sidebar_forms: { uk: "Форми", en: "Forms" },
   search: { uk: "Пошук", en: "Search" },
   logout: { uk: "Вийти", en: "Logout" },
+  user_profile: { uk: "Профіль користувача", en: "User Profile" },
+  menu_profile: { uk: "Мій профіль", en: "My Profile" },
+  menu_profile_desc: { uk: "Налаштування облікового запису", en: "Account settings" },
   hero_badge: { uk: "Збільшуємо прибуток на 30–50%", en: "Increase profit by 30–50%" },
   hero_title: { uk: "Допомагаємо бізнесу на маркетплейсах", en: "We help businesses on marketplaces" },
   hero_desc: {
