@@ -8,41 +8,40 @@ import { useI18n } from "@/providers/i18n-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sun, Moon, AlignJustify, User2, StickyNote, CheckSquare, Mail } from "lucide-react";
-
-const Stat = ({ title, value }: { title: string; value: string }) => (
-  <Card className="shadow-sm">
+const Stat = ({
+  title,
+  value
+}: {
+  title: string;
+  value: string;
+}) => <Card className="shadow-sm">
     <CardContent className="pt-6">
       <div className="text-2xl font-semibold">{value}</div>
       <div className="text-sm text-muted-foreground">{title}</div>
     </CardContent>
-  </Card>
-);
-
+  </Card>;
 const AdminDashboard = () => {
   const [email, setEmail] = useState<string>("");
   const [name, setName] = useState<string>("");
   const [role, setRole] = useState<string>("Business");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [uploading, setUploading] = useState<boolean>(false);
-
   useEffect(() => {
     const load = async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       const user = userData.user;
       setEmail(user?.email ?? "");
       if (user?.id) {
-        const { data: profiles, error } = await supabase
-          .from("profiles")
-          .select("name,email,avatar_url,role")
-          .eq("id", user.id)
-          .limit(1)
-          .maybeSingle();
-  
+        const {
+          data: profiles,
+          error
+        } = await supabase.from("profiles").select("name,email,avatar_url,role").eq("id", user.id).limit(1).maybeSingle();
         if (error) {
           console.error("profiles select error:", error);
           return;
         }
-  
         setName((profiles as any)?.name || "");
         setAvatarUrl(((profiles as any)?.avatar_url || "").trim());
         setRole((profiles as any)?.role || "Business");
@@ -50,39 +49,46 @@ const AdminDashboard = () => {
     };
     load();
   }, []);
-
   const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       const user = userData.user;
       if (!user) return;
       const ext = file.name.split('.').pop();
       const path = `avatars/${user.id}-${Date.now()}.${ext}`;
-      await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      await supabase.storage.from('avatars').upload(path, file, {
+        upsert: true
+      });
+      const {
+        data: pub
+      } = supabase.storage.from('avatars').getPublicUrl(path);
       const url = pub.publicUrl;
-      await supabase.from('profiles').update({ avatar_url: url } as any).eq('id', user.id);
+      await supabase.from('profiles').update({
+        avatar_url: url
+      } as any).eq('id', user.id);
       setAvatarUrl(url);
     } finally {
       setUploading(false);
       e.target.value = '';
     }
   };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     window.location.href = "/admin-auth";
   };
-
-  const { t, lang, setLang } = useI18n();
+  const {
+    t,
+    lang,
+    setLang
+  } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const toggleLang = () => setLang(lang === "uk" ? "en" : "uk");
-
-  return (
-    <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
+  return <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
       {/* Sidebar */}
       <aside className={`hidden md:flex ${collapsed ? "w-20" : "w-64"} transition-all shrink-0 border-r bg-background p-4 flex-col gap-6`}>
         <div className="text-xl font-semibold">{collapsed ? "MG" : "MarketGrow"}</div>
@@ -126,10 +132,7 @@ const AdminDashboard = () => {
             </DropdownMenu>
             <Sheet>
   <SheetTrigger asChild>
-    <div
-      role="button"
-      className="pl-2 pr-3 py-1 h-auto rounded-lg border-l select-none"
-    >
+    <div role="button" className="pl-2 pr-3 py-1 h-auto rounded-lg border-l select-none">
       <div className="flex items-center gap-2">
         <Avatar className="h-8 w-8">
           <AvatarImage src={avatarUrl || "/placeholder.svg"} alt="Admin" />
@@ -160,7 +163,9 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <Button variant="ghost" className="group w-full justify-start h-auto py-3 hover:bg-transparent" onClick={() => { window.location.href = "/admin/personal"; }}>
+                    <Button variant="ghost" className="group w-full justify-start h-auto py-3 hover:bg-transparent" onClick={() => {
+                    window.location.href = "/admin/personal";
+                  }}>
                       <User2 className="h-5 w-5 mr-3 text-emerald-600" />
                       <div>
                         <div className="font-medium group-hover:text-emerald-600 transition-colors">My Profile</div>
@@ -175,15 +180,7 @@ const AdminDashboard = () => {
                     </Button>
                   </div>
                   
-                  <div className="border-t pt-4 space-y-3">
-                    <input id="avatar-file" type="file" accept="image/*" className="hidden" onChange={onAvatarChange} />
-                    <div className="flex gap-2">
-                      <Button variant="secondary" onClick={() => document.getElementById("avatar-file")?.click()} disabled={uploading}>
-                        {uploading ? "Uploading…" : "Change avatar"}
-                      </Button>
-                      <Button className="bg-emerald-500 hover:bg-emerald-600 text-white flex-1" onClick={signOut}>Logout</Button>
-                    </div>
-                  </div>
+                  
                 </div>
               </SheetContent>
             </Sheet>
@@ -232,10 +229,6 @@ const AdminDashboard = () => {
           </div>
         </main>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default AdminDashboard;
-
-
