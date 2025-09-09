@@ -46,7 +46,7 @@ export const UserProfileSection: React.FC<UserProfileSectionProps> = ({
             onClick={handleProfileClick}
           />
         </SheetNoOverlayTrigger>
-        <SheetNoOverlayContent side="left" className="w-96">
+        <SheetNoOverlayContent side="right" className="w-96">
           <SheetNoOverlayHeader>
             <SheetNoOverlayTitle>{t("user_profile")}</SheetNoOverlayTitle>
           </SheetNoOverlayHeader>

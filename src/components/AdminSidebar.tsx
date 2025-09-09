@@ -8,6 +8,7 @@ import { UserProfileSection } from "@/components/ui/user-profile-section";
 import { Logo } from "@/components/ui/logo";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserProfile } from "@/components/ui/profile-types";
 import { useI18n } from "@/providers/i18n-provider";
 
 function buildTree(items: MenuItemData[]): Record<number | "root", MenuItemData[]> {
@@ -26,6 +27,7 @@ function buildTree(items: MenuItemData[]): Record<number | "root", MenuItemData[
 interface AdminSidebarProps {
   collapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
+  userProfile?: UserProfile;
 }
 
 interface SubmenuState {
@@ -39,7 +41,7 @@ interface MenuSectionConfig {
   isCollapsible: boolean;
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false }) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, userProfile }) => {
   const { 
     menuItems, 
     activeMenuItem, 
@@ -110,11 +112,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false })
     }
   };
 
-  // Get user profile from context or set default
-  const userProfile = {
-    name: "Admin User",
+  // Get user profile from props or set default
+  const defaultUserProfile: UserProfile = {
+    name: "Administrator",
     email: "admin@marketgrow.com",
-    role: "Administrator"
+    role: "Administrator",
+    avatarUrl: ""
   };
 
   return (
@@ -157,7 +160,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false })
         )}
       </nav>
       
-      <UserProfileSection collapsed={collapsed} onLogout={signOut} userProfile={userProfile} />
+      <UserProfileSection collapsed={collapsed} onLogout={signOut} userProfile={userProfile || defaultUserProfile} />
     </aside>
   );
 };

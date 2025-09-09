@@ -49,7 +49,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
   return (
     <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
       {/* Responsive Sidebar */}
-      <AdminSidebar collapsed={sidebarCollapsed} onCollapseChange={setSidebarCollapsed} />
+      <AdminSidebar collapsed={sidebarCollapsed} onCollapseChange={setSidebarCollapsed} userProfile={userProfile} />
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">

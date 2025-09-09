@@ -5,14 +5,18 @@ import { Menu } from 'lucide-react';
 import { AdminSidebar } from './AdminSidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+import { UserProfile } from '@/components/ui/profile-types';
+
 interface ResponsiveAdminSidebarProps {
   collapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
+  userProfile?: UserProfile;
 }
 
 export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
   collapsed = false,
   onCollapseChange,
+  userProfile,
 }) => {
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -30,13 +34,13 @@ export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-64">
-          <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} />
+          <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} />
         </SheetContent>
       </Sheet>
     );
   }
 
-  return <AdminSidebar collapsed={collapsed} onCollapseChange={onCollapseChange} />;
+  return <AdminSidebar collapsed={collapsed} onCollapseChange={onCollapseChange} userProfile={userProfile} />;
 };
 
 export default ResponsiveAdminSidebar;
