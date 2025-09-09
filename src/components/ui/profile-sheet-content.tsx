@@ -1,0 +1,94 @@
+import React from 'react';
+import { Mail, User2 } from 'lucide-react';
+import { Button } from './button';
+import { Avatar, AvatarFallback, AvatarImage } from './avatar';
+import { useI18n } from '@/providers/i18n-provider';
+import { ProfileSheetContentProps } from './profile-types';
+
+/**
+ * Shared profile sheet content component used by both header and sidebar profile sections
+ * Provides consistent user details display, navigation options, and logout functionality
+ */
+export const ProfileSheetContent: React.FC<ProfileSheetContentProps> = ({
+  userProfile,
+  onNavigate,
+  onLogout,
+  onClose,
+}) => {
+  const { t } = useI18n();
+
+  const userInfo = userProfile || {
+    name: "Administrator",
+    email: "admin@example.com",
+    role: "Business",
+    avatarUrl: ""
+  };
+
+  const handleProfileClick = () => {
+    onClose();
+    onNavigate('/admin/personal');
+  };
+
+  const handleLogoutClick = () => {
+    onClose();
+    onLogout();
+  };
+
+  const getAvatarFallback = () => {
+    if (userInfo.name) {
+      return userInfo.name.charAt(0).toUpperCase();
+    }
+    return "A";
+  };
+
+  return (
+    <div className="mt-4 space-y-6">
+      {/* User Details Section */}
+      <div className="flex items-center gap-3 border-b pb-4">
+        <Avatar className="h-12 w-12">
+          <AvatarImage src={userInfo.avatarUrl || "/placeholder.svg"} alt="Admin" />
+          <AvatarFallback className="bg-emerald-100 text-emerald-600 font-medium">
+            {getAvatarFallback()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <div className="font-semibold">{userInfo.name}</div>
+          <div className="text-sm text-muted-foreground">{userInfo.role}</div>
+          <div className="text-sm text-muted-foreground flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            {userInfo.email}
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Section */}
+      <div className="space-y-1">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start h-auto py-3 hover:bg-emerald-300/10 hover:text-emerald-600" 
+          onClick={handleProfileClick}
+        >
+          <div className="h-8 w-8 mr-3 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center">
+            <User2 className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="font-medium text-emerald-700 hover:text-emerald-600">{t("menu_profile")}</div>
+            <div className="text-xs text-muted-foreground">{t("menu_profile_desc")}</div>
+          </div>
+        </Button>
+      </div>
+      
+      {/* Logout Section */}
+      <div className="border-t pt-4">
+        <Button 
+          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" 
+          onClick={handleLogoutClick}
+        >
+          {t("logout")}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default ProfileSheetContent;
