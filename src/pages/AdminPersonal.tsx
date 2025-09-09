@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Plus } from "lucide-react";
 
 const AdminPersonal = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -41,6 +43,10 @@ const AdminPersonal = () => {
     e.target.value = '';
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const save = async () => {
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
@@ -60,12 +66,26 @@ const AdminPersonal = () => {
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-4">
             <div className="flex flex-col items-center">
-              <Avatar className="h-28 w-28">
-                <AvatarImage src={avatarUrl || "/placeholder.svg"} />
-                <AvatarFallback>AD</AvatarFallback>
-              </Avatar>
-              <label className="mt-3 text-sm font-medium">Завантажити новий</label>
-              <input type="file" accept="image/*" onChange={onAvatarChange} />
+              <div 
+                className="relative group cursor-pointer" 
+                onClick={handleAvatarClick}
+              >
+                <Avatar className="h-28 w-28 transition-all duration-200 group-hover:brightness-75">
+                  <AvatarImage src={avatarUrl || "/placeholder.svg"} />
+                  <AvatarFallback>AD</AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full">
+                  <Plus className="h-6 w-6 text-white mb-1" />
+                  <span className="text-xs text-white font-medium">Змінити фото</span>
+                </div>
+              </div>
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                accept="image/*" 
+                onChange={onAvatarChange} 
+                className="hidden"
+              />
             </div>
           </div>
           <div className="md:col-span-2 space-y-4">
