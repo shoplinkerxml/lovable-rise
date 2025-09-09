@@ -33,6 +33,19 @@ const dictionary: Dictionary = {
   feat_enrichment: { uk: "Збагачення та чистка даних", en: "Data enrichment and cleaning" },
   feat_export: { uk: "Експорт на маркетплейси", en: "Export to marketplaces" },
   feat_analytics: { uk: "Єдина аналітика", en: "Unified analytics" },
+  
+  // New translations for menu items
+  menu_forms: { uk: "Форми", en: "Forms" },
+  menu_settings: { uk: "Налаштування", en: "Settings" },
+  menu_users: { uk: "Користувачі", en: "Users" },
+  menu_dashboard: { uk: "Панель управління", en: "Dashboard" },
+  menu_analytics: { uk: "Аналітика", en: "Analytics" },
+  menu_reports: { uk: "Звіти", en: "Reports" },
+  menu_content: { uk: "Контент", en: "Content" },
+  menu_categories: { uk: "Категорії", en: "Categories" },
+  menu_products: { uk: "Товари", en: "Products" },
+  menu_main: { uk: "Головна", en: "Main" },
+  auth_logout: { uk: "Вийти", en: "Logout" },
 };
 
 type I18nContextType = {

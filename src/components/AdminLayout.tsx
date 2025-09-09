@@ -6,14 +6,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from '@/components/ui/sheet-no-overlay';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Sun, Moon, AlignJustify, User2, Mail } from 'lucide-react';
-import AdminSidebar from '@/components/AdminSidebar';
+import AdminSidebar from '@/components/ResponsiveAdminSidebar';
 import ContentWorkspace from '@/components/ContentWorkspace';
 import { useEffect } from 'react';
 
 interface AdminLayoutInnerProps {
+  children?: React.ReactNode;
   userProfile?: {
     email: string;
     name: string;
@@ -22,7 +23,7 @@ interface AdminLayoutInnerProps {
   };
 }
 
-const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
+const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfile }) => {
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -38,8 +39,8 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
 
   return (
     <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
-      {/* Persistent Sidebar */}
-      <AdminSidebar collapsed={sidebarCollapsed} />
+      {/* Responsive Sidebar */}
+      <AdminSidebar collapsed={sidebarCollapsed} onCollapseChange={setSidebarCollapsed} />
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
@@ -60,7 +61,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
           
           <div className="flex items-center gap-2 md:gap-4">
             {/* Theme Toggle */}
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="hover:bg-transparent cursor-pointer">
               <Sun className="h-5 w-5 hidden dark:block" />
               <Moon className="h-5 w-5 block dark:hidden" />
             </Button>
@@ -68,7 +69,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
             {/* Language Toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" title={lang === "uk" ? "Українська" : "English"}>
+                <Button variant="ghost" size="icon" className="hover:bg-transparent cursor-pointer" title={lang === "uk" ? "Українська" : "English"}>
                   <span className="text-lg">{lang === "uk" ? "🇺🇦" : "🇺🇸"}</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -79,8 +80,8 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
             </DropdownMenu>
             
             {/* User Profile */}
-            <Sheet>
-              <SheetTrigger asChild>
+            <SheetNoOverlay>
+              <SheetNoOverlayTrigger asChild>
                 <div role="button" className="pl-2 pr-3 py-1 h-auto rounded-lg border-l select-none">
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
@@ -93,11 +94,11 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
                     </div>
                   </div>
                 </div>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-96">
-                <SheetHeader>
-                  <SheetTitle>{t("user_profile")}</SheetTitle>
-                </SheetHeader>
+              </SheetNoOverlayTrigger>
+              <SheetNoOverlayContent side="right" className="w-96">
+                <SheetNoOverlayHeader>
+                  <SheetNoOverlayTitle>{t("user_profile")}</SheetNoOverlayTitle>
+                </SheetNoOverlayHeader>
                 <div className="mt-4 space-y-6">
                   <div className="flex items-center gap-3 border-b pb-4">
                     <Avatar className="h-12 w-12">
@@ -117,14 +118,14 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
                   <div className="space-y-1">
                     <Button 
                       variant="ghost" 
-                      className="w-full justify-start h-auto py-3 hover:bg-transparent" 
+                      className="w-full justify-start h-auto py-3 hover:bg-emerald-300/10 hover:text-emerald-600" 
                       onClick={() => navigate('/admin/personal')}
                     >
                       <div className="h-8 w-8 mr-3 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center">
                         <User2 className="h-5 w-5" />
                       </div>
                       <div>
-                        <div className="font-medium">{t("menu_profile")}</div>
+                        <div className="font-medium text-emerald-700 hover:text-emerald-600">{t("menu_profile")}</div>
                         <div className="text-xs text-muted-foreground">{t("menu_profile_desc")}</div>
                       </div>
                     </Button>
@@ -135,12 +136,12 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile }) => {
                       className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" 
                       onClick={signOut}
                     >
-                      Logout
+                      {t("logout")}
                     </Button>
                   </div>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </SheetNoOverlayContent>
+            </SheetNoOverlay>
           </div>
         </header>
 

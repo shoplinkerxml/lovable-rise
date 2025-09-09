@@ -1,28 +1,22 @@
 import { Header } from "@/components/Header"
 import { Footer } from "@/components/Footer"
-import { HeroSection } from "@/components/HeroSection"
-import { ProblemsSection } from "@/components/ProblemsSection"
-import { SolutionsSection } from "@/components/SolutionsSection"
-import { TestimonialsSection } from "@/components/TestimonialsSection"
-import { PricingSection } from "@/components/PricingSection"
-import { FAQSection } from "@/components/FAQSection"
-import { NewsletterSection } from "@/components/NewsletterSection"
+import { useI18n } from "@/providers/i18n-provider"
 
 const Index = () => {
-  console.log('Index component rendering...')
-  console.log('Components loaded:', { HeroSection, ProblemsSection, SolutionsSection })
+  const { t } = useI18n();
   
   return (
     <div className="min-h-screen">
       <Header />
-      <main>
-        <HeroSection />
-        <ProblemsSection />
-        <SolutionsSection />
-        <TestimonialsSection />
-        <PricingSection />
-        <FAQSection />
-        <NewsletterSection />
+      <main className="py-16">
+        <div className="container mx-auto px-4 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            MarketGrow
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Professional business management platform
+          </p>
+        </div>
       </main>
       <Footer />
     </div>

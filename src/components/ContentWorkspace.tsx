@@ -55,15 +55,21 @@ const ContentWorkspace: React.FC = () => {
     return location.pathname.replace('/admin', '');
   }, [location.pathname]);
 
-  // Determine content skeleton type based on active menu item
+  // Determine content skeleton type based on active menu item and route
   const getSkeletonType = () => {
+    // Priority given to static route patterns
     if (adminPath === '/dashboard') return 'dashboard';
     if (adminPath.startsWith('/forms/')) return 'form';
+    if (adminPath === '/personal') return 'default';
+    
+    // Fallback to menu item page_type if available
     if (activeMenuItem?.page_type === 'list') return 'list';
     if (activeMenuItem?.page_type === 'form') return 'form';
     if (activeMenuItem?.page_type === 'dashboard') return 'dashboard';
+    
     return 'default';
   };
+
   const ContentComponent = useMemo(() => {
     // Check for static components first
     if (STATIC_COMPONENTS[adminPath]) {
@@ -73,18 +79,6 @@ const ContentWorkspace: React.FC = () => {
     // For dynamic menu items, return null to render via ContentRenderer
     return null;
   }, [adminPath]);
-
-  // Handle loading states with progressive loading
-  if (menuLoading) {
-    return (
-      <ProgressiveLoader 
-        isLoading={true} 
-        fallback={<ContentSkeleton type={getSkeletonType()} />}
-      >
-        {null}
-      </ProgressiveLoader>
-    );
-  }
 
   // Handle errors
   if (contentError) {
@@ -103,19 +97,33 @@ const ContentWorkspace: React.FC = () => {
     );
   }
 
-  // Render static component
+  // Render static component immediately (don't wait for menu loading for core admin routes)
   if (ContentComponent) {
     return (
       <ErrorBoundary>
         <ProgressiveLoader
           isLoading={contentLoading}
           fallback={<ContentSkeleton type={getSkeletonType()} />}
+          delay={50}
         >
           <div className="h-full overflow-auto">
             <ContentComponent />
           </div>
         </ProgressiveLoader>
       </ErrorBoundary>
+    );
+  }
+
+  // Handle loading states for dynamic content only
+  if (menuLoading && !ContentComponent) {
+    return (
+      <ProgressiveLoader 
+        isLoading={true} 
+        fallback={<ContentSkeleton type={getSkeletonType()} />}
+        delay={100}
+      >
+        {null}
+      </ProgressiveLoader>
     );
   }
 
@@ -126,6 +134,7 @@ const ContentWorkspace: React.FC = () => {
         <ProgressiveLoader
           isLoading={contentLoading}
           fallback={<ContentSkeleton type={getSkeletonType()} />}
+          delay={50}
         >
           <div className="h-full overflow-auto">
             <div className="p-4 md:p-6">
@@ -137,7 +146,8 @@ const ContentWorkspace: React.FC = () => {
     );
   }
 
-  // No matching route found
+  // Show not found only if menu has finished loading and no match found
+  // This prevents premature "not found" during initialization
   return (
     <div className="h-full overflow-auto">
       <NotFoundFallback 

@@ -2,6 +2,98 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
+// Static routes that are always available regardless of database state
+const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
+  '/dashboard': {
+    id: -1,
+    title: 'Dashboard',
+    path: '/dashboard',
+    page_type: 'dashboard',
+    is_active: true,
+    order_index: 0,
+    created_at: new Date().toISOString(),
+    icon_name: 'layout-dashboard',
+    section_type: 'dashboard'
+  },
+  '/personal': {
+    id: -2,
+    title: 'Personal',
+    path: '/personal',
+    page_type: 'content',
+    is_active: true,
+    order_index: 999,
+    created_at: new Date().toISOString(),
+    icon_name: 'user',
+    section_type: 'settings'
+  },
+  '/forms/elements': {
+    id: -3,
+    title: 'Form Elements',
+    path: '/forms/elements',
+    page_type: 'form',
+    is_active: true,
+    order_index: 10,
+    created_at: new Date().toISOString(),
+    icon_name: 'form-input',
+    section_type: 'main'
+  },
+  '/forms/layouts': {
+    id: -4,
+    title: 'Form Layouts',
+    path: '/forms/layouts',
+    page_type: 'form',
+    is_active: true,
+    order_index: 11,
+    created_at: new Date().toISOString(),
+    icon_name: 'layout-grid',
+    section_type: 'main'
+  },
+  '/forms/horizontal': {
+    id: -5,
+    title: 'Horizontal Forms',
+    path: '/forms/horizontal',
+    page_type: 'form',
+    is_active: true,
+    order_index: 12,
+    created_at: new Date().toISOString(),
+    icon_name: 'move-horizontal',
+    section_type: 'main'
+  },
+  '/forms/vertical': {
+    id: -6,
+    title: 'Vertical Forms',
+    path: '/forms/vertical',
+    page_type: 'form',
+    is_active: true,
+    order_index: 13,
+    created_at: new Date().toISOString(),
+    icon_name: 'move-vertical',
+    section_type: 'main'
+  },
+  '/forms/custom': {
+    id: -7,
+    title: 'Custom Forms',
+    path: '/forms/custom',
+    page_type: 'form',
+    is_active: true,
+    order_index: 14,
+    created_at: new Date().toISOString(),
+    icon_name: 'palette',
+    section_type: 'main'
+  },
+  '/forms/validation': {
+    id: -8,
+    title: 'Form Validation',
+    path: '/forms/validation',
+    page_type: 'form',
+    is_active: true,
+    order_index: 15,
+    created_at: new Date().toISOString(),
+    icon_name: 'check-circle',
+    section_type: 'main'
+  }
+};
+
 export interface MenuItemData {
   id: number;
   title: string;
@@ -13,6 +105,24 @@ export interface MenuItemData {
   parent_id?: number | null;
   order_index: number;
   is_active: boolean;
+  created_at: string;
+  // New icon and section fields
+  icon_name?: string | null;
+  section_type?: 'dashboard' | 'main' | 'settings';
+  has_separator?: boolean;
+  description?: string | null;
+  badge_text?: string | null;
+  badge_color?: string | null;
+}
+
+export interface MenuSectionData {
+  id: number;
+  name: string;
+  type: 'dashboard' | 'main' | 'settings';
+  order_index: number;
+  icon_name?: string | null;
+  is_collapsible: boolean;
+  is_collapsed: boolean;
   created_at: string;
 }
 
@@ -108,10 +218,32 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     await loadMenuItems();
   }, [loadMenuItems]);
 
-  // Find active menu item based on current path
+  // Find active menu item based on current path with static route fallback
   const findActiveMenuItem = useCallback((currentPath: string, items: MenuItemData[]) => {
     const adminPath = currentPath.replace('/admin', '');
-    return items.find(item => item.path === adminPath) || null;
+    
+    // First try to find in loaded menu items from database
+    const menuItem = items.find(item => item.path === adminPath);
+    if (menuItem) {
+      return menuItem;
+    }
+    
+    // For static routes, create virtual menu item if not found in database
+    if (STATIC_ROUTES[adminPath]) {
+      return {
+        ...STATIC_ROUTES[adminPath],
+        // Ensure all required fields are present
+        id: STATIC_ROUTES[adminPath].id!,
+        title: STATIC_ROUTES[adminPath].title!,
+        path: STATIC_ROUTES[adminPath].path!,
+        page_type: STATIC_ROUTES[adminPath].page_type!,
+        is_active: STATIC_ROUTES[adminPath].is_active!,
+        order_index: STATIC_ROUTES[adminPath].order_index!,
+        created_at: STATIC_ROUTES[adminPath].created_at!
+      } as MenuItemData;
+    }
+    
+    return null;
   }, []);
 
   // Set active menu item
@@ -171,6 +303,18 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
 
   // Update active menu item when location changes
   useEffect(() => {
+    const adminPath = location.pathname.replace('/admin', '');
+    
+    // Handle static routes immediately, even during menu loading
+    if (STATIC_ROUTES[adminPath]) {
+      const staticMenuItem = findActiveMenuItem(location.pathname, []);
+      if (staticMenuItem && staticMenuItem.id !== activeMenuItem?.id) {
+        setActiveMenuItem(staticMenuItem);
+      }
+      return;
+    }
+    
+    // For dynamic routes, wait for menu items to load
     if (menuItems.length > 0) {
       const activeItem = findActiveMenuItem(location.pathname, menuItems);
       if (activeItem && activeItem.id !== activeMenuItem?.id) {
