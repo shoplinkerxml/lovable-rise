@@ -1,19 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAdmin, MenuItemData } from "@/providers/admin-provider";
+import { MenuSkeleton } from "@/components/LoadingSkeletons";
 
-type MenuItem = {
-  id: number;
-  title: string;
-  path: string;
-  parent_id: number | null;
-  order_index: number;
-  is_active: boolean;
-};
-
-function buildTree(items: MenuItem[]): Record<number | "root", MenuItem[]> {
-  const map: Record<number | "root", MenuItem[]> = { root: [] };
+function buildTree(items: MenuItemData[]): Record<number | "root", MenuItemData[]> {
+  const map: Record<number | "root", MenuItemData[]> = { root: [] };
   for (const it of items) {
     const key = (it.parent_id ?? "root") as number | "root";
     if (!map[key]) map[key] = [];
@@ -25,65 +17,93 @@ function buildTree(items: MenuItem[]): Record<number | "root", MenuItem[]> {
   return map;
 }
 
-export const AdminSidebar = () => {
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(false);
+interface AdminSidebarProps {
+  collapsed?: boolean;
+}
+
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false }) => {
+  const { 
+    menuItems, 
+    activeMenuItem, 
+    menuLoading, 
+    navigateToMenuItem, 
+    preloadContent 
+  } = useAdmin();
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("menu_items")
-          .select("id,title,path,parent_id,order_index,is_active")
-          .eq("is_active", true)
-          .order("order_index", { ascending: true });
-        if (!error) setItems((data as any) || []);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+  const tree = useMemo(() => buildTree(menuItems), [menuItems]);
 
-  const tree = useMemo(() => buildTree(items), [items]);
+  // Handle menu item click
+  const handleMenuClick = (item: MenuItemData) => {
+    navigateToMenuItem(item);
+  };
+
+  // Handle menu item hover for preloading
+  const handleMenuHover = (item: MenuItemData) => {
+    preloadContent(item);
+  };
+
+  // Check if item is active
+  const isActiveItem = (item: MenuItemData) => {
+    return activeMenuItem?.id === item.id || location.pathname === `/admin${item.path}`;
+  };
+
+
 
   return (
-    <aside className={`hidden md:flex w-64 transition-all shrink-0 border-r bg-background p-4 flex-col gap-3`}> 
-      <div className="text-xl font-semibold">MarketGrow</div>
-      <nav className="space-y-1">
-        {loading && <div className="text-xs text-muted-foreground px-2">Loading…</div>}
-        {tree.root?.map((it) => (
-          <div key={it.id}>
-            <NavLink
-              to={it.path}
-              className={({ isActive }) =>
-                `block px-3 py-2 rounded-md text-sm ${isActive || location.pathname === it.path ? "bg-secondary" : "hover:bg-accent"}`
-              }
-            >
-              {it.title}
-            </NavLink>
-            {tree[it.id]?.length ? (
-              <div className="ml-3 mt-1 space-y-1">
-                {tree[it.id].map((child) => (
-                  <NavLink
-                    key={child.id}
-                    to={child.path}
-                    className={({ isActive }) =>
-                      `block px-3 py-1.5 rounded-md text-sm ${isActive || location.pathname === child.path ? "bg-secondary" : "hover:bg-accent"}`
-                    }
-                  >
-                    {child.title}
-                  </NavLink>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ))}
+    <aside className={`hidden md:flex ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}> 
+      <div className={`text-xl font-semibold ${collapsed ? 'text-center text-sm' : ''}`}>
+        {collapsed ? 'MG' : 'MarketGrow'}
+      </div>
+      
+      <nav className="space-y-1 flex-1">
+        {menuLoading ? (
+          <MenuSkeleton />
+        ) : (
+          tree.root?.map((item) => (
+            <div key={item.id}>
+              <button
+                onClick={() => handleMenuClick(item)}
+                onMouseEnter={() => handleMenuHover(item)}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                  isActiveItem(item) ? "bg-secondary" : "hover:bg-accent"
+                }`}
+                title={collapsed ? item.title : undefined}
+              >
+                {collapsed ? item.title.charAt(0).toUpperCase() : item.title}
+              </button>
+              
+              {!collapsed && tree[item.id]?.length && (
+                <div className="ml-3 mt-1 space-y-1">
+                  {tree[item.id].map((child) => (
+                    <button
+                      key={child.id}
+                      onClick={() => handleMenuClick(child)}
+                      onMouseEnter={() => handleMenuHover(child)}
+                      className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                        isActiveItem(child) ? "bg-secondary" : "hover:bg-accent"
+                      }`}
+                    >
+                      {child.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </nav>
-      <Button variant="secondary" className="mt-auto" onClick={() => navigate("/admin/dashboard")}>Dashboard</Button>
+      
+      <Button 
+        variant="secondary" 
+        className="mt-auto" 
+        onClick={() => navigate("/admin/dashboard")}
+        size={collapsed ? "icon" : "default"}
+        title={collapsed ? "Dashboard" : undefined}
+      >
+        {collapsed ? "D" : "Dashboard"}
+      </Button>
     </aside>
   );
 };
