@@ -42,8 +42,73 @@ const UserAuth = () => {
         return;
       }
       
+      if (error === 'email_confirmation_required') {
+        toast.error(
+          lang === 'uk'
+            ? 'Потрібно підтвердити електронну пошту. Перевірте скриньку вхідних повідомлень.'
+            : 'Please confirm your email address. Check your inbox for the confirmation link.'
+        );
+        setTimeout(() => {
+          toast.info(
+            lang === 'uk'
+              ? 'Після підтвердження поверніться сюди і увійдіть знову.'
+              : 'After confirming, come back here and sign in again.'
+          );
+        }, 2000);
+        return;
+      }
+      
+      if (error === 'invalid_credentials') {
+        toast.error(
+          lang === 'uk'
+            ? 'Невірний email або пароль. Перевірте дані і спробуйте ще раз.'
+            : 'Invalid email or password. Please check your credentials and try again.'
+        );
+        return;
+      }
+      
+      if (error === 'user_not_found') {
+        toast.error(
+          lang === 'uk'
+            ? 'Користувач з таким email не знайдений. Можливо, вам потрібно спочатку зареєструватися?'
+            : 'No user found with this email. Do you need to register first?'
+        );
+        setTimeout(() => {
+          const shouldRedirect = confirm(
+            lang === 'uk'
+              ? 'Перейти до реєстрації?'
+              : 'Go to registration page?'
+          );
+          if (shouldRedirect) {
+            navigate('/user-register');
+          }
+        }, 1000);
+        return;
+      }
+      
       if (error) {
-        toast.error(t(error as any) || t("login_failed"));
+        // Handle other errors with translated messages
+        const errorMessages: { [key: string]: { uk: string; en: string } } = {
+          'network_error': {
+            uk: 'Помилка мережі. Перевірте інтернет з’єднання.',
+            en: 'Network error. Please check your internet connection.'
+          },
+          'rate_limit_exceeded': {
+            uk: 'Занадто багато спроб. Спробуйте пізніше.',
+            en: 'Too many attempts. Please try again later.'
+          },
+          'login_failed': {
+            uk: 'Помилка входу. Перевірте дані.',
+            en: 'Login failed. Please check your credentials.'
+          }
+        };
+        
+        const errorMessage = errorMessages[error] || {
+          uk: 'Неочікувана помилка. Спробуйте ще раз.',
+          en: 'An unexpected error occurred. Please try again.'
+        };
+        
+        toast.error(lang === 'uk' ? errorMessage.uk : errorMessage.en);
         return;
       }
 
@@ -53,7 +118,11 @@ const UserAuth = () => {
       }
     } catch (error) {
       console.error("Login error:", error);
-      toast.error(t("login_failed"));
+      toast.error(
+        lang === 'uk'
+          ? 'Неочікувана помилка. Спробуйте ще раз.'
+          : 'An unexpected error occurred. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

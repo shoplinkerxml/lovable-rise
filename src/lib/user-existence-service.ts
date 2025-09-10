@@ -41,7 +41,7 @@ export class UserExistenceService {
   
   /**
    * Primary method for checking if a user exists
-   * Checks both profiles table and auth users
+   * Uses profile-based checking only for reliability
    */
   static async checkUserExists(email: string): Promise<UserExistenceCheck> {
     try {
@@ -57,43 +57,26 @@ export class UserExistenceService {
         return cached;
       }
 
-      // Check profile existence first (most common case)
+      // Main check through profile (more reliable than auth check)
       const profile = await ProfileService.getProfileByEmail(email);
       
-      if (profile) {
-        const result: UserExistenceCheck = {
-          exists: true,
-          profile,
-          authUser: true, // If profile exists, auth user likely exists too
-          existenceType: 'both'
-        };
-        
-        // Cache the result
-        ProfileCache.set(cacheKey, result);
-        this.logCheck(email, true, 'profile_found');
-        return result;
-      }
-
-      // If no profile, check if auth user exists without profile
-      const authUserExists = await this.checkAuthUserExists(email);
-      
       const result: UserExistenceCheck = {
-        exists: authUserExists,
-        profile: null,
-        authUser: authUserExists,
-        existenceType: authUserExists ? 'auth_only' : 'none'
+        exists: !!profile,
+        profile: profile,
+        authUser: !!profile, // If profile exists, auth user exists
+        existenceType: profile ? 'both' : 'none'
       };
-
+      
       // Cache the result
       ProfileCache.set(cacheKey, result);
-      this.logCheck(email, authUserExists, authUserExists ? 'auth_only' : 'not_found');
+      this.logCheck(email, result.exists, profile ? 'profile_found' : 'not_found');
       
       return result;
     } catch (error) {
       console.error('Error checking user existence:', error);
       this.logCheck(email, false, 'error');
       
-      // Return safe default - assume user doesn't exist on error
+      // Safe default - assume user doesn't exist on error
       return {
         exists: false,
         profile: null,
@@ -117,52 +100,19 @@ export class UserExistenceService {
   }
 
   /**
-   * Check if auth user exists without profile
-   * This uses admin API functionality if available
+   * Check if auth user exists without profile (DEPRECATED)
+   * This method is unreliable and should not be used
+   * @deprecated Use profile-based checking instead
    */
   static async checkAuthUserExists(email: string): Promise<boolean> {
-    try {
-      // Use auth.admin to check if user exists in auth
-      // Note: This requires service role key in server environment
-      // For client-side, we'll use a different approach
-      
-      // Attempt to get user by email using auth admin
-      // This is a simplified check - in production, you might want to
-      // implement this as an edge function for security
-      
-      // For now, we'll use the sign in attempt with a dummy password
-      // and check the error type to determine if user exists
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: 'dummy_password_for_existence_check_12345'
-      });
-      
-      if (error) {
-        // If error is about invalid credentials, user exists
-        // If error is about user not found, user doesn't exist
-        const errorMessage = error.message.toLowerCase();
-        
-        if (errorMessage.includes('invalid login credentials') || 
-            errorMessage.includes('invalid credentials')) {
-          return true; // User exists but wrong password
-        }
-        
-        if (errorMessage.includes('user not found') || 
-            errorMessage.includes('email not found')) {
-          return false; // User doesn't exist
-        }
-        
-        // For other errors (like too many requests), assume user might exist
-        return true;
-      }
-      
-      // If no error, user exists and password was correct (unlikely with dummy password)
-      return true;
-    } catch (error) {
-      console.error('Error checking auth user existence:', error);
-      // On error, assume user might exist to be safe
-      return true;
-    }
+    console.warn('checkAuthUserExists is deprecated and unreliable. Use profile-based checking instead.');
+    
+    // Always return false to force profile-based checking
+    // This method has been identified as unreliable due to:
+    // 1. Uses dummy password approach which can trigger rate limits
+    // 2. Error message parsing is brittle and inconsistent
+    // 3. Can cause false positives
+    return false;
   }
 
   /**

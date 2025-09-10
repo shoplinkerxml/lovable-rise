@@ -60,7 +60,7 @@ export interface AuthResponse {
   error: string | null;
 }
 
-// Authentication error types with enhanced messaging
+// Authentication error types with enhanced messaging for email confirmation flow
 export enum UserAuthError {
   REGISTRATION_FAILED = 'registration_failed',
   LOGIN_FAILED = 'login_failed',
@@ -71,8 +71,33 @@ export enum UserAuthError {
   VALIDATION_ERROR = 'validation_error',
   PROFILE_CREATION_FAILED = 'profile_creation_failed',
   EMAIL_CONFIRMATION_REQUIRED = 'email_confirmation_required',
+  EMAIL_NOT_CONFIRMED = 'email_not_confirmed', // Alias for login errors
   RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
-  USER_NOT_FOUND = 'user_not_found'
+  USER_NOT_FOUND = 'user_not_found',
+  AUTHORIZATION_ERROR = 'authorization_error',
+  SESSION_EXPIRED = 'session_expired',
+  INSUFFICIENT_PERMISSIONS = 'insufficient_permissions',
+  AUTH_TOKEN_INVALID = 'auth_token_invalid',
+  SESSION_NOT_READY = 'session_not_ready'
+}
+
+// Authorization error details interface
+export interface AuthorizationError {
+  type: 'token_expired' | 'invalid_token' | 'insufficient_permissions' | 'session_not_ready' | 'unknown';
+  code: number | string;
+  message: string;
+  retryable: boolean;
+  suggestedAction: string;
+  waitTime?: number; // For retryable errors
+}
+
+// Session management error types
+export enum SessionError {
+  SESSION_NOT_FOUND = 'session_not_found',
+  SESSION_EXPIRED = 'session_expired',
+  SESSION_INVALID = 'session_invalid',
+  REFRESH_FAILED = 'refresh_failed',
+  TOKEN_MALFORMED = 'token_malformed'
 }
 
 // Enhanced registration error interface
@@ -82,6 +107,15 @@ export interface RegistrationError {
   code: string;
   retryable: boolean;
   suggestedAction?: string;
+}
+
+// Session context interface for tracking authentication state
+export interface SessionContext {
+  accessToken: string | null;
+  refreshToken: string | null;
+  userId: string;
+  isReady: boolean;
+  expiresAt: number | null;
 }
 
 // User existence check result interface

@@ -14,6 +14,7 @@ import {
   validateProfileData,
   ProfileCache 
 } from "./error-handler";
+import { SessionValidator, isAuthenticationError, createAuthenticatedClient } from "./session-validation";
 
 export interface UserProfile {
   id: string;
@@ -227,25 +228,45 @@ export class ProfileService {
   }
 
   /**
-   * Create or update user profile
+   * Create or update user profile with UPSERT and verification
+   * This method ensures reliable profile creation with conflict resolution
    */
   static async upsertProfile(profileData: Partial<UserProfile> & { id: string }): Promise<UserProfile | null> {
     try {
+      // Validate profile data
+      if (!profileData.email || !profileData.name || !profileData.id) {
+        throw new Error('Missing required profile fields');
+      }
+
       const { data, error } = await supabase
         .from('profiles')
-        .upsert(profileData, { onConflict: 'id' })
+        .upsert(profileData, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
         .select()
-        .maybeSingle();
+        .single(); // Use single() since we're upserting one record
       
       if (error) {
         console.error('Error upserting user profile:', error);
-        throw error;
+        throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
+      }
+      
+      // Update cache with new profile data
+      if (data) {
+        ProfileCache.set(`profile_${data.id}`, data);
+        if (data.email) {
+          ProfileCache.set(`profile_email_${data.email.toLowerCase()}`, data);
+        }
       }
       
       return data as UserProfile | null;
     } catch (error) {
       console.error('Error in upsertProfile:', error);
-      throw error;
+      if (error instanceof ProfileOperationError) {
+        throw error;
+      }
+      throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
     }
   }
 
@@ -325,81 +346,187 @@ export class ProfileService {
   }
 
   /**
-   * Create user profile with retry logic
+   * Create profile with authentication context awareness
+   * This method waits for proper authentication before attempting profile creation
    */
-  static async createProfile(profileData: Partial<UserProfile> & { id: string }): Promise<UserProfile | null> {
-    const maxRetries = 3;
-    let retryCount = 0;
+  static async createProfileWithAuthContext(
+    profileData: Partial<UserProfile> & { id: string },
+    options: { waitForAuth?: boolean; maxWaitTime?: number } = {}
+  ): Promise<UserProfile> {
+    const { waitForAuth = true, maxWaitTime = 5000 } = options;
     
     try {
-      // Validate profile data
-      validateProfileData(profileData);
+      // If waiting for auth is enabled, check for valid session first
+      if (waitForAuth) {
+        await this.waitForValidSession(profileData.id, maxWaitTime);
+      }
+      
+      // Proceed with profile creation
+      return await this.createProfileWithVerification(profileData);
     } catch (error) {
-      throw error; // Re-throw validation errors
+      console.error('Error in createProfileWithAuthContext:', error);
+      if (error instanceof ProfileOperationError) {
+        throw error;
+      }
+      throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
+    }
+  }
+
+  /**
+   * Wait for a valid authentication session to be available
+   * Enhanced with proper session validation
+   */
+  private static async waitForValidSession(userId: string, maxWaitTime: number): Promise<boolean> {
+    console.log(`[ProfileService] Waiting for valid session for user ${userId}...`);
+    
+    const validation = await SessionValidator.waitForValidSession(userId, maxWaitTime);
+    
+    if (validation.isValid) {
+      console.log('[ProfileService] Valid session found for profile operations');
+      return true;
     }
     
-    while (retryCount < maxRetries) {
+    console.warn(`[ProfileService] No valid session found within ${maxWaitTime}ms for user ${userId}`, {
+      error: validation.error,
+      hasSession: !!validation.session
+    });
+    
+    return false;
+  }
+
+  /**
+   * Create profile with enhanced retry logic for authorization issues
+   */
+  static async createProfileWithAuthRetry(
+    profileData: Partial<UserProfile> & { id: string },
+    maxRetries: number = 3
+  ): Promise<UserProfile> {
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const profile = await this.upsertProfile(profileData);
-        if (profile) {
-          // Clear cache and update with new profile
-          ProfileCache.clearUser(profileData.id);
-          ProfileCache.set(`profile_${profileData.id}`, profile);
-          
-          this.logProfileOperation('createProfile', profileData.id, profile);
-          return profile;
+        console.log(`Profile creation attempt ${attempt}/${maxRetries} for user ${profileData.id}`);
+        
+        // Add progressive delay between attempts
+        if (attempt > 1) {
+          const delay = 500 * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
         
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 500));
-        retryCount++;
-      } catch (error) {
-        console.error(`Profile creation attempt ${retryCount + 1} failed:`, error);
-        if (retryCount === maxRetries - 1) {
-          throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
+        // Check for valid session before each attempt
+        const sessionValid = await this.waitForValidSession(profileData.id, 2000);
+        
+        if (!sessionValid) {
+          console.warn(`Session not valid for attempt ${attempt}, proceeding anyway`);
         }
-        retryCount++;
+        
+        // Attempt profile creation
+        const profile = await this.createProfileWithVerification(profileData);
+        console.log(`Profile creation succeeded on attempt ${attempt}`);
+        return profile;
+        
+      } catch (error) {
+        lastError = error;
+        console.error(`Profile creation attempt ${attempt} failed:`, error);
+        
+        // Check if this is an authorization-related error
+        if (this.isAuthorizationError(error)) {
+          console.error('Authorization error detected in profile creation');
+          
+          // If we still have retries left, continue
+          if (attempt < maxRetries) {
+            console.log('Retrying due to authorization error...');
+            continue;
+          }
+        }
+        
+        // For non-auth errors or final attempt, break
+        if (attempt === maxRetries) {
+          break;
+        }
       }
     }
     
-    throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED);
+    console.error(`Profile creation failed after ${maxRetries} attempts`);
+    throw lastError || new Error(`Profile creation failed after ${maxRetries} attempts`);
+  }
+
+  /**
+   * Enhanced authorization error detection with session validation context
+   */
+  private static isAuthorizationError(error: any): boolean {
+    return isAuthenticationError(error);
+  }
+
+  /**
+   * Create user profile with verification and retry logic
+   * Ensures profile is actually created and can be retrieved
+   */
+  static async createProfileWithVerification(
+    profileData: Partial<UserProfile> & { id: string }
+  ): Promise<UserProfile> {
+    try {
+      // Validate profile data
+      if (!profileData.email || !profileData.name || !profileData.id) {
+        throw new Error('Missing required profile fields');
+      }
+
+      // Step 1: UPSERT operation
+      const { data: upsertedProfile, error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(profileData, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
+        .select()
+        .single();
+
+      if (upsertError) {
+        console.error('Profile upsert failed:', upsertError);
+        throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, upsertError);
+      }
+
+      // Step 2: Verification with delay for triggers
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const { data: verifiedProfile, error: verifyError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profileData.id)
+        .single();
+
+      if (verifyError || !verifiedProfile) {
+        console.error('Profile verification failed:', verifyError);
+        throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, verifyError);
+      }
+
+      // Step 3: Update cache
+      ProfileCache.set(`profile_${profileData.id}`, verifiedProfile);
+      if (verifiedProfile.email) {
+        ProfileCache.set(`profile_email_${verifiedProfile.email.toLowerCase()}`, verifiedProfile);
+      }
+
+      return verifiedProfile as UserProfile;
+    } catch (error) {
+      console.error('Error in createProfileWithVerification:', error);
+      if (error instanceof ProfileOperationError) {
+        throw error;
+      }
+      throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
+    }
   }
   
   /**
-   * Ensure profile exists, create if missing
+   * Create user profile with retry logic (kept for backward compatibility)
    */
-  static async ensureProfile(userId: string, userData: { email: string; name: string }): Promise<UserProfile | null> {
+  static async createProfile(profileData: Partial<UserProfile> & { id: string }): Promise<UserProfile | null> {
     try {
-      let profile = await this.getProfile(userId);
-      
-      if (!profile) {
-        console.log('Profile not found, creating...', userId);
-        profile = await this.createProfile({
-          id: userId,
-          email: userData.email,
-          name: userData.name,
-          role: 'user',
-          status: 'active'
-        });
-      }
-      
-      return profile;
+      // Use the new verification method
+      return await this.createProfileWithVerification(profileData);
     } catch (error) {
-      if (error instanceof ProfileOperationError && error.code === ProfileErrorCode.PROFILE_NOT_FOUND) {
-        // Try to create the profile if it doesn't exist
-        try {
-          return await this.createProfile({
-            id: userId,
-            email: userData.email,
-            name: userData.name,
-            role: 'user',
-            status: 'active'
-          });
-        } catch (createError) {
-          throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, createError);
-        }
-      }
-      throw error;
+      console.error('Error in createProfile:', error);
+      return null;
     }
   }
 
@@ -464,6 +591,101 @@ export class ProfileService {
   }
 
   /**
+   * Create profile with authentication context (Bearer token)
+   * Enhanced with proper session validation and standard Supabase client usage
+   */
+  static async createProfileWithAuth(
+    profileData: Partial<UserProfile> & { id: string },
+    accessToken?: string
+  ): Promise<UserProfile> {
+    try {
+      // Validate session first
+      const sessionValidation = await SessionValidator.ensureValidSession();
+      
+      if (!sessionValidation.isValid) {
+        throw new ProfileOperationError(
+          ProfileErrorCode.INSUFFICIENT_PERMISSIONS, 
+          `No valid session for profile creation: ${sessionValidation.error}`
+        );
+      }
+      
+      // Validate profile data
+      if (!profileData.email || !profileData.name || !profileData.id) {
+        throw new ProfileOperationError(
+          ProfileErrorCode.PROFILE_CREATION_FAILED,
+          'Missing required profile fields'
+        );
+      }
+      
+      // Log session context for debugging
+      await SessionValidator.logSessionDebugInfo('profile-creation');
+      
+      // Use the standard Supabase client which automatically includes the access token
+      // The client automatically handles the Bearer token in Authorization header
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert(profileData)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('[ProfileService] Profile creation failed:', error);
+        
+        // Enhanced error handling for authentication issues
+        if (this.isAuthorizationError(error)) {
+          // Validate RLS context for debugging
+          const rlsValidation = await SessionValidator.validateRLSContext();
+          console.error('[ProfileService] RLS context validation:', rlsValidation);
+          
+          throw new ProfileOperationError(
+            ProfileErrorCode.INSUFFICIENT_PERMISSIONS, 
+            `Authentication error during profile creation: ${error.message}`
+          );
+        }
+        
+        throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
+      }
+      
+      // Update cache
+      if (data) {
+        ProfileCache.set(`profile_${data.id}`, data);
+        if (data.email) {
+          ProfileCache.set(`profile_email_${data.email.toLowerCase()}`, data);
+        }
+      }
+      
+      this.logProfileOperation('createProfileWithAuth', profileData.id, data);
+      return data as UserProfile;
+    } catch (error) {
+      if (error instanceof ProfileOperationError) {
+        throw error;
+      }
+      console.error('[ProfileService] Error in createProfileWithAuth:', error);
+      throw new ProfileOperationError(ProfileErrorCode.PROFILE_CREATION_FAILED, error);
+    }
+  }
+
+  /**
+   * Get current access token from Supabase session
+   * Enhanced with session validation
+   */
+  private static async getCurrentAccessToken(): Promise<string | null> {
+    try {
+      const validation = await SessionValidator.validateSession();
+      
+      if (!validation.isValid || !validation.accessToken) {
+        console.warn('[ProfileService] No valid access token available');
+        return null;
+      }
+      
+      return validation.accessToken;
+    } catch (error) {
+      console.error('[ProfileService] Error getting current session:', error);
+      return null;
+    }
+  }
+
+  /**
    * Validate profile data before operations
    */
   private static validateProfileData(data: Partial<UserProfile>): void {
@@ -477,13 +699,14 @@ export class ProfileService {
   }
 
   /**
-   * Log profile operations for debugging
+   * Log profile operations for debugging with enhanced token context
    */
   private static logProfileOperation(operation: string, userId: string, result: any): void {
     console.log(`[ProfileService] ${operation}:`, {
       userId,
       timestamp: new Date().toISOString(),
-      result: result ? 'success' : 'null/failure'
+      result: result ? 'success' : 'null/failure',
+      context: 'RLS-aware operation'
     });
   }
 }

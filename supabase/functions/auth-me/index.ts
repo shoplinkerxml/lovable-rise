@@ -13,12 +13,21 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    
+    // Enhanced logging for token debugging
+    console.log('Auth-me request received:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
+      timestamp: new Date().toISOString()
+    });
+    
     const supabaseClient = createClient<Database>(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader! },
         },
       }
     )
@@ -26,7 +35,11 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     
     if (userError || !user) {
-      console.log('User authentication failed:', userError)
+      console.log('User authentication failed:', {
+        error: userError,
+        hasUser: !!user,
+        timestamp: new Date().toISOString()
+      })
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { 
@@ -35,6 +48,12 @@ Deno.serve(async (req) => {
         }
       )
     }
+    
+    console.log('User authenticated successfully:', {
+      userId: user.id,
+      email: user.email,
+      timestamp: new Date().toISOString()
+    });
 
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')

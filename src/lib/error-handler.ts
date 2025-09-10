@@ -66,6 +66,137 @@ export class ProfileOperationError extends Error {
   }
 }
 
+import { 
+  UserAuthError, 
+  AuthorizationError, 
+  SessionError 
+} from "./user-auth-schemas";
+
+/**
+ * Enhanced authorization error handler
+ */
+export class AuthorizationErrorHandler {
+  /**
+   * Analyze and categorize authorization errors
+   */
+  static analyzeAuthorizationError(error: any): AuthorizationError {
+    const status = error.status || error.statusCode || 0;
+    const message = (error.message || '').toLowerCase();
+    const code = error.code || status;
+    
+    // 401 Unauthorized errors
+    if (status === 401 || message.includes('unauthorized')) {
+      if (message.includes('jwt') || message.includes('token')) {
+        return {
+          type: 'invalid_token',
+          code,
+          message: 'Authentication token is invalid or expired',
+          retryable: true,
+          suggestedAction: 'Please sign in again',
+          waitTime: 1000
+        };
+      }
+      
+      if (message.includes('session') || message.includes('expired')) {
+        return {
+          type: 'token_expired',
+          code,
+          message: 'Your session has expired',
+          retryable: true,
+          suggestedAction: 'Session will be refreshed automatically',
+          waitTime: 2000
+        };
+      }
+      
+      return {
+        type: 'session_not_ready',
+        code,
+        message: 'Authentication session is not ready',
+        retryable: true,
+        suggestedAction: 'Waiting for session establishment',
+        waitTime: 1500
+      };
+    }
+    
+    // 403 Forbidden errors
+    if (status === 403 || message.includes('forbidden') || message.includes('permission')) {
+      return {
+        type: 'insufficient_permissions',
+        code,
+        message: 'Insufficient permissions for this operation',
+        retryable: false,
+        suggestedAction: 'Contact support if this persists'
+      };
+    }
+    
+    // Unknown authorization error
+    return {
+      type: 'unknown',
+      code,
+      message: 'Unknown authorization error occurred',
+      retryable: true,
+      suggestedAction: 'Please try again',
+      waitTime: 1000
+    };
+  }
+  
+  /**
+   * Get user-friendly error message for authorization errors
+   */
+  static getUserFriendlyMessage(authError: AuthorizationError, lang: string = 'en'): string {
+    const messages = {
+      en: {
+        invalid_token: 'Your session is invalid. Please sign in again.',
+        token_expired: 'Your session has expired. Please wait while we refresh it.',
+        session_not_ready: 'Setting up your account. Please wait a moment.',
+        insufficient_permissions: 'You do not have permission for this action.',
+        unknown: 'Authentication error. Please try again.'
+      },
+      uk: {
+        invalid_token: 'Ваша сесія недійсна. Будь ласка, увійдіть знову.',
+        token_expired: 'Ваша сесія закінчилася. Зачекайте, поки ми її оновимо.',
+        session_not_ready: 'Налаштовуємо ваш акаунт. Зачекайте хвилинку.',
+        insufficient_permissions: 'У вас немає дозволу на цю дію.',
+        unknown: 'Помилка автентифікації. Спробуйте ще раз.'
+      }
+    };
+    
+    return messages[lang as keyof typeof messages]?.[authError.type] || 
+           messages.en[authError.type] || 
+           authError.message;
+  }
+  
+  /**
+   * Determine if an error should trigger a retry
+   */
+  static shouldRetry(authError: AuthorizationError, attemptCount: number, maxAttempts: number = 3): boolean {
+    if (!authError.retryable || attemptCount >= maxAttempts) {
+      return false;
+    }
+    
+    // Special retry logic for different error types
+    switch (authError.type) {
+      case 'session_not_ready':
+        return attemptCount <= 5; // Allow more retries for session issues
+      case 'token_expired':
+        return attemptCount <= 2; // Limited retries for expired tokens
+      case 'invalid_token':
+        return attemptCount <= 1; // Only one retry for invalid tokens
+      default:
+        return attemptCount < maxAttempts;
+    }
+  }
+  
+  /**
+   * Get recommended wait time before retry
+   */
+  static getRetryWaitTime(authError: AuthorizationError, attemptCount: number): number {
+    const baseWaitTime = authError.waitTime || 1000;
+    const exponentialBackoff = Math.pow(2, attemptCount - 1);
+    return Math.min(baseWaitTime * exponentialBackoff, 10000); // Max 10 seconds
+  }
+}
+
 /**
  * Enhanced error handling for authentication and registration operations
  */
@@ -205,32 +336,78 @@ export function validateProfileData(data: { email?: string; name?: string; id?: 
 }
 
 /**
- * Cache for profile operations to reduce repeated requests
+ * Enhanced cache for profile operations to reduce repeated requests
+ * Provides better cache management with different TTL settings
  */
 class ProfileCache {
-  private static cache = new Map<string, { data: any; timestamp: number }>();
-  private static CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private static DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
+  private static EXISTENCE_TTL = 2 * 60 * 1000; // 2 minutes for existence checks
   
   static get(key: string): any | null {
     const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
       return cached.data;
     }
     this.cache.delete(key);
     return null;
   }
   
-  static set(key: string, data: any): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
+  static set(key: string, data: any, customTtl?: number): void {
+    const ttl = customTtl || (key.startsWith('user_existence_') || key.startsWith('exists_') 
+      ? this.EXISTENCE_TTL 
+      : this.DEFAULT_TTL);
+    
+    this.cache.set(key, { 
+      data, 
+      timestamp: Date.now(),
+      ttl 
+    });
   }
   
   static clear(): void {
     this.cache.clear();
   }
   
+  /**
+   * Clear all cache entries for a specific user
+   */
   static clearUser(userId: string): void {
     for (const [key] of this.cache) {
       if (key.includes(userId)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+  
+  /**
+   * Clear cache entries by pattern
+   */
+  static clearPattern(pattern: string): void {
+    for (const [key] of this.cache) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+  
+  /**
+   * Get cache statistics for monitoring
+   */
+  static getStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
+  }
+  
+  /**
+   * Clean expired entries
+   */
+  static cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache) {
+      if (now - entry.timestamp >= entry.ttl) {
         this.cache.delete(key);
       }
     }

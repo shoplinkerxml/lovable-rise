@@ -13,11 +13,18 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    // Enhanced session recovery
+    storageKey: 'supabase.auth.token'
   },
   global: {
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json'
     }
+  },
+  // Enhanced error handling for RLS debugging
+  db: {
+    schema: 'public'
   }
 });

@@ -11,6 +11,7 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log('Handling authentication callback...');
         const { user, session, error } = await UserAuthService.handleOAuthCallback();
         
         if (error === 'redirect_to_admin') {
@@ -20,19 +21,33 @@ const AuthCallback = () => {
         }
         
         if (error === 'oauth_callback_failed') {
-          toast.error("Authentication failed. Please try again.");
+          toast.error("Authentication failed. Please try signing in again.");
+          navigate("/user-auth");
+          return;
+        }
+        
+        if (error === 'profile_creation_failed') {
+          toast.error("Account confirmed but profile setup failed. Please try signing in again.");
           navigate("/user-auth");
           return;
         }
         
         if (error) {
+          console.error('Auth callback error:', error);
           toast.error("Authentication failed. Please try again.");
           navigate("/user-auth");
           return;
         }
 
         if (user && session) {
-          toast.success("Welcome to MarketGrow!");
+          // Check if this is coming from email confirmation
+          const isEmailConfirmation = window.location.search.includes('type=signup');
+          
+          if (isEmailConfirmation) {
+            toast.success("Email confirmed successfully! Welcome to MarketGrow!");
+          } else {
+            toast.success("Welcome to MarketGrow!");
+          }
           navigate("/user/dashboard");
         } else {
           toast.error("Authentication failed. Please try again.");
@@ -41,7 +56,7 @@ const AuthCallback = () => {
       } catch (error) {
         console.error("Auth callback error:", error);
         toast.error("Authentication failed. Please try again.");
-        navigate("/login");
+        navigate("/user-auth");
       }
     };
 
@@ -58,6 +73,9 @@ const AuthCallback = () => {
           <Spinner className="mx-auto" />
           <p className="text-muted-foreground">
             Please wait while we complete your authentication...
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This may take a moment if you're confirming your email.
           </p>
         </CardContent>
       </Card>

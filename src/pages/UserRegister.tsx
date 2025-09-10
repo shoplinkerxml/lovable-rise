@@ -37,7 +37,6 @@ const UserRegister = () => {
     try {
       const { user, session, error } = await UserAuthService.register(data);
       
-      // Enhanced error handling based on new error types
       if (error === 'email_exists') {
         toast.error(
           lang === 'uk' 
@@ -58,38 +57,41 @@ const UserRegister = () => {
         return;
       }
       
-      if (error === 'rate_limit_exceeded') {
-        toast.error(
-          lang === 'uk'
-            ? 'Забагато спроб реєстрації. Спробуйте ще раз через кілька хвилин.'
-            : 'Too many registration attempts. Please try again in a few minutes.'
-        );
-        return;
-      }
-      
-      if (error === 'email_confirmation_required') {
-        toast.success(
-          lang === 'uk' 
-            ? 'Реєстрація успішна! Перевірте електронну пошту для підтвердження облікового запису.'
-            : 'Registration successful! Please check your email to confirm your account.'
-        );
-        // Show additional helpful message
-        setTimeout(() => {
-          toast.info(
-            lang === 'uk'
-              ? 'Після підтвердження електронної пошти ви зможете увійти в систему.'
-              : 'After confirming your email, you will be able to sign in.'
-          );
-        }, 2000);
-        return;
-      }
-      
       if (error === 'profile_creation_failed') {
         toast.error(
           lang === 'uk'
             ? 'Акаунт створено, але сталася помилка налаштування профілю. Зверніться до підтримки.'
             : 'Account created but profile setup failed. Please contact support.'
         );
+        return;
+      }
+      
+      if (error === 'email_confirmation_required') {
+        // Show success message for email confirmation flow
+        toast.success(
+          lang === 'uk' 
+            ? 'Реєстрація успішна! Перевірте електронну пошту для підтвердження облікового запису.'
+            : 'Registration successful! Please check your email to confirm your account.'
+        );
+        // Show additional helpful message with instructions
+        setTimeout(() => {
+          toast.info(
+            lang === 'uk'
+              ? 'Після підтвердження електронної пошти поверніться сюди і увійдіть в систему.'
+              : 'After confirming your email, come back here and sign in to access your account.'
+          );
+        }, 2000);
+        // Optionally redirect to login after some time
+        setTimeout(() => {
+          const shouldRedirect = confirm(
+            lang === 'uk'
+              ? 'Перейти до сторінки входу?'
+              : 'Go to sign in page?'
+          );
+          if (shouldRedirect) {
+            navigate('/user-auth');
+          }
+        }, 5000);
         return;
       }
       
@@ -102,22 +104,27 @@ const UserRegister = () => {
         return;
       }
       
-      if (error === 'validation_error') {
+      if (error === 'registration_failed') {
         toast.error(
           lang === 'uk'
-            ? 'Помилка валідації даних. Перевірте введену інформацію.'
-            : 'Data validation error. Please check your input.'
+            ? 'Реєстрація не вдалася. Спробуйте ще раз або зверніться до підтримки.'
+            : 'Registration failed. Please try again or contact support.'
         );
         return;
       }
       
       if (error) {
-        // Fallback error handling
+        // Fallback error handling for any other errors
         console.error('Unhandled registration error:', error);
-        toast.error(t(error as any) || t("registration_failed"));
+        toast.error(
+          lang === 'uk'
+            ? 'Неочікувана помилка. Спробуйте ще раз або зверніться до підтримки.'
+            : 'Unexpected error. Please try again or contact support.'
+        );
         return;
       }
 
+      // This case should be rare with email confirmation enabled
       if (user && session) {
         toast.success(t("registration_success"));
         navigate("/user/dashboard");
@@ -229,13 +236,13 @@ const UserRegister = () => {
             </CardHeader>
             
             <CardContent className="space-y-4">
-              {/* Social Auth Buttons */}
+              {/* Social Auth Buttons - Disabled for now */}
               <div className="space-y-2 md:space-y-0 md:flex md:gap-2">
                 <Button 
                   variant="outline" 
                   className="w-full md:flex-1" 
                   onClick={() => handleSocialAuth('google')}
-                  disabled={loading}
+                  disabled={true}
                 >
                   <Chrome className="h-4 w-4 mr-2" />
                   {t("google_signup")}
@@ -244,7 +251,7 @@ const UserRegister = () => {
                   variant="outline" 
                   className="w-full md:flex-1" 
                   onClick={() => handleSocialAuth('facebook')}
-                  disabled={loading}
+                  disabled={true}
                 >
                   <Facebook className="h-4 w-4 mr-2" />
                   {t("facebook_signup")}
