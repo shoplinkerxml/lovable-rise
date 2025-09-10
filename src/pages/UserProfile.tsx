@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { UserAuthService } from "@/lib/user-auth-service";
+import { ProfileService } from "@/lib/profile-service";
 import { UserProfile as UserProfileType } from "@/lib/user-auth-schemas";
 import { useI18n } from "@/providers/i18n-provider";
 import { ArrowLeft, User, Save, Upload, TrendingUp } from "lucide-react";
@@ -55,20 +56,18 @@ const UserProfile = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: name.trim(),
-          phone: phone.trim() || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+      const updatedProfile = await ProfileService.updateProfile(user.id, {
+        name: name.trim(),
+        phone: phone.trim() || null
+      });
 
-      if (error) throw error;
-
-      // Update local state
-      setUser({ ...user, name: name.trim(), phone: phone.trim() || undefined });
-      toast.success("Profile updated successfully");
+      if (updatedProfile) {
+        // Update local state
+        setUser({ ...user, name: name.trim(), phone: phone.trim() || undefined });
+        toast.success("Profile updated successfully");
+      } else {
+        throw new Error('Failed to update profile');
+      }
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
@@ -96,15 +95,14 @@ const UserProfile = () => {
         .from('avatars')
         .getPublicUrl(fileName);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
+      const updatedProfile = await ProfileService.updateProfile(user.id, { avatar_url: publicUrl });
 
-      if (updateError) throw updateError;
-
-      setUser({ ...user, avatar_url: publicUrl });
-      toast.success("Avatar updated successfully");
+      if (updatedProfile) {
+        setUser({ ...user, avatar_url: publicUrl });
+        toast.success("Avatar updated successfully");
+      } else {
+        throw new Error('Failed to update profile with avatar');
+      }
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar");

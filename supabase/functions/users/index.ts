@@ -3,7 +3,8 @@ import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
+  'Content-Type': 'application/json'
 }
 
 async function checkAdminPermission(supabaseClient: any) {
@@ -17,9 +18,14 @@ async function checkAdminPermission(supabaseClient: any) {
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (profileError || profile?.role !== 'admin') {
+  if (profileError) {
+    console.log('Profile fetch error:', profileError)
+    return { error: 'Failed to fetch profile', status: 500 }
+  }
+
+  if (!profile || profile?.role !== 'admin') {
     return { error: 'Forbidden - Admin access required', status: 403 }
   }
 
@@ -48,7 +54,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: adminCheck.error }),
         { 
           status: adminCheck.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -70,7 +76,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Failed to fetch users' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -78,7 +84,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ users }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -93,7 +99,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Email, password and name are required' }),
           { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -112,7 +118,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: authError.message }),
           { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -124,7 +130,7 @@ Deno.serve(async (req) => {
         .update({ phone, role })
         .eq('id', authData.user.id)
         .select()
-        .single()
+        .maybeSingle()
 
       if (profileError) {
         console.log('Profile update error:', profileError)
@@ -132,7 +138,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'User created but profile update failed' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -141,7 +147,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ user: profile }),
         { 
           status: 201,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -156,7 +162,7 @@ Deno.serve(async (req) => {
         .update({ name, phone, role, status })
         .eq('id', userId)
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.log('User update error:', error)
@@ -164,7 +170,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Failed to update user' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -172,7 +178,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ user }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -184,7 +190,7 @@ Deno.serve(async (req) => {
         .update({ status: 'inactive' })
         .eq('id', userId)
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.log('User deactivation error:', error)
@@ -192,7 +198,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Failed to deactivate user' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -200,7 +206,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ user }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -209,7 +215,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: 'Method not allowed' }),
       { 
         status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders }
       }
     )
 
@@ -219,7 +225,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: 'Internal server error' }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders }
       }
     )
   }

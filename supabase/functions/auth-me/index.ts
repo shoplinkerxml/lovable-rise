@@ -3,7 +3,8 @@ import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
+  'Content-Type': 'application/json'
 }
 
 Deno.serve(async (req) => {
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Unauthorized' }),
         { 
           status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -39,15 +40,26 @@ Deno.serve(async (req) => {
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     if (profileError) {
       console.log('Profile fetch error:', profileError)
       return new Response(
+        JSON.stringify({ error: 'Failed to fetch profile' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders }
+        }
+      )
+    }
+
+    if (!profile) {
+      console.log('Profile not found for user:', user.id)
+      return new Response(
         JSON.stringify({ error: 'Profile not found' }),
         { 
           status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -61,7 +73,7 @@ Deno.serve(async (req) => {
         }
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders }
       }
     )
 
@@ -71,7 +83,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: 'Internal server error' }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders }
       }
     )
   }

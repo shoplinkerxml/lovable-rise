@@ -3,7 +3,8 @@ import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
+  'Content-Type': 'application/json'
 }
 
 async function getUserWithPermissions(supabaseClient: any) {
@@ -17,9 +18,14 @@ async function getUserWithPermissions(supabaseClient: any) {
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (profileError) {
+    console.log('Profile fetch error:', profileError)
+    return { error: 'Failed to fetch profile', status: 500 }
+  }
+
+  if (!profile) {
     return { error: 'Profile not found', status: 404 }
   }
 
@@ -48,7 +54,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: userCheck.error }),
         { 
           status: userCheck.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -68,7 +74,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Path parameter is required' }),
           { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -78,25 +84,25 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('path', menuPath)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          return new Response(
-            JSON.stringify({ error: 'Menu item not found', path: menuPath }),
-            { 
-              status: 404, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          )
-        }
-        
         console.error('Menu item fetch error:', error)
         return new Response(
           JSON.stringify({ error: 'Failed to fetch menu item' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
+          }
+        )
+      }
+
+      if (!menuItem) {
+        return new Response(
+          JSON.stringify({ error: 'Menu item not found', path: menuPath }),
+          { 
+            status: 404, 
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -108,14 +114,14 @@ Deno.serve(async (req) => {
           .select('can_view')
           .eq('user_id', user.id)
           .eq('menu_item_id', menuItem.id)
-          .single()
+          .maybeSingle()
 
         if (!permission?.can_view) {
           return new Response(
             JSON.stringify({ error: 'Access denied' }),
             { 
               status: 403, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              headers: { ...corsHeaders }
             }
           )
         }
@@ -124,7 +130,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ menuItem }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -135,7 +141,7 @@ Deno.serve(async (req) => {
         .from('menu_items')
         .select('*')
         .eq('id', param)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error('Menu item fetch error:', error)
@@ -143,7 +149,17 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Failed to fetch menu item' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
+          }
+        )
+      }
+
+      if (!menuItem) {
+        return new Response(
+          JSON.stringify({ error: 'Menu item not found' }),
+          { 
+            status: 404, 
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -151,7 +167,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ menuItem }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -162,7 +178,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Forbidden - Admin access required' }),
         { 
           status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -206,7 +222,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Failed to update menu item content' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -214,7 +230,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ menuItem }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -238,7 +254,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Title and path are required' }),
           { 
             status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -264,7 +280,7 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: 'Failed to create menu item' }),
           { 
             status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders }
           }
         )
       }
@@ -273,7 +289,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ menuItem }),
         { 
           status: 201,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -291,7 +307,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ templates }),
         { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders }
         }
       )
     }
@@ -300,7 +316,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: 'Endpoint not found' }),
       { 
         status: 404, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders }
       }
     )
 
@@ -310,7 +326,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: 'Internal server error' }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders }
       }
     )
   }

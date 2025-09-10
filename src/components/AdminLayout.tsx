@@ -12,9 +12,11 @@ import { Sun, Moon, AlignJustify } from 'lucide-react';
 import { ProfileTrigger } from '@/components/ui/profile-trigger';
 import { ProfileSheetContent } from '@/components/ui/profile-sheet-content';
 import { UserProfile } from '@/components/ui/profile-types';
+import { ProfileService } from '@/lib/profile-service';
 import AdminSidebar from '@/components/ResponsiveAdminSidebar';
 import ContentWorkspace from '@/components/ContentWorkspace';
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 interface AdminLayoutInnerProps {
   children?: React.ReactNode;
@@ -135,24 +137,26 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         const user = userData.user;
         
         if (user?.id) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("name,email,avatar_url,role")
-            .eq("id", user.id)
-            .limit(1)
-            .maybeSingle();
-
-          if (profiles) {
+          const profile = await ProfileService.ensureProfile(user.id, {
+            email: user.email || '',
+            name: user.user_metadata?.name || ''
+          });
+          
+          if (profile) {
             setUserProfile({
               email: user.email || '',
-              name: (profiles as any)?.name || '',
-              role: (profiles as any)?.role || 'Business',
-              avatarUrl: ((profiles as any)?.avatar_url || '').trim(),
+              name: profile.name || '',
+              role: profile.role || 'user',
+              avatarUrl: profile.avatar_url?.trim() || '',
             });
+          } else {
+            console.error('Failed to ensure user profile');
+            toast.error('Failed to load user profile. Please refresh and try again.');
           }
         }
       } catch (error) {
         console.error('Error loading user profile:', error);
+        toast.error('Unable to load profile. Please refresh and try again.');
       }
     };
 

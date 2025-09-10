@@ -120,7 +120,7 @@ export class UserMenuService {
         .select('id')
         .eq('user_id', userId)
         .eq('path', menuData.path)
-        .single();
+        .maybeSingle();
 
       if (existingItem) {
         throw new Error('Path already exists for this user');
@@ -136,7 +136,7 @@ export class UserMenuService {
           .eq('parent_id', menuData.parent_id || null)
           .order('order_index', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         orderIndex = (maxOrderItem?.order_index || 0) + 1;
       }
@@ -150,7 +150,7 @@ export class UserMenuService {
           page_type: menuData.page_type || 'content'
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error creating menu item:', error);
@@ -177,7 +177,7 @@ export class UserMenuService {
           .eq('user_id', userId)
           .eq('path', menuData.path)
           .neq('id', itemId)
-          .single();
+          .maybeSingle();
 
         if (existingItem) {
           throw new Error('Path already exists for this user');
@@ -190,7 +190,7 @@ export class UserMenuService {
         .eq('id', itemId)
         .eq('user_id', userId)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error updating menu item:', error);
@@ -271,7 +271,7 @@ export class UserMenuService {
         .select('*')
         .eq('id', itemId)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         if (error.code === 'PGRST116') {

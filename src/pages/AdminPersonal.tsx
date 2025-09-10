@@ -1,10 +1,18 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ProfileService } from "@/lib/profile-service";
+import { 
+  withProfileErrorHandling, 
+  SUCCESS_MESSAGES, 
+  ProfileOperationError, 
+  ProfileErrorCode 
+} from "@/lib/error-handler";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 const AdminPersonal = () => {
   const [name, setName] = useState("");
@@ -15,14 +23,27 @@ const AdminPersonal = () => {
 
   useEffect(() => {
     const load = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      setEmail(user?.email ?? "");
-      if (user?.id) {
-        const { data } = await supabase.from("profiles").select("name,avatar_url").eq("id", user.id).maybeSingle();
-        setName((data as any)?.full_name || (data as any)?.name || "");
-        setAvatarUrl((data as any)?.avatar_url || "");
-      }
+      await withProfileErrorHandling(async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData.user;
+        setEmail(user?.email ?? "");
+        
+        if (user?.id) {
+          const profile = await ProfileService.ensureProfile(user.id, {
+            email: user.email || '',
+            name: user.user_metadata?.name || ''
+          });
+          
+          if (profile) {
+            setName(profile.name || "");
+            setAvatarUrl(profile.avatar_url || "");
+            return profile;
+          } else {
+            throw new ProfileOperationError(ProfileErrorCode.PROFILE_NOT_FOUND);
+          }
+        }
+        return null;
+      }, 'profile loading', SUCCESS_MESSAGES.PROFILE_LOADED);
     };
     load();
   }, []);
@@ -30,16 +51,36 @@ const AdminPersonal = () => {
   const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (!user) return;
-    const ext = file.name.split('.').pop();
-    const path = `avatars/${user.id}-${Date.now()}.${ext}`;
-    await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
-    const url = pub.publicUrl;
-    await supabase.from('profiles').update({ avatar_url: url } as any).eq('id', user.id);
-    setAvatarUrl(url);
+    
+    await withProfileErrorHandling(async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+      if (!user) throw new ProfileOperationError(ProfileErrorCode.PERMISSION_DENIED);
+      
+      const ext = file.name.split('.').pop();
+      const path = `avatars/${user.id}-${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true });
+      
+      if (uploadError) {
+        throw new ProfileOperationError(ProfileErrorCode.AVATAR_UPLOAD_FAILED, uploadError);
+      }
+      
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      const url = pub.publicUrl;
+      
+      const updatedProfile = await ProfileService.updateProfile(user.id, { avatar_url: url });
+      
+      if (updatedProfile) {
+        setAvatarUrl(url);
+        return updatedProfile;
+      } else {
+        throw new ProfileOperationError(ProfileErrorCode.PROFILE_UPDATE_FAILED);
+      }
+    }, 'avatar upload', SUCCESS_MESSAGES.AVATAR_UPDATED);
+    
     e.target.value = '';
   };
 
@@ -49,12 +90,26 @@ const AdminPersonal = () => {
 
   const save = async () => {
     setSaving(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (user?.id) {
-      await supabase.from('profiles').update({ full_name: name } as any).eq('id', user.id);
+    try {
+      await withProfileErrorHandling(async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData.user;
+        
+        if (user?.id) {
+          const updatedProfile = await ProfileService.updateProfile(user.id, { name });
+          
+          if (updatedProfile) {
+            return updatedProfile;
+          } else {
+            throw new ProfileOperationError(ProfileErrorCode.PROFILE_UPDATE_FAILED);
+          }
+        } else {
+          throw new ProfileOperationError(ProfileErrorCode.PERMISSION_DENIED);
+        }
+      }, 'profile save', SUCCESS_MESSAGES.PROFILE_UPDATED);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (

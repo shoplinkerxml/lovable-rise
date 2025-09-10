@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { ProfileService } from "@/lib/profile-service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Plug, FileSpreadsheet, Tags, Sparkles, UploadCloud, BarChart3, Shield } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
 
 const AdminAuth = () => {
   const navigate = useNavigate();
@@ -19,23 +21,42 @@ const AdminAuth = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      
       if (signInError) throw signInError;
+      
       if (data.session) {
-        // Ensure default avatar for admin if missing
+        // Ensure profile exists and has default avatar if missing
         try {
           const userId = data.session.user.id;
-          const { data: prof } = await supabase.from('profiles').select('avatar_url,avater_url').eq('id', userId).maybeSingle();
-          if (!prof || (!(prof as any).avatar_url && !(prof as any).avater_url)) {
-            const defaultUrl = '/placeholder.svg';
-            await supabase.from('profiles').update({ avatar_url: defaultUrl, avater_url: defaultUrl } as any).eq('id', userId);
+          const profile = await ProfileService.ensureProfile(userId, {
+            email: data.session.user.email || '',
+            name: data.session.user.user_metadata?.name || ''
+          });
+          
+          if (!profile) {
+            toast.error('Failed to load user profile. Please try again.');
+            return;
           }
-        } catch {}
-        navigate("/admin/dashboard");
+          
+          if (!profile.avatar_url) {
+            const defaultUrl = '/placeholder.svg';
+            await ProfileService.updateProfile(userId, { avatar_url: defaultUrl });
+          }
+          
+          toast.success('Login successful');
+          navigate("/admin/dashboard");
+        } catch (profileError) {
+          console.error('Profile handling error:', profileError);
+          // Still allow login even if profile operations fail
+          navigate("/admin/dashboard");
+        }
       }
     } catch (err: any) {
       setError(err.message || "Не вдалося увійти. Перевірте дані.");
+      toast.error(err.message || "Не вдалося увійти. Перевірте дані.");
     } finally {
       setLoading(false);
     }

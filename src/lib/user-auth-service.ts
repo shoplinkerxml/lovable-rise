@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { ProfileService } from "./profile-service";
 import { 
   RegistrationData, 
   LoginData, 
@@ -42,17 +43,11 @@ export class UserAuthService {
         // Give more time for trigger to process and add retry logic
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Check if profile was created with retry mechanism
-        let profile = await UserAuthService.getUserProfile(authData.user.id);
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        while (!profile && retryCount < maxRetries) {
-          console.log(`Profile not found, retrying... attempt ${retryCount + 1}/${maxRetries}`);
-          await new Promise(resolve => setTimeout(resolve, 500));
-          profile = await UserAuthService.getUserProfile(authData.user.id);
-          retryCount++;
-        }
+        // Check if profile was created with retry mechanism using ProfileService
+        let profile = await ProfileService.ensureProfile(authData.user.id, {
+          email: data.email,
+          name: data.name
+        });
         
         if (profile) {
           console.log(`Profile created successfully with role: ${profile.role}`);
@@ -79,7 +74,7 @@ export class UserAuthService {
             };
           }
         } else {
-          console.error(`Profile creation failed for user ${data.email} after ${maxRetries} retries`);
+          console.error(`Profile creation failed for user ${data.email}`);
           // Profile creation failed
           return {
             user: null,
@@ -187,24 +182,11 @@ export class UserAuthService {
         };
       }
 
-      // Check if profile exists, if not create it with user role
-      let profile = await UserAuthService.getUserProfile(session.user.id);
-      
-      if (!profile) {
-        // Create profile for OAuth user with user role - this will use the database trigger
-        // No need to manually create profile as the trigger will handle it
-        // But we need to ensure the user metadata has the correct role
-        await supabase.auth.updateUser({
-          data: {
-            name: session.user.user_metadata?.name || session.user.email || 'User',
-            role: 'user'  // Ensure OAuth users get 'user' role
-          }
-        });
-        
-        // Wait a moment for the trigger to process
-        await new Promise(resolve => setTimeout(resolve, 100));
-        profile = await UserAuthService.getUserProfile(session.user.id);
-      }
+      // Check if profile exists, if not create it with user role using ProfileService
+      let profile = await ProfileService.ensureProfile(session.user.id, {
+        email: session.user.email || 'User',
+        name: session.user.user_metadata?.name || session.user.email || 'User'
+      });
 
       // Check role and redirect appropriately
       if (profile && profile.role !== 'user') {
@@ -249,7 +231,7 @@ export class UserAuthService {
       }
 
       if (authData.user && authData.session) {
-        const profile = await UserAuthService.getUserProfile(authData.user.id);
+        const profile = await ProfileService.getProfile(authData.user.id);
         
         // Validate user role
         if (profile && profile.role !== 'user') {
@@ -383,7 +365,7 @@ export class UserAuthService {
         };
       }
 
-      const profile = await UserAuthService.getUserProfile(session.user.id);
+      const profile = await ProfileService.getProfile(session.user.id);
       
       return {
         user: profile,
@@ -428,26 +410,12 @@ export class UserAuthService {
   }
 
   /**
-   * Get user profile from database
+   * Get user profile from database (deprecated - use ProfileService.getProfile instead)
+   * @deprecated Use ProfileService.getProfile for better error handling
    */
   static async getUserProfile(userId: string): Promise<UserProfile | null> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-      }
-
-      return data as UserProfile;
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
+    console.warn('getUserProfile is deprecated, use ProfileService.getProfile instead');
+    return ProfileService.getProfile(userId);
   }
 
   /**
