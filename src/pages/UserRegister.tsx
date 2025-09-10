@@ -43,17 +43,10 @@ const UserRegister = () => {
             ? 'Акаунт з цією електронною поштою вже існує. Будь ласка, увійдіть в систему.'
             : 'An account with this email already exists. Please sign in instead.'
         );
-        // Offer helpful action
+        // Automatically redirect to login page after a short delay
         setTimeout(() => {
-          const shouldRedirect = confirm(
-            lang === 'uk' 
-              ? 'Перейти до сторінки входу?'
-              : 'Go to sign in page?'
-          );
-          if (shouldRedirect) {
-            navigate('/user-auth');
-          }
-        }, 1000);
+          navigate('/user-auth');
+        }, 3000);
         return;
       }
       
@@ -81,17 +74,10 @@ const UserRegister = () => {
               : 'After confirming your email, come back here and sign in to access your account.'
           );
         }, 2000);
-        // Optionally redirect to login after some time
+        // Automatically redirect to login page after email confirmation
         setTimeout(() => {
-          const shouldRedirect = confirm(
-            lang === 'uk'
-              ? 'Перейти до сторінки входу?'
-              : 'Go to sign in page?'
-          );
-          if (shouldRedirect) {
-            navigate('/user-auth');
-          }
-        }, 5000);
+          navigate('/user-auth');
+        }, 6000);
         return;
       }
       

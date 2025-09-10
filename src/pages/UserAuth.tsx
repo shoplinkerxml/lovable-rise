@@ -73,16 +73,10 @@ const UserAuth = () => {
             ? 'Користувач з таким email не знайдений. Можливо, вам потрібно спочатку зареєструватися?'
             : 'No user found with this email. Do you need to register first?'
         );
+        // Automatically redirect to registration page after a short delay
         setTimeout(() => {
-          const shouldRedirect = confirm(
-            lang === 'uk'
-              ? 'Перейти до реєстрації?'
-              : 'Go to registration page?'
-          );
-          if (shouldRedirect) {
-            navigate('/user-register');
-          }
-        }, 1000);
+          navigate('/user-register');
+        }, 3000);
         return;
       }
       
