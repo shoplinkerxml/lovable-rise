@@ -21,13 +21,13 @@ const AuthCallback = () => {
         
         if (error === 'oauth_callback_failed') {
           toast.error("Authentication failed. Please try again.");
-          navigate("/login");
+          navigate("/user-auth");
           return;
         }
         
         if (error) {
           toast.error("Authentication failed. Please try again.");
-          navigate("/login");
+          navigate("/user-auth");
           return;
         }
 
@@ -36,7 +36,7 @@ const AuthCallback = () => {
           navigate("/user/dashboard");
         } else {
           toast.error("Authentication failed. Please try again.");
-          navigate("/login");
+          navigate("/user-auth");
         }
       } catch (error) {
         console.error("Auth callback error:", error);

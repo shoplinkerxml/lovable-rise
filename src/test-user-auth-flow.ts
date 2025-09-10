@@ -100,7 +100,7 @@
 
 /**
  * Test 6: Password Reset Completion
- * Navigate to reset link from email (format: /reset-password?access_token=...&refresh_token=...&type=recovery)
+ * Navigate to reset link from email (format: /user-forgot-password?access_token=...&refresh_token=...&type=recovery)
  * 
  * Steps:
  * 1. Click reset link from email
@@ -299,7 +299,7 @@ console.log("User Authentication Test Suite Ready");
 console.log("Run manual tests as described in comments");
 console.log("All routes available:", {
   userAuth: "http://localhost:8082/user-auth",
-  passwordReset: "http://localhost:8082/reset-password",
+  passwordReset: "http://localhost:8082/user-forgot-password",
   userDashboard: "http://localhost:8082/user/dashboard",
   userProfile: "http://localhost:8082/user/profile",
   adminAuth: "http://localhost:8082/admin-auth"

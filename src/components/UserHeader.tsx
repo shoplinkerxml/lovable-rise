@@ -48,7 +48,7 @@ export const UserHeader = ({ user, onMenuToggle }: UserHeaderProps) => {
 
       if (success) {
         toast.success("Logged out successfully");
-        navigate("/login");
+        navigate("/user-auth");
       }
     } catch (error) {
       console.error("Logout error:", error);
