@@ -1,48 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface Database {
-  public: {
-    Tables: {
-      profiles: {
-        Row: {
-          id: string
-          role: 'admin' | 'manager'
-        }
-      }
-      user_permissions: {
-        Row: {
-          id: number
-          user_id: string
-          menu_item_id: number
-          can_view: boolean
-          can_edit: boolean
-          created_at: string
-        }
-        Insert: {
-          user_id: string
-          menu_item_id: number
-          can_view?: boolean
-          can_edit?: boolean
-        }
-        Update: {
-          can_view?: boolean
-          can_edit?: boolean
-        }
-      }
-      menu_items: {
-        Row: {
-          id: number
-          title: string
-          path: string
-        }
-      }
-    }
-  }
 }
 
 async function checkAdminPermission(supabaseClient: any) {

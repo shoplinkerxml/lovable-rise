@@ -1,27 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface Database {
-  public: {
-    Tables: {
-      profiles: {
-        Row: {
-          id: string
-          email: string
-          name: string
-          phone: string | null
-          role: 'admin' | 'manager'
-          status: 'active' | 'inactive'
-          created_at: string
-          updated_at: string
-        }
-      }
-    }
-  }
 }
 
 Deno.serve(async (req) => {
