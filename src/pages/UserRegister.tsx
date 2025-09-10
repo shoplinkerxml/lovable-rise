@@ -157,7 +157,7 @@ const UserRegister = () => {
           type="button" 
           variant="ghost" 
           onClick={() => setLang(lang === "uk" ? "en" : "uk")}
-          className="text-emerald-700 hover:bg-emerald-50"
+          className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
         >
           {lang === "uk" ? "EN" : "UA"}
         </Button>
