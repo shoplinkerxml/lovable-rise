@@ -12,6 +12,17 @@ const AuthCallback = () => {
     const handleCallback = async () => {
       try {
         console.log('Handling authentication callback...');
+        
+        // Check if this is a password reset callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const type = urlParams.get('type');
+        
+        if (type === 'recovery') {
+          console.log('Password reset callback detected, redirecting to reset page');
+          navigate('/user-reset-password');
+          return;
+        }
+        
         const { user, session, error } = await UserAuthService.handleOAuthCallback();
         
         if (error === 'redirect_to_admin') {

@@ -15,6 +15,7 @@ import AuthCallback from "./pages/AuthCallback";
 import UserAuth from "./pages/UserAuth";
 import UserRegister from "./pages/UserRegister";
 import UserForgotPassword from "./pages/UserForgotPassword";
+import UserResetPassword from "./pages/UserResetPassword";
 import UserProtected from "./pages/UserProtected";
 import UserLayout from "@/components/UserLayout";
 import UserDashboard from "./pages/UserDashboard";
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/user-register" element={<UserRegister />} />
             <Route path="/user-auth" element={<UserAuth />} />
             <Route path="/user-forgot-password" element={<UserForgotPassword />} />
+            <Route path="/user-reset-password" element={<UserResetPassword />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
 
             

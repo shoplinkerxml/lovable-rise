@@ -66,6 +66,25 @@ const dictionary: Dictionary = {
   reset_success: { uk: "Лист надіслано на пошту", en: "Email sent successfully" },
   reset_email_placeholder: { uk: "Ваш email", en: "Your email" },
   
+  // Password Reset Page
+  reset_password_title: { uk: "Скинути пароль", en: "Reset Your Password" },
+  reset_password_desc: { uk: "Введіть новий пароль нижче", en: "Enter your new password below" },
+  new_password: { uk: "Новий пароль", en: "New Password" },
+  confirm_new_password: { uk: "Підтвердіть новий пароль", en: "Confirm New Password" },
+  password_updated: { uk: "Пароль успішно оновлено", en: "Password updated successfully" },
+  update_password_button: { uk: "Оновити пароль", en: "Update Password" },
+  continue_to_login: { uk: "Перейти до входу", en: "Continue to Login" },
+  request_new_reset: { uk: "Запросити нове посилання", en: "Request new reset link" },
+  session_expired: { uk: "Сесія закінчилася", en: "Session expired" },
+  session_invalid: { uk: "Недійсна сесія", en: "Invalid session" },
+  validating_session: { uk: "Перевірка сесії...", en: "Validating session..." },
+  security_features_title: { uk: "Безпечне скидання", en: "Secure Reset" },
+  security_features_subtitle: { uk: "Безпека вашого акаунта - наш пріоритет", en: "Your account security is our priority" },
+  feat_secure_reset: { uk: "Безпечний процес скидання паролю", en: "Secure password reset process" },
+  feat_token_validation: { uk: "Валідація на основі токену", en: "Token-based validation" },
+  feat_session_timeout: { uk: "Автоматичне закінчення сесії", en: "Automatic session timeout" },
+  feat_password_requirements: { uk: "Вимоги до надійного паролю", en: "Strong password requirements" },
+  
   // Social Auth (disabled)
   google_signup: { uk: "Google", en: "Google" },
   facebook_signup: { uk: "Facebook", en: "Facebook" },
