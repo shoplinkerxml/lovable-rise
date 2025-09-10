@@ -19,7 +19,7 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
     name: "Administrator",
     email: "admin@example.com", 
     role: "Business",
-    avatarUrl: ""
+    avatarUrl: "/placeholder.svg"
   };
 
   const getAvatarFallback = () => {
@@ -27,6 +27,12 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
       return userInfo.name.charAt(0).toUpperCase();
     }
     return "A";
+  };
+
+  // Ensure avatar URL is valid or use placeholder
+  const getAvatarUrl = () => {
+    const url = userInfo.avatarUrl?.trim();
+    return url && url !== '' ? url : '/placeholder.svg';
   };
 
   // Header position logic
@@ -39,7 +45,7 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
       >
         <div className="flex items-center gap-2">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={userInfo.avatarUrl || "/placeholder.svg"} alt="Admin" />
+            <AvatarImage src={getAvatarUrl()} alt="Admin" />
             <AvatarFallback className="bg-emerald-100 text-emerald-600 font-medium">
               {getAvatarFallback()}
             </AvatarFallback>
@@ -67,7 +73,7 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
               aria-label="User Profile"
             >
               <Avatar className="h-6 w-6">
-                <AvatarImage src={userInfo.avatarUrl || "/placeholder.svg"} alt="Admin" />
+                <AvatarImage src={getAvatarUrl()} alt="Admin" />
                 <AvatarFallback className="bg-emerald-100 text-emerald-600 text-xs font-medium">
                   {getAvatarFallback()}
                 </AvatarFallback>
@@ -89,7 +95,7 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
       className="w-full flex items-center gap-2 pl-2 pr-3 py-1 h-auto rounded-lg border-l transition-colors group cursor-pointer select-none hover:bg-emerald-50"
     >
       <Avatar className="h-8 w-8">
-        <AvatarImage src={userInfo.avatarUrl || "/placeholder.svg"} alt="Admin" />
+        <AvatarImage src={getAvatarUrl()} alt="Admin" />
         <AvatarFallback className="bg-emerald-100 text-emerald-600 font-medium">
           {getAvatarFallback()}
         </AvatarFallback>

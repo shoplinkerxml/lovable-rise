@@ -346,6 +346,38 @@ export class ProfileService {
   }
 
   /**
+   * Ensure profile exists - get or create profile with given data
+   * This method provides a convenient way to ensure a profile exists
+   */
+  static async ensureProfile(
+    userId: string, 
+    profileData: { email: string; name: string }
+  ): Promise<UserProfile | null> {
+    try {
+      // First try to get existing profile
+      let profile = await this.getProfile(userId);
+      
+      if (profile) {
+        return profile;
+      }
+      
+      // If no profile exists, create one using upsert
+      profile = await this.upsertProfile({
+        id: userId,
+        email: profileData.email,
+        name: profileData.name,
+        role: 'admin', // Default role for admin authentication
+        status: 'active'
+      });
+      
+      return profile;
+    } catch (error) {
+      console.error('Error ensuring profile:', error);
+      return null;
+    }
+  }
+
+  /**
    * Create profile with authentication context awareness
    * This method waits for proper authentication before attempting profile creation
    */

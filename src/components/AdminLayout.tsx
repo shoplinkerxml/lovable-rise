@@ -143,11 +143,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           });
           
           if (profile) {
+            const avatarUrl = profile.avatar_url?.trim();
+            // If no avatar URL or it's empty, set default placeholder
+            const finalAvatarUrl = avatarUrl && avatarUrl !== '' ? avatarUrl : '/placeholder.svg';
+            
             setUserProfile({
               email: user.email || '',
-              name: profile.name || '',
-              role: profile.role || 'user',
-              avatarUrl: profile.avatar_url?.trim() || '',
+              name: profile.name || 'Administrator',
+              role: profile.role || 'admin',
+              avatarUrl: finalAvatarUrl,
             });
           } else {
             console.error('Failed to ensure user profile');

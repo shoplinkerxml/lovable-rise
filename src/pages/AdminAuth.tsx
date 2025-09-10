@@ -41,12 +41,17 @@ const AdminAuth = () => {
             return;
           }
           
-          if (!profile.avatar_url) {
+          if (!profile.avatar_url || profile.avatar_url.trim() === '') {
             const defaultUrl = '/placeholder.svg';
-            await ProfileService.updateProfile(userId, { avatar_url: defaultUrl });
+            try {
+              await ProfileService.updateProfile(userId, { avatar_url: defaultUrl });
+            } catch (avatarError) {
+              console.error('Failed to set default avatar:', avatarError);
+              // Don't block login if avatar update fails
+            }
           }
           
-          toast.success('Login successful');
+          toast.success('Вы успешно вошли в кабинет администратора');
           navigate("/admin/dashboard");
         } catch (profileError) {
           console.error('Profile handling error:', profileError);
