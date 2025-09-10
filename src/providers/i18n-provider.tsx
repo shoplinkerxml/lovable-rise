@@ -96,14 +96,14 @@ const dictionary: Dictionary = {
   confirm_password_required: { uk: "Підтвердження паролю обов'язкове", en: "Password confirmation is required" },
   
   // Authentication Messages
-  registration_success: { uk: "Реєстрація успішна!", en: "Registration successful!" },
+  registration_success: { uk: "Реєстрація успішна! Перенаправляємо на сторінку входу...", en: "Registration successful! Redirecting to login page..." },
   login_success: { uk: "Успішний вхід!", en: "Login successful!" },
   registration_failed: { uk: "Помилка реєстрації. Спробуйте ще раз", en: "Registration failed. Please try again" },
-  login_failed: { uk: "Помилка входу. Перевірте дані", en: "Login failed. Check your credentials" },
-  invalid_credentials: { uk: "Невірний email або пароль", en: "Invalid email or password" },
-  email_exists: { uk: "Користувач з таким email вже існує", en: "User with this email already exists" },
+  login_failed: { uk: "Помилка входу. Перевірте ваші дані.", en: "Login failed. Please check your credentials." },
+  invalid_credentials: { uk: "Неправильний email або пароль", en: "Invalid email or password" },
+  email_exists: { uk: "Користувач з таким email вже зареєстрований. Спробуйте увійти.", en: "User with this email is already registered. Try signing in." },
   weak_password: { uk: "Пароль занадто слабкий", en: "Password is too weak" },
-  network_error: { uk: "Помилка мережі. Спробуйте пізніше", en: "Network error. Please try again later" },
+  network_error: { uk: "Помилка мережі. Спробуйте пізніше.", en: "Network error. Please try again later." },
   
   // User Dashboard
   user_dashboard_title: { uk: "Особистий кабінет", en: "Personal Dashboard" },
@@ -117,8 +117,16 @@ const dictionary: Dictionary = {
   password_placeholder: { uk: "••••••••", en: "••••••••" },
   
   // Terms and conditions
-  accept_terms: { uk: "Я погоджуюся з умовами політики конфіденційності", en: "I agree to the terms of use and privacy policy" },
+  accept_terms: { uk: "Я погоджуюся з Умовами користування та Політикою конфіденційності", en: "I agree to the Terms of Service and Privacy Policy" },
   terms_required: { uk: "Необхідно прийняти умови", en: "You must accept the terms" },
+  
+  // Email continuation text
+  continue_with_email: { uk: "або продовжити з email", en: "or continue with email" },
+  continue_with_signin: { uk: "або увійдіть за допомогою", en: "or sign in with" },
+  
+  // Enhanced error messages for registration
+  profile_creation_failed: { uk: "Не вдалося створити профіль", en: "Failed to create profile" },
+  email_confirmation_required: { uk: "Підтвердження email обов'язкове", en: "Email confirmation required" },
 };
 
 type I18nContextType = {

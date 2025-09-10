@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ProfileService } from "./profile-service";
+import { UserExistenceService, UserExistenceCheck } from "./user-existence-service";
 import { 
   RegistrationData, 
   LoginData, 
@@ -11,12 +12,34 @@ import {
 
 export class UserAuthService {
   /**
-   * Register a new user with 'user' role
+   * Register a new user with enhanced existence checking to prevent unnecessary API calls
    */
   static async register(data: RegistrationData): Promise<AuthResponse> {
     try {
-      console.log('Starting user registration for:', data.email);
+      console.log('Starting enhanced user registration for:', data.email);
       
+      // Step 1: Check user existence BEFORE attempting signup
+      const existenceCheck = await UserExistenceService.checkUserExists(data.email);
+      
+      if (existenceCheck.exists) {
+        console.log('User already exists:', {
+          email: data.email,
+          hasProfile: !!existenceCheck.profile,
+          hasAuth: existenceCheck.authUser,
+          type: existenceCheck.existenceType
+        });
+        
+        // Return appropriate error based on existence type
+        return {
+          user: null,
+          session: null,
+          error: UserAuthError.EMAIL_EXISTS // Maps to enhanced error messaging
+        };
+      }
+      
+      console.log('User does not exist, proceeding with registration for:', data.email);
+      
+      // Step 2: Proceed with signup only if user doesn't exist
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -30,6 +53,10 @@ export class UserAuthService {
 
       if (signUpError) {
         console.error('Registration signup error:', signUpError);
+        
+        // Clear existence cache since our check might have been stale
+        UserExistenceService.clearExistenceCache(data.email);
+        
         return {
           user: null,
           session: null,
@@ -38,44 +65,52 @@ export class UserAuthService {
       }
 
       if (authData.user) {
-        console.log('User created in auth, waiting for profile creation...');
+        console.log('User created in auth, setting up profile...', authData.user.id);
         
-        // Give more time for trigger to process and add retry logic
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Check if profile was created with retry mechanism using ProfileService
-        let profile = await ProfileService.ensureProfile(authData.user.id, {
-          email: data.email,
-          name: data.name
-        });
-        
-        if (profile) {
-          console.log(`Profile created successfully with role: ${profile.role}`);
+        // Step 3: Ensure profile creation with retry logic
+        try {
+          const profile = await ProfileService.ensureProfile(authData.user.id, {
+            email: data.email,
+            name: data.name
+          });
           
-          // Validate correct role assignment
-          if (profile.role !== 'user' && profile.role !== 'admin') {
-            console.warn(`Role mismatch: expected 'user' or 'admin', got '${profile.role}' for user ${data.email}`);
-            // Log this for monitoring but don't fail registration
-          }
-          
-          if (authData.session) {
-            // User confirmed, has session
-            return {
-              user: profile,
-              session: authData.session,
-              error: null
-            };
+          if (profile) {
+            console.log(`Profile created successfully with role: ${profile.role}`);
+            
+            // Clear existence cache to ensure fresh data on next check
+            UserExistenceService.clearExistenceCache(data.email);
+            
+            // Validate correct role assignment
+            if (profile.role !== 'user' && profile.role !== 'admin') {
+              console.warn(`Role mismatch: expected 'user' or 'admin', got '${profile.role}' for user ${data.email}`);
+              // Log this for monitoring but don't fail registration
+            }
+            
+            if (authData.session) {
+              // User confirmed, has session
+              return {
+                user: profile,
+                session: authData.session,
+                error: null
+              };
+            } else {
+              // Email confirmation required
+              return {
+                user: null,
+                session: null,
+                error: UserAuthError.EMAIL_CONFIRMATION_REQUIRED
+              };
+            }
           } else {
-            // Email confirmation required
+            console.error(`Profile creation failed for user ${data.email}`);
             return {
               user: null,
               session: null,
-              error: UserAuthError.EMAIL_CONFIRMATION_REQUIRED
+              error: UserAuthError.PROFILE_CREATION_FAILED
             };
           }
-        } else {
-          console.error(`Profile creation failed for user ${data.email}`);
-          // Profile creation failed
+        } catch (profileError) {
+          console.error('Profile creation error:', profileError);
           return {
             user: null,
             session: null,
@@ -91,6 +126,28 @@ export class UserAuthService {
       };
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Determine error type for better user feedback
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = (error as any).message.toLowerCase();
+        
+        if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+          return {
+            user: null,
+            session: null,
+            error: UserAuthError.NETWORK_ERROR
+          };
+        }
+        
+        if (errorMessage.includes('too many') || errorMessage.includes('rate limit')) {
+          return {
+            user: null,
+            session: null,
+            error: 'rate_limit_exceeded' // Enhanced error type
+          };
+        }
+      }
+      
       return {
         user: null,
         session: null,
@@ -419,7 +476,7 @@ export class UserAuthService {
   }
 
   /**
-   * Map Supabase auth errors to user-friendly messages
+   * Map Supabase auth errors to user-friendly messages with enhanced error types
    */
   private static mapSupabaseError(error: any): string {
     const message = error.message?.toLowerCase() || '';
@@ -438,6 +495,9 @@ export class UserAuthService {
     }
     if (message.includes('email not confirmed')) {
       return UserAuthError.EMAIL_CONFIRMATION_REQUIRED;
+    }
+    if (message.includes('too many') || message.includes('rate limit')) {
+      return 'rate_limit_exceeded';
     }
     
     return UserAuthError.REGISTRATION_FAILED;

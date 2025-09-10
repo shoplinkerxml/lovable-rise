@@ -69,13 +69,13 @@ const UserAuth = () => {
 
   return (
     <div className="relative min-h-screen flex">
-      {/* Language Toggle */}
+      {/* Language Toggle - Improved hover state */}
       <div className="absolute right-4 top-4 md:right-8 md:top-8 z-10">
         <Button 
           type="button" 
           variant="ghost" 
           onClick={() => setLang(lang === "uk" ? "en" : "uk")}
-          className="text-emerald-700 hover:bg-emerald-50"
+          className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
         >
           {lang === "uk" ? "EN" : "UA"}
         </Button>
@@ -154,11 +154,11 @@ const UserAuth = () => {
             </CardHeader>
             
             <CardContent className="space-y-4">
-              {/* Social Auth Buttons */}
-              <div className="space-y-2 md:space-y-0 md:flex md:gap-2">
+              {/* Social Auth Buttons - Single Row Layout */}
+              <div className="grid grid-cols-2 gap-2">
                 <Button 
                   variant="outline" 
-                  className="w-full md:flex-1" 
+                  className="w-full" 
                   onClick={() => handleSocialAuth('google')}
                   disabled={loading}
                 >
@@ -167,7 +167,7 @@ const UserAuth = () => {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="w-full md:flex-1" 
+                  className="w-full" 
                   onClick={() => handleSocialAuth('facebook')}
                   disabled={loading}
                 >
@@ -182,7 +182,7 @@ const UserAuth = () => {
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-background px-2 text-muted-foreground">
-                    {lang === 'uk' ? 'або увійдіть за допомогою' : 'or sign in with'}
+                    {t("continue_with_signin")}
                   </span>
                 </div>
               </div>

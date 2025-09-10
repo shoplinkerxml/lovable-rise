@@ -54,13 +54,13 @@ const UserForgotPassword = () => {
 
   return (
     <div className="relative min-h-screen flex">
-      {/* Language Toggle */}
+      {/* Language Toggle - Improved hover state */}
       <div className="absolute right-4 top-4 md:right-8 md:top-8 z-10">
         <Button 
           type="button" 
           variant="ghost" 
           onClick={() => setLang(lang === "uk" ? "en" : "uk")}
-          className="text-emerald-700 hover:bg-emerald-50"
+          className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
         >
           {lang === "uk" ? "EN" : "UA"}
         </Button>

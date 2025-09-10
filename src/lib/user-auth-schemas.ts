@@ -60,7 +60,7 @@ export interface AuthResponse {
   error: string | null;
 }
 
-// Authentication error types
+// Authentication error types with enhanced messaging
 export enum UserAuthError {
   REGISTRATION_FAILED = 'registration_failed',
   LOGIN_FAILED = 'login_failed',
@@ -70,5 +70,24 @@ export enum UserAuthError {
   NETWORK_ERROR = 'network_error',
   VALIDATION_ERROR = 'validation_error',
   PROFILE_CREATION_FAILED = 'profile_creation_failed',
-  EMAIL_CONFIRMATION_REQUIRED = 'email_confirmation_required'
+  EMAIL_CONFIRMATION_REQUIRED = 'email_confirmation_required',
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
+  USER_NOT_FOUND = 'user_not_found'
+}
+
+// Enhanced registration error interface
+export interface RegistrationError {
+  type: 'validation' | 'user_exists' | 'network' | 'rate_limit' | 'signup_failed' | 'profile_failed';
+  message: string;
+  code: string;
+  retryable: boolean;
+  suggestedAction?: string;
+}
+
+// User existence check result interface
+export interface UserExistenceCheck {
+  exists: boolean;
+  profile?: UserProfile | null;
+  authUser?: boolean;
+  existenceType?: 'profile_only' | 'auth_only' | 'both' | 'none';
 }

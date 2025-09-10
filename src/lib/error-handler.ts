@@ -18,6 +18,8 @@ export enum ProfileErrorCode {
   VALIDATION_ERROR = 'validation_error',
   PERMISSION_DENIED = 'permission_denied',
   NETWORK_ERROR = 'network_error',
+  USER_EXISTS = 'user_exists',
+  RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded',
   UNKNOWN_ERROR = 'unknown_error'
 }
 
@@ -32,6 +34,8 @@ const ERROR_MESSAGES: Record<ProfileErrorCode, string> = {
   [ProfileErrorCode.VALIDATION_ERROR]: 'Invalid data provided. Please check your input.',
   [ProfileErrorCode.PERMISSION_DENIED]: 'You do not have permission to perform this action.',
   [ProfileErrorCode.NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
+  [ProfileErrorCode.USER_EXISTS]: 'An account with this email already exists. Please sign in instead.',
+  [ProfileErrorCode.RATE_LIMIT_EXCEEDED]: 'Too many attempts. Please try again in a few minutes.',
   [ProfileErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred. Please try again.'
 };
 
@@ -42,7 +46,10 @@ export const SUCCESS_MESSAGES = {
   PROFILE_CREATED: 'Profile created successfully',
   PROFILE_UPDATED: 'Profile updated successfully', 
   AVATAR_UPDATED: 'Avatar updated successfully',
-  PROFILE_LOADED: 'Profile loaded successfully'
+  PROFILE_LOADED: 'Profile loaded successfully',
+  REGISTRATION_SUCCESS: 'Account created successfully! Please check your email for confirmation.',
+  LOGIN_SUCCESS: 'Welcome back!',
+  PASSWORD_RESET_SENT: 'Password reset email sent. Please check your inbox.'
 } as const;
 
 /**
@@ -57,6 +64,51 @@ export class ProfileOperationError extends Error {
     super(message || ERROR_MESSAGES[code]);
     this.name = 'ProfileOperationError';
   }
+}
+
+/**
+ * Enhanced error handling for authentication and registration operations
+ */
+export function handleAuthError(error: unknown, operation: string = 'operation'): string {
+  console.error(`Auth ${operation} error:`, error);
+  
+  if (error && typeof error === 'object' && 'message' in error) {
+    const errorMessage = (error as any).message?.toLowerCase() || '';
+    
+    // Enhanced error detection patterns
+    if (errorMessage.includes('user already registered') || 
+        errorMessage.includes('email already registered') ||
+        errorMessage.includes('email already exists')) {
+      return ERROR_MESSAGES[ProfileErrorCode.USER_EXISTS];
+    }
+    
+    if (errorMessage.includes('too many') || 
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('429')) {
+      return ERROR_MESSAGES[ProfileErrorCode.RATE_LIMIT_EXCEEDED];
+    }
+    
+    if (errorMessage.includes('network') || 
+        errorMessage.includes('connection') ||
+        errorMessage.includes('timeout')) {
+      return ERROR_MESSAGES[ProfileErrorCode.NETWORK_ERROR];
+    }
+    
+    if (errorMessage.includes('validation') || 
+        errorMessage.includes('invalid') ||
+        errorMessage.includes('format')) {
+      return ERROR_MESSAGES[ProfileErrorCode.VALIDATION_ERROR];
+    }
+    
+    if (errorMessage.includes('permission') || 
+        errorMessage.includes('access') ||
+        errorMessage.includes('unauthorized')) {
+      return ERROR_MESSAGES[ProfileErrorCode.PERMISSION_DENIED];
+    }
+  }
+  
+  // Fallback to generic error
+  return ERROR_MESSAGES[ProfileErrorCode.UNKNOWN_ERROR];
 }
 
 /**

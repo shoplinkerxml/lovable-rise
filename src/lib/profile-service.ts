@@ -58,6 +58,51 @@ export enum ProfileError {
 
 export class ProfileService {
   /**
+   * Get user profile by email address
+   * Returns null if profile doesn't exist instead of throwing PGRST116 error
+   */
+  static async getProfileByEmail(email: string): Promise<UserProfile | null> {
+    try {
+      // Check cache first
+      const cached = ProfileCache.get(`profile_email_${email.toLowerCase()}`);
+      if (cached) {
+        this.logProfileOperation('getProfileByEmail (cached)', email, cached);
+        return cached;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching user profile by email:', error);
+        const result = handlePostgRESTError(error);
+        if (result === null) {
+          throw new ProfileOperationError(ProfileErrorCode.PROFILE_NOT_FOUND, error);
+        }
+        throw new ProfileOperationError(ProfileErrorCode.NETWORK_ERROR, error);
+      }
+      
+      // Cache the result if it exists
+      if (data) {
+        ProfileCache.set(`profile_email_${email.toLowerCase()}`, data);
+        ProfileCache.set(`profile_${data.id}`, data); // Also cache by ID
+      }
+      
+      this.logProfileOperation('getProfileByEmail', email, data);
+      return data as UserProfile | null;
+    } catch (error) {
+      if (error instanceof ProfileOperationError) {
+        throw error;
+      }
+      console.error('Error in getProfileByEmail:', error);
+      throw new ProfileOperationError(ProfileErrorCode.NETWORK_ERROR, error);
+    }
+  }
+
+  /**
    * Get user profile by ID
    * Returns null if profile doesn't exist instead of throwing PGRST116 error
    */
@@ -111,6 +156,51 @@ export class ProfileService {
       throw new Error('Profile not found');
     }
     return profile;
+  }
+
+  /**
+   * Check if multiple users exist by email addresses
+   * Returns a map of email -> exists boolean
+   */
+  static async checkMultipleUsersExist(emails: string[]): Promise<Map<string, boolean>> {
+    try {
+      const results = new Map<string, boolean>();
+      
+      // Process emails in batches to avoid overwhelming the database
+      const batchSize = 10;
+      const batches = [];
+      
+      for (let i = 0; i < emails.length; i += batchSize) {
+        batches.push(emails.slice(i, i + batchSize));
+      }
+      
+      for (const batch of batches) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('email')
+          .in('email', batch.map(email => email.toLowerCase()));
+        
+        if (error) {
+          console.error('Error checking multiple users existence:', error);
+          // Mark all as potentially existing on error to be safe
+          batch.forEach(email => results.set(email, true));
+          continue;
+        }
+        
+        const existingEmails = new Set((data || []).map(profile => profile.email));
+        batch.forEach(email => {
+          results.set(email, existingEmails.has(email.toLowerCase()));
+        });
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Error in checkMultipleUsersExist:', error);
+      // Return map with all emails marked as potentially existing
+      const results = new Map<string, boolean>();
+      emails.forEach(email => results.set(email, true));
+      return results;
+    }
   }
 
   /**
@@ -310,6 +400,66 @@ export class ProfileService {
         }
       }
       throw error;
+    }
+  }
+
+  /**
+   * Find profiles by email pattern (for admin search functionality)
+   */
+  static async findProfilesByEmailPattern(pattern: string, limit: number = 10): Promise<UserProfile[]> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', `%${pattern}%`)
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error finding profiles by email pattern:', error);
+        return [];
+      }
+      
+      return (data || []) as UserProfile[];
+    } catch (error) {
+      console.error('Error in findProfilesByEmailPattern:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get profile existence status by email without fetching full profile
+   * Optimized for existence checks only
+   */
+  static async profileExistsByEmail(email: string): Promise<boolean> {
+    try {
+      // Check cache first
+      const cached = ProfileCache.get(`exists_${email.toLowerCase()}`);
+      if (cached !== null) {
+        return cached;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.toLowerCase())
+        .maybeSingle();
+      
+      if (error) {
+        const result = handlePostgRESTError(error);
+        if (result === null) {
+          ProfileCache.set(`exists_${email.toLowerCase()}`, false);
+          return false;
+        }
+        throw error;
+      }
+      
+      const exists = !!data;
+      ProfileCache.set(`exists_${email.toLowerCase()}`, exists);
+      return exists;
+    } catch (error) {
+      console.error('Error checking profile existence by email:', error);
+      // Return true on error to be safe and avoid duplicate registrations
+      return true;
     }
   }
 

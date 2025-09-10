@@ -37,26 +37,83 @@ const UserRegister = () => {
     try {
       const { user, session, error } = await UserAuthService.register(data);
       
+      // Enhanced error handling based on new error types
+      if (error === 'email_exists') {
+        toast.error(
+          lang === 'uk' 
+            ? 'Акаунт з цією електронною поштою вже існує. Будь ласка, увійдіть в систему.'
+            : 'An account with this email already exists. Please sign in instead.'
+        );
+        // Offer helpful action
+        setTimeout(() => {
+          const shouldRedirect = confirm(
+            lang === 'uk' 
+              ? 'Перейти до сторінки входу?'
+              : 'Go to sign in page?'
+          );
+          if (shouldRedirect) {
+            navigate('/user-auth');
+          }
+        }, 1000);
+        return;
+      }
+      
+      if (error === 'rate_limit_exceeded') {
+        toast.error(
+          lang === 'uk'
+            ? 'Забагато спроб реєстрації. Спробуйте ще раз через кілька хвилин.'
+            : 'Too many registration attempts. Please try again in a few minutes.'
+        );
+        return;
+      }
+      
       if (error === 'email_confirmation_required') {
         toast.success(
           lang === 'uk' 
             ? 'Реєстрація успішна! Перевірте електронну пошту для підтвердження облікового запису.'
             : 'Registration successful! Please check your email to confirm your account.'
         );
-        // Don't redirect, show confirmation message
+        // Show additional helpful message
+        setTimeout(() => {
+          toast.info(
+            lang === 'uk'
+              ? 'Після підтвердження електронної пошти ви зможете увійти в систему.'
+              : 'After confirming your email, you will be able to sign in.'
+          );
+        }, 2000);
         return;
       }
       
       if (error === 'profile_creation_failed') {
         toast.error(
           lang === 'uk'
-            ? 'Помилка створення профілю. Спробуйте ще раз або зверніться до підтримки.'
-            : 'Profile creation failed. Please try again or contact support.'
+            ? 'Акаунт створено, але сталася помилка налаштування профілю. Зверніться до підтримки.'
+            : 'Account created but profile setup failed. Please contact support.'
+        );
+        return;
+      }
+      
+      if (error === 'network_error') {
+        toast.error(
+          lang === 'uk'
+            ? 'Помилка мережі. Перевірте підключення до інтернету та спробуйте ще раз.'
+            : 'Network error. Please check your connection and try again.'
+        );
+        return;
+      }
+      
+      if (error === 'validation_error') {
+        toast.error(
+          lang === 'uk'
+            ? 'Помилка валідації даних. Перевірте введену інформацію.'
+            : 'Data validation error. Please check your input.'
         );
         return;
       }
       
       if (error) {
+        // Fallback error handling
+        console.error('Unhandled registration error:', error);
         toast.error(t(error as any) || t("registration_failed"));
         return;
       }
@@ -67,7 +124,11 @@ const UserRegister = () => {
       }
     } catch (error) {
       console.error("Registration error:", error);
-      toast.error(t("registration_failed"));
+      toast.error(
+        lang === 'uk'
+          ? 'Неочікувана помилка. Спробуйте ще раз або зверніться до підтримки.'
+          : 'Unexpected error. Please try again or contact support.'
+      );
     } finally {
       setLoading(false);
     }
