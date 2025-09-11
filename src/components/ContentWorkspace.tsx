@@ -16,6 +16,7 @@ import FormsHorizontal from '@/pages/admin/FormsHorizontal';
 import FormsVertical from '@/pages/admin/FormsVertical';
 import FormsCustom from '@/pages/admin/FormsCustom';
 import FormValidation from '@/pages/admin/FormValidation';
+import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 
 
 
@@ -38,6 +39,7 @@ const STATIC_COMPONENTS: Record<string, React.ComponentType> = {
   '/forms/vertical': FormsVertical,
   '/forms/custom': FormsCustom,
   '/forms/validation': FormValidation,
+  '/users': AdminUsersPage,
 };
 
 const ContentWorkspace: React.FC = () => {
@@ -61,6 +63,7 @@ const ContentWorkspace: React.FC = () => {
     if (adminPath === '/dashboard') return 'dashboard';
     if (adminPath.startsWith('/forms/')) return 'form';
     if (adminPath === '/personal') return 'default';
+    if (adminPath === '/users') return 'list';
     
     // Fallback to menu item page_type if available
     if (activeMenuItem?.page_type === 'list') return 'list';

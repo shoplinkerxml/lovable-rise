@@ -91,6 +91,17 @@ const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
     created_at: new Date().toISOString(),
     icon_name: 'check-circle',
     section_type: 'main'
+  },
+  '/users': {
+    id: -9,
+    title: 'Users',
+    path: '/users',
+    page_type: 'list',
+    is_active: true,
+    order_index: 2,
+    created_at: new Date().toISOString(),
+    icon_name: 'users',
+    section_type: 'main'
   }
 };
 
@@ -205,7 +216,21 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
         return;
       }
 
-      setMenuItems(data || []);
+      // Map database rows to MenuItemData format
+      const menuItemsData: MenuItemData[] = (data || []).map(item => ({
+        ...item,
+        page_type: (item.page_type as 'content' | 'form' | 'dashboard' | 'list' | 'custom') || 'content',
+        content_data: item.content_data || {},
+        meta_data: item.meta_data || {},
+        section_type: (item.section_type as 'dashboard' | 'main' | 'settings') || 'main',
+        icon_name: item.icon_name || null,
+        has_separator: item.has_separator || false,
+        description: item.description || null,
+        badge_text: item.badge_text || null,
+        badge_color: item.badge_color || null,
+      }));
+
+      setMenuItems(menuItemsData);
     } catch (error) {
       console.error('Error loading menu items:', error);
     } finally {
@@ -270,21 +295,12 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
 
     try {
-      // For pages that have dynamic content, fetch it
+      // For pages that have dynamic content, cache the content_data
       if (item.page_type === 'content' || item.content_data) {
-        // Check if we need to fetch additional content from menu_content table
-        const { data: contentData, error } = await supabase
-          .from('menu_content')
-          .select('*')
-          .eq('menu_item_id', item.id)
-          .maybeSingle();
-
-        if (!error && contentData) {
-          setContentCache(prev => ({
-            ...prev,
-            [cacheKey]: contentData
-          }));
-        }
+        setContentCache(prev => ({
+          ...prev,
+          [cacheKey]: item.content_data || {}
+        }));
       }
     } catch (error) {
       console.error('Error preloading content for item:', item.title, error);

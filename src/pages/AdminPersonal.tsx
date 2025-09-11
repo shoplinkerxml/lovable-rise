@@ -11,10 +11,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/PageHeader";
+import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
+import { useI18n } from "@/providers/i18n-provider";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 const AdminPersonal = () => {
+  const { t } = useI18n();
+  const breadcrumbs = useBreadcrumbs();
+  const pageInfo = usePageInfo();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -113,10 +119,16 @@ const AdminPersonal = () => {
   };
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 space-y-6">
+      <PageHeader
+        title={pageInfo.title}
+        description={pageInfo.description}
+        breadcrumbItems={breadcrumbs}
+      />
+      
       <Card className="max-w-5xl mx-auto">
         <CardHeader>
-          <CardTitle>Редагувати профіль</CardTitle>
+          <CardTitle>{t("user_profile_title")}</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-4">
@@ -131,7 +143,7 @@ const AdminPersonal = () => {
                 </Avatar>
                 <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full">
                   <Plus className="h-6 w-6 text-white mb-1" />
-                  <span className="text-xs text-white font-medium">Змінити фото</span>
+                  <span className="text-xs text-white font-medium">{t("menu_profile")}</span>
                 </div>
               </div>
               <input 
@@ -145,14 +157,14 @@ const AdminPersonal = () => {
           </div>
           <div className="md:col-span-2 space-y-4">
             <div>
-              <label className="text-sm font-medium">Повне ім'я</label>
+              <label className="text-sm font-medium">{t("form_full_name")}</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium">Email</label>
+              <label className="text-sm font-medium">{t("form_email_address")}</label>
               <Input value={email} disabled />
             </div>
-            <Button onClick={save} disabled={saving} className="bg-emerald-600 text-white hover:bg-emerald-700">Зберегти</Button>
+            <Button onClick={save} disabled={saving} className="bg-emerald-600 text-white hover:bg-emerald-700">{t("btn_update")}</Button>
           </div>
         </CardContent>
       </Card>

@@ -146,6 +146,137 @@ const dictionary: Dictionary = {
   // Enhanced error messages for registration
   profile_creation_failed: { uk: "Не вдалося створити профіль", en: "Failed to create profile" },
   email_confirmation_required: { uk: "Підтвердження email обов'язкове", en: "Email confirmation required" },
+  
+  // User Management
+  users_title: { uk: "Користувачі", en: "Users" },
+  users_subtitle: { uk: "Управління системними користувачами та їх дозволами", en: "Manage system users and their permissions" },
+  add_user: { uk: "Додати користувача", en: "Add User" },
+  edit_user: { uk: "Редагувати користувача", en: "Edit User" },
+  delete_user: { uk: "Видалити користувача", en: "Delete User" },
+  export_users: { uk: "Експорт", en: "Export" },
+  
+  // User Table
+  table_customer: { uk: "Клієнт", en: "Customer" },
+  table_status: { uk: "Статус", en: "Status" },
+  table_email: { uk: "Електронна пошта", en: "Email Address" },
+  table_phone: { uk: "Телефон", en: "Phone" },
+  table_created: { uk: "Створено", en: "Created" },
+  table_actions: { uk: "Дії", en: "Actions" },
+  
+  // User Status
+  status_active: { uk: "Активний", en: "Active" },
+  status_inactive: { uk: "Неактивний", en: "Inactive" },
+  activate_user: { uk: "Активувати користувача", en: "Activate User" },
+  deactivate_user: { uk: "Деактивувати користувача", en: "Deactivate User" },
+  
+  // User Actions
+  edit_action: { uk: "Редагувати", en: "Edit User" },
+  delete_action: { uk: "Видалити", en: "Delete User" },
+  send_email: { uk: "Надіслати email", en: "Send Email" },
+  call_user: { uk: "Зателефонувати", en: "Call User" },
+  
+  // User Forms
+  form_full_name: { uk: "Повне ім'я", en: "Full Name" },
+  form_email_address: { uk: "Електронна пошта", en: "Email Address" },
+  form_password: { uk: "Пароль", en: "Password" },
+  form_phone_number: { uk: "Номер телефону (необов'язково)", en: "Phone Number (Optional)" },
+  form_notify_email: { uk: "Надіслати облікові дані на пошту", en: "Send credentials by email" },
+  
+  // Form Placeholders
+  placeholder_full_name: { uk: "Введіть повне ім'я користувача", en: "Enter user's full name" },
+  placeholder_email: { uk: "user@example.com", en: "user@example.com" },
+  placeholder_password: { uk: "Мінімум 8 символів", en: "Minimum 8 characters" },
+  placeholder_phone: { uk: "+38 (050) 123-45-67", en: "+1 (555) 123-4567" },
+  
+  // Form Descriptions
+  desc_password: { uk: "Пароль має бути не менше 8 символів", en: "Password must be at least 8 characters long" },
+  desc_email_notify: { uk: "Користувач отримає облікові дані на електронну пошту", en: "User will receive login credentials via email" },
+  desc_email_readonly: { uk: "Електронну пошту неможливо змінити", en: "Email address cannot be changed" },
+  
+  // Dialog Messages
+  create_user_title: { uk: "Додати нового користувача", en: "Add New User" },
+  create_user_desc: { uk: "Створити новий обліковий запис користувача. Користувач отримає облікові дані на електронну пошту.", en: "Create a new user account. The user will receive login credentials via email." },
+  edit_user_title: { uk: "Редагувати користувача", en: "Edit User" },
+  edit_user_desc: { uk: "Оновити інформацію користувача. Електронну пошту неможливо змінити.", en: "Update user information. Email address cannot be changed." },
+  delete_user_title: { uk: "Видалити обліковий запис користувача", en: "Delete User Account" },
+  delete_user_desc: { uk: "Цю дію неможливо скасувати.", en: "This action cannot be undone." },
+  
+  // Status Change Confirmations
+  confirm_activate: { uk: "Ви впевнені, що хочете активувати цього користувача? Він отримає доступ до системи.", en: "Are you sure you want to activate this user? They will regain access to the system." },
+  confirm_deactivate: { uk: "Ви впевнені, що хочете деактивувати цього користувача? Він втратить доступ до системи.", en: "Are you sure you want to deactivate this user? They will lose access to the system." },
+  
+  // Delete Consequences
+  delete_consequences_title: { uk: "Що станеться при видаленні користувача:", en: "What happens when you delete this user:" },
+  delete_consequence_1: { uk: "• Обліковий запис користувача буде назавжди деактивований", en: "• User account will be permanently deactivated" },
+  delete_consequence_2: { uk: "• Користувач негайно втратить доступ до системи", en: "• User will lose access to the system immediately" },
+  delete_consequence_3: { uk: "• Дані користувача будуть позначені як видалені, але збережені для аудиту", en: "• User data will be marked as deleted but retained for audit purposes" },
+  delete_consequence_4: { uk: "• Цю дію неможливо скасувати", en: "• This action cannot be undone" },
+  
+  // Filters and Search
+  filters_title: { uk: "Фільтри", en: "Filters" },
+  search_placeholder: { uk: "Пошук користувачів за ім'ям або email...", en: "Search users by name or email..." },
+  filter_all_status: { uk: "Всі статуси", en: "All Status" },
+  sort_newest_first: { uk: "Спочатку нові", en: "Newest First" },
+  sort_oldest_first: { uk: "Спочатку старі", en: "Oldest First" },
+  sort_name_az: { uk: "Ім'я А-Я", en: "Name A-Z" },
+  sort_name_za: { uk: "Ім'я Я-А", en: "Name Z-A" },
+  sort_email_az: { uk: "Email А-Я", en: "Email A-Z" },
+  sort_email_za: { uk: "Email Я-А", en: "Email Z-A" },
+  refresh: { uk: "Оновити", en: "Refresh" },
+  
+  // Pagination
+  showing_users: { uk: "Показано з", en: "Showing" },
+  to: { uk: "до", en: "to" },
+  of: { uk: "з", en: "of" },
+  users_total: { uk: "користувачів", en: "users" },
+  previous: { uk: "Попередня", en: "Previous" },
+  next: { uk: "Наступна", en: "Next" },
+  
+  // Empty States
+  no_users_found: { uk: "Користувачів не знайдено", en: "No users found" },
+  
+  // Buttons
+  btn_cancel: { uk: "Скасувати", en: "Cancel" },
+  btn_create: { uk: "Створити користувача", en: "Create User" },
+  btn_update: { uk: "Оновити користувача", en: "Update User" },
+  btn_delete: { uk: "Видалити користувача", en: "Delete User" },
+  btn_activate: { uk: "Активувати", en: "Activate" },
+  btn_deactivate: { uk: "Деактивувати", en: "Deactivate" },
+  
+  // Loading States
+  loading_creating: { uk: "Створення...", en: "Creating..." },
+  loading_updating: { uk: "Оновлення...", en: "Updating..." },
+  loading_deleting: { uk: "Видалення...", en: "Deleting..." },
+  
+  // Success Messages
+  success_user_created: { uk: "Користувача успішно створено", en: "User created successfully" },
+  success_user_updated: { uk: "Користувача успішно оновлено", en: "User updated successfully" },
+  success_user_deleted: { uk: "Користувача успішно видалено", en: "User deleted successfully" },
+  success_user_activated: { uk: "Користувача успішно активовано", en: "User activated successfully" },
+  success_user_deactivated: { uk: "Користувача успішно деактивовано", en: "User deactivated successfully" },
+  
+  // Error Messages
+  error_create_user: { uk: "Не вдалося створити користувача", en: "Failed to create user" },
+  error_update_user: { uk: "Не вдалося оновити користувача", en: "Failed to update user" },
+  error_delete_user: { uk: "Не вдалося видалити користувача", en: "Failed to delete user" },
+  error_fetch_users: { uk: "Не вдалося завантажити користувачів", en: "Failed to fetch users" },
+  error_update_status: { uk: "Не вдалося оновити статус користувача", en: "Failed to update user status" },
+  error_try_again: { uk: "Будь ласка, спробуйте ще раз", en: "Please try again later" },
+  
+  // Breadcrumb Navigation
+  breadcrumb_home: { uk: "Головна", en: "Home" },
+  breadcrumb_dashboard: { uk: "Панель управління", en: "Dashboard" },
+  breadcrumb_users: { uk: "Користувачі", en: "Users" },
+  breadcrumb_forms: { uk: "Форми", en: "Forms" },
+  breadcrumb_settings: { uk: "Налаштування", en: "Settings" },
+  breadcrumb_personal: { uk: "Особистий кабінет", en: "Personal" },
+  breadcrumb_profile: { uk: "Профіль", en: "Profile" },
+  breadcrumb_elements: { uk: "Елементи", en: "Elements" },
+  breadcrumb_layouts: { uk: "Макети", en: "Layouts" },
+  breadcrumb_horizontal: { uk: "Горизонтальні", en: "Horizontal" },
+  breadcrumb_vertical: { uk: "Вертикальні", en: "Vertical" },
+  breadcrumb_custom: { uk: "Користувацькі", en: "Custom" },
+  breadcrumb_validation: { uk: "Валідація", en: "Validation" },
 };
 
 type I18nContextType = {
@@ -167,6 +298,29 @@ export const useI18n = () => {
   const ctx = useContext(I18nContext);
   if (!ctx) throw new Error("useI18n must be used within I18nProvider");
   return ctx;
+};
+
+// Helper hook for user management translations
+export const useUserTranslations = () => {
+  const { t, lang } = useI18n();
+  
+  return {
+    t: (key: keyof typeof dictionary) => t(key),
+    lang,
+    // Predefined common translations for user management
+    common: {
+      users: t("users_title"),
+      addUser: t("add_user"),
+      editUser: t("edit_user"),
+      deleteUser: t("delete_user"),
+      active: t("status_active"),
+      inactive: t("status_inactive"),
+      cancel: t("btn_cancel"),
+      save: t("btn_update"),
+      create: t("btn_create"),
+      delete: t("btn_delete"),
+    },
+  };
 };
 
 

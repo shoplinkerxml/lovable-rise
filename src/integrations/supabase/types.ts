@@ -23,6 +23,16 @@ export type Database = {
           parent_id: number | null
           path: string
           title: string
+          page_type: string
+          content_data: Json | null
+          template_name: string | null
+          meta_data: Json | null
+          icon_name: string | null
+          section_type: string | null
+          has_separator: boolean | null
+          description: string | null
+          badge_text: string | null
+          badge_color: string | null
         }
         Insert: {
           created_at?: string
@@ -32,6 +42,16 @@ export type Database = {
           parent_id?: number | null
           path: string
           title: string
+          page_type?: string
+          content_data?: Json | null
+          template_name?: string | null
+          meta_data?: Json | null
+          icon_name?: string | null
+          section_type?: string | null
+          has_separator?: boolean | null
+          description?: string | null
+          badge_text?: string | null
+          badge_color?: string | null
         }
         Update: {
           created_at?: string
@@ -41,6 +61,16 @@ export type Database = {
           parent_id?: number | null
           path?: string
           title?: string
+          page_type?: string
+          content_data?: Json | null
+          template_name?: string | null
+          meta_data?: Json | null
+          icon_name?: string | null
+          section_type?: string | null
+          has_separator?: boolean | null
+          description?: string | null
+          badge_text?: string | null
+          badge_color?: string | null
         }
         Relationships: [
           {
@@ -69,6 +99,7 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
+          avatar_url: string | null
         }
         Insert: {
           created_at?: string
@@ -79,6 +110,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
+          avatar_url?: string | null
         }
         Update: {
           created_at?: string
@@ -89,6 +121,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
+          avatar_url?: string | null
         }
         Relationships: []
       }
