@@ -17,6 +17,7 @@ interface UserProfile {
 interface UserFilters {
   search?: string;
   status?: "all" | "active" | "inactive";
+  role?: "user" | "admin" | "manager" | "all";
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }

@@ -23,6 +23,7 @@ import { useUsers, useToggleUserStatus } from "@/hooks/useUsers";
 interface UserFilters {
   search: string;
   status: "all" | "active" | "inactive";
+  role: "user" | "admin" | "manager" | "all";
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -54,6 +55,7 @@ export default function AdminUsersPage() {
   const [filters, setFilters] = useState<UserFilters>({
     search: "",
     status: "all",
+    role: "user", // Show only users by default (changed from "all")
     sortBy: "created_at",
     sortOrder: "desc",
   });
@@ -195,6 +197,18 @@ export default function AdminUsersPage() {
               <option value="all">{t("filter_all_status")}</option>
               <option value="active">{t("status_active")}</option>
               <option value="inactive">{t("status_inactive")}</option>
+            </select>
+            
+            {/* Role Filter */}
+            <select
+              value={filters.role}
+              onChange={(e) => handleFilterChange("role", e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+            >
+              <option value="user">{t("role_user")}</option>
+              <option value="admin">{t("role_admin")}</option>
+              <option value="manager">{t("role_manager")}</option>
+              <option value="all">{t("filter_all_roles")}</option>
             </select>
             
             {/* Sort Options */}

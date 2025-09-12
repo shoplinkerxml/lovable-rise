@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
@@ -13,25 +13,46 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Handle both authentication methods per Supabase recommendations
     const authHeader = req.headers.get('Authorization');
-    
+    const apiKey = req.headers.get('apikey');
+
+    let supabaseClient;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Authenticated user request
+      supabaseClient = createClient<Database>(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        }
+      );
+    } else if (apiKey) {
+      // Anonymous request
+      supabaseClient = createClient<Database>(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        apiKey,
+        {}
+      );
+    } else {
+      // No authentication provided
+      return new Response(
+        JSON.stringify({ error: 'Missing authentication' }),
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
     // Enhanced logging for token debugging
     console.log('Auth-me request received:', {
       hasAuthHeader: !!authHeader,
+      hasApiKey: !!apiKey,
       authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
       timestamp: new Date().toISOString()
     });
     
-    const supabaseClient = createClient<Database>(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader! },
-        },
-      }
-    )
-
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     
     if (userError || !user) {

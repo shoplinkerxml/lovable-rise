@@ -11,6 +11,11 @@
  */
 
 export interface Database {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.4"
+  }
   public: {
     Tables: {
       profiles: {
@@ -33,6 +38,8 @@ export interface Database {
           role?: 'admin' | 'manager' | 'user'  // All three roles explicitly defined
           status?: 'active' | 'inactive'
           avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           email?: string
@@ -41,6 +48,8 @@ export interface Database {
           role?: 'admin' | 'manager' | 'user'  // All three roles explicitly defined
           status?: 'active' | 'inactive'
           avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
       menu_items: {
