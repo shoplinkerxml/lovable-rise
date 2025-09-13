@@ -164,7 +164,7 @@ const AdminPersonal = () => {
               <label className="text-sm font-medium">{t("form_email_address")}</label>
               <Input value={email} disabled />
             </div>
-            <Button onClick={save} disabled={saving} className="bg-emerald-600 text-white hover:bg-emerald-700">{t("btn_update")}</Button>
+            <Button onClick={save} disabled={saving} variant="secondary">{t("btn_update")}</Button>
           </div>
         </CardContent>
       </Card>

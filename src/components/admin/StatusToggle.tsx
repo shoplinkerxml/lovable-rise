@@ -52,7 +52,6 @@ export function StatusToggle({ userId, status, onToggle, disabled = false }: Sta
           checked={status === "active"}
           onCheckedChange={handleToggleClick}
           disabled={disabled}
-          className="data-[state=checked]:bg-green-600"
         />
         <Badge
           variant={status === "active" ? "default" : "secondary"}

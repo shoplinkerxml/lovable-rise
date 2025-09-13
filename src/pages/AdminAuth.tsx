@@ -142,7 +142,7 @@ const AdminAuth = () => {
               {error && (
                 <div className="text-sm text-red-600">{error}</div>
               )}
-              <Button type="submit" disabled={loading} className="w-full bg-emerald-200 text-emerald-900 hover:bg-emerald-300">
+              <Button type="submit" disabled={loading} className="w-full" variant="default">
                 {loading ? "…" : t("sign_in")}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
