@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       if (name !== undefined) updateData.name = name
       if (phone !== undefined) updateData.phone = phone
       if (role !== undefined) updateData.role = role
-      if (status !== undefined) updateData.status = status
+      if (status !== undefined) updateData.status = status  // ✅ добавлено
 
       const { data: user, error } = await serviceClient
         .from('profiles')

@@ -136,13 +136,10 @@ export class UserService {
 
   static async updateUser(id: string, data: UpdateUserData): Promise<UserProfile> {
     try {
-      const response = await supabase.functions.invoke("users", {
+      const response = await supabase.functions.invoke(`users/${id}`, {
         method: "PATCH",
         headers: await getAuthHeaders(),
-        body: JSON.stringify({
-          id,
-          ...data,
-        }),
+        body: JSON.stringify(data),
       });
 
       if (response.error) {
@@ -158,7 +155,7 @@ export class UserService {
 
   static async deleteUser(id: string): Promise<UserProfile> {
     try {
-      const response = await supabase.functions.invoke("users", {
+      const response = await supabase.functions.invoke(`users/${id}`, {
         method: "DELETE",
         headers: await getAuthHeaders(),
         body: JSON.stringify({ id }),

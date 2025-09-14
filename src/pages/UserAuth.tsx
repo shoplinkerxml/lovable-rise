@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { TrendingUp, User, CheckCircle2, Chrome, Facebook } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { UserAuthService } from "@/lib/user-auth-service";
+import { ProfileService } from "@/lib/profile-service";
 import { 
   loginSchema,
   LoginData
@@ -77,6 +78,18 @@ const UserAuth = () => {
         setTimeout(() => {
           navigate('/user-register');
         }, 3000);
+        return;
+      }
+      
+      // Check if user account is inactive
+      if (user && user.status === 'inactive') {
+        toast.error(
+          lang === 'uk'
+            ? 'Ваш акаунт заблоковано. Зверніться до адміністратора.'
+            : 'Your account has been blocked. Please contact the administrator.'
+        );
+        // Logout the user since they can't access the system
+        await UserAuthService.logout();
         return;
       }
       
@@ -288,7 +301,8 @@ const UserAuth = () => {
                 <Button 
                   type="submit" 
                   disabled={loading} 
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full"
+                  variant="default"
                 >
                   {loading ? "..." : t("login_button_user")}
                 </Button>

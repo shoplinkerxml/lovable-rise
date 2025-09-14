@@ -183,7 +183,8 @@ const UserForgotPassword = () => {
                   <Button 
                     type="submit" 
                     disabled={loading} 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    className="w-full"
+                    variant="default"
                   >
                     {loading ? "..." : t("reset_button")}
                   </Button>
