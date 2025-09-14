@@ -1,25 +1,29 @@
+// File: src/services/UserService.ts (клиентская часть)
 import { supabase } from "@/integrations/supabase/client";
 
-// Helper function to get the appropriate authentication header
+/**
+ * Helper function to get the appropriate authentication headers
+ * - Если пользователь авторизован, используем Bearer token
+ * - Если нет — используем анонимный apikey
+ */
 async function getAuthHeaders() {
   const session = await supabase.auth.getSession();
-  const headers: Record<string, string> = { 
-    "Content-Type": "application/json"
-  };
-  
+  const headers: Record<string, string> = {};
+
   if (session.data.session) {
-    // Use Authorization header for authenticated users
     headers["Authorization"] = `Bearer ${session.data.session.access_token}`;
   } else {
-    // Use apikey header for anonymous requests
-    // Access the anon key from the Supabase client configuration
-    headers["apikey"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0";
+    // ВАЖНО: не храните service_role ключ на клиенте
+    headers["apikey"] =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0";
   }
-  
+
+  console.log("getAuthHeaders called, returning headers:", headers);
   return headers;
 }
 
-interface UserProfile {
+/** Интерфейсы данных */
+export interface UserProfile {
   id: string;
   email: string;
   name: string;
@@ -31,7 +35,7 @@ interface UserProfile {
   avatar_url?: string;
 }
 
-interface UserFilters {
+export interface UserFilters {
   search?: string;
   status?: "all" | "active" | "inactive";
   role?: "user" | "admin" | "manager" | "all";
@@ -39,19 +43,19 @@ interface UserFilters {
   sortOrder?: "asc" | "desc";
 }
 
-interface PaginationParams {
+export interface PaginationParams {
   page: number;
   limit: number;
 }
 
-interface UsersResponse {
+export interface UsersResponse {
   users: UserProfile[];
   total: number;
   page: number;
   limit: number;
 }
 
-interface CreateUserData {
+export interface CreateUserData {
   email: string;
   password: string;
   name: string;
@@ -60,140 +64,135 @@ interface CreateUserData {
   notify_by_email: boolean;
 }
 
-interface UpdateUserData {
+export interface UpdateUserData {
   name?: string;
   phone?: string;
   status?: "active" | "inactive";
 }
 
+/** Класс для работы с пользователями */
 export class UserService {
+  /** Получение списка пользователей */
   static async getUsers(
     filters: UserFilters = {},
     pagination: PaginationParams = { page: 1, limit: 10 }
   ): Promise<UsersResponse> {
-    try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      
-      // Add filters
-      if (filters.search) queryParams.append('search', filters.search);
-      if (filters.status && filters.status !== 'all') queryParams.append('status', filters.status);
-      // Handle role filter properly - only add if explicitly set
-      if (filters.role && filters.role !== 'all') {
-        queryParams.append('role', filters.role);
-      } else if (filters.role === 'all') {
-        queryParams.append('role', 'all');
-      }
-      // If filters.role is undefined or null, we don't add the role parameter at all
-      if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
-      if (filters.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
-      
-      // Add pagination
-      queryParams.append('page', pagination.page.toString());
-      queryParams.append('limit', pagination.limit.toString());
-      
-      // Convert query parameters to query string
-      const queryString = queryParams.toString();
-      const url = queryString ? `?${queryString}` : '';
+    const queryParams = new URLSearchParams();
 
-      const response = await supabase.functions.invoke("users" + url, {
-        method: "GET",
-        headers: await getAuthHeaders()
-      });
+    if (filters.search) queryParams.append("search", filters.search);
+    if (filters.status && filters.status !== "all") queryParams.append("status", filters.status);
+    if (filters.role && filters.role !== "all") queryParams.append("role", filters.role);
+    if (filters.sortBy) queryParams.append("sortBy", filters.sortBy);
+    if (filters.sortOrder) queryParams.append("sortOrder", filters.sortOrder);
 
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to fetch users");
-      }
+    queryParams.append("page", pagination.page.toString());
+    queryParams.append("limit", pagination.limit.toString());
 
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      throw new Error(error instanceof Error ? error.message : "Failed to fetch users");
-    }
+    const queryString = queryParams.toString();
+    const url = queryString ? `users?${queryString}` : "users";
+
+    const response = await supabase.functions.invoke(url, {
+      method: "GET",
+      headers: await getAuthHeaders(),
+    });
+
+    if (response.error) throw new ApiError(response.error.message || "Failed to fetch users");
+    return response.data;
   }
 
+  /** Создание пользователя */
   static async createUser(userData: CreateUserData): Promise<UserProfile> {
-    try {
-      const response = await supabase.functions.invoke("users", {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({
-          ...userData,
-          email_confirm: true, // Skip email confirmation for admin-created users
-        }),
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to create user");
-      }
-
-      return response.data.user;
-    } catch (error) {
-      console.error("Error creating user:", error);
-      throw new Error(error instanceof Error ? error.message : "Failed to create user");
+    if (!userData.email || !userData.password || !userData.name) {
+      throw new ApiError("Missing required fields: email, password, or name", 400);
     }
+
+    const response = await supabase.functions.invoke("users", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({
+        ...userData,
+        email_confirm: true, // Skip email confirmation for admin-created users
+      }),
+    });
+
+    if (response.error) throw new ApiError(response.error.message || "Failed to create user");
+    return response.data.user;
   }
 
+  /** Обновление пользователя */
   static async updateUser(id: string, data: UpdateUserData): Promise<UserProfile> {
-    try {
-      const response = await supabase.functions.invoke(`users/${id}`, {
-        method: "PATCH",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
+    if (!id) throw new ApiError("User ID is required", 400);
+    if (!data || Object.keys(data).length === 0) throw new ApiError("No fields provided for update", 400);
 
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to update user");
-      }
+    // Filter out undefined values
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, value]) => value !== undefined)
+    );
 
-      return response.data.user;
-    } catch (error) {
-      console.error("Error updating user:", error);
-      throw new Error(error instanceof Error ? error.message : "Failed to update user");
-    }
+    // Check if we still have data after filtering
+    if (Object.keys(cleanData).length === 0) throw new ApiError("No valid fields provided for update", 400);
+
+    // Log the request for debugging
+    console.log("UserService.updateUser called with:", { id, cleanData });
+
+    const response = await supabase.functions.invoke(`users/${id}`, {
+      method: "PATCH",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify(cleanData), // Pass JSON string, not object
+    });
+
+    console.log("UserService.updateUser response:", response);
+
+    if (response.error) throw new ApiError(response.error.message || "Failed to update user");
+    return response.data.user;
   }
 
+  /** Удаление пользователя */
   static async deleteUser(id: string): Promise<UserProfile> {
-    try {
-      const response = await supabase.functions.invoke(`users/${id}`, {
-        method: "DELETE",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ id }),
-      });
+    if (!id) throw new ApiError("User ID is required", 400);
 
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to delete user");
-      }
+    const response = await supabase.functions.invoke(`users/${id}`, {
+      method: "DELETE",
+      headers: await getAuthHeaders(),
+    });
 
-      return response.data.user;
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      throw new Error(error instanceof Error ? error.message : "Failed to delete user");
-    }
+    if (response.error) throw new ApiError(response.error.message || "Failed to delete user");
+    return response.data.user;
   }
 
+  /** Переключение статуса пользователя */
   static async toggleUserStatus(id: string, status: "active" | "inactive"): Promise<UserProfile> {
+    // Validate parameters
+    if (!id) throw new ApiError("User ID is required", 400);
+    if (status === undefined || status === null) throw new ApiError("Status is required", 400);
+    if (!["active", "inactive"].includes(status)) throw new ApiError("Invalid status value", 400);
+
+    console.log("UserService.toggleUserStatus called with:", { id, status });
+
     return this.updateUser(id, { status });
   }
 }
 
+/** Класс для ошибок API */
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number = 500,
-    public code?: string
-  ) {
+  constructor(message: string, public status: number = 500, public code?: string) {
     super(message);
     this.name = "ApiError";
   }
 }
 
+/** Обработка ошибок */
 export function handleApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
-  
-  if (error && typeof error === "object" && "message" in error) {
-    return new ApiError(error.message as string, 500);
+
+  if (error && typeof error === "object") {
+    if ("message" in error && typeof error.message === "string") {
+      return new ApiError(error.message, 500);
+    }
+    if ("error" in error && typeof error.error === "string") {
+      return new ApiError(error.error, 500);
+    }
   }
-  
+
   return new ApiError("An unexpected error occurred", 500);
 }
