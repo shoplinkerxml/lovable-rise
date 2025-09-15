@@ -69,8 +69,16 @@ const AdminAuth = () => {
 
   return (
     <div className="relative min-h-screen flex">
+      {/* Language Toggle - Improved hover state */}
       <div className="absolute right-4 top-4 md:right-8 md:top-8 z-10">
-        <Button type="button" variant="ghost" onClick={() => setLang(lang === "uk" ? "en" : "uk")}>UA/EN</Button>
+        <Button 
+          type="button" 
+          variant="ghost" 
+          onClick={() => setLang(lang === "uk" ? "en" : "uk")}
+          className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
+        >
+          {lang === "uk" ? "EN" : "UA"}
+        </Button>
       </div>
       <div className="container mx-auto my-auto grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] items-center gap-4 md:gap-8">
       <div className="hidden md:flex flex-col justify-center md:items-end px-6 lg:px-10">
