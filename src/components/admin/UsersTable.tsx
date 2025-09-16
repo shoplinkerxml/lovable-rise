@@ -265,9 +265,6 @@ export function UsersTable({
                     <UserAvatar user={user} />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm">{user.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {user.email}
-                      </div>
                     </div>
                   </div>
                 </TableCell>
@@ -283,8 +280,8 @@ export function UsersTable({
                 </TableCell>
 
                 {/* Email Column */}
-                <TableCell>
-                  <div className="max-w-[200px] truncate" title={user.email}>
+                <TableCell className="max-w-[250px]">
+                  <div className="max-w-full truncate" title={user.email}>
                     {user.email}
                   </div>
                 </TableCell>
@@ -294,7 +291,7 @@ export function UsersTable({
                   {user.phone ? (
                     <a 
                       href={`tel:${user.phone}`}
-                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                      className="text-muted-foreground hover:text-muted-foreground hover:underline"
                     >
                       {user.phone}
                     </a>
