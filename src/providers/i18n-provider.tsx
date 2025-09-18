@@ -284,7 +284,7 @@ const dictionary: Dictionary = {
 
 // User Statistics
 const userStatisticsDictionary = {
-  total_users: { uk: "Загальна кількість користувачів", en: "Total Users" },
+  total_users: { uk: "Всього користувачів", en: "Total Users" },
   active_users: { uk: "Активні користувачі", en: "Active Users" },
   registered_users: { uk: "Зареєстровані користувачі", en: "Registered Users" },
   user_statistics: { uk: "Статистика користувачів", en: "User Statistics" },
