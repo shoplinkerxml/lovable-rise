@@ -81,33 +81,45 @@ export class UserService {
     filters: UserFilters = {},
     pagination: PaginationParams = { page: 1, limit: 10 }
   ): Promise<UsersResponse> {
-    const queryParams = new URLSearchParams();
-
-    if (filters.search) queryParams.append("search", filters.search);
-    if (filters.status && filters.status !== "all") queryParams.append("status", filters.status);
-    if (filters.role && filters.role !== "all") queryParams.append("role", filters.role);
-    if (filters.sortBy) queryParams.append("sortBy", filters.sortBy);
-    if (filters.sortOrder) queryParams.append("sortOrder", filters.sortOrder);
-
-    queryParams.append("page", pagination.page.toString());
-    queryParams.append("limit", pagination.limit.toString());
-
-    const queryString = queryParams.toString();
-    const url = queryString ? `users?${queryString}` : "users";
-
     // Validate session before operation
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
-    const response = await supabase.functions.invoke(url, {
-      method: "GET",
-      headers: await getAuthHeaders(),
+    console.log("UserService.getUsers called with:", { filters, pagination });
+
+    // Подготавливаем фильтры
+    const requestFilters: Record<string, any> = {};
+    if (filters.search) requestFilters.name = filters.search;
+    if (filters.status && filters.status !== "all") requestFilters.status = filters.status;
+    if (filters.role && filters.role !== "all") requestFilters.role = filters.role;
+
+    // Подготавливаем данные для запроса
+    const requestBody = {
+      action: "list" as const,
+      limit: pagination.limit,
+      offset: (pagination.page - 1) * pagination.limit,
+      filters: requestFilters
+    };
+
+    const { data: responseData, error } = await supabase.functions.invoke("users", {
+      body: requestBody,
     });
 
-    if (response.error) throw new ApiError(response.error.message || "Failed to fetch users");
-    return response.data;
+    console.log("UserService.getUsers response:", { responseData, error });
+
+    if (error) {
+      throw new ApiError(error.message || "Failed to fetch users", error.status || 500);
+    }
+
+    // Преобразуем ответ в ожидаемый формат
+    return {
+      users: responseData.users || [],
+      total: responseData.users?.length || 0,
+      page: pagination.page,
+      limit: pagination.limit
+    };
   }
 
   /** Создание пользователя */
@@ -122,23 +134,74 @@ export class UserService {
       throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
-    const response = await supabase.functions.invoke("users", {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({
+    console.log("UserService.createUser called with:", userData);
+
+    const { data: responseData, error } = await supabase.functions.invoke("users", {
+      body: {
+        action: "create",
         ...userData,
         email_confirm: true, // Skip email confirmation for admin-created users
-      }),
+      },
     });
 
-    if (response.error) throw new ApiError(response.error.message || "Failed to create user");
-    return response.data.user;
+    console.log("UserService.createUser response:", { responseData, error });
+
+    if (error) {
+      throw new ApiError(error.message || "Failed to create user", error.status || 500);
+    }
+
+    if (!responseData || !responseData.user) {
+      throw new ApiError("Invalid response from server", 500);
+    }
+
+    return responseData.user;
   }
 
   /** Обновление пользователя */
   static async updateUser(id: string, data: UpdateUserData): Promise<UserProfile> {
     if (!id) throw new ApiError("User ID is required", 400);
-    if (!data || Object.keys(data).length === 0) throw new ApiError("No fields provided for update", 400);
+    
+    // Validate session before operation
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
+    }
+
+    // Убираем undefined, но оставляем null
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, value]) => value !== undefined)
+    );
+
+    if (Object.keys(cleanData).length === 0) {
+      throw new ApiError("No fields provided for update", 400);
+    }
+
+    console.log("UserService.updateUser called with:", { id, cleanData });
+
+    const { data: responseData, error } = await supabase.functions.invoke("users", {
+      body: {
+        action: "update",
+        id,
+        ...cleanData,
+      },
+    });
+
+    console.log("UserService.updateUser response:", { responseData, error });
+
+    if (error) {
+      throw new ApiError(error.message || "Failed to update user", error.status || 500);
+    }
+
+    if (!responseData || !responseData.user) {
+      throw new ApiError("Invalid response from server", 500);
+    }
+
+    return responseData.user;
+  }
+
+  /** Получение одного пользователя */
+  static async getUser(id: string): Promise<UserProfile> {
+    if (!id) throw new ApiError("User ID is required", 400);
 
     // Validate session before operation
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -146,27 +209,26 @@ export class UserService {
       throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
-    // Filter out undefined values
-    const cleanData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined)
-    );
+    console.log("UserService.getUser called with:", { id });
 
-    // Check if we still have data after filtering
-    if (Object.keys(cleanData).length === 0) throw new ApiError("No valid fields provided for update", 400);
-
-    // Log the request for debugging
-    console.log("UserService.updateUser called with:", { id, cleanData });
-
-    const response = await supabase.functions.invoke(`users/${id}`, {
-      method: "PATCH",
-      headers: await getAuthHeaders(),
-      body: JSON.stringify(cleanData), // Pass JSON string, not object
+    const { data: responseData, error } = await supabase.functions.invoke("users", {
+      body: {
+        action: "get",
+        id,
+      },
     });
 
-    console.log("UserService.updateUser response:", response);
+    console.log("UserService.getUser response:", { responseData, error });
 
-    if (response.error) throw new ApiError(response.error.message || "Failed to update user");
-    return response.data.user;
+    if (error) {
+      throw new ApiError(error.message || "Failed to get user", error.status || 500);
+    }
+
+    if (!responseData || !responseData.user) {
+      throw new ApiError("User not found", 404);
+    }
+
+    return responseData.user;
   }
 
   /** Удаление пользователя */
@@ -179,13 +241,26 @@ export class UserService {
       throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
-    const response = await supabase.functions.invoke(`users/${id}`, {
-      method: "DELETE",
-      headers: await getAuthHeaders(),
+    console.log("UserService.deleteUser called with:", { id });
+
+    const { data: responseData, error } = await supabase.functions.invoke("users", {
+      body: {
+        action: "delete",
+        id,
+      },
     });
 
-    if (response.error) throw new ApiError(response.error.message || "Failed to delete user");
-    return response.data.user;
+    console.log("UserService.deleteUser response:", { responseData, error });
+
+    if (error) {
+      throw new ApiError(error.message || "Failed to delete user", error.status || 500);
+    }
+
+    if (!responseData || !responseData.user) {
+      throw new ApiError("Invalid response from server", 500);
+    }
+
+    return responseData.user;
   }
 
   /** Переключение статуса пользователя */

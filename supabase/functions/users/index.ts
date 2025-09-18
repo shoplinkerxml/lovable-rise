@@ -285,6 +285,16 @@ Deno.serve(async (req) => {
 
     // ---------------- PATCH /users/:id ----------------
     if (req.method === 'PATCH' && userId) {
+      // Add detailed logging for debugging
+      console.log('PATCH /users/:id called with:', {
+        userId,
+        method: req.method,
+        contentType: req.headers.get('Content-Type'),
+        contentLength: req.headers.get('Content-Length'),
+        authorizationHeader: req.headers.get('Authorization') ? 'present' : 'missing',
+        allHeaders: Object.fromEntries(req.headers.entries())
+      });
+
       const contentType = req.headers.get('Content-Type') || '';
       if (!contentType.includes('application/json')) {
         return new Response(JSON.stringify({ error: 'Content-Type must be application/json' }), { 
@@ -293,17 +303,42 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Check if Content-Length header is present and valid
+      const contentLength = req.headers.get('Content-Length');
+      if (contentLength && parseInt(contentLength, 10) === 0) {
+        console.log('Empty request body detected via Content-Length header');
+        return new Response(JSON.stringify({ error: 'Request body is required and cannot be empty' }), { 
+          status: 400, 
+          headers: corsHeaders 
+        });
+      }
+
       let body: { name?: string; phone?: string; role?: string; status?: string };
       try { 
-        body = await req.json(); 
+        body = await req.json();
+        console.log('Request body parsed successfully:', { body, bodyKeys: Object.keys(body) });
       } catch (err) {
+        console.error('Failed to parse request body:', err);
+        // Check if body is empty or malformed
+        const bodyText = await req.text().catch(() => '');
+        console.log('Raw body text:', { bodyText, bodyLength: bodyText.length });
         return new Response(JSON.stringify({ error: 'Request body must be valid JSON' }), { 
           status: 400, 
           headers: corsHeaders 
         });
       }
 
-      if (!body || Object.keys(body).length === 0) {
+      // Additional validation for edge cases
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        console.log('Invalid body type detected:', { body, bodyType: typeof body, isArray: Array.isArray(body) });
+        return new Response(JSON.stringify({ error: 'Request body must be a JSON object' }), { 
+          status: 400, 
+          headers: corsHeaders 
+        });
+      }
+
+      if (Object.keys(body).length === 0) {
+        console.log('Empty body detected:', { body, bodyLength: Object.keys(body).length });
         return new Response(JSON.stringify({ error: 'No fields provided for update' }), { 
           status: 400, 
           headers: corsHeaders 
@@ -316,6 +351,17 @@ Deno.serve(async (req) => {
       if (phone !== undefined) updateData.phone = phone;
       if (role !== undefined) updateData.role = role;
       if (status !== undefined) updateData.status = status;
+
+      // Validate that we have at least one field to update
+      if (Object.keys(updateData).length === 0) {
+        console.log('No valid fields to update after filtering:', { body, updateData });
+        return new Response(JSON.stringify({ error: 'No valid fields provided for update' }), { 
+          status: 400, 
+          headers: corsHeaders 
+        });
+      }
+
+      console.log('Update data prepared:', { updateData, userId });
 
       const { data: user, error } = await serviceClient
         .from('profiles')
@@ -339,6 +385,7 @@ Deno.serve(async (req) => {
         });
       }
 
+      console.log('User updated successfully:', { userId, updateData });
       return new Response(JSON.stringify({ user }), { headers: corsHeaders });
     }
 
