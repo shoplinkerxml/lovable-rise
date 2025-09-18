@@ -12,12 +12,39 @@ const corsHeaders = {
 
 // Проверка админа для POST/PATCH/DELETE
 async function checkAdminPermission(serviceClient: SupabaseClient, authHeader: string) {
+  // Debug information for header analysis
+  const hasAuthHeader = !!authHeader;
+  const tokenLength = authHeader ? authHeader.length : 0;
+  const isBearerToken = authHeader && authHeader.startsWith('Bearer ');
+  
   if (!authHeader) {
-    return { error: 'Unauthorized - no token', status: 401 };
+    return { 
+      error: 'Unauthorized - no token', 
+      status: 401,
+      debug: {
+        hasAuthHeader,
+        tokenLength,
+        isBearerToken
+      }
+    };
   }
 
   // Extract the token from the Authorization header (Bearer token)
   const token = authHeader.replace('Bearer ', '');
+  
+  // Validate that we have a proper token
+  if (!token || token.length < 10) {
+    return { 
+      error: 'Unauthorized - invalid token format', 
+      status: 401,
+      debug: {
+        hasAuthHeader,
+        tokenLength,
+        isBearerToken,
+        extractedTokenLength: token ? token.length : 0
+      }
+    };
+  }
   
   const client = createClient(
     Deno.env.get('SUPABASE_URL') || '',
@@ -31,7 +58,16 @@ async function checkAdminPermission(serviceClient: SupabaseClient, authHeader: s
 
   const { data: { user }, error: userError } = await client.auth.getUser();
   if (userError || !user) {
-    return { error: 'Unauthorized', status: 401 };
+    return { 
+      error: 'Unauthorized - invalid token', 
+      status: 401,
+      debug: {
+        hasAuthHeader,
+        tokenLength,
+        isBearerToken,
+        userError: userError?.message || 'No user found'
+      }
+    };
   }
 
   const { data: profile, error: profileError } = await serviceClient
@@ -40,8 +76,38 @@ async function checkAdminPermission(serviceClient: SupabaseClient, authHeader: s
     .eq('id', user.id)
     .maybeSingle();
 
-  if (profileError) return { error: 'Failed to fetch profile', status: 500 };
-  if (!profile || profile.role !== 'admin') return { error: 'Forbidden - Admin access required', status: 403 };
+  if (profileError) return { 
+    error: 'Failed to fetch profile', 
+    status: 500,
+    debug: {
+      hasAuthHeader,
+      tokenLength,
+      isBearerToken,
+      profileError: profileError.message
+    }
+  };
+  
+  if (!profile) return { 
+    error: 'User profile not found', 
+    status: 404,
+    debug: {
+      hasAuthHeader,
+      tokenLength,
+      isBearerToken,
+      userId: user.id
+    }
+  };
+  
+  if (profile.role !== 'admin') return { 
+    error: 'Forbidden - Admin access required', 
+    status: 403,
+    debug: {
+      hasAuthHeader,
+      tokenLength,
+      isBearerToken,
+      userRole: profile.role
+    }
+  };
 
   return { user, profile };
 }
@@ -104,7 +170,10 @@ Deno.serve(async (req) => {
     // Check admin permission for POST, PATCH, DELETE operations
     const adminCheck: any = await checkAdminPermission(serviceClient, authHeader);
     if ('error' in adminCheck) {
-      return new Response(JSON.stringify({ error: adminCheck.error }), { 
+      return new Response(JSON.stringify({ 
+        error: adminCheck.error,
+        debug: adminCheck.debug || {}
+      }), { 
         status: adminCheck.status, 
         headers: corsHeaders 
       });

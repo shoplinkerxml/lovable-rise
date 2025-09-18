@@ -1,21 +1,25 @@
 // File: src/services/UserService.ts (клиентская часть)
 import { supabase } from "@/integrations/supabase/client";
+import { SessionValidator } from "./session-validation";
 
 /**
  * Helper function to get the appropriate authentication headers
  * - Если пользователь авторизован, используем Bearer token
- * - Если нет — используем анонимный apikey
+ * - Для операций администратора, используем только Bearer token
  */
 async function getAuthHeaders() {
   const session = await supabase.auth.getSession();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
 
-  if (session.data.session) {
+  if (session.data.session?.access_token) {
+    // For authenticated operations, use only Bearer token
     headers["Authorization"] = `Bearer ${session.data.session.access_token}`;
   } else {
-    // ВАЖНО: не храните service_role ключ на клиенте
-    headers["apikey"] =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0";
+    // For unauthenticated requests to Edge Functions, don't send apikey
+    // Edge Functions expect only Bearer tokens for authenticated operations
+    console.warn("No valid session found for Edge Function request");
   }
 
   console.log("getAuthHeaders called, returning headers:", headers);
@@ -91,6 +95,12 @@ export class UserService {
     const queryString = queryParams.toString();
     const url = queryString ? `users?${queryString}` : "users";
 
+    // Validate session before operation
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
+    }
+
     const response = await supabase.functions.invoke(url, {
       method: "GET",
       headers: await getAuthHeaders(),
@@ -104,6 +114,12 @@ export class UserService {
   static async createUser(userData: CreateUserData): Promise<UserProfile> {
     if (!userData.email || !userData.password || !userData.name) {
       throw new ApiError("Missing required fields: email, password, or name", 400);
+    }
+
+    // Validate session before operation
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
     const response = await supabase.functions.invoke("users", {
@@ -123,6 +139,12 @@ export class UserService {
   static async updateUser(id: string, data: UpdateUserData): Promise<UserProfile> {
     if (!id) throw new ApiError("User ID is required", 400);
     if (!data || Object.keys(data).length === 0) throw new ApiError("No fields provided for update", 400);
+
+    // Validate session before operation
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
+    }
 
     // Filter out undefined values
     const cleanData = Object.fromEntries(
@@ -150,6 +172,12 @@ export class UserService {
   /** Удаление пользователя */
   static async deleteUser(id: string): Promise<UserProfile> {
     if (!id) throw new ApiError("User ID is required", 400);
+
+    // Validate session before operation
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
+    }
 
     const response = await supabase.functions.invoke(`users/${id}`, {
       method: "DELETE",

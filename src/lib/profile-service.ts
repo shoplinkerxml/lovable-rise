@@ -631,6 +631,19 @@ export class ProfileService {
     accessToken?: string
   ): Promise<UserProfile> {
     try {
+      // Validate that name is present
+      if (!profileData.name || profileData.name.trim() === '') {
+        console.warn('[ProfileService] Profile name is missing, using fallback');
+        profileData.name = profileData.email?.split('@')[0] || 'User';
+      }
+      
+      // Log profile data for debugging
+      console.log('[ProfileService] Creating profile with data:', {
+        id: profileData.id,
+        email: profileData.email,
+        name: profileData.name
+      });
+      
       // Validate session first
       const sessionValidation = await SessionValidator.ensureValidSession();
       

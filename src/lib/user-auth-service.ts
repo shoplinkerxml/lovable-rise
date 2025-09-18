@@ -214,7 +214,8 @@ export class UserAuthService {
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            name: data.name
+            name: data.name,
+            full_name: data.name  // Alternative field for redundancy
           }
         }
       });
@@ -417,13 +418,18 @@ export class UserAuthService {
       
       if (!profile) {
         console.log('Creating profile for authenticated user:', session.user.id);
+        // Enhanced name extraction with fallbacks
+        const userName = session.user.user_metadata?.name || 
+                        session.user.user_metadata?.full_name ||
+                        session.user.email?.split('@')[0] || 
+                        'User';
+        
         // Create profile if it doesn't exist
         try {
           profile = await ProfileService.createProfileWithAuth({
             id: session.user.id,
             email: session.user.email || '',
-            name: session.user.user_metadata?.name || session.user.email || 'User'
-            
+            name: userName
           }, session.access_token);
           
           console.log('Profile created successfully for authenticated user');
@@ -487,12 +493,17 @@ export class UserAuthService {
         
         if (!profile) {
           console.log('Creating profile for confirmed user:', authData.user.id);
+          // Enhanced name extraction with fallbacks
+          const userName = authData.user.user_metadata?.name || 
+                          authData.user.user_metadata?.full_name ||
+                          authData.user.email?.split('@')[0] || 
+                          'User';
+          
           try {
             profile = await ProfileService.createProfileWithAuth({
               id: authData.user.id,
               email: data.email,
-              name: authData.user.user_metadata?.name || authData.user.email || 'User'
-              
+              name: userName
             }, authData.session.access_token);
           } catch (profileError) {
             console.error('Profile creation during login failed:', profileError);
