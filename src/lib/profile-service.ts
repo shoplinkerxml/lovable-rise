@@ -652,11 +652,14 @@ export class ProfileService {
       // Log session context for debugging
       await SessionValidator.logSessionDebugInfo('profile-creation');
       
-      // Use the standard Supabase client which automatically includes the access token
-      // The client automatically handles the Bearer token in Authorization header
+      // Use upsert instead of insert to handle cases where profile might already exist
+      // This is more robust for registration flows
       const { data, error } = await supabase
         .from('profiles')
-        .insert(profileData)
+        .upsert(profileData, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        })
         .select()
         .single();
         

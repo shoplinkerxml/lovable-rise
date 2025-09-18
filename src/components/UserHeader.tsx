@@ -19,7 +19,8 @@ import {
   User,
   Settings,
   LogOut,
-  Globe
+  Globe,
+  Home
 } from "lucide-react";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { UserAuthService } from "@/lib/user-auth-service";
@@ -78,6 +79,11 @@ export const UserHeader = ({ user, onMenuToggle }: UserHeaderProps) => {
           className="md:hidden"
         >
           <Menu className="h-4 w-4" />
+        </Button>
+        
+        <Button variant="ghost" size="sm" onClick={() => navigate('/user/dashboard')} className="hidden md:flex">
+          <Home className="h-4 w-4" />
+          <span className="hidden md:inline ml-2">Dashboard</span>
         </Button>
         
         <div className="hidden md:block">
@@ -141,6 +147,10 @@ export const UserHeader = ({ user, onMenuToggle }: UserHeaderProps) => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/user/dashboard')}>
+              <Home className="mr-2 h-4 w-4" />
+              <span>Dashboard</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate('/user/profile')}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>

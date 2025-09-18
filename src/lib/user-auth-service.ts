@@ -214,8 +214,7 @@ export class UserAuthService {
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            name: data.name,
-            role: 'user'
+            name: data.name
           }
         }
       });
@@ -268,10 +267,9 @@ export class UserAuthService {
           profile = await ProfileService.createProfileWithAuth({
             id: authData.user.id,
             email: data.email,
-            name: data.name,
-            role: 'user' as const,
-            status: 'active' as const
+            name: data.name
           }, authData.session.access_token);
+
           
           RegistrationLogger.logStep(data.email, 'profile_creation_immediate', {
             profileId: profile.id
@@ -297,8 +295,11 @@ export class UserAuthService {
         };
       }
       
-      // Fallback case
-      RegistrationLogger.finishRegistration(data.email, true, 'Email confirmation required');
+      // For email confirmation flow, we don't attempt to create profile immediately
+      // Profile will be created when user confirms email and logs in
+      UserExistenceService.clearExistenceCache(data.email);
+      RegistrationLogger.finishRegistration(data.email, true);
+      
       return {
         user: null,
         session: null,
@@ -421,9 +422,8 @@ export class UserAuthService {
           profile = await ProfileService.createProfileWithAuth({
             id: session.user.id,
             email: session.user.email || '',
-            name: session.user.user_metadata?.name || session.user.email || 'User',
-            role: 'user' as const,
-            status: 'active' as const
+            name: session.user.user_metadata?.name || session.user.email || 'User'
+            
           }, session.access_token);
           
           console.log('Profile created successfully for authenticated user');
@@ -491,9 +491,8 @@ export class UserAuthService {
             profile = await ProfileService.createProfileWithAuth({
               id: authData.user.id,
               email: data.email,
-              name: authData.user.user_metadata?.name || authData.user.email || 'User',
-              role: 'user' as const,
-              status: 'active' as const
+              name: authData.user.user_metadata?.name || authData.user.email || 'User'
+              
             }, authData.session.access_token);
           } catch (profileError) {
             console.error('Profile creation during login failed:', profileError);
@@ -658,28 +657,27 @@ export class UserAuthService {
    * Create user profile in database
    */
   private static async createUserProfile(userId: string, userData: { email: string; name: string }): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          email: userData.email,
-          name: userData.name,
-          role: 'user',
-          status: 'active'
-        }, {
-          onConflict: 'id'
-        });
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        email: userData.email,
+        name: userData.name
+      }, {
+        onConflict: 'id'
+      });
 
-      if (error) {
-        console.error('Error creating user profile:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Error in createUserProfile:', error);
+    if (error) {
+      console.error('Error creating user profile:', error);
       throw error;
     }
+  } catch (error) {
+    console.error('Error in createUserProfile:', error);
+    throw error;
   }
+}
+
 
   /**
    * Get user profile from database (deprecated - use ProfileService.getProfile instead)

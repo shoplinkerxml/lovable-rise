@@ -1,4 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+
 
 // Заголовки CORS
 const corsHeaders = {
@@ -9,17 +11,20 @@ const corsHeaders = {
 };
 
 // Проверка админа для POST/PATCH/DELETE
-async function checkAdminPermission(serviceClient, authHeader) {
+async function checkAdminPermission(serviceClient: SupabaseClient, authHeader: string) {
   if (!authHeader) {
     return { error: 'Unauthorized - no token', status: 401 };
   }
 
+  // Extract the token from the Authorization header (Bearer token)
+  const token = authHeader.replace('Bearer ', '');
+  
   const client = createClient(
-    Deno.env.get('SUPABASE_URL'),
-    Deno.env.get('SUPABASE_ANON_KEY'),
+    Deno.env.get('SUPABASE_URL') || '',
+    Deno.env.get('SUPABASE_ANON_KEY') || '',
     {
       global: {
-        headers: { Authorization: authHeader }
+        headers: { Authorization: `Bearer ${token}` }
       }
     }
   );
@@ -51,15 +56,18 @@ Deno.serve(async (req) => {
     const pathParts = url.pathname.split('/').filter(p => p);
     const userId = pathParts.length > 1 ? pathParts[1] : null;
 
-    const anonClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_ANON_KEY'),
-      { global: { headers: authHeader ? { Authorization: authHeader } : {} } }
+    // Extract the token from the Authorization header (Bearer token)
+    const token = authHeader.replace('Bearer ', '');
+    
+    const anonClient: SupabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_ANON_KEY') || '',
+      { global: { headers: authHeader ? { Authorization: `Bearer ${token}` } : {} } }
     );
 
-    const serviceClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    const serviceClient: SupabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
@@ -70,8 +78,8 @@ Deno.serve(async (req) => {
       const offset = (page - 1) * limit;
       const sortBy = url.searchParams.get('sortBy') || 'created_at';
       const sortOrder = url.searchParams.get('sortOrder') || 'desc';
-      const search = url.searchParams.get('search');
-      const roleParam = url.searchParams.get('role');
+      const search = url.searchParams.get('search') || undefined;
+      const roleParam = url.searchParams.get('role') || undefined;
 
       let query = anonClient.from('profiles').select('*', { count: 'exact' });
       if (roleParam && roleParam !== 'all') query = query.eq('role', roleParam);
@@ -92,34 +100,146 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ user }), { headers: corsHeaders });
     }
 
-    // ---------------- POST/PATCH/DELETE требуют админа ----------------
-    const adminCheck = await checkAdminPermission(serviceClient, authHeader);
-    if ('error' in adminCheck) return new Response(JSON.stringify({ error: adminCheck.error }), { status: adminCheck.status, headers: corsHeaders });
+    // ---------------- ALL OTHER OPERATIONS REQUIRE ADMIN PERMISSIONS ----------------
+    // Check admin permission for POST, PATCH, DELETE operations
+    const adminCheck: any = await checkAdminPermission(serviceClient, authHeader);
+    if ('error' in adminCheck) {
+      return new Response(JSON.stringify({ error: adminCheck.error }), { 
+        status: adminCheck.status, 
+        headers: corsHeaders 
+      });
+    }
 
     // ---------------- POST /users ----------------
     if (req.method === 'POST') {
-      const { email, password, name, phone, role = 'user' } = await req.json();
-      if (!email || !password || !name) return new Response(JSON.stringify({ error: 'Email, password, name required' }), { status: 400, headers: corsHeaders });
+      try {
+        const { email, password, name, phone, role = 'user' }: { email: string; password: string; name: string; phone?: string; role?: string } = await req.json();
+        if (!email || !password || !name) {
+          return new Response(JSON.stringify({ error: 'Email, password, and name are required' }), { 
+            status: 400, 
+            headers: corsHeaders 
+          });
+        }
 
-      const { data: authData, error: authError } = await serviceClient.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name } });
-      if (authError) return new Response(JSON.stringify({ error: authError.message }), { status: 400, headers: corsHeaders });
+        // Validate role
+        const validRoles = ['admin', 'manager', 'user'];
+        if (!validRoles.includes(role)) {
+          return new Response(JSON.stringify({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` }), { 
+            status: 400, 
+            headers: corsHeaders 
+          });
+        }
 
-      const { data: profile, error: profileError } = await serviceClient.from('profiles').upsert({ id: authData.user.id, email, name, phone: phone || null, role, status: 'active' }).select().maybeSingle();
-      if (profileError) return new Response(JSON.stringify({ error: profileError.message }), { status: 500, headers: corsHeaders });
+        // Create user with Supabase auth
+        const { data: authData, error: authError } = await serviceClient.auth.admin.createUser({ 
+          email, 
+          password, 
+          email_confirm: true, 
+          user_metadata: { name, role }  // Pass role in metadata so trigger function can use it
+        });
+        
+        if (authError) {
+          console.error('Auth error:', authError);
+          // Check if it's a duplicate email error
+          if (authError.message.includes('duplicate') || authError.message.includes('already exists')) {
+            return new Response(JSON.stringify({ error: 'A user with this email already exists' }), { 
+              status: 409, 
+              headers: corsHeaders 
+            });
+          }
+          return new Response(JSON.stringify({ error: `Authentication error: ${authError.message}` }), { 
+            status: 400, 
+            headers: corsHeaders 
+          });
+        }
 
-      return new Response(JSON.stringify({ user: profile }), { status: 201, headers: corsHeaders });
+        // Wait for the trigger function to create the profile
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Try to get the created profile
+        const { data: profile, error: profileError } = await serviceClient
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+          
+        if (profileError || !profile) {
+          console.warn('Warning: Could not retrieve created profile:', profileError?.message || 'Profile not found');
+          // Return basic user info
+          return new Response(JSON.stringify({ 
+            user: { 
+              id: authData.user.id,
+              email,
+              name,
+              phone: phone || null,
+              role,
+              status: 'active'
+            }
+          }), { 
+            status: 201, 
+            headers: corsHeaders 
+          });
+        }
+
+        // Try to update the profile with additional information
+        const { data: updatedProfile, error: updateError } = await serviceClient
+          .from('profiles')
+          .update({ 
+            name, 
+            phone: phone || null
+          })
+          .eq('id', authData.user.id)
+          .select()
+          .maybeSingle();
+          
+        if (updateError) {
+          console.warn('Warning: Could not update profile with additional info:', updateError.message);
+          // Return the original profile data
+          return new Response(JSON.stringify({ user: profile }), { 
+            status: 201, 
+            headers: corsHeaders 
+          });
+        }
+        
+        return new Response(JSON.stringify({ user: updatedProfile || profile }), { 
+          status: 201, 
+          headers: corsHeaders 
+        });
+      } catch (err) {
+        console.error('Unexpected error in POST /users:', err);
+        return new Response(JSON.stringify({ error: `Unexpected error: ${err.message || 'Unknown error'}` }), { 
+          status: 500, 
+          headers: corsHeaders 
+        });
+      }
     }
 
     // ---------------- PATCH /users/:id ----------------
     if (req.method === 'PATCH' && userId) {
       const contentType = req.headers.get('Content-Type') || '';
-      if (!contentType.includes('application/json')) return new Response(JSON.stringify({ error: 'Content-Type must be application/json' }), { status: 400, headers: corsHeaders });
+      if (!contentType.includes('application/json')) {
+        return new Response(JSON.stringify({ error: 'Content-Type must be application/json' }), { 
+          status: 400, 
+          headers: corsHeaders 
+        });
+      }
 
-      let body: any;
-      try { body = await req.json(); } 
-      catch { return new Response(JSON.stringify({ error: 'Request body must be valid JSON' }), { status: 400, headers: corsHeaders }); }
+      let body: { name?: string; phone?: string; role?: string; status?: string };
+      try { 
+        body = await req.json(); 
+      } catch (err) {
+        return new Response(JSON.stringify({ error: 'Request body must be valid JSON' }), { 
+          status: 400, 
+          headers: corsHeaders 
+        });
+      }
 
-      if (!body || Object.keys(body).length === 0) return new Response(JSON.stringify({ error: 'No fields provided for update' }), { status: 400, headers: corsHeaders });
+      if (!body || Object.keys(body).length === 0) {
+        return new Response(JSON.stringify({ error: 'No fields provided for update' }), { 
+          status: 400, 
+          headers: corsHeaders 
+        });
+      }
 
       const { name, phone, role, status } = body;
       const updateData: any = {};
@@ -128,27 +248,76 @@ Deno.serve(async (req) => {
       if (role !== undefined) updateData.role = role;
       if (status !== undefined) updateData.status = status;
 
-      const { data: user, error } = await serviceClient.from('profiles').update(updateData).eq('id', userId).select().maybeSingle();
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
-      if (!user) return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: corsHeaders });
+      const { data: user, error } = await serviceClient
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userId)
+        .select()
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Update error:', error);
+        return new Response(JSON.stringify({ error: `Update error: ${error.message}` }), { 
+          status: 500, 
+          headers: corsHeaders 
+        });
+      }
+      
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'User not found' }), { 
+          status: 404, 
+          headers: corsHeaders 
+        });
+      }
 
       return new Response(JSON.stringify({ user }), { headers: corsHeaders });
     }
 
     // ---------------- DELETE /users/:id ----------------
     if (req.method === 'DELETE' && userId) {
-      const { error: authError } = await serviceClient.auth.admin.deleteUser(userId);
-      if (authError) return new Response(JSON.stringify({ error: authError.message }), { status: 500, headers: corsHeaders });
+      try {
+        // Delete user from auth
+        const { error: authError } = await serviceClient.auth.admin.deleteUser(userId);
+        if (authError) {
+          console.error('Auth delete error:', authError);
+          return new Response(JSON.stringify({ error: `Auth delete error: ${authError.message}` }), { 
+            status: 500, 
+            headers: corsHeaders 
+          });
+        }
 
-      const { data: user, error: profileError } = await serviceClient.from('profiles').delete().eq('id', userId).select().maybeSingle();
-      if (profileError) return new Response(JSON.stringify({ error: profileError.message }), { status: 500, headers: corsHeaders });
+        // Delete user profile
+        const { data: user, error: profileError } = await serviceClient
+          .from('profiles')
+          .delete()
+          .eq('id', userId)
+          .select()
+          .maybeSingle();
+          
+        if (profileError) {
+          console.error('Profile delete error:', profileError);
+          return new Response(JSON.stringify({ error: `Profile delete error: ${profileError.message}` }), { 
+            status: 500, 
+            headers: corsHeaders 
+          });
+        }
 
-      return new Response(JSON.stringify({ user }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ user }), { headers: corsHeaders });
+      } catch (err) {
+        console.error('Unexpected error in DELETE /users:', err);
+        return new Response(JSON.stringify({ error: `Unexpected error: ${err.message || 'Unknown error'}` }), { 
+          status: 500, 
+          headers: corsHeaders 
+        });
+      }
     }
 
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500, headers: corsHeaders });
+    console.error('Unexpected error in main function:', error);
+    return new Response(JSON.stringify({ error: `Internal server error: ${error.message || 'Unknown error'}` }), { 
+      status: 500, 
+      headers: corsHeaders 
+    });
   }
 });

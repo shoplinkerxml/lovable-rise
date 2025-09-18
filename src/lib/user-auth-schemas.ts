@@ -46,7 +46,7 @@ export interface UserProfile {
   email: string;
   name: string;
   phone?: string;
-  role: 'user';
+  role: 'admin' | 'manager' | 'user';
   status: 'active' | 'inactive';
   avatar_url?: string;
   created_at: string;

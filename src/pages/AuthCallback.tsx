@@ -61,7 +61,10 @@ const AuthCallback = () => {
           }
           navigate("/user/dashboard");
         } else {
-          toast.error("Authentication failed. Please try again.");
+          // Handle case where user confirmed email but profile wasn't created
+          // This can happen if the database trigger failed
+          toast.success("Email confirmed successfully!");
+          toast.info("Please sign in to complete your registration.");
           navigate("/user-auth");
         }
       } catch (error) {

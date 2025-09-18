@@ -21,6 +21,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json'
+      // Do not include Authorization or apikey here to avoid conflicts with Edge Functions
     }
   },
   // Enhanced error handling for RLS debugging

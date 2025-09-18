@@ -1,5 +1,5 @@
 -- Create enums for user roles and status
-CREATE TYPE public.user_role AS ENUM ('admin', 'manager');
+CREATE TYPE public.user_role AS ENUM ('admin', 'manager', 'user');
 CREATE TYPE public.user_status AS ENUM ('active', 'inactive');
 
 -- Create profiles table
@@ -8,7 +8,7 @@ CREATE TABLE public.profiles (
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   phone TEXT,
-  role public.user_role NOT NULL DEFAULT 'manager',
+  role public.user_role NOT NULL DEFAULT 'user',
   status public.user_status NOT NULL DEFAULT 'active',
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -116,15 +116,16 @@ CREATE TRIGGER update_profiles_updated_at
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, name, role)
+  INSERT INTO public.profiles (id, email, name, role, status)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
     CASE 
       WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin') THEN 'admin'::public.user_role
-      ELSE 'manager'::public.user_role
-    END
+      ELSE 'user'::public.user_role
+    END,
+    'active'::public.user_status
   );
   RETURN NEW;
 END;

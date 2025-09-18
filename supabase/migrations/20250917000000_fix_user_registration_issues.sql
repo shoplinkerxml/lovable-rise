@@ -1,11 +1,10 @@
--- Migration: Fix registration profile creation
--- This addresses the issue where the system returns HTTP 200 status 
--- but fails to create profile record in the database
+-- Migration: Fix user registration issues
+-- This addresses multiple issues that were preventing proper user registration
 
--- Drop conflicting RLS policy that prevents profile access during registration
-DROP POLICY IF EXISTS "Users with user role can view own profile" ON public.profiles;
+-- Add 'user' value to user_role enum if it doesn't exist
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'user';
 
--- Update trigger function with better error handling and metadata parsing
+-- Update the handle_new_user function to properly insert all required fields
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -32,14 +31,14 @@ BEGIN
     assigned_role := 'user'::public.user_role;  -- Default to 'user' for safety
   END IF;
   
-  -- Insert profile with error handling
+  -- Insert profile with all required fields
   INSERT INTO public.profiles (id, email, name, role, status)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', NEW.user_metadata->>'name', NEW.email),
     assigned_role,
-    'active'  -- Default status
+    'active'::public.user_status
   );
   
   RETURN NEW;
@@ -54,18 +53,33 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Add comment for documentation
 COMMENT ON FUNCTION public.handle_new_user() IS 'Handles new user registration with proper role assignment and error handling. Defaults to user role for regular registrations and includes exception handling to prevent auth failures.';
 
--- Ensure the updated menu policy allows users to see basic menu items
-DROP POLICY IF EXISTS "Users can view active menu items" ON public.menu_items;
+-- Update existing profiles to have 'user' role where role is NULL or invalid
+UPDATE public.profiles 
+SET role = 'user' 
+WHERE role IS NULL OR role NOT IN ('admin', 'manager', 'user');
 
-CREATE POLICY "Users can view active menu items" ON public.menu_items
-  FOR SELECT USING (
-    auth.role() = 'authenticated' 
-    AND is_active = true 
-    AND (
-      public.get_current_user_role() IN ('admin', 'manager') 
-      OR path IN ('/dashboard', '/profile', '/user/dashboard', '/user/profile')
-    )
-  );
+-- Update existing profiles to have 'active' status where status is NULL
+UPDATE public.profiles 
+SET status = 'active' 
+WHERE status IS NULL;
 
--- Add an index to improve profile lookup performance during registration
-CREATE INDEX IF NOT EXISTS idx_profiles_id_role ON public.profiles(id, role);
+-- Ensure all profiles have proper default values
+ALTER TABLE public.profiles 
+ALTER COLUMN role SET DEFAULT 'user',
+ALTER COLUMN status SET DEFAULT 'active';
+
+-- Fix RLS policies to ensure users can access their own profiles
+-- Drop the restrictive policy
+DROP POLICY IF EXISTS "Users with user role can view own profile" ON public.profiles;
+
+-- Ensure users can view their own profiles regardless of role
+CREATE POLICY "Users can view their own profile" ON public.profiles
+  FOR SELECT USING (auth.uid() = id);
+
+-- Ensure users can update their own profiles
+CREATE POLICY "Users can update their own profile" ON public.profiles
+  FOR UPDATE USING (auth.uid() = id);
+
+-- Ensure users can insert their own profiles (needed for registration)
+CREATE POLICY "Users can insert their own profile" ON public.profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);

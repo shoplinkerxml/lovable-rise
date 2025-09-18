@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TrendingUp, User, CheckCircle2, Chrome, Facebook } from "lucide-react";
+import { TrendingUp, User, CheckCircle2, Chrome, Facebook, Mail } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { 
@@ -359,9 +359,23 @@ const UserRegister = () => {
                   className="w-full"
                   variant="default"
                 >
-                  {loading ? "..." : t("register_button")}
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div>
+                      {lang === 'uk' ? 'Реєстрація...' : 'Registering...'}
+                    </div>
+                  ) : (
+                    t("register_button")
+                  )}
                 </Button>
               </form>
+
+              <div className="text-center text-sm text-muted-foreground pt-2">
+                <Mail className="inline h-4 w-4 mr-1" />
+                {lang === 'uk' 
+                  ? 'Після реєстрації перевірте електронну пошту для підтвердження' 
+                  : 'Check your email for confirmation after registration'}
+              </div>
 
               <p className="text-center text-sm text-muted-foreground">
                 {t("already_account")} 
