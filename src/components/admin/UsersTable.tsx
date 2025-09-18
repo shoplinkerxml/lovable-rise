@@ -58,15 +58,41 @@ interface UsersTableProps {
 }
 
 const LoadingSkeleton = () => (
-  <TableRow>
-    <TableCell colSpan={6}>
-      <div className="flex items-center space-x-4 p-4">
+  <TableRow className="hover:bg-muted/50">
+    {/* Customer Column */}
+    <TableCell>
+      <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse" />
-        <div className="space-y-2 flex-1">
-          <div className="h-4 bg-gray-200 rounded animate-pulse" />
-          <div className="h-3 bg-gray-200 rounded w-2/3 animate-pulse" />
+        <div className="min-w-0 flex-1">
+          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
         </div>
       </div>
+    </TableCell>
+
+    {/* Status Column */}
+    <TableCell>
+      <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse"></div>
+    </TableCell>
+
+    {/* Email Column */}
+    <TableCell>
+      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+    </TableCell>
+
+    {/* Phone Column */}
+    <TableCell className="hidden md:table-cell">
+      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+    </TableCell>
+
+    {/* Created Date Column */}
+    <TableCell>
+      <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-1"></div>
+      <div className="h-3 w-16 bg-gray-200 rounded animate-pulse hidden sm:block"></div>
+    </TableCell>
+
+    {/* Actions Column */}
+    <TableCell className="text-right">
+      <div className="h-8 w-8 bg-gray-200 rounded animate-pulse ml-auto"></div>
     </TableCell>
   </TableRow>
 );

@@ -280,8 +280,18 @@ const dictionary: Dictionary = {
   breadcrumb_horizontal: { uk: "Горизонтальні", en: "Horizontal" },
   breadcrumb_vertical: { uk: "Вертикальні", en: "Vertical" },
   breadcrumb_custom: { uk: "Користувацькі", en: "Custom" },
-  breadcrumb_validation: { uk: "Валідація", en: "Validation" },
 };
+
+// User Statistics
+const userStatisticsDictionary = {
+  total_users: { uk: "Загальна кількість користувачів", en: "Total Users" },
+  active_users: { uk: "Активні користувачі", en: "Active Users" },
+  registered_users: { uk: "Зареєстровані користувачі", en: "Registered Users" },
+  user_statistics: { uk: "Статистика користувачів", en: "User Statistics" },
+};
+
+// Merge dictionaries
+Object.assign(dictionary, userStatisticsDictionary);
 
 type I18nContextType = {
   lang: Lang;

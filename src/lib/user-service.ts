@@ -100,7 +100,9 @@ export class UserService {
       action: "list" as const,
       limit: pagination.limit,
       offset: (pagination.page - 1) * pagination.limit,
-      filters: requestFilters
+      filters: requestFilters,
+      sortBy: filters.sortBy || "created_at",
+      sortOrder: filters.sortOrder || "desc"
     };
 
     const { data: responseData, error } = await supabase.functions.invoke("users", {
@@ -116,7 +118,7 @@ export class UserService {
     // Преобразуем ответ в ожидаемый формат
     return {
       users: responseData.users || [],
-      total: responseData.users?.length || 0,
+      total: responseData.total || responseData.users?.length || 0,
       page: pagination.page,
       limit: pagination.limit
     };

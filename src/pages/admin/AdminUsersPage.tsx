@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useI18n } from "@/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { EditUserDialog } from "@/components/admin/EditUserDialog";
 import { DeleteUserDialog } from "@/components/admin/DeleteUserDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
-import { useUsers, useToggleUserStatus } from "@/hooks/useUsers";
+import { useUsers, useToggleUserStatus, usePrefetchUsers } from "@/hooks/useUsers";
 
 interface UserFilters {
   search: string;
@@ -70,10 +70,29 @@ export default function AdminUsersPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   // Data fetching
   const { data: usersData, isLoading, error, refetch } = useUsers(filters, pagination);
   const toggleUserStatusMutation = useToggleUserStatus();
+  
+  // Prefetch next page
+  const prefetchUsers = usePrefetchUsers();
+  
+  // Prefetch next page when current page loads
+  useEffect(() => {
+    if (usersData && pagination.page < Math.ceil(usersData.total / pagination.limit)) {
+      const nextPage = pagination.page + 1;
+      prefetchUsers({ ...filters }, { ...pagination, page: nextPage });
+    }
+  }, [usersData, pagination, filters, prefetchUsers]);
+  
+  // Handle initial load
+  useEffect(() => {
+    if (!isLoading && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [isLoading, isInitialLoad]);
   
   // Event handlers
   const handleCreateUser = () => {
@@ -241,7 +260,7 @@ export default function AdminUsersPage() {
         <CardContent className="p-0">
           <UsersTable
             users={usersData?.users || []}
-            loading={isLoading}
+            loading={isLoading && !isInitialLoad}
             onEditUser={handleEditUser}
             onDeleteUser={handleDeleteUser}
             onStatusToggle={handleStatusToggle}

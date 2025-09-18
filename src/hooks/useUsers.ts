@@ -42,6 +42,15 @@ interface UpdateUserData {
   status?: "active" | "inactive";
 }
 
+// Add a small delay to prevent loading flicker for fast requests
+const withMinimumDelay = async <T>(promise: Promise<T>, minDelayMs = 300): Promise<T> => {
+  const [result] = await Promise.all([
+    promise,
+    new Promise(resolve => setTimeout(resolve, minDelayMs))
+  ]);
+  return result;
+};
+
 // Query Keys
 export const userQueries = {
   all: ["users"] as const,
@@ -56,9 +65,11 @@ export const userQueries = {
 export function useUsers(filters: UserFilters = {}, pagination: PaginationParams = { page: 1, limit: 10 }) {
   return useQuery({
     queryKey: userQueries.list(filters, pagination),
-    queryFn: () => UserService.getUsers(filters, pagination),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    queryFn: () => withMinimumDelay(UserService.getUsers(filters, pagination)),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 }
 
@@ -131,19 +142,43 @@ export function useToggleUserStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "active" | "inactive" }) => 
       UserService.toggleUserStatus(id, status),
-    onSuccess: (data) => {
+    onMutate: async ({ id, status }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: userQueries.lists() });
+      
+      // Snapshot the previous value
+      const previousUsers = queryClient.getQueryData(userQueries.lists());
+      
+      // Optimistically update to the new value
+      queryClient.setQueryData(userQueries.lists(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          users: old.users?.map((user: UserProfile) => 
+            user.id === id ? { ...user, status } : user
+          ) || []
+        };
+      });
+      
+      // Return a context object with the snapshotted value
+      return { previousUsers };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousUsers) {
+        queryClient.setQueryData(userQueries.lists(), context.previousUsers);
+      }
+    },
+    onSettled: () => {
+      // Invalidate queries regardless of success or failure
       queryClient.invalidateQueries({ queryKey: userQueries.lists() });
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: userQueries.detail(data.id) });
       
       const action = data.status === "active" ? "activated" : "deactivated";
       toast.success(`User ${action} successfully`, {
         description: `${data.name} has been ${action}`,
-      });
-    },
-    onError: (error: Error) => {
-      console.error("Toggle user status error:", error);
-      toast.error("Failed to update user status", {
-        description: error.message || "Please try again later",
       });
     },
   });
@@ -156,8 +191,21 @@ export function usePrefetchUser() {
   return (id: string) => {
     queryClient.prefetchQuery({
       queryKey: userQueries.detail(id),
-      queryFn: () => UserService.getUsers({ search: id }, { page: 1, limit: 1 }),
-      staleTime: 10 * 60 * 1000, // 10 minutes
+      queryFn: () => UserService.getUser(id),
+      staleTime: 1000 * 60 * 10, // 10 minutes
+    });
+  };
+}
+
+// Prefetch list of users
+export function usePrefetchUsers(filters: UserFilters = {}, pagination: PaginationParams = { page: 1, limit: 10 }) {
+  const queryClient = useQueryClient();
+  
+  return () => {
+    queryClient.prefetchQuery({
+      queryKey: userQueries.list(filters, pagination),
+      queryFn: () => withMinimumDelay(UserService.getUsers(filters, pagination)),
+      staleTime: 1000 * 60 * 5, // 5 minutes
     });
   };
 }
