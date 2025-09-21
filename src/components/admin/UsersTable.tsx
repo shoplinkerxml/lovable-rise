@@ -153,6 +153,8 @@ const UserAvatar = ({ user }: { user: UserProfile }) => {
 };
 
 const StatusBadge = ({ status }: { status: "active" | "inactive" }) => {
+  const { t } = useI18n();
+  
   return (
     <Badge
       variant={status === "active" ? "default" : "secondary"}
@@ -162,7 +164,7 @@ const StatusBadge = ({ status }: { status: "active" | "inactive" }) => {
           : "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100"
       }
     >
-      {status === "active" ? "Active" : "Inactive"}
+      {status === "active" ? t("status_active") : t("status_inactive")}
     </Badge>
   );
 };

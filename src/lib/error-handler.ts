@@ -26,17 +26,17 @@ export enum ProfileErrorCode {
 /**
  * User-friendly error messages
  */
-const ERROR_MESSAGES: Record<ProfileErrorCode, string> = {
-  [ProfileErrorCode.PROFILE_NOT_FOUND]: 'User profile not found. Please refresh and try again.',
-  [ProfileErrorCode.PROFILE_CREATION_FAILED]: 'Failed to create user profile. Please try again.',
-  [ProfileErrorCode.PROFILE_UPDATE_FAILED]: 'Failed to update profile. Please try again.',
-  [ProfileErrorCode.AVATAR_UPLOAD_FAILED]: 'Failed to upload avatar. Please try again.',
-  [ProfileErrorCode.VALIDATION_ERROR]: 'Invalid data provided. Please check your input.',
-  [ProfileErrorCode.PERMISSION_DENIED]: 'You do not have permission to perform this action.',
-  [ProfileErrorCode.NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
-  [ProfileErrorCode.USER_EXISTS]: 'An account with this email already exists. Please sign in instead.',
-  [ProfileErrorCode.RATE_LIMIT_EXCEEDED]: 'Too many attempts. Please try again in a few minutes.',
-  [ProfileErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred. Please try again.'
+export const ERROR_MESSAGES = {
+  PROFILE_NOT_FOUND: 'User profile not found. Please refresh and try again.',
+  PROFILE_CREATION_FAILED: 'Failed to create user profile. Please try again.',
+  PROFILE_UPDATE_FAILED: 'Failed to update profile. Please try again.',
+  AVATAR_UPLOAD_FAILED: 'Failed to upload avatar. Please try again.',
+  VALIDATION_ERROR: 'Invalid data provided. Please check your input.',
+  PERMISSION_DENIED: 'You do not have permission to perform this action.',
+  NETWORK_ERROR: 'Network error. Please check your connection and try again.',
+  USER_EXISTS: 'An account with this email already exists. Please sign in instead.',
+  RATE_LIMIT_EXCEEDED: 'Too many attempts. Please try again in a few minutes.',
+  UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.'
 };
 
 /**
@@ -258,23 +258,23 @@ export function handleProfileError(error: unknown, operation: string = 'operatio
     const errorMessage = (error as any).message;
     
     if (errorMessage.includes('permission') || errorMessage.includes('access')) {
-      toast.error(ERROR_MESSAGES[ProfileErrorCode.PERMISSION_DENIED]);
+      toast.error(ERROR_MESSAGES.PERMISSION_DENIED);
       return;
     }
     
     if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-      toast.error(ERROR_MESSAGES[ProfileErrorCode.NETWORK_ERROR]);
+      toast.error(ERROR_MESSAGES.NETWORK_ERROR);
       return;
     }
     
     if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
-      toast.error(ERROR_MESSAGES[ProfileErrorCode.VALIDATION_ERROR]);
+      toast.error(ERROR_MESSAGES.VALIDATION_ERROR);
       return;
     }
   }
   
   // Fallback to generic error
-  toast.error(ERROR_MESSAGES[ProfileErrorCode.UNKNOWN_ERROR]);
+  toast.error(ERROR_MESSAGES.UNKNOWN_ERROR);
 }
 
 /**

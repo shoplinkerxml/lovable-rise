@@ -36,7 +36,7 @@ const UserForgotPassword = () => {
       const { success, error } = await UserAuthService.resetPassword(data);
       
       if (error) {
-        toast.error(t(error as any) || "Failed to send reset email");
+        toast.error(t(error as any) || t("failed_send_reset_email"));
         return;
       }
 
@@ -46,7 +46,7 @@ const UserForgotPassword = () => {
       }
     } catch (error) {
       console.error("Password reset error:", error);
-      toast.error("Failed to send reset email");
+      toast.error(t("failed_send_reset_email"));
     } finally {
       setLoading(false);
     }

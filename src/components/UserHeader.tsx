@@ -34,7 +34,7 @@ interface UserHeaderProps {
 
 export const UserHeader = ({ user, onMenuToggle }: UserHeaderProps) => {
   const navigate = useNavigate();
-  const { lang, setLang } = useI18n();
+  const { lang, setLang, t } = useI18n();
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
@@ -43,17 +43,17 @@ export const UserHeader = ({ user, onMenuToggle }: UserHeaderProps) => {
       const { success, error } = await UserAuthService.logout();
       
       if (error) {
-        toast.error("Failed to logout");
+        toast.error(t("failed_logout"));
         return;
       }
 
       if (success) {
-        toast.success("Logged out successfully");
+        toast.success(t("logged_out_successfully"));
         navigate("/user-auth");
       }
     } catch (error) {
       console.error("Logout error:", error);
-      toast.error("Failed to logout");
+      toast.error(t("failed_logout"));
     } finally {
       setLoading(false);
     }

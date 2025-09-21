@@ -37,7 +37,7 @@ const AdminAuth = () => {
           });
           
           if (!profile) {
-            toast.error('Failed to load user profile. Please try again.');
+            toast.error(t("failed_load_user_profile"));
             return;
           }
           
@@ -51,7 +51,7 @@ const AdminAuth = () => {
             }
           }
           
-          toast.success('Вы успешно вошли в кабинет администратора');
+          toast.success(t("login_success_admin"));
           navigate("/admin/dashboard");
         } catch (profileError) {
           console.error('Profile handling error:', profileError);
@@ -60,8 +60,8 @@ const AdminAuth = () => {
         }
       }
     } catch (err: any) {
-      setError(err.message || "Не вдалося увійти. Перевірте дані.");
-      toast.error(err.message || "Не вдалося увійти. Перевірте дані.");
+      setError(err.message || t("login_failed"));
+      toast.error(err.message || t("login_failed"));
     } finally {
       setLoading(false);
     }

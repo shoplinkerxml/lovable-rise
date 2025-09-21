@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UserService } from "@/lib/user-service";
 import { toast } from "sonner";
+import { useI18n } from "@/providers/i18n-provider";
 
 interface UserProfile {
   id: string;
@@ -75,19 +76,20 @@ export function useUsers(filters: UserFilters = {}, pagination: PaginationParams
 
 export function useCreateUser() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   
   return useMutation({
     mutationFn: (userData: CreateUserData) => UserService.createUser(userData),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: userQueries.lists() });
-      toast.success("User created successfully", {
-        description: `${data.name} has been added to the system`,
+      toast.success(t("user_created_success"), {
+        description: `${data.name} ${t("user_created_desc")}`,
       });
     },
     onError: (error: Error) => {
       console.error("Create user error:", error);
-      toast.error("Failed to create user", {
-        description: error.message || "Please try again later",
+      toast.error(t("failed_create_user"), {
+        description: error.message || t("error_try_again"),
       });
     },
   });
@@ -95,6 +97,7 @@ export function useCreateUser() {
 
 export function useUpdateUser() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateUserData }) => 
@@ -102,14 +105,14 @@ export function useUpdateUser() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: userQueries.lists() });
       queryClient.invalidateQueries({ queryKey: userQueries.detail(data.id) });
-      toast.success("User updated successfully", {
-        description: `${data.name}'s information has been updated`,
+      toast.success(t("user_updated_success"), {
+        description: `${data.name} ${t("user_updated_desc")}`,
       });
     },
     onError: (error: Error) => {
       console.error("Update user error:", error);
-      toast.error("Failed to update user", {
-        description: error.message || "Please try again later",
+      toast.error(t("failed_update_user"), {
+        description: error.message || t("error_try_again"),
       });
     },
   });
@@ -117,20 +120,21 @@ export function useUpdateUser() {
 
 export function useDeleteUser() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   
   return useMutation({
     mutationFn: (id: string) => UserService.deleteUser(id),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: userQueries.lists() });
       queryClient.removeQueries({ queryKey: userQueries.detail(data.id) });
-      toast.success("User deleted successfully", {
-        description: `${data.name} has been removed from the system`,
+      toast.success(t("user_deleted_success"), {
+        description: `${data.name} ${t("user_deleted_desc")}`,
       });
     },
     onError: (error: Error) => {
       console.error("Delete user error:", error);
-      toast.error("Failed to delete user", {
-        description: error.message || "Please try again later",
+      toast.error(t("failed_delete_user"), {
+        description: error.message || t("error_try_again"),
       });
     },
   });
@@ -138,6 +142,7 @@ export function useDeleteUser() {
 
 export function useToggleUserStatus() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "active" | "inactive" }) => 
@@ -177,8 +182,10 @@ export function useToggleUserStatus() {
       queryClient.invalidateQueries({ queryKey: userQueries.detail(data.id) });
       
       const action = data.status === "active" ? "activated" : "deactivated";
-      toast.success(`User ${action} successfully`, {
-        description: `${data.name} has been ${action}`,
+      const actionText = data.status === "active" ? t("user_activated_desc") : t("user_deactivated_desc");
+      const successMessage = data.status === "active" ? t("user_activated_success") : t("user_deactivated_success");
+      toast.success(successMessage, {
+        description: `${data.name} ${actionText}`,
       });
     },
   });

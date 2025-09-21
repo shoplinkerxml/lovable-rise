@@ -127,40 +127,43 @@ interface AdminLayoutProps {
   children?: React.ReactNode;
 }
 
-const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const [userProfile, setUserProfile] = useState<UserProfile | undefined>();
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
-        const { data: userData } = await supabase.auth.getUser();
-        const user = userData.user;
+        const { data: { user }, error: sessionError } = await supabase.auth.getUser();
         
-        if (user?.id) {
-          const profile = await ProfileService.ensureProfile(user.id, {
-            email: user.email || '',
-            name: user.user_metadata?.name || ''
-          });
+        if (sessionError || !user) {
+          console.error('No user session:', sessionError);
+          return;
+        }
+
+        // Try to get existing profile first
+        const profile = await ProfileService.getProfile(user.id);
+        
+        if (profile) {
+          // Use existing profile data
+          const finalAvatarUrl = profile.avatar_url && profile.avatar_url.trim() !== '' 
+            ? profile.avatar_url 
+            : '/placeholder.svg';
           
-          if (profile) {
-            const avatarUrl = profile.avatar_url?.trim();
-            // If no avatar URL or it's empty, set default placeholder
-            const finalAvatarUrl = avatarUrl && avatarUrl !== '' ? avatarUrl : '/placeholder.svg';
-            
-            setUserProfile({
-              email: user.email || '',
-              name: profile.name || 'Administrator',
-              role: profile.role || 'admin',
-              avatarUrl: finalAvatarUrl,
-            });
-          } else {
-            console.error('Failed to ensure user profile');
-            toast.error('Failed to load user profile. Please refresh and try again.');
-          }
+          setUserProfile({
+            id: user.id,
+            email: user.email || '',
+            name: profile.name || 'Administrator',
+            role: profile.role || 'admin',
+            avatarUrl: finalAvatarUrl,
+          });
+        } else {
+          console.error('Failed to ensure user profile');
+          toast.error(t("failed_load_user_profile"));
         }
       } catch (error) {
         console.error('Error loading user profile:', error);
-        toast.error('Unable to load profile. Please refresh and try again.');
+        toast.error(t("unable_load_profile"));
       }
     };
 
@@ -175,5 +178,3 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     </AdminProvider>
   );
 };
-
-export default AdminLayout;

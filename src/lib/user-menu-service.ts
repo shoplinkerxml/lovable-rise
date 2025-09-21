@@ -57,7 +57,7 @@ export class UserMenuService {
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('user_menu_items')
         .select('*')
         .eq('user_id', userId);
@@ -115,7 +115,7 @@ export class UserMenuService {
   static async createMenuItem(userId: string, menuData: CreateUserMenuItem): Promise<UserMenuItem> {
     try {
       // Validate path uniqueness for the user
-      const { data: existingItem } = await supabase
+      const { data: existingItem } = await (supabase as any)
         .from('user_menu_items')
         .select('id')
         .eq('user_id', userId)
@@ -129,7 +129,7 @@ export class UserMenuService {
       // Get the next order index if not provided
       let orderIndex = menuData.order_index;
       if (orderIndex === undefined) {
-        const { data: maxOrderItem } = await supabase
+        const { data: maxOrderItem } = await (supabase as any)
           .from('user_menu_items')
           .select('order_index')
           .eq('user_id', userId)
@@ -141,7 +141,7 @@ export class UserMenuService {
         orderIndex = (maxOrderItem?.order_index || 0) + 1;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .insert({
           user_id: userId,
@@ -157,7 +157,7 @@ export class UserMenuService {
         throw error;
       }
 
-      return data;
+      return data as UserMenuItem;
     } catch (error) {
       console.error('Error in createMenuItem:', error);
       throw error;
@@ -171,7 +171,7 @@ export class UserMenuService {
     try {
       // If path is being updated, validate uniqueness
       if (menuData.path) {
-        const { data: existingItem } = await supabase
+        const { data: existingItem } = await (supabase as any)
           .from('user_menu_items')
           .select('id')
           .eq('user_id', userId)
@@ -184,7 +184,7 @@ export class UserMenuService {
         }
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .update(menuData)
         .eq('id', itemId)
@@ -197,7 +197,7 @@ export class UserMenuService {
         throw error;
       }
 
-      return data;
+      return data as UserMenuItem;
     } catch (error) {
       console.error('Error in updateMenuItem:', error);
       throw error;
@@ -209,7 +209,7 @@ export class UserMenuService {
    */
   static async deleteMenuItem(itemId: number, userId: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_menu_items')
         .delete()
         .eq('id', itemId)
@@ -244,7 +244,7 @@ export class UserMenuService {
     try {
       // Perform updates in a transaction-like manner
       const updates = reorderedItems.map(item => 
-        supabase
+        (supabase as any)
           .from('user_menu_items')
           .update({ 
             order_index: item.order_index,
@@ -266,7 +266,7 @@ export class UserMenuService {
    */
   static async getMenuItem(itemId: number, userId: string): Promise<UserMenuItem | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .select('*')
         .eq('id', itemId)
@@ -293,7 +293,7 @@ export class UserMenuService {
    */
   static async getChildMenuItems(userId: string, parentId?: number): Promise<UserMenuItem[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .select('*')
         .eq('user_id', userId)

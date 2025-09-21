@@ -5,6 +5,7 @@ import { Separator } from './separator';
 import { DynamicIcon, getAutoIcon } from './dynamic-icon';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/providers/i18n-provider';
 
 export interface MenuSectionProps {
   title?: string;
@@ -39,6 +40,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 }) => {
   const [submenuStates, setSubmenuStates] = useState<SubmenuState>({});
   const tree = buildTree([...items, ...children]);
+  const { t } = useI18n();
   
   // Don't render if no items
   if (!items.length) {
@@ -70,6 +72,41 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     return item.has_separator && index === 0;
   };
 
+  // Helper function to translate menu items (duplicated from MenuItemWithIcon for consistency)
+  const translateMenuItem = (title: string): string => {
+    const translationMap: Record<string, string> = {
+      "Forms": "menu_forms",
+      "Settings": "menu_settings", 
+      "Users": "menu_users",
+      "Dashboard": "menu_dashboard",
+      "Analytics": "menu_analytics",
+      "Reports": "menu_reports",
+      "Content": "menu_content",
+      "Categories": "menu_categories",
+      "Products": "menu_products",
+      "Форми": "menu_forms",
+      "Налаштування": "menu_settings",
+      "Користувачі": "menu_users",
+      "Панель управління": "menu_dashboard",
+      "Аналітика": "menu_analytics",
+      "Звіти": "menu_reports",
+      "Контент": "menu_content",
+      "Категорії": "menu_categories",
+      "Товари": "menu_products",
+      // Additional translations
+      "Головна": "menu_main",
+      "Тарифні плани": "menu_pricing",
+      "Валюта": "menu_currency",
+      "Платіжні системи": "menu_payment",
+      "Pricing Plans": "menu_pricing",
+      "Currency": "menu_currency",
+      "Payment Systems": "menu_payment",
+    };
+    
+    const translationKey = translationMap[title];
+    return translationKey ? t(translationKey as any) : title;
+  };
+
   return (
     <div className={cn("space-y-1", type === 'dashboard' && "mb-4")}>
       {renderSectionHeader()}
@@ -77,6 +114,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
       {items.map((item, index) => {
         const hasChildren = tree[item.id]?.length > 0;
         const isExpanded = submenuStates[item.id];
+        const translatedTitle = translateMenuItem(item.title);
         
         return (
           <div key={item.id}>
@@ -102,7 +140,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                       ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50 shadow-sm"
                       : "hover:bg-emerald-50 hover:text-[#10b981] border border-transparent hover:border-emerald-200/30 hover:shadow-sm"
                   )}
-                  aria-label={`${item.title} - ${isExpanded ? "Collapse" : "Expand"} submenu`}
+                  aria-label={`${translatedTitle} - ${isExpanded ? "Collapse" : "Expand"} submenu`}
                 >
                   <div className="flex items-center min-w-0 flex-1">
                     <DynamicIcon 
@@ -115,7 +153,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                     />
                     {!collapsed && (
                       <span className="truncate flex-1">
-                        {item.title}
+                        {translatedTitle}
                       </span>
                     )}
                   </div>

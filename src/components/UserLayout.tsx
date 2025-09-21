@@ -6,8 +6,10 @@ import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { toast } from "sonner";
+import { useI18n } from "@/providers/i18n-provider";
 
 const UserLayout = () => {
+  const { t } = useI18n();
   const [menuItems, setMenuItems] = useState<UserMenuItem[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -25,7 +27,7 @@ const UserLayout = () => {
       const { user: currentUser, session, error } = await UserAuthService.getCurrentUser();
       
       if (error || !currentUser || !session) {
-        toast.error("Please log in to continue");
+        toast.error(t("please_log_in"));
         return;
       }
 
@@ -35,7 +37,7 @@ const UserLayout = () => {
       await loadUserMenuItems(currentUser.id);
     } catch (error) {
       console.error("Error loading user data:", error);
-      toast.error("Failed to load user data");
+      toast.error(t("failed_load_user_data"));
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ const UserLayout = () => {
       setMenuItems(items);
     } catch (error) {
       console.error("Failed to load user menu items:", error);
-      toast.error("Failed to load menu items");
+      toast.error(t("failed_load_menu_items"));
     }
   };
 
@@ -82,7 +84,7 @@ const UserLayout = () => {
         menuItems={menuItems}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onMenuUpdate={handleMenuUpdate}
+        onMenuChange={handleMenuUpdate}
         user={user}
       />
       <div className="flex-1 flex flex-col">

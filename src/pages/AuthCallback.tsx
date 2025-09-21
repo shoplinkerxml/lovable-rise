@@ -4,9 +4,11 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { useI18n } from "@/providers/i18n-provider";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -26,26 +28,26 @@ const AuthCallback = () => {
         const { user, session, error } = await UserAuthService.handleOAuthCallback();
         
         if (error === 'redirect_to_admin') {
-          toast.success("Welcome back!");
+          toast.success(t("welcome_back"));
           navigate("/admin");
           return;
         }
         
         if (error === 'oauth_callback_failed') {
-          toast.error("Authentication failed. Please try signing in again.");
+          toast.error(t("oauth_failed"));
           navigate("/user-auth");
           return;
         }
         
         if (error === 'profile_creation_failed') {
-          toast.error("Account confirmed but profile setup failed. Please try signing in again.");
+          toast.error(t("account_confirmed_setup_failed"));
           navigate("/user-auth");
           return;
         }
         
         if (error) {
           console.error('Auth callback error:', error);
-          toast.error("Authentication failed. Please try again.");
+          toast.error(t("auth_failed"));
           navigate("/user-auth");
           return;
         }
@@ -55,21 +57,21 @@ const AuthCallback = () => {
           const isEmailConfirmation = window.location.search.includes('type=signup');
           
           if (isEmailConfirmation) {
-            toast.success("Email confirmed successfully! Welcome to MarketGrow!");
+            toast.success(t("email_confirmed_welcome"));
           } else {
-            toast.success("Welcome to MarketGrow!");
+            toast.success(t("welcome_back"));
           }
           navigate("/user/dashboard");
         } else {
           // Handle case where user confirmed email but profile wasn't created
           // This can happen if the database trigger failed
-          toast.success("Email confirmed successfully!");
-          toast.info("Please sign in to complete your registration.");
+          toast.success(t("email_confirmed"));
+          toast.info(t("please_sign_in_complete_registration"));
           navigate("/user-auth");
         }
       } catch (error) {
         console.error("Auth callback error:", error);
-        toast.error("Authentication failed. Please try again.");
+        toast.error(t("auth_failed"));
         navigate("/user-auth");
       }
     };

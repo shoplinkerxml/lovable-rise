@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { ChevronDown, Copy, CheckCircle, Download, Edit, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useI18n } from '@/providers/i18n-provider';
 
 interface ApiEndpoint {
   name: string;
@@ -30,6 +31,7 @@ export default function ApiDocs() {
   const [adminEmail, setAdminEmail] = useState<string>('');
   const [adminPassword, setAdminPassword] = useState<string>('');
   const { toast } = useToast();
+  const { t } = useI18n();
 
   // Загружаем сохранённые скрипты и API ключ из localStorage
   useEffect(() => {
@@ -75,8 +77,8 @@ export default function ApiDocs() {
   const updateScript = (endpointKey: string, script: string) => {
     saveScripts(prev => ({ ...prev, [endpointKey]: script }));
     toast({
-      title: "Скрипт обновлён!",
-      description: "Postman скрипт сохранён",
+      title: t("script_updated"),
+      description: t("script_saved"),
       duration: 2000,
     });
   };
@@ -86,8 +88,8 @@ export default function ApiDocs() {
     try {
       localStorage.setItem('supabase-apikey', newApiKey);
       toast({
-        title: "API ключ сохранён!",
-        description: "API ключ будет использоваться во всех запросах",
+        title: t("api_key_saved"),
+        description: t("api_key_used"),
         duration: 2000,
       });
     } catch (e) {
@@ -143,8 +145,8 @@ export default function ApiDocs() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Скопировано!",
-      description: "Код скопирован в буфер обмена",
+      title: t("copied"),
+      description: t("copied_clipboard"),
       duration: 2000,
     });
   };
@@ -645,8 +647,8 @@ console.log("Права доступа обновлены:", responseData);`
     downloadAnchorNode.remove();
     
     toast({
-      title: "Коллекция скачана!",
-      description: "Postman коллекция готова к импорту",
+      title: t("collection_downloaded"),
+      description: t("collection_ready"),
       duration: 3000,
     });
   };

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/providers/i18n-provider";
 
 interface FormPageProps {
   template?: string;
@@ -25,6 +26,7 @@ interface FormField {
 const DefaultFormTemplate = ({ formConfig, title }: { formConfig: any; title: string }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const { toast } = useToast();
+  const { t } = useI18n();
 
   const fields: FormField[] = formConfig?.fields || [
     { id: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Enter your name' },
@@ -41,8 +43,8 @@ const DefaultFormTemplate = ({ formConfig, title }: { formConfig: any; title: st
     
     if (missingFields.length > 0) {
       toast({
-        title: "Validation Error",
-        description: `Please fill in required fields: ${missingFields.map(f => f.label).join(', ')}`,
+        title: t("validation_error"),
+        description: `${t("fill_required_fields")}: ${missingFields.map(f => f.label).join(', ')}`,
         variant: "destructive"
       });
       return;
@@ -51,8 +53,8 @@ const DefaultFormTemplate = ({ formConfig, title }: { formConfig: any; title: st
     // Simulate form submission
     console.log('Form submitted:', formData);
     toast({
-      title: "Success",
-      description: "Form submitted successfully!",
+      title: t("success"),
+      description: t("form_submitted"),
     });
     
     // Reset form

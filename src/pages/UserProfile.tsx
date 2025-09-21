@@ -64,13 +64,13 @@ const UserProfile = () => {
       if (updatedProfile) {
         // Update local state
         setUser({ ...user, name: name.trim(), phone: phone.trim() || undefined });
-        toast.success("Profile updated successfully");
+        toast.success(t("profile_updated_success"));
       } else {
-        throw new Error('Failed to update profile');
+        throw new Error(t("failed_update_profile"));
       }
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      toast.error(t("failed_update_profile"));
     } finally {
       setSaving(false);
     }
@@ -99,13 +99,13 @@ const UserProfile = () => {
 
       if (updatedProfile) {
         setUser({ ...user, avatar_url: publicUrl });
-        toast.success("Avatar updated successfully");
+        toast.success(t("avatar_updated_success"));
       } else {
-        throw new Error('Failed to update profile with avatar');
+        throw new Error(t("failed_upload_avatar"));
       }
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar");
+      toast.error(t("failed_upload_avatar"));
     } finally {
       setUploading(false);
     }

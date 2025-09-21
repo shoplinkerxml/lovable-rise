@@ -46,6 +46,14 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
       "Контент": "menu_content",
       "Категорії": "menu_categories",
       "Товари": "menu_products",
+      // Additional translations
+      "Головна": "menu_main",
+      "Тарифні плани": "menu_pricing",
+      "Валюта": "menu_currency",
+      "Платіжні системи": "menu_payment",
+      "Pricing Plans": "menu_pricing",
+      "Currency": "menu_currency",
+      "Payment Systems": "menu_payment",
     };
     
     const translationKey = translationMap[title];

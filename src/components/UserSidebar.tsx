@@ -1,83 +1,140 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { 
+  FileText, 
   ChevronLeft, 
   ChevronRight, 
-  Plus, 
-  Settings, 
-  LayoutDashboard, 
   User, 
-  Menu as MenuIcon,
-  Edit3,
-  Trash2,
-  Copy
+  Edit3, 
+  Copy, 
+  Trash2, 
+  MenuIcon,
+  Plus,
+  Settings
 } from "lucide-react";
+import { useI18n } from "@/providers/i18n-provider";
+import { useToast } from "@/hooks/use-toast";
 import { UserMenuItem } from "@/lib/user-menu-service";
-import { UserProfile } from "@/lib/user-auth-schemas";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 
-interface UserSidebarProps {
-  menuItems: UserMenuItem[];
-  collapsed: boolean;
-  onToggle: () => void;
-  onMenuUpdate: () => void;
-  user: UserProfile;
+interface DefaultMenuItem {
+  title: string;
+  path: string;
+  icon: string;
+  isDefault: true;
 }
 
-export const UserSidebar = ({ 
-  menuItems, 
-  collapsed, 
-  onToggle, 
-  onMenuUpdate,
-  user 
-}: UserSidebarProps) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+const defaultMenuItems: DefaultMenuItem[] = [
+  {
+    title: "Dashboard",
+    path: "/user/dashboard",
+    icon: "LayoutDashboard",
+    isDefault: true as const
+  },
+  {
+    title: "Profile",
+    path: "/user/profile",
+    icon: "User",
+    isDefault: true as const
+  }
+];
 
-  const defaultMenuItems = [
-    {
-      title: "Dashboard",
-      path: "/user/dashboard",
-      icon: "LayoutDashboard",
-      isDefault: true
-    },
-    {
-      title: "Profile",
-      path: "/user/profile",
-      icon: "User",
-      isDefault: true
-    }
-  ];
+export const UserSidebar = ({ 
+  user, 
+  menuItems = [], 
+  collapsed = false, 
+  onToggle,
+  onMenuChange
+}) => {
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null)
+  const navigate = useNavigate()
+  const { toast } = useToast()
+  const { t } = useI18n()
 
   const handleMenuClick = (path: string) => {
     navigate(path);
   };
 
   const handleMenuAction = (action: string, item: UserMenuItem) => {
-    // These will be implemented when we add menu management UI
-    console.log(`${action} menu item:`, item);
+    switch (action) {
+      case 'edit':
+        navigate(`/user/content/${item.id}`);
+        break;
+      case 'duplicate':
+        toast({
+          title: t("duplicate_menu_item"),
+          description: t("feature_not_implemented"),
+          variant: "destructive"
+        });
+        break;
+      case 'delete':
+        toast({
+          title: t("delete_menu_item"),
+          description: t("feature_not_implemented"),
+          variant: "destructive"
+        });
+        break;
+    }
   };
 
   const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + "/");
+    return window.location.pathname === path || window.location.pathname.startsWith(path + "/");
   };
 
-  const renderMenuItem = (item: UserMenuItem | typeof defaultMenuItems[0], level = 0) => {
-    const isDefaultItem = 'isDefault' in item;
-    const itemPath = item.path;
-    const active = isActive(itemPath);
+  // Helper function to translate menu items
+  const translateMenuItem = (title: string): string => {
+    const translationMap: Record<string, string> = {
+      "Forms": "menu_forms",
+      "Settings": "menu_settings", 
+      "Users": "menu_users",
+      "Dashboard": "menu_dashboard",
+      "Analytics": "menu_analytics",
+      "Reports": "menu_reports",
+      "Content": "menu_content",
+      "Categories": "menu_categories",
+      "Products": "menu_products",
+      "Форми": "menu_forms",
+      "Налаштування": "menu_settings",
+      "Користувачі": "menu_users",
+      "Панель управління": "menu_dashboard",
+      "Аналітика": "menu_analytics",
+      "Звіти": "menu_reports",
+      "Контент": "menu_content",
+      "Категорії": "menu_categories",
+      "Товари": "menu_products",
+      // Additional translations
+      "Головна": "menu_main",
+      "Тарифні плани": "menu_pricing",
+      "Валюта": "menu_currency",
+      "Платіжні системи": "menu_payment",
+      "Pricing Plans": "menu_pricing",
+      "Currency": "menu_currency",
+      "Payment Systems": "menu_payment",
+    };
+    
+    const translationKey = translationMap[title];
+    return translationKey ? t(translationKey as any) : title;
+  };
+
+  const isDefaultMenuItem = (item: any): item is DefaultMenuItem => {
+    return item && typeof item === 'object' && 'isDefault' in item && item.isDefault === true;
+  };
+
+  const renderMenuItem = (item: DefaultMenuItem | UserMenuItem, level = 0) => {
+    const isDefaultItem = isDefaultMenuItem(item);
+    const itemPath = isDefaultItem ? item.path : `/user/content/${(item as UserMenuItem).id}`;
+    const translatedTitle = translateMenuItem(item.title);
     
     return (
       <div 
@@ -92,7 +149,7 @@ export const UserSidebar = ({
         <div
           className={cn(
             "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer",
-            active
+            isActive(itemPath)
               ? "bg-emerald-100 text-emerald-900"
               : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
           )}
@@ -106,7 +163,7 @@ export const UserSidebar = ({
               className="h-4 w-4" 
             />
             {!collapsed && (
-              <span className="truncate">{item.title}</span>
+              <span className="truncate">{translatedTitle}</span>
             )}
           </div>
           
@@ -139,7 +196,7 @@ export const UserSidebar = ({
         </div>
         
         {/* Render children if any */}
-        {'children' in item && item.children && item.children.map(child => 
+        {!isDefaultItem && 'children' in item && (item as any).children && (item as any).children.map(child => 
           renderMenuItem(child, level + 1)
         )}
       </div>
