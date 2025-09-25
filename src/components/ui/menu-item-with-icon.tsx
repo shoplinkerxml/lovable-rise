@@ -78,8 +78,8 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
   const iconMargin = collapsed ? "" : "mr-3"; // 12px gap between icon and text
   
   // Auto-assign icon if none is explicitly set
-  // For child items (submenus), always use circle icon
-  const iconName = variant === 'child' ? 'circle' : (item.icon_name || getAutoIcon({ 
+  // For child items (submenus), use 'dot' icon
+  const iconName = variant === 'child' ? 'dot' : (item.icon_name || getAutoIcon({ 
     title: item.title, 
     path: item.path, 
     page_type: item.page_type 
@@ -90,7 +90,7 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
       <div className="flex items-center min-w-0 flex-1">
         <DynamicIcon 
           name={iconName} 
-          className={cn(iconSize, iconMargin, "shrink-0")}
+          className={cn(iconSize, iconMargin, "shrink-0", variant === 'child' ? "fill-emerald-400 stroke-emerald-400 scale-50" : "")}
         />
         {!collapsed && (
           <span className="truncate flex-1">

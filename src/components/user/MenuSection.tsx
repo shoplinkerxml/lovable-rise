@@ -72,7 +72,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     return false; // Not implementing separators for user menu
   };
 
-  // Helper function to translate menu items (duplicated from MenuItemWithIcon for consistency)
+  // Helper function to translate menu items
   const translateMenuItem = (title: string): string => {
     const translationMap: Record<string, string> = {
       "Forms": "menu_forms",

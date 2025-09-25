@@ -38,6 +38,7 @@ import {
   CreditCard,
   DollarSign,
   Tags,
+  ChevronRight,
   LucideIcon,
 } from 'lucide-react';
 
@@ -146,10 +147,12 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   logout: LogOut,
   'door-open': DoorOpen,
   exit: DoorOpen,
+  'chevron-right': ChevronRight,
   Menu: Menu,
   
   // Fallback
   circle: Circle,
+  'dot': Circle,
   Circle: Circle,
 } as const;
 

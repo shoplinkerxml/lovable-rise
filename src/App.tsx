@@ -23,6 +23,7 @@ import UserLayout from "@/components/UserLayout";
 import UserDashboard from "./pages/UserDashboard";
 import UserProfile from "./pages/UserProfile";
 import UserMenuContent from "./pages/UserMenuContent";
+import UserMenuManagement from "./pages/UserMenuManagement";
 // Add import for new component
 import UserMenuContentByPath from "./pages/UserMenuContentByPath";
 
@@ -74,9 +75,9 @@ const App = () => (
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<UserDashboard />} />
                 <Route path="profile" element={<UserProfile />} />
+                <Route path="menu-management" element={<UserMenuManagement />} />
                 <Route path="content/:id" element={<UserMenuContent />} />
                 <Route path=":path/*" element={<UserMenuContentByPath />} />
-                {/* Removed /user/menu-management route as requested */}
               </Route>
             </Route>
             

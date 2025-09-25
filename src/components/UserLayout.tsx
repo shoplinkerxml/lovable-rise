@@ -30,6 +30,7 @@ const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
     is_active: true,
     order_index: 0,
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     icon_name: 'layout-dashboard'
   },
   '/profile': {
@@ -40,6 +41,7 @@ const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
     is_active: true,
     order_index: 1,
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     icon_name: 'user'
   }
 };
@@ -87,7 +89,8 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
   const loadMenuItems = async () => {
     setMenuLoading(true);
     try {
-      const items = await UserMenuService.getMenuHierarchy(userId);
+      // Get all menu items as a flat list, not hierarchical
+      const items = await UserMenuService.getUserMenuItems(userId, true);
       setMenuItems(items);
     } catch (error) {
       console.error("Failed to load user menu items:", error);
@@ -131,7 +134,8 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
         page_type: STATIC_ROUTES[normalizedUserPath].page_type!,
         is_active: STATIC_ROUTES[normalizedUserPath].is_active!,
         order_index: STATIC_ROUTES[normalizedUserPath].order_index!,
-        created_at: STATIC_ROUTES[normalizedUserPath].created_at!
+        created_at: STATIC_ROUTES[normalizedUserPath].created_at!,
+        updated_at: STATIC_ROUTES[normalizedUserPath].updated_at!
       } as UserMenuItem;
     }
     
@@ -146,9 +150,15 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
   // Navigate to menu item
   const navigateToMenuItem = (item: UserMenuItem) => {
     setActiveMenuItem(item);
-    // Ensure path doesn't have leading slash to prevent double slashes
-    const cleanPath = item.path.startsWith('/') ? item.path.substring(1) : item.path;
-    navigate(`/user/${cleanPath}`, { replace: false });
+    // Handle static routes (negative IDs) differently from database routes
+    if (item.id < 0) {
+      // Static routes already have the correct path format
+      navigate(`/user${item.path}`, { replace: false });
+    } else {
+      // Database routes should not have leading slash
+      const cleanPath = item.path.startsWith('/') ? item.path.substring(1) : item.path;
+      navigate(`/user/${cleanPath}`, { replace: false });
+    }
   };
 
   // Initialize menu items on mount
@@ -346,11 +356,9 @@ const UserLayoutContent = ({
   handleProfileNavigation: (path: string) => void;
   handleLogout: () => void;
 }) => {
-  const { menuItems, menuLoading, activeMenuItem, navigateToMenuItem } = useUserMenu();
+  const { menuItems, menuLoading, activeMenuItem, navigateToMenuItem, refreshMenuItems } = useUserMenu();
   const location = useLocation();
   const navigate = useNavigate();
-
-  const tree = buildTree(menuItems);
 
   // Organize menu items into sections
   const menuSections = [
@@ -371,6 +379,11 @@ const UserLayoutContent = ({
 
   // Check if item is active
   const isActiveItem = (item: UserMenuItem) => {
+    // For static routes, compare with the full path
+    if (item.id < 0) { // Static routes have negative IDs
+      return activeMenuItem?.id === item.id || location.pathname === `/user${item.path}`;
+    }
+    // For database routes, compare with the path without leading slash
     return activeMenuItem?.id === item.id || location.pathname === `/user/${item.path}`;
   };
 
@@ -505,7 +518,7 @@ const UserLayoutContent = ({
         {/* Content */}
         <main className="flex-1 overflow-hidden">
           <div className="h-full">
-            <Outlet context={{ user, menuItems, onMenuUpdate: () => {} }} />
+            <Outlet context={{ user, menuItems, onMenuUpdate: refreshMenuItems }} />
           </div>
         </main>
       </div>

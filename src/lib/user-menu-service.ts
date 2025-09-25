@@ -58,7 +58,7 @@ export class UserMenuService {
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
     try {
       console.log('getUserMenuItems called with:', { userId, activeOnly }); // Debug log
-      // Get shared menu items for all users (no user_id filter)
+      // Get menu items - user menu items are shared across all users
       let query = (supabase as any)
         .from('user_menu_items')
         .select('*');
@@ -91,33 +91,48 @@ export class UserMenuService {
   static async getMenuHierarchy(userId: string): Promise<UserMenuItem[]> {
     try {
       console.log('getMenuHierarchy called with userId:', userId); // Debug log
-      // We still pass userId for potential future use, but currently get all active menu items
+      // Get all active menu items for the user
       const allItems = await this.getUserMenuItems(userId, true);
       console.log('All items for hierarchy:', allItems); // Debug log
       
-      // Separate root items and children
-      const rootItems = allItems.filter(item => !item.parent_id);
-      const childItems = allItems.filter(item => item.parent_id);
+      // Build a map of all items by ID for quick lookup
+      const itemMap = new Map<number, UserMenuItem & { children?: UserMenuItem[] }>();
+      allItems.forEach(item => {
+        itemMap.set(item.id, { ...item, children: [] });
+      });
       
-      console.log('Root items:', rootItems); // Debug log
-      console.log('Child items:', childItems); // Debug log
+      // Build hierarchy by assigning children to their parents
+      const rootItems: (UserMenuItem & { children?: UserMenuItem[] })[] = [];
       
-      // Build hierarchy
-      const buildHierarchy = (items: UserMenuItem[]): UserMenuItem[] => {
-        return items.map(item => {
-          const children = childItems.filter(child => child.parent_id === item.id);
-          console.log('Processing item:', item, 'Children:', children); // Debug log
-          const result = {
-            ...item,
-            children: children.length > 0 ? children : undefined
-          } as UserMenuItem & { children?: UserMenuItem[] };
-          return result;
-        });
-      };
+      allItems.forEach(item => {
+        if (item.parent_id) {
+          // This is a child item, add it to its parent's children array
+          const parent = itemMap.get(item.parent_id);
+          if (parent) {
+            parent.children = parent.children || [];
+            parent.children.push(item);
+          }
+        } else {
+          // This is a root item
+          const itemWithChildren = itemMap.get(item.id);
+          if (itemWithChildren) {
+            rootItems.push(itemWithChildren);
+          }
+        }
+      });
       
-      const hierarchy = buildHierarchy(rootItems);
-      console.log('Built hierarchy:', hierarchy); // Debug log
-      return hierarchy;
+      // Sort children by order_index
+      rootItems.forEach(item => {
+        if (item.children) {
+          item.children.sort((a, b) => a.order_index - b.order_index);
+        }
+      });
+      
+      // Sort root items by order_index
+      rootItems.sort((a, b) => a.order_index - b.order_index);
+      
+      console.log('Built hierarchy:', rootItems); // Debug log
+      return rootItems;
     } catch (error) {
       console.error('Error in getMenuHierarchy:', error);
       throw error;
@@ -133,7 +148,6 @@ export class UserMenuService {
       const { data: existingItem } = await (supabase as any)
         .from('user_menu_items')
         .select('id')
-        .eq('user_id', userId)
         .eq('path', menuData.path)
         .maybeSingle();
 
@@ -147,7 +161,6 @@ export class UserMenuService {
         const { data: maxOrderItem } = await (supabase as any)
           .from('user_menu_items')
           .select('order_index')
-          .eq('user_id', userId)
           .eq('parent_id', menuData.parent_id || null)
           .order('order_index', { ascending: false })
           .limit(1)
@@ -208,7 +221,7 @@ export class UserMenuService {
       const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .insert({
-          user_id: userId,
+          user_id: userId, // Still store user_id for RLS policy compatibility
           ...menuData,
           order_index: orderIndex,
           page_type: menuData.page_type || 'content',
@@ -239,13 +252,12 @@ export class UserMenuService {
         const { data: existingItem } = await (supabase as any)
           .from('user_menu_items')
           .select('id')
-          .eq('user_id', userId)
           .eq('path', menuData.path)
           .neq('id', itemId)
           .maybeSingle();
 
         if (existingItem) {
-          throw new Error('Path already exists for this user');
+          throw new Error('Path already exists');
         }
       }
 
@@ -253,7 +265,6 @@ export class UserMenuService {
         .from('user_menu_items')
         .update(menuData)
         .eq('id', itemId)
-        .eq('user_id', userId)
         .select()
         .maybeSingle();
 
@@ -277,8 +288,7 @@ export class UserMenuService {
       const { error } = await (supabase as any)
         .from('user_menu_items')
         .delete()
-        .eq('id', itemId)
-        .eq('user_id', userId);
+        .eq('id', itemId);
 
       if (error) {
         console.error('Error deleting menu item:', error);
@@ -316,7 +326,6 @@ export class UserMenuService {
             parent_id: item.parent_id || null
           })
           .eq('id', item.id)
-          .eq('user_id', userId)
       );
 
       await Promise.all(updates);
@@ -336,7 +345,6 @@ export class UserMenuService {
         .from('user_menu_items')
         .select('*')
         .eq('id', itemId)
-        .eq('user_id', userId)
         .maybeSingle();
 
       if (error) {
@@ -392,7 +400,6 @@ export class UserMenuService {
       const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .select('*')
-        .eq('user_id', userId)
         .eq('parent_id', parentId || null)
         .eq('is_active', true)
         .order('order_index');
