@@ -1,5 +1,6 @@
 import { useI18n } from "@/providers/i18n-provider";
 import UserStatisticsCard from "@/components/admin/UserStatisticsCard";
+import AddMissingMenuItems from "@/components/admin/AddMissingMenuItems";
 
 const AdminDashboardContent = () => {
   const { t } = useI18n();
@@ -13,6 +14,7 @@ const AdminDashboardContent = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <UserStatisticsCard />
+        <AddMissingMenuItems />
         {/* Additional dashboard widgets can be added here */}
       </div>
     </div>

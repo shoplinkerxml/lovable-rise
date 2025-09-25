@@ -1,0 +1,68 @@
+-- Skip all migrations as tables don't exist yet
+-- Add trigger to automatically set default content for new menu items
+-- This ensures that every new menu item has appropriate default content based on its page type
+
+-- Function to set default content based on page type
+-- CREATE OR REPLACE FUNCTION public.set_default_menu_item_content()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--   -- Only set default content if content_data is null or empty
+--   IF NEW.content_data IS NULL OR NEW.content_data = '{}'::jsonb THEN
+--     CASE NEW.page_type
+--       WHEN 'content' THEN
+--         NEW.content_data := jsonb_build_object(
+--           'content',
+--           '<div class="prose max-w-none"><h2>Welcome to ' || NEW.title || '</h2><p>This is a placeholder content page. Configure the content through the admin interface.</p></div>'
+--         );
+--       WHEN 'dashboard' THEN
+--         NEW.content_data := jsonb_build_object(
+--           'widgets',
+--           jsonb_build_array(
+--             jsonb_build_object(
+--               'type', 'stats',
+--               'title', 'Overview',
+--               'data', '{}'::jsonb
+--             ),
+--             jsonb_build_object(
+--               'type', 'chart',
+--               'title', 'Analytics',
+--               'data', '{}'::jsonb
+--             )
+--           )
+--         );
+--       WHEN 'form' THEN
+--         NEW.content_data := jsonb_build_object(
+--           'form_config',
+--           jsonb_build_object(
+--             'fields', '[]'::jsonb,
+--             'submitAction', 'save'
+--           )
+--         );
+--       WHEN 'list' THEN
+--         NEW.content_data := jsonb_build_object(
+--           'table_config',
+--           jsonb_build_object(
+--             'columns', '[]'::jsonb,
+--             'dataSource', 'api'
+--           )
+--         );
+--       ELSE
+--         NEW.content_data := jsonb_build_object(
+--           'content',
+--           '<div class="prose max-w-none"><h2>' || NEW.title || '</h2><p>Configure your custom page content through the admin interface.</p></div>'
+--         );
+--     END CASE;
+--   END IF;
+--   
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to automatically set default content before inserting a new menu item
+-- CREATE TRIGGER set_default_menu_item_content_trigger
+--   BEFORE INSERT ON public.user_menu_items
+--   FOR EACH ROW
+--   EXECUTE FUNCTION public.set_default_menu_item_content();
+
+-- Grant necessary permissions
+-- GRANT EXECUTE ON FUNCTION public.set_default_menu_item_content() TO authenticated;

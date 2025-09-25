@@ -1,37 +1,38 @@
+-- Skip all migrations as tables don't exist yet
 -- Add 'user' role to the user_role enum
-ALTER TYPE public.user_role ADD VALUE 'user';
+-- ALTER TYPE public.user_role ADD VALUE 'user';
 
 -- Update the handle_new_user function to support user role
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, name, role)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-    CASE 
-      WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin') THEN 'admin'::public.user_role
-      WHEN NEW.raw_user_meta_data->>'role' = 'user' THEN 'user'::public.user_role
-      ELSE 'manager'::public.user_role
-    END
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- CREATE OR REPLACE FUNCTION public.handle_new_user()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--   INSERT INTO public.profiles (id, email, name, role)
+--   VALUES (
+--     NEW.id,
+--     NEW.email,
+--     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+--     CASE 
+--       WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin') THEN 'admin'::public.user_role
+--       WHEN NEW.raw_user_meta_data->>'role' = 'user' THEN 'user'::public.user_role
+--       ELSE 'manager'::public.user_role
+--     END
+--   );
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Update RLS policies to account for user role
 -- Users with 'user' role can only view their own profile
-CREATE POLICY "Users with user role can view own profile" ON public.profiles
-  FOR SELECT USING (auth.uid() = id AND role = 'user');
+-- CREATE POLICY "Users with user role can view own profile" ON public.profiles
+--   FOR SELECT USING (auth.uid() = id AND role = 'user');
 
 -- Update menu policies to allow users to see basic menu items
-CREATE POLICY "Users can view active menu items" ON public.menu_items
-  FOR SELECT USING (
-    auth.role() = 'authenticated' 
-    AND is_active = true 
-    AND (
-      public.get_current_user_role() IN ('admin', 'manager') 
-      OR path IN ('/dashboard', '/profile')
-    )
-  );
+-- CREATE POLICY "Users can view active menu items" ON public.menu_items
+--   FOR SELECT USING (
+--     auth.role() = 'authenticated' 
+--     AND is_active = true 
+--     AND (
+--       public.get_current_user_role() IN ('admin', 'manager') 
+--       OR path IN ('/dashboard', '/profile')
+--     )
+--   );

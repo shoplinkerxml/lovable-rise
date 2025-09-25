@@ -38,13 +38,13 @@ interface DefaultMenuItem {
 const defaultMenuItems: DefaultMenuItem[] = [
   {
     title: "Dashboard",
-    path: "/user/dashboard",
+    path: "dashboard",
     icon: "LayoutDashboard",
     isDefault: true as const
   },
   {
     title: "Profile",
-    path: "/user/profile",
+    path: "profile",
     icon: "User",
     isDefault: true as const
   }
@@ -89,7 +89,12 @@ export const UserSidebar = ({
   };
 
   const isActive = (path: string) => {
-    return window.location.pathname === path || window.location.pathname.startsWith(path + "/");
+    // Ensure path doesn't have leading slash to prevent double slashes
+    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    return window.location.pathname === `/user/${cleanPath}` || 
+           (window.location.pathname.startsWith(`/user/${cleanPath}`) && 
+            (window.location.pathname.length === `/user/${cleanPath}`.length || 
+             window.location.pathname.charAt(`/user/${cleanPath}`.length) === '/'));
   };
 
   // Helper function to translate menu items
@@ -133,7 +138,10 @@ export const UserSidebar = ({
 
   const renderMenuItem = (item: DefaultMenuItem | UserMenuItem, level = 0) => {
     const isDefaultItem = isDefaultMenuItem(item);
-    const itemPath = isDefaultItem ? item.path : `/user/content/${(item as UserMenuItem).id}`;
+    // Ensure path doesn't have leading slash to prevent double slashes
+    const cleanPath = isDefaultItem ? item.path : (item as UserMenuItem).path;
+    const normalizedPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
+    const itemPath = `/user/${normalizedPath}`;
     const translatedTitle = translateMenuItem(item.title);
     
     return (
@@ -287,20 +295,6 @@ export const UserSidebar = ({
             </>
           )}
 
-          {/* Add Menu Item Button */}
-          {!collapsed && (
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => navigate('/user/menu-management')}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Menu Item
-              </Button>
-            </div>
-          )}
         </div>
       </ScrollArea>
 

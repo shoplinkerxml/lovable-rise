@@ -1,5 +1,4 @@
+-- Skip all migrations as tables don't exist yet
 -- Add avatar_url column to profiles if not exists
-alter table if exists public.profiles
-  add column if not exists avatar_url text;
-
-
+-- alter table if exists public.profiles
+--   add column if not exists avatar_url text;

@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-
 export interface UserMenuItem {
   id: number;
   user_id: string;
@@ -52,27 +51,33 @@ export interface MenuReorderItem {
 }
 
 export class UserMenuService {
+  
   /**
    * Get all menu items for a user
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
     try {
+      console.log('getUserMenuItems called with:', { userId, activeOnly }); // Debug log
+      // Get shared menu items for all users (no user_id filter)
       let query = (supabase as any)
         .from('user_menu_items')
-        .select('*')
-        .eq('user_id', userId);
+        .select('*');
 
       if (activeOnly) {
         query = query.eq('is_active', true);
+        console.log('Filtering for active items only'); // Debug log
       }
 
-      const { data, error } = await query.order('order_index');
+      // Apply ordering before executing the query
+      const { data, error } = await query.order('order_index', { ascending: true });
 
       if (error) {
         console.error('Error fetching user menu items:', error);
         throw error;
       }
 
+      console.log('Fetched user menu items:', data); // Debug log
+      console.log('Active only:', activeOnly); // Debug log
       return data || [];
     } catch (error) {
       console.error('Error in getUserMenuItems:', error);
@@ -85,24 +90,34 @@ export class UserMenuService {
    */
   static async getMenuHierarchy(userId: string): Promise<UserMenuItem[]> {
     try {
+      console.log('getMenuHierarchy called with userId:', userId); // Debug log
+      // We still pass userId for potential future use, but currently get all active menu items
       const allItems = await this.getUserMenuItems(userId, true);
+      console.log('All items for hierarchy:', allItems); // Debug log
       
       // Separate root items and children
       const rootItems = allItems.filter(item => !item.parent_id);
       const childItems = allItems.filter(item => item.parent_id);
       
+      console.log('Root items:', rootItems); // Debug log
+      console.log('Child items:', childItems); // Debug log
+      
       // Build hierarchy
       const buildHierarchy = (items: UserMenuItem[]): UserMenuItem[] => {
         return items.map(item => {
           const children = childItems.filter(child => child.parent_id === item.id);
-          return {
+          console.log('Processing item:', item, 'Children:', children); // Debug log
+          const result = {
             ...item,
             children: children.length > 0 ? children : undefined
           } as UserMenuItem & { children?: UserMenuItem[] };
+          return result;
         });
       };
       
-      return buildHierarchy(rootItems);
+      const hierarchy = buildHierarchy(rootItems);
+      console.log('Built hierarchy:', hierarchy); // Debug log
+      return hierarchy;
     } catch (error) {
       console.error('Error in getMenuHierarchy:', error);
       throw error;
@@ -141,13 +156,63 @@ export class UserMenuService {
         orderIndex = (maxOrderItem?.order_index || 0) + 1;
       }
 
+      // Set default content based on page type with better defaults
+      const defaultContent = menuData.content_data || {};
+      if (!defaultContent.content) {
+        switch (menuData.page_type) {
+          case 'content':
+            defaultContent.content = `<div class="prose max-w-none">
+              <h2>Welcome to ${menuData.title}</h2>
+              <p>This is a placeholder content page. You can edit this page to add your own content.</p>
+              <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mt-4">
+                <h3 class="font-semibold text-emerald-800">Getting Started</h3>
+                <p class="text-emerald-700">Click the "Edit" button in the top right corner to customize this page.</p>
+              </div>
+            </div>`;
+            break;
+          case 'dashboard':
+            defaultContent.widgets = [{
+              type: 'stats',
+              title: 'Overview',
+              data: {}
+            }, {
+              type: 'chart',
+              title: 'Analytics',
+              data: {}
+            }];
+            break;
+          case 'form':
+            defaultContent.form_config = {
+              fields: [],
+              submitAction: 'save'
+            };
+            break;
+          case 'list':
+            defaultContent.table_config = {
+              columns: [],
+              dataSource: 'api'
+            };
+            break;
+          default:
+            defaultContent.content = `<div class="prose max-w-none">
+              <h2>${menuData.title}</h2>
+              <p>Configure your custom page content through the menu management interface.</p>
+              <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mt-4">
+                <h3 class="font-semibold text-emerald-800">Custom Page</h3>
+                <p class="text-emerald-700">This is a custom page type. You can add your own components here.</p>
+              </div>
+            </div>`;
+        }
+      }
+
       const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .insert({
           user_id: userId,
           ...menuData,
           order_index: orderIndex,
-          page_type: menuData.page_type || 'content'
+          page_type: menuData.page_type || 'content',
+          content_data: defaultContent
         })
         .select()
         .maybeSingle();
@@ -261,6 +326,7 @@ export class UserMenuService {
     }
   }
 
+  
   /**
    * Get a single menu item by ID
    */
@@ -284,6 +350,36 @@ export class UserMenuService {
       return data;
     } catch (error) {
       console.error('Error in getMenuItem:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a single menu item by path
+   */
+  static async getMenuItemByPath(path: string, userId: string): Promise<UserMenuItem | null> {
+    try {
+      // Remove leading slash if present to match database format
+      const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+      
+      const { data, error } = await (supabase as any)
+        .from('user_menu_items')
+        .select('*')
+        .eq('path', normalizedPath)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Not found
+        }
+        console.error('Error fetching menu item by path:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getMenuItemByPath:', error);
       throw error;
     }
   }

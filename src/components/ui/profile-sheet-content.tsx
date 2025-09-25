@@ -26,7 +26,12 @@ export const ProfileSheetContent: React.FC<ProfileSheetContentProps> = ({
 
   const handleProfileClick = () => {
     onClose();
-    onNavigate('/admin/personal');
+    // Check if this is a user profile or admin profile based on role
+    if (userInfo.role === "admin") {
+      onNavigate('/admin/personal');
+    } else {
+      onNavigate('/user/profile');
+    }
   };
 
   const handleLogoutClick = () => {

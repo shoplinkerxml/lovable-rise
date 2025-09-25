@@ -4,7 +4,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { BreadcrumbItem } from "@/components/ui/breadcrumb";
 
 // Route mapping for breadcrumb labels
-const ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string }> = {
+const ADMIN_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string }> = {
   "/admin": { labelKey: "breadcrumb_dashboard" },
   "/admin/dashboard": { labelKey: "breadcrumb_dashboard", parentPath: "/admin" },
   "/admin/personal": { labelKey: "breadcrumb_personal", parentPath: "/admin" },
@@ -19,24 +19,80 @@ const ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string }> =
   "/admin/settings": { labelKey: "breadcrumb_settings", parentPath: "/admin" },
 };
 
+const USER_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string }> = {
+  "/user": { labelKey: "breadcrumb_dashboard" },
+  "/user/dashboard": { labelKey: "breadcrumb_dashboard", parentPath: "/user" },
+  "/user/profile": { labelKey: "breadcrumb_personal", parentPath: "/user" },
+  "/user/settings": { labelKey: "breadcrumb_settings", parentPath: "/user" },
+};
+
 export function useBreadcrumbs(): BreadcrumbItem[] {
   const location = useLocation();
   const { t } = useI18n();
 
   return useMemo(() => {
     const path = location.pathname;
+    const isUserPath = path.startsWith("/user");
+    const ROUTE_MAPPING = isUserPath ? USER_ROUTE_MAPPING : ADMIN_ROUTE_MAPPING;
+    
     const breadcrumbs: BreadcrumbItem[] = [];
 
     // Always start with home
     breadcrumbs.push({
       label: t("breadcrumb_home"),
-      href: "/admin",
+      href: isUserPath ? "/user" : "/admin",
     });
 
     // Find the route in our mapping
     const route = ROUTE_MAPPING[path];
     if (!route) {
-      // If route not found, show the path as is
+      // Handle dynamic user menu paths
+      if (isUserPath && path.startsWith("/user/")) {
+        // Extract the dynamic part
+        const dynamicPath = path.substring(5); // Remove "/user"
+        const segments = dynamicPath.split("/").filter(Boolean);
+        
+        if (segments.length > 0) {
+          // For user content paths like /user/content/123
+          if (segments[0] === "content" && segments.length > 1) {
+            breadcrumbs.push({
+              label: t("menu_content"),
+              href: "/user/content",
+            });
+            breadcrumbs.push({
+              label: segments[1],
+              current: true,
+            });
+            return breadcrumbs;
+          }
+          
+          // For user dynamic menu paths like /user/reports, /user/tariff, etc.
+          if (segments.length === 1) {
+            // Capitalize first letter
+            const label = segments[0].charAt(0).toUpperCase() + segments[0].slice(1);
+            breadcrumbs.push({
+              label,
+              current: true,
+            });
+            return breadcrumbs;
+          }
+          
+          // For nested paths
+          segments.forEach((segment, index) => {
+            const isLast = index === segments.length - 1;
+            const fullPath = "/user/" + segments.slice(0, index + 1).join("/");
+            
+            breadcrumbs.push({
+              label: segment.charAt(0).toUpperCase() + segment.slice(1),
+              href: isLast ? undefined : fullPath,
+              current: isLast,
+            });
+          });
+          return breadcrumbs;
+        }
+      }
+      
+      // If route not found and not a handled dynamic path, show the path as is
       const segments = path.split("/").filter(Boolean);
       if (segments.length > 1) {
         breadcrumbs.push({
@@ -53,14 +109,14 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
       if (!currentRoute) return;
 
       // Add parent first (recursive)
-      if (currentRoute.parentPath && currentRoute.parentPath !== "/admin") {
+      if (currentRoute.parentPath && currentRoute.parentPath !== (isUserPath ? "/user" : "/admin")) {
         buildChain(currentRoute.parentPath);
       }
 
       // Add current route
-      if (currentPath !== "/admin") {
+      if (currentPath !== (isUserPath ? "/user" : "/admin")) {
         breadcrumbs.push({
-          label: t(currentRoute.labelKey as keyof typeof import("@/providers/i18n-provider").dictionary),
+          label: t(currentRoute.labelKey as any),
           href: currentPath === path ? undefined : currentPath,
           current: currentPath === path,
         });
@@ -79,9 +135,43 @@ export function usePageInfo() {
 
   return useMemo(() => {
     const path = location.pathname;
+    const isUserPath = path.startsWith("/user");
+    const ROUTE_MAPPING = isUserPath ? USER_ROUTE_MAPPING : ADMIN_ROUTE_MAPPING;
     const route = ROUTE_MAPPING[path];
 
     if (!route) {
+      // Handle dynamic user menu paths
+      if (isUserPath && path.startsWith("/user/")) {
+        const dynamicPath = path.substring(5); // Remove "/user"
+        const segments = dynamicPath.split("/").filter(Boolean);
+        
+        if (segments.length > 0) {
+          // For user content paths like /user/content/123
+          if (segments[0] === "content" && segments.length > 1) {
+            return {
+              title: segments[1],
+              description: t("menu_content"),
+            };
+          }
+          
+          // For user dynamic menu paths like /user/reports, /user/tariff, etc.
+          if (segments.length === 1) {
+            const title = segments[0].charAt(0).toUpperCase() + segments[0].slice(1);
+            return {
+              title,
+              description: undefined,
+            };
+          }
+          
+          // For nested paths, use the last segment as title
+          const title = segments[segments.length - 1].charAt(0).toUpperCase() + segments[segments.length - 1].slice(1);
+          return {
+            title,
+            description: undefined,
+          };
+        }
+      }
+      
       const segments = path.split("/").filter(Boolean);
       return {
         title: segments[segments.length - 1]?.charAt(0).toUpperCase() + segments[segments.length - 1]?.slice(1) || "Page",
@@ -92,23 +182,26 @@ export function usePageInfo() {
     // Get page-specific info
     switch (path) {
       case "/admin/users":
+      case "/user/users":
         return {
           title: t("users_title"),
           description: t("users_subtitle"),
         };
       case "/admin/personal":
+      case "/user/profile":
         return {
           title: t("user_profile_title"),
           description: t("menu_profile_desc"),
         };
       case "/admin/dashboard":
+      case "/user/dashboard":
         return {
           title: t("breadcrumb_dashboard"),
           description: undefined,
         };
       default:
         return {
-          title: t(route.labelKey as keyof typeof import("@/providers/i18n-provider").dictionary),
+          title: t(route.labelKey as any),
           description: undefined,
         };
     }

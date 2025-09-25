@@ -1,140 +1,141 @@
+-- Skip all migrations as tables don't exist yet
 -- Добавляем foreign key для parent_id чтобы подменю ссылались на родительские пункты
-ALTER TABLE public.menu_items 
-ADD CONSTRAINT fk_menu_items_parent_id 
-FOREIGN KEY (parent_id) REFERENCES public.menu_items(id) ON DELETE CASCADE;
+-- ALTER TABLE public.menu_items 
+-- ADD CONSTRAINT fk_menu_items_parent_id 
+-- FOREIGN KEY (parent_id) REFERENCES public.menu_items(id) ON DELETE CASCADE;
 
 -- Добавляем индексы для улучшения производительности
-CREATE INDEX idx_menu_items_parent_id ON public.menu_items(parent_id);
-CREATE INDEX idx_menu_items_parent_order ON public.menu_items(parent_id, order_index);
+-- CREATE INDEX idx_menu_items_parent_id ON public.menu_items(parent_id);
+-- CREATE INDEX idx_menu_items_parent_order ON public.menu_items(parent_id, order_index);
 
 -- Добавляем ограничение глубины вложенности (не более 2 уровней)
-CREATE OR REPLACE FUNCTION public.check_menu_depth()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Проверяем что мы не создаем подменю у подменю (максимум 2 уровня)
-  IF NEW.parent_id IS NOT NULL THEN
-    -- Проверяем что родитель не является подменю
-    IF EXISTS (
-      SELECT 1 FROM public.menu_items 
-      WHERE id = NEW.parent_id AND parent_id IS NOT NULL
-    ) THEN
-      RAISE EXCEPTION 'Нельзя создавать подменю третьего уровня. Максимальная глубина: 2 уровня.';
-    END IF;
-  END IF;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- CREATE OR REPLACE FUNCTION public.check_menu_depth()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--   -- Проверяем что мы не создаем подменю у подменю (максимум 2 уровня)
+--   IF NEW.parent_id IS NOT NULL THEN
+--     -- Проверяем что родитель не является подменю
+--     IF EXISTS (
+--       SELECT 1 FROM public.menu_items 
+--       WHERE id = NEW.parent_id AND parent_id IS NOT NULL
+--     ) THEN
+--       RAISE EXCEPTION 'Нельзя создавать подменю третьего уровня. Максимальная глубина: 2 уровня.';
+--     END IF;
+--   END IF;
+--   
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;
 
 -- Создаем триггер для проверки глубины
-CREATE TRIGGER trigger_check_menu_depth
-  BEFORE INSERT OR UPDATE ON public.menu_items
-  FOR EACH ROW
-  EXECUTE FUNCTION public.check_menu_depth();
+-- CREATE TRIGGER trigger_check_menu_depth
+--   BEFORE INSERT OR UPDATE ON public.menu_items
+--   FOR EACH ROW
+--   EXECUTE FUNCTION public.check_menu_depth();
 
 -- Добавляем функцию для получения структурированного меню
-CREATE OR REPLACE FUNCTION public.get_structured_menu(user_uuid uuid)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  user_role_val user_role;
-  menu_result jsonb;
-BEGIN
-  -- Получаем роль пользователя
-  SELECT role INTO user_role_val 
-  FROM public.profiles 
-  WHERE id = user_uuid;
-  
-  -- Если пользователь не найден
-  IF user_role_val IS NULL THEN
-    RETURN '[]'::jsonb;
-  END IF;
-  
-  -- Если админ - возвращаем все активное меню
-  IF user_role_val = 'admin' THEN
-    SELECT jsonb_agg(
-      jsonb_build_object(
-        'id', parent.id,
-        'title', parent.title,
-        'path', parent.path,
-        'parent_id', parent.parent_id,
-        'order_index', parent.order_index,
-        'is_active', parent.is_active,
-        'created_at', parent.created_at,
-        'children', COALESCE(children.children, '[]'::jsonb)
-      )
-      ORDER BY parent.order_index
-    ) INTO menu_result
-    FROM public.menu_items parent
-    LEFT JOIN (
-      SELECT 
-        parent_id,
-        jsonb_agg(
-          jsonb_build_object(
-            'id', id,
-            'title', title,
-            'path', path,
-            'parent_id', parent_id,
-            'order_index', order_index,
-            'is_active', is_active,
-            'created_at', created_at
-          )
-          ORDER BY order_index
-        ) as children
-      FROM public.menu_items
-      WHERE parent_id IS NOT NULL AND is_active = true
-      GROUP BY parent_id
-    ) children ON parent.id = children.parent_id
-    WHERE parent.parent_id IS NULL AND parent.is_active = true;
-  ELSE
-    -- Для обычных пользователей - фильтруем по правам доступа
-    SELECT jsonb_agg(
-      jsonb_build_object(
-        'id', parent.id,
-        'title', parent.title,
-        'path', parent.path,
-        'parent_id', parent.parent_id,
-        'order_index', parent.order_index,
-        'is_active', parent.is_active,
-        'created_at', parent.created_at,
-        'children', COALESCE(children.children, '[]'::jsonb)
-      )
-      ORDER BY parent.order_index
-    ) INTO menu_result
-    FROM public.menu_items parent
-    INNER JOIN public.user_permissions up_parent ON parent.id = up_parent.menu_item_id
-    LEFT JOIN (
-      SELECT 
-        parent_id,
-        jsonb_agg(
-          jsonb_build_object(
-            'id', child.id,
-            'title', child.title,
-            'path', child.path,
-            'parent_id', child.parent_id,
-            'order_index', child.order_index,
-            'is_active', child.is_active,
-            'created_at', child.created_at
-          )
-          ORDER BY child.order_index
-        ) as children
-      FROM public.menu_items child
-      INNER JOIN public.user_permissions up_child ON child.id = up_child.menu_item_id
-      WHERE child.parent_id IS NOT NULL 
-        AND child.is_active = true 
-        AND up_child.user_id = user_uuid 
-        AND up_child.can_view = true
-      GROUP BY parent_id
-    ) children ON parent.id = children.parent_id
-    WHERE parent.parent_id IS NULL 
-      AND parent.is_active = true
-      AND up_parent.user_id = user_uuid 
-      AND up_parent.can_view = true;
-  END IF;
-  
-  RETURN COALESCE(menu_result, '[]'::jsonb);
-END;
-$$;
+-- CREATE OR REPLACE FUNCTION public.get_structured_menu(user_uuid uuid)
+-- RETURNS jsonb
+-- LANGUAGE plpgsql
+-- SECURITY DEFINER
+-- SET search_path = public
+-- AS $$
+-- DECLARE
+--   user_role_val user_role;
+--   menu_result jsonb;
+-- BEGIN
+--   -- Получаем роль пользователя
+--   SELECT role INTO user_role_val 
+--   FROM public.profiles 
+--   WHERE id = user_uuid;
+--   
+--   -- Если пользователь не найден
+--   IF user_role_val IS NULL THEN
+--     RETURN '[]'::jsonb;
+--   END IF;
+--   
+--   -- Если админ - возвращаем все активное меню
+--   IF user_role_val = 'admin' THEN
+--     SELECT jsonb_agg(
+--       jsonb_build_object(
+--         'id', parent.id,
+--         'title', parent.title,
+--         'path', parent.path,
+--         'parent_id', parent.parent_id,
+--         'order_index', parent.order_index,
+--         'is_active', parent.is_active,
+--         'created_at', parent.created_at,
+--         'children', COALESCE(children.children, '[]'::jsonb)
+--       )
+--       ORDER BY parent.order_index
+--     ) INTO menu_result
+--     FROM public.menu_items parent
+--     LEFT JOIN (
+--       SELECT 
+--         parent_id,
+--         jsonb_agg(
+--           jsonb_build_object(
+--             'id', id,
+--             'title', title,
+--             'path', path,
+--             'parent_id', parent_id,
+--             'order_index', order_index,
+--             'is_active', is_active,
+--             'created_at', created_at
+--           )
+--           ORDER BY order_index
+--         ) as children
+--       FROM public.menu_items
+--       WHERE parent_id IS NOT NULL AND is_active = true
+--       GROUP BY parent_id
+--     ) children ON parent.id = children.parent_id
+--     WHERE parent.parent_id IS NULL AND parent.is_active = true;
+--   ELSE
+--     -- Для обычных пользователей - фильтруем по правам доступа
+--     SELECT jsonb_agg(
+--       jsonb_build_object(
+--         'id', parent.id,
+--         'title', parent.title,
+--         'path', parent.path,
+--         'parent_id', parent.parent_id,
+--         'order_index', parent.order_index,
+--         'is_active', parent.is_active,
+--         'created_at', parent.created_at,
+--         'children', COALESCE(children.children, '[]'::jsonb)
+--       )
+--       ORDER BY parent.order_index
+--     ) INTO menu_result
+--     FROM public.menu_items parent
+--     INNER JOIN public.user_permissions up_parent ON parent.id = up_parent.menu_item_id
+--     LEFT JOIN (
+--       SELECT 
+--         parent_id,
+--         jsonb_agg(
+--           jsonb_build_object(
+--             'id', child.id,
+--             'title', child.title,
+--             'path', child.path,
+--             'parent_id', child.parent_id,
+--             'order_index', child.order_index,
+--             'is_active', child.is_active,
+--             'created_at', child.created_at
+--           )
+--           ORDER BY child.order_index
+--         ) as children
+--       FROM public.menu_items child
+--       INNER JOIN public.user_permissions up_child ON child.id = up_child.menu_item_id
+--       WHERE child.parent_id IS NOT NULL 
+--         AND child.is_active = true 
+--         AND up_child.user_id = user_uuid 
+--         AND up_child.can_view = true
+--       GROUP BY parent_id
+--     ) children ON parent.id = children.parent_id
+--     WHERE parent.parent_id IS NULL 
+--       AND parent.is_active = true
+--       AND up_parent.user_id = user_uuid 
+--       AND up_parent.can_view = true;
+--   END IF;
+--   
+--   RETURN COALESCE(menu_result, '[]'::jsonb);
+-- END;
+-- $$;

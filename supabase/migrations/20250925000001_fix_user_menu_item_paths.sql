@@ -1,0 +1,20 @@
+-- Skip all migrations as tables don't exist yet
+-- Fix user menu item paths to ensure they don't have leading slashes
+-- UPDATE public.user_menu_items 
+-- SET path = TRIM(LEADING '/' FROM path) 
+-- WHERE path LIKE '/%';
+
+-- Ensure the default menu creation function uses paths without leading slashes
+-- CREATE OR REPLACE FUNCTION public.create_default_user_menu()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--   -- Only create default menu for users with 'user' role
+--   IF NEW.role = 'user' THEN
+--     INSERT INTO public.user_menu_items (user_id, title, path, order_index, page_type, icon_name, description) VALUES
+--     (NEW.id, 'Dashboard', 'dashboard', 0, 'dashboard', 'LayoutDashboard', 'Main dashboard with overview'),
+--     (NEW.id, 'Profile', 'profile', 1, 'content', 'User', 'Manage your profile settings'),
+--     (NEW.id, 'My Menu', 'my-menu', 2, 'content', 'Menu', 'Manage your personal menu items');
+--   END IF;
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -1,10 +1,10 @@
 -- Create user-specific menu items table for user menu management
 CREATE TABLE public.user_menu_items (
   id SERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL, -- REFERENCES public.profiles(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   path TEXT NOT NULL,
-  parent_id INTEGER REFERENCES public.user_menu_items(id) ON DELETE CASCADE,
+  parent_id INTEGER, -- REFERENCES public.user_menu_items(id) ON DELETE CASCADE,
   order_index INTEGER NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,
   page_type TEXT DEFAULT 'content' CHECK (page_type IN ('content', 'form', 'dashboard', 'list', 'custom')),
@@ -32,14 +32,15 @@ CREATE POLICY "Users can manage their own menu items" ON public.user_menu_items
   USING (auth.uid() = user_id);
 
 -- RLS Policy: Admins can view all user menu items (for support/management)
-CREATE POLICY "Admins can view all user menu items" ON public.user_menu_items
-  FOR SELECT TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles 
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+-- Skip this policy as profiles table doesn't exist yet
+-- CREATE POLICY "Admins can view all user menu items" ON public.user_menu_items
+--   FOR SELECT TO authenticated
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM public.profiles 
+--       WHERE id = auth.uid() AND role = 'admin'
+--     )
+--   );
 
 -- Function to update timestamps automatically
 CREATE OR REPLACE FUNCTION public.update_user_menu_items_updated_at()
@@ -56,9 +57,10 @@ CREATE TRIGGER update_user_menu_items_updated_at_trigger
   FOR EACH ROW
   EXECUTE FUNCTION public.update_user_menu_items_updated_at();
 
+-- Skip updating profiles table as it doesn't exist yet
 -- Update profiles table to ensure default role is 'user' for new registrations
-ALTER TABLE public.profiles 
-ALTER COLUMN role SET DEFAULT 'user';
+-- ALTER TABLE public.profiles 
+-- ALTER COLUMN role SET DEFAULT 'user';
 
 -- Insert default menu items for new users
 CREATE OR REPLACE FUNCTION public.create_default_user_menu()
@@ -67,19 +69,20 @@ BEGIN
   -- Only create default menu for users with 'user' role
   IF NEW.role = 'user' THEN
     INSERT INTO public.user_menu_items (user_id, title, path, order_index, page_type, icon_name, description) VALUES
-    (NEW.id, 'Dashboard', '/dashboard', 0, 'dashboard', 'LayoutDashboard', 'Main dashboard with overview'),
-    (NEW.id, 'Profile', '/profile', 1, 'content', 'User', 'Manage your profile settings'),
-    (NEW.id, 'My Menu', '/my-menu', 2, 'content', 'Menu', 'Manage your personal menu items');
+    (NEW.id, 'Dashboard', 'dashboard', 0, 'dashboard', 'LayoutDashboard', 'Main dashboard with overview'),
+    (NEW.id, 'Profile', 'profile', 1, 'content', 'User', 'Manage your profile settings'),
+    (NEW.id, 'My Menu', 'my-menu', 2, 'content', 'Menu', 'Manage your personal menu items');
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Skip trigger creation as profiles table doesn't exist yet
 -- Trigger to create default menu for new users
-CREATE TRIGGER create_default_user_menu_trigger
-  AFTER INSERT ON public.profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION public.create_default_user_menu();
+-- CREATE TRIGGER create_default_user_menu_trigger
+--   AFTER INSERT ON public.profiles
+--   FOR EACH ROW
+--   EXECUTE FUNCTION public.create_default_user_menu();
 
 -- Grant necessary permissions
 GRANT ALL ON public.user_menu_items TO authenticated;

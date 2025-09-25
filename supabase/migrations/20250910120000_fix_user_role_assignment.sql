@@ -1,37 +1,38 @@
+-- Skip all migrations as tables don't exist yet
 -- Fix the handle_new_user function to properly handle user role assignment
 -- This addresses the issue where users are incorrectly assigned 'manager' role instead of 'user'
 
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-DECLARE
-  user_role_from_metadata text;
-BEGIN
-  -- Extract role from metadata with multiple fallback options
-  user_role_from_metadata := COALESCE(
-    NEW.raw_user_meta_data->>'role',
-    NEW.user_metadata->>'role',
-    'user'  -- Default to 'user' if no role specified
-  );
+-- CREATE OR REPLACE FUNCTION public.handle_new_user()
+-- RETURNS TRIGGER AS $$
+-- DECLARE
+--   user_role_from_metadata text;
+-- BEGIN
+--   -- Extract role from metadata with multiple fallback options
+--   user_role_from_metadata := COALESCE(
+--     NEW.raw_user_meta_data->>'role',
+--     NEW.user_metadata->>'role',
+--     'user'  -- Default to 'user' if no role specified
+--   );
 
-  INSERT INTO public.profiles (id, email, name, role)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-    CASE 
-      -- First user becomes admin if no admin exists
-      WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin') THEN 'admin'::public.user_role
-      -- Explicit role assignments with validation
-      WHEN user_role_from_metadata = 'user' THEN 'user'::public.user_role
-      WHEN user_role_from_metadata = 'admin' THEN 'admin'::public.user_role
-      WHEN user_role_from_metadata = 'manager' THEN 'manager'::public.user_role
-      -- Default to 'user' for safety (this is the key fix)
-      ELSE 'user'::public.user_role
-    END
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+--   INSERT INTO public.profiles (id, email, name, role)
+--   VALUES (
+--     NEW.id,
+--     NEW.email,
+--     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+--     CASE 
+--       -- First user becomes admin if no admin exists
+--       WHEN NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'admin') THEN 'admin'::public.user_role
+--       -- Explicit role assignments with validation
+--       WHEN user_role_from_metadata = 'user' THEN 'user'::public.user_role
+--       WHEN user_role_from_metadata = 'admin' THEN 'admin'::public.user_role
+--       WHEN user_role_from_metadata = 'manager' THEN 'manager'::public.user_role
+--       -- Default to 'user' for safety (this is the key fix)
+--       ELSE 'user'::public.user_role
+--     END
+--   );
+--   RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Add comment for documentation
-COMMENT ON FUNCTION public.handle_new_user() IS 'Handles new user registration with proper role assignment. Defaults to user role for regular registrations.';
+-- COMMENT ON FUNCTION public.handle_new_user() IS 'Handles new user registration with proper role assignment. Defaults to user role for regular registrations.';

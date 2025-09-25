@@ -47,6 +47,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   'layout-dashboard': LayoutDashboard,
   dashboard: LayoutDashboard,
   home: Home,
+  LayoutDashboard: LayoutDashboard,
   
   // Forms
   'file-text': FileText,
@@ -58,6 +59,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   'check-circle': CheckCircle,
   'forms-validation': CheckCircle,
   'file-spreadsheet': FileSpreadsheet,
+  FileText: FileText,
   
   // Layout specific
   'layout-grid': LayoutGrid,
@@ -66,6 +68,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   'move-horizontal': MoveHorizontal,
   'move-vertical': MoveVertical,
   palette: Palette,
+  Layout: Layout,
   
   // Users & Management
   users: Users,
@@ -75,6 +78,8 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   'user-management': UserCog,
   'user-check': UserCheck,
   'user-cog': UserCog,
+  User: User,
+  Users: Users,
   
   // Reports & Analytics
   'bar-chart-3': BarChart3,
@@ -83,6 +88,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   'trending-up': TrendingUp,
   'file-bar-chart': FileBarChart,
   statistics: FileBarChart,
+  BarChart3: BarChart3,
   
   // Content Management
   content: FileText,
@@ -91,6 +97,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   categories: Layers,
   package: Package,
   products: Package,
+  Package: Package,
   
   // Pricing & Commerce
   'credit-card': CreditCard,
@@ -101,16 +108,20 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   money: DollarSign,
   tags: Tags,
   discounts: Tags,
+  CreditCard: CreditCard,
   
   // API & Development
   code: Code,
   api: Code,
+  Code: Code,
   
   // Media & Notifications
   image: Image,
   media: Image,
   bell: Bell,
   notifications: Bell,
+  Image: Image,
+  Bell: Bell,
   
   // Settings & Configuration
   settings: Settings,
@@ -118,6 +129,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   cog: Cog,
   sliders: Sliders,
   preferences: Sliders,
+  Settings: Settings,
   
   // Security & Permissions
   shield: Shield,
@@ -126,6 +138,7 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   security: Lock,
   key: Key,
   access: Key,
+  Shield: Shield,
   
   // Navigation & System
   menu: Menu,
@@ -133,9 +146,11 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   logout: LogOut,
   'door-open': DoorOpen,
   exit: DoorOpen,
+  Menu: Menu,
   
   // Fallback
   circle: Circle,
+  Circle: Circle,
 } as const;
 
 export interface DynamicIconProps {

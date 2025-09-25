@@ -36,54 +36,11 @@ const UserDashboard = () => {
       </div>
 
       {/* Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Summary Card */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Profile Summary
-            </CardTitle>
-            <CardDescription>
-              Your account information and status
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={user?.avatar_url} alt={user?.name} />
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-lg">
-                  {user?.name ? getUserInitials(user.name) : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <h3 className="font-semibold">{user?.name}</h3>
-                <p className="text-sm text-gray-600">{user?.email}</p>
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-                  {user?.role}
-                </Badge>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <Badge variant={user?.status === 'active' ? 'default' : 'secondary'}>
-                  {user?.status}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Member since:</span>
-                <span>{user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-6">
+        {/* Removed Profile Summary Card as requested */}
 
         {/* Quick Stats */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
@@ -135,72 +92,7 @@ const UserDashboard = () => {
         </Card>
       </div>
 
-      {/* Menu Management Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Personal Menu
-            </CardTitle>
-            <CardDescription>
-              Manage your custom menu items and navigation
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">
-                You have {menuItems.length} custom menu item{menuItems.length !== 1 ? 's' : ''}
-              </p>
-              {menuItems.length > 0 && (
-                <div className="space-y-1">
-                  {menuItems.slice(0, 3).map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 text-sm">
-                      <div className="h-2 w-2 bg-emerald-500 rounded-full" />
-                      {item.title}
-                    </div>
-                  ))}
-                  {menuItems.length > 3 && (
-                    <p className="text-xs text-gray-500">
-                      +{menuItems.length - 3} more items
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            <Separator />
-            <Button variant="outline" className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Menu Item
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Getting Started</CardTitle>
-            <CardDescription>
-              Quick actions to personalize your experience
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Update Profile Settings
-              </Button>
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                Customize Dashboard
-              </Button>
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Explore Features
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Removed Menu Management Section and Getting Started Section as requested */}
     </div>
   );
 };

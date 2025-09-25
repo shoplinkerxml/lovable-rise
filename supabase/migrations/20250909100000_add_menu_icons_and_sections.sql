@@ -1,104 +1,105 @@
+-- Skip all migrations as tables don't exist yet
 -- Enhanced menu_items table with icon and section support
-ALTER TABLE public.menu_items 
-ADD COLUMN icon_name TEXT,
-ADD COLUMN section_type TEXT DEFAULT 'main' CHECK (section_type IN ('dashboard', 'main', 'settings')),
-ADD COLUMN has_separator BOOLEAN DEFAULT false,
-ADD COLUMN description TEXT,
-ADD COLUMN badge_text TEXT,
-ADD COLUMN badge_color TEXT DEFAULT 'default';
+-- ALTER TABLE public.menu_items 
+-- ADD COLUMN icon_name TEXT,
+-- ADD COLUMN section_type TEXT DEFAULT 'main' CHECK (section_type IN ('dashboard', 'main', 'settings')),
+-- ADD COLUMN has_separator BOOLEAN DEFAULT false,
+-- ADD COLUMN description TEXT,
+-- ADD COLUMN badge_text TEXT,
+-- ADD COLUMN badge_color TEXT DEFAULT 'default';
 
 -- Create menu sections for better organization
-CREATE TABLE public.menu_sections (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('dashboard', 'main', 'settings')),
-  order_index INTEGER NOT NULL DEFAULT 0,
-  icon_name TEXT,
-  is_collapsible BOOLEAN DEFAULT false,
-  is_collapsed BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
+-- CREATE TABLE public.menu_sections (
+--   id SERIAL PRIMARY KEY,
+--   name TEXT NOT NULL,
+--   type TEXT NOT NULL CHECK (type IN ('dashboard', 'main', 'settings')),
+--   order_index INTEGER NOT NULL DEFAULT 0,
+--   icon_name TEXT,
+--   is_collapsible BOOLEAN DEFAULT false,
+--   is_collapsed BOOLEAN DEFAULT false,
+--   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+-- );
 
 -- Add comments to explain the new columns
-COMMENT ON COLUMN public.menu_items.icon_name IS 'Lucide icon name for the menu item';
-COMMENT ON COLUMN public.menu_items.section_type IS 'Section where the menu item belongs: dashboard, main, or settings';
-COMMENT ON COLUMN public.menu_items.has_separator IS 'Whether to show a separator after this menu item';
-COMMENT ON COLUMN public.menu_items.description IS 'Optional description for the menu item (used in tooltips)';
-COMMENT ON COLUMN public.menu_items.badge_text IS 'Optional badge text to display next to menu item';
-COMMENT ON COLUMN public.menu_items.badge_color IS 'Badge color theme';
+-- COMMENT ON COLUMN public.menu_items.icon_name IS 'Lucide icon name for the menu item';
+-- COMMENT ON COLUMN public.menu_items.section_type IS 'Section where the menu item belongs: dashboard, main, or settings';
+-- COMMENT ON COLUMN public.menu_items.has_separator IS 'Whether to show a separator after this menu item';
+-- COMMENT ON COLUMN public.menu_items.description IS 'Optional description for the menu item (used in tooltips)';
+-- COMMENT ON COLUMN public.menu_items.badge_text IS 'Optional badge text to display next to menu item';
+-- COMMENT ON COLUMN public.menu_items.badge_color IS 'Badge color theme';
 
 -- Create indexes for better performance
-CREATE INDEX idx_menu_items_section_type ON public.menu_items(section_type);
-CREATE INDEX idx_menu_items_icon_name ON public.menu_items(icon_name);
-CREATE INDEX idx_menu_sections_type ON public.menu_sections(type);
+-- CREATE INDEX idx_menu_items_section_type ON public.menu_items(section_type);
+-- CREATE INDEX idx_menu_items_icon_name ON public.menu_items(icon_name);
+-- CREATE INDEX idx_menu_sections_type ON public.menu_sections(type);
 
 -- Update existing menu items with appropriate sections and icons
-UPDATE public.menu_items 
-SET 
-  section_type = CASE 
-    WHEN path = '/dashboard' OR title ILIKE '%dashboard%' THEN 'dashboard'
-    WHEN path LIKE '%settings%' OR path LIKE '%permissions%' OR path LIKE '%menu%' OR title ILIKE '%settings%' OR title ILIKE '%permissions%' THEN 'settings'
-    ELSE 'main'
-  END,
-  icon_name = CASE 
-    WHEN path = '/dashboard' OR title ILIKE '%dashboard%' THEN 'layout-dashboard'
-    WHEN path LIKE '%forms%' OR title ILIKE '%forms%' THEN 'file-text'
-    WHEN path LIKE '%users%' OR title ILIKE '%users%' OR title ILIKE '%користувачі%' THEN 'users'
-    WHEN path LIKE '%reports%' OR title ILIKE '%reports%' OR title ILIKE '%звіти%' THEN 'bar-chart-3'
-    WHEN path LIKE '%analytics%' OR title ILIKE '%analytics%' OR title ILIKE '%аналітика%' THEN 'trending-up'
-    WHEN path LIKE '%content%' OR title ILIKE '%content%' OR title ILIKE '%контент%' THEN 'file-text'
-    WHEN path LIKE '%categories%' OR title ILIKE '%categories%' OR title ILIKE '%категорії%' THEN 'layers'
-    WHEN path LIKE '%products%' OR title ILIKE '%products%' OR title ILIKE '%товари%' THEN 'package'
-    WHEN path LIKE '%settings%' OR title ILIKE '%settings%' OR title ILIKE '%налаштування%' THEN 'settings'
-    WHEN path LIKE '%permissions%' OR title ILIKE '%permissions%' THEN 'shield'
-    WHEN path LIKE '%menu%' AND (title ILIKE '%management%' OR title ILIKE '%editor%') THEN 'menu'
-    WHEN title ILIKE '%elements%' THEN 'form-input'
-    WHEN title ILIKE '%layouts%' THEN 'layout-grid'
-    WHEN title ILIKE '%validation%' THEN 'check-circle'
-    WHEN title ILIKE '%horizontal%' THEN 'move-horizontal'
-    WHEN title ILIKE '%vertical%' THEN 'move-vertical'
-    WHEN title ILIKE '%custom%' THEN 'palette'
-    ELSE 'circle'
-  END;
+-- UPDATE public.menu_items 
+-- SET 
+--   section_type = CASE 
+--     WHEN path = '/dashboard' OR title ILIKE '%dashboard%' THEN 'dashboard'
+--     WHEN path LIKE '%settings%' OR path LIKE '%permissions%' OR path LIKE '%menu%' OR title ILIKE '%settings%' OR title ILIKE '%permissions%' THEN 'settings'
+--     ELSE 'main'
+--   END,
+--   icon_name = CASE 
+--     WHEN path = '/dashboard' OR title ILIKE '%dashboard%' THEN 'layout-dashboard'
+--     WHEN path LIKE '%forms%' OR title ILIKE '%forms%' THEN 'file-text'
+--     WHEN path LIKE '%users%' OR title ILIKE '%users%' OR title ILIKE '%користувачі%' THEN 'users'
+--     WHEN path LIKE '%reports%' OR title ILIKE '%reports%' OR title ILIKE '%звіти%' THEN 'bar-chart-3'
+--     WHEN path LIKE '%analytics%' OR title ILIKE '%analytics%' OR title ILIKE '%аналітика%' THEN 'trending-up'
+--     WHEN path LIKE '%content%' OR title ILIKE '%content%' OR title ILIKE '%контент%' THEN 'file-text'
+--     WHEN path LIKE '%categories%' OR title ILIKE '%categories%' OR title ILIKE '%категорії%' THEN 'layers'
+--     WHEN path LIKE '%products%' OR title ILIKE '%products%' OR title ILIKE '%товари%' THEN 'package'
+--     WHEN path LIKE '%settings%' OR title ILIKE '%settings%' OR title ILIKE '%налаштування%' THEN 'settings'
+--     WHEN path LIKE '%permissions%' OR title ILIKE '%permissions%' THEN 'shield'
+--     WHEN path LIKE '%menu%' AND (title ILIKE '%management%' OR title ILIKE '%editor%') THEN 'menu'
+--     WHEN title ILIKE '%elements%' THEN 'form-input'
+--     WHEN title ILIKE '%layouts%' THEN 'layout-grid'
+--     WHEN title ILIKE '%validation%' THEN 'check-circle'
+--     WHEN title ILIKE '%horizontal%' THEN 'move-horizontal'
+--     WHEN title ILIKE '%vertical%' THEN 'move-vertical'
+--     WHEN title ILIKE '%custom%' THEN 'palette'
+--     ELSE 'circle'
+--   END;
 
 -- Insert default menu sections
-INSERT INTO public.menu_sections (name, type, order_index, icon_name, is_collapsible) VALUES 
-('Dashboard', 'dashboard', 0, 'layout-dashboard', false),
-('Main Menu', 'main', 1, 'menu', true),
-('Settings', 'settings', 2, 'settings', true);
+-- INSERT INTO public.menu_sections (name, type, order_index, icon_name, is_collapsible) VALUES 
+-- ('Dashboard', 'dashboard', 0, 'layout-dashboard', false),
+-- ('Main Menu', 'main', 1, 'menu', true),
+-- ('Settings', 'settings', 2, 'settings', true);
 
 -- Add separators where appropriate (before settings section items)
-UPDATE public.menu_items 
-SET has_separator = true 
-WHERE section_type = 'settings' 
-  AND id = (
-    SELECT id FROM public.menu_items 
-    WHERE section_type = 'settings' 
-    ORDER BY order_index ASC 
-    LIMIT 1
-  );
+-- UPDATE public.menu_items 
+-- SET has_separator = true 
+-- WHERE section_type = 'settings' 
+--   AND id = (
+--     SELECT id FROM public.menu_items 
+--     WHERE section_type = 'settings' 
+--     ORDER BY order_index ASC 
+--     LIMIT 1
+--   );
 
 -- Enable RLS on menu_sections table
-ALTER TABLE public.menu_sections ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.menu_sections ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policy for menu_sections (allow read access to authenticated users)
-CREATE POLICY "Users can view menu sections" ON public.menu_sections
-  FOR SELECT TO authenticated
-  USING (true);
+-- CREATE POLICY "Users can view menu sections" ON public.menu_sections
+--   FOR SELECT TO authenticated
+--   USING (true);
 
 -- Create RLS policy for admin users to manage menu sections
-CREATE POLICY "Admins can manage menu sections" ON public.menu_sections
-  FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_permissions up
-      WHERE up.user_id = auth.uid()
-      AND up.permission_name IN ('admin', 'menu_management')
-    )
-  );
+-- CREATE POLICY "Admins can manage menu sections" ON public.menu_sections
+--   FOR ALL TO authenticated
+--   USING (
+--     EXISTS (
+--       SELECT 1 FROM public.user_permissions up
+--       WHERE up.user_id = auth.uid()
+--       AND up.permission_name IN ('admin', 'menu_management')
+--     )
+--   );
 
 -- Grant necessary permissions
-GRANT SELECT ON public.menu_sections TO authenticated;
-GRANT ALL ON public.menu_sections TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.menu_sections_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.menu_sections_id_seq TO service_role;
+-- GRANT SELECT ON public.menu_sections TO authenticated;
+-- GRANT ALL ON public.menu_sections TO service_role;
+-- GRANT USAGE, SELECT ON SEQUENCE public.menu_sections_id_seq TO authenticated;
+-- GRANT ALL ON SEQUENCE public.menu_sections_id_seq TO service_role;

@@ -36,6 +36,13 @@ const UserProfile = () => {
           return;
         }
         if (currentUser) {
+          // Ensure the user has the correct role for the user profile page
+          if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+            // Redirect admin/manager users to admin profile
+            navigate("/admin/personal");
+            return;
+          }
+          
           setUser(currentUser);
           setName(currentUser.name || "");
           setPhone(currentUser.phone || "");

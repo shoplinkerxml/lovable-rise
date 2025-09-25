@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { I18nProvider } from "@/providers/i18n-provider";
+
 import Index from "./pages/Index";
 import ApiDocs from "./pages/ApiDocs";
 import NotFound from "./pages/NotFound";
@@ -20,8 +22,9 @@ import UserProtected from "./pages/UserProtected";
 import UserLayout from "@/components/UserLayout";
 import UserDashboard from "./pages/UserDashboard";
 import UserProfile from "./pages/UserProfile";
-
-import { I18nProvider } from "@/providers/i18n-provider";
+import UserMenuContent from "./pages/UserMenuContent";
+// Add import for new component
+import UserMenuContentByPath from "./pages/UserMenuContentByPath";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,7 +56,7 @@ const App = () => (
             
             {/* Admin Authentication Routes */}
             <Route path="/admin-auth" element={<AdminAuth />} />
-            <Route path="/admin" element={<AdminProtected />}>
+            <Route path="/admin" element={<AdminProtected />}>              
               <Route path="*" element={<AdminLayout><Outlet /></AdminLayout>} />
             </Route>
             
@@ -66,11 +69,14 @@ const App = () => (
 
             
             {/* Protected User Routes */}
-            <Route path="/user" element={<UserProtected />}>
-              <Route element={<UserLayout />}>
+            <Route path="/user" element={<UserProtected />}>              
+              <Route element={<UserLayout />}>                
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<UserDashboard />} />
                 <Route path="profile" element={<UserProfile />} />
+                <Route path="content/:id" element={<UserMenuContent />} />
+                <Route path=":path/*" element={<UserMenuContentByPath />} />
+                {/* Removed /user/menu-management route as requested */}
               </Route>
             </Route>
             
