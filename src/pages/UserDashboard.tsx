@@ -25,71 +25,63 @@ const UserDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, {user?.name}!
-        </h1>
-        <p className="text-gray-600">
-          Here's an overview of your MarketGrow dashboard and personal settings.
-        </p>
-      </div>
-
       {/* Dashboard Grid */}
       <div className="grid grid-cols-1 gap-6">
         {/* Removed Profile Summary Card as requested */}
 
         {/* Quick Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Account Overview
-            </CardTitle>
-            <CardDescription>
-              Your personal dashboard statistics
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-emerald-600">Menu Items</p>
-                    <p className="text-2xl font-bold text-emerald-900">{menuItems.length}</p>
-                  </div>
-                  <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <User className="h-5 w-5 text-emerald-600" />
+        <div className="p-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Account Overview
+              </CardTitle>
+              <CardDescription>
+                Your personal dashboard statistics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-emerald-600">Menu Items</p>
+                      <p className="text-2xl font-bold text-emerald-900">{menuItems.length}</p>
+                    </div>
+                    <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <User className="h-5 w-5 text-emerald-600" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-600">Account Status</p>
-                    <p className="text-2xl font-bold text-blue-900">Active</p>
-                  </div>
-                  <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Activity className="h-5 w-5 text-blue-600" />
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-600">Account Status</p>
+                      <p className="text-2xl font-bold text-blue-900">Active</p>
+                    </div>
+                    <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Activity className="h-5 w-5 text-blue-600" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-600">Profile</p>
-                    <p className="text-2xl font-bold text-purple-900">100%</p>
-                  </div>
-                  <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-purple-600" />
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-600">Profile</p>
+                      <p className="text-2xl font-bold text-purple-900">100%</p>
+                    </div>
+                    <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Removed Menu Management Section and Getting Started Section as requested */}

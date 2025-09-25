@@ -17,6 +17,8 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { MenuSection } from "@/components/user/MenuSection";
+import { MenuItemWithIcon } from "@/components/user/MenuItemWithIcon";
 
 // Static routes that are always available regardless of database state
 const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
@@ -60,6 +62,19 @@ export const useUserMenu = () => {
   }
   return context;
 };
+
+function buildTree(items: UserMenuItem[]): Record<number | "root", UserMenuItem[]> {
+  const map: Record<number | "root", UserMenuItem[]> = { root: [] };
+  for (const it of items) {
+    const key = (it.parent_id ?? "root") as number | "root";
+    if (!map[key]) map[key] = [];
+    map[key].push(it);
+  }
+  for (const key in map) {
+    map[key as any].sort((a, b) => a.order_index - b.order_index);
+  }
+  return map;
+}
 
 const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> = ({ children, userId }) => {
   const [menuItems, setMenuItems] = useState<UserMenuItem[]>([]);
@@ -265,20 +280,6 @@ const UserLayout = () => {
     document.documentElement.classList.toggle("dark");
   };
 
-  const isActive = (path: string) => {
-    // For default routes, we need to check against the full path
-    if (path === "/user/dashboard" || path === "/user/profile") {
-      return window.location.pathname === path;
-    }
-    // For custom menu items, ensure path doesn't have leading slash and check if the current path ends with the menu item path
-    // This prevents false positives when one path is a substring of another
-    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    return window.location.pathname === `/user/${cleanPath}` || 
-           (window.location.pathname.startsWith(`/user/${cleanPath}`) && 
-            (window.location.pathname.length === `/user/${cleanPath}`.length || 
-             window.location.pathname.charAt(`/user/${cleanPath}`.length) === '/'));
-  };
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -305,7 +306,6 @@ const UserLayout = () => {
         uiUserProfile={uiUserProfile}
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
-        isActive={isActive}
         toggleTheme={toggleTheme}
         lang={lang}
         setLang={setLang}
@@ -324,7 +324,6 @@ const UserLayoutContent = ({
   uiUserProfile,
   sidebarCollapsed,
   setSidebarCollapsed,
-  isActive,
   toggleTheme,
   lang,
   setLang,
@@ -338,7 +337,6 @@ const UserLayoutContent = ({
   uiUserProfile: UIUserProfile;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  isActive: (path: string) => boolean;
   toggleTheme: () => void;
   lang: string;
   setLang: (lang: string) => void;
@@ -349,20 +347,45 @@ const UserLayoutContent = ({
   handleLogout: () => void;
 }) => {
   const { menuItems, menuLoading, activeMenuItem, navigateToMenuItem } = useUserMenu();
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const tree = buildTree(menuItems);
+
+  // Organize menu items into sections
+  const menuSections = [
+    {
+      key: 'main',
+      titleKey: 'menu_main',
+      items: menuItems.filter(item => 
+        !item.parent_id
+      ),
+      isCollapsible: false
+    }
+  ];
+
+  // Handle menu item click
+  const handleMenuClick = (item: UserMenuItem) => {
+    navigateToMenuItem(item);
+  };
+
+  // Check if item is active
+  const isActiveItem = (item: UserMenuItem) => {
+    return activeMenuItem?.id === item.id || location.pathname === `/user/${item.path}`;
+  };
 
   return (
     <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
       {/* User Sidebar */}
-      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-33`}>
+      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
         {/* Logo/Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
                 <span className="text-white font-semibold text-sm">UG</span>
               </div>
-              <span className="font-semibold">UserGrow</span>
+              <span className="font-semibold text-lg">UserGrow</span>
             </div>
           )}
           <Button
@@ -381,46 +404,42 @@ const UserLayoutContent = ({
 
         {/* Navigation */}
         <nav className="space-y-1 flex-1">
-          {/* Default Menu Items */}
-          {!sidebarCollapsed && (
-            <div className="mb-4">
-
-            </div>
-          )}
-          
-          {/* User Custom Menu Items */}
-          {menuItems.length > 0 && (
-            <>
-              {!sidebarCollapsed && (
-                <div className="mt-6 mb-4">
-                  <div className="flex items-center justify-between px-3 mb-2">
-
-                  </div>
-                </div>
-              )}
-              
-              {menuItems.map(item => (
-                <div 
-                  key={item.id}
-                  className={cn(
-                    "group relative flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer",
-                    activeMenuItem?.id === item.id
-                      ? "bg-emerald-100 text-emerald-900"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                  )}
-                  onClick={() => navigateToMenuItem(item)}
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <span className="h-4 w-4">📄</span>
-                    {!sidebarCollapsed && (
-                      <span className="truncate">{item.title}</span>
-                    )}
-                  </div>
-                </div>
+          {menuLoading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>
               ))}
+            </div>
+          ) : (
+            <>
+              {menuSections.map((section, sectionIndex) => {
+                if (!section.items.length) return null;
+                
+                return (
+                  <div key={section.key}>
+                    {/* Section separator */}
+                    {sectionIndex > 0 && (
+                      <div className="py-2">
+                        <div className="border-t border-gray-200" />
+                      </div>
+                    )}
+                    
+                    <MenuSection
+                      title={section.key === 'main' ? undefined : (sidebarCollapsed ? undefined : t(section.titleKey as any))}
+                      type={section.key === 'main' ? 'main' : 'settings'}
+                      items={section.items}
+                      collapsed={sidebarCollapsed}
+                      isCollapsible={section.isCollapsible}
+                      children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))}
+                      onItemClick={handleMenuClick}
+                      isActiveItem={isActiveItem}
+                      buildTree={buildTree}
+                    />
+                  </div>
+                );
+              })}
             </>
           )}
-
         </nav>
       </aside>
 
@@ -485,7 +504,7 @@ const UserLayoutContent = ({
 
         {/* Content */}
         <main className="flex-1 overflow-hidden">
-          <div className="h-full p-6">
+          <div className="h-full">
             <Outlet context={{ user, menuItems, onMenuUpdate: () => {} }} />
           </div>
         </main>
