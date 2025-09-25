@@ -292,33 +292,6 @@ const UserProfile = () => {
             </CardContent>
           </Card>
 
-          {/* Account Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-              <CardDescription>
-                Read-only account details and status
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <label className="font-medium text-gray-600">User ID</label>
-                  <p className="font-mono text-xs bg-gray-100 p-2 rounded mt-1">{user?.id}</p>
-                </div>
-                <div>
-                  <label className="font-medium text-gray-600">Account Type</label>
-                  <p className="capitalize mt-1">{user?.role} Account</p>
-                </div>
-                <div>
-                  <label className="font-medium text-gray-600">Last Updated</label>
-                  <p className="mt-1">
-                    {user?.updated_at ? new Date(user.updated_at).toLocaleString() : 'N/A'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>

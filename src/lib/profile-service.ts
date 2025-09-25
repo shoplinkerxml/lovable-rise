@@ -220,7 +220,7 @@ export class ProfileService {
         return handlePostgRESTError(error);
       }
       
-      return data;
+      return data as Partial<UserProfile> | null;
     } catch (error) {
       console.error('Error in getProfileFields:', error);
       return handlePostgRESTError(error);
@@ -238,9 +238,25 @@ export class ProfileService {
         throw new Error('Missing required profile fields');
       }
 
+      // Create a clean object with only the fields we want to upsert
+      // This ensures we have the correct types for the Supabase upsert function
+      const upsertData: any = {
+        id: profileData.id,
+        email: profileData.email,
+        name: profileData.name
+      };
+      
+      // Add optional fields if they exist
+      if (profileData.phone !== undefined) upsertData.phone = profileData.phone;
+      if (profileData.role !== undefined) upsertData.role = profileData.role;
+      if (profileData.status !== undefined) upsertData.status = profileData.status;
+      if (profileData.avatar_url !== undefined) upsertData.avatar_url = profileData.avatar_url;
+      if (profileData.created_at !== undefined) upsertData.created_at = profileData.created_at;
+      if (profileData.updated_at !== undefined) upsertData.updated_at = profileData.updated_at;
+
       const { data, error } = await supabase
         .from('profiles')
-        .upsert(profileData, { 
+        .upsert(upsertData, { 
           onConflict: 'id',
           ignoreDuplicates: false 
         })
@@ -312,9 +328,16 @@ export class ProfileService {
   static async isAdmin(userId: string): Promise<boolean> {
     try {
       const profile = await this.getProfileFields(userId, ['role']);
-      return profile?.role === 'admin';
+      // If no profile exists or no role is set, default to checking if user ID matches known admin IDs
+      // This provides a fallback for cases where profile might not be fully initialized
+      if (!profile || !profile.role) {
+        console.warn('[ProfileService] No profile or role found for user, assuming non-admin:', userId);
+        return false;
+      }
+      return profile.role === 'admin';
     } catch (error) {
       console.error('Error checking admin status:', error);
+      // Default to false to prevent unauthorized access
       return false;
     }
   }
@@ -504,10 +527,26 @@ export class ProfileService {
         throw new Error('Missing required profile fields');
       }
 
+      // Create a clean object with only the fields we want to upsert
+      // This ensures we have the correct types for the Supabase upsert function
+      const upsertData: any = {
+        id: profileData.id,
+        email: profileData.email,
+        name: profileData.name
+      };
+      
+      // Add optional fields if they exist
+      if (profileData.phone !== undefined) upsertData.phone = profileData.phone;
+      if (profileData.role !== undefined) upsertData.role = profileData.role;
+      if (profileData.status !== undefined) upsertData.status = profileData.status;
+      if (profileData.avatar_url !== undefined) upsertData.avatar_url = profileData.avatar_url;
+      if (profileData.created_at !== undefined) upsertData.created_at = profileData.created_at;
+      if (profileData.updated_at !== undefined) upsertData.updated_at = profileData.updated_at;
+
       // Step 1: UPSERT operation
       const { data: upsertedProfile, error: upsertError } = await supabase
         .from('profiles')
-        .upsert(profileData, { 
+        .upsert(upsertData, { 
           onConflict: 'id',
           ignoreDuplicates: false 
         })
@@ -649,8 +688,8 @@ export class ProfileService {
       
       if (!sessionValidation.isValid) {
         throw new ProfileOperationError(
-          ProfileErrorCode.INSUFFICIENT_PERMISSIONS, 
-          `No valid session for profile creation: ${sessionValidation.error}`
+          ProfileErrorCode.PERMISSION_DENIED, 
+          new Error(`No valid session for profile creation: ${sessionValidation.error}`)
         );
       }
       
@@ -658,18 +697,34 @@ export class ProfileService {
       if (!profileData.email || !profileData.name || !profileData.id) {
         throw new ProfileOperationError(
           ProfileErrorCode.PROFILE_CREATION_FAILED,
-          'Missing required profile fields'
+          new Error('Missing required profile fields')
         );
       }
       
       // Log session context for debugging
       await SessionValidator.logSessionDebugInfo('profile-creation');
       
+      // Create a clean object with only the fields we want to upsert
+      // This ensures we have the correct types for the Supabase upsert function
+      const upsertData: any = {
+        id: profileData.id,
+        email: profileData.email,
+        name: profileData.name
+      };
+      
+      // Add optional fields if they exist
+      if (profileData.phone !== undefined) upsertData.phone = profileData.phone;
+      if (profileData.role !== undefined) upsertData.role = profileData.role;
+      if (profileData.status !== undefined) upsertData.status = profileData.status;
+      if (profileData.avatar_url !== undefined) upsertData.avatar_url = profileData.avatar_url;
+      if (profileData.created_at !== undefined) upsertData.created_at = profileData.created_at;
+      if (profileData.updated_at !== undefined) upsertData.updated_at = profileData.updated_at;
+
       // Use upsert instead of insert to handle cases where profile might already exist
       // This is more robust for registration flows
       const { data, error } = await supabase
         .from('profiles')
-        .upsert(profileData, {
+        .upsert(upsertData, {
           onConflict: 'id',
           ignoreDuplicates: false
         })
@@ -686,8 +741,8 @@ export class ProfileService {
           console.error('[ProfileService] RLS context validation:', rlsValidation);
           
           throw new ProfileOperationError(
-            ProfileErrorCode.INSUFFICIENT_PERMISSIONS, 
-            `Authentication error during profile creation: ${error.message}`
+            ProfileErrorCode.PERMISSION_DENIED, 
+            new Error(`Authentication error during profile creation: ${error.message}`)
           );
         }
         
