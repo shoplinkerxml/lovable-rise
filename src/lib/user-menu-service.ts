@@ -370,19 +370,43 @@ export class UserMenuService {
       // Remove leading slash if present to match database format
       const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
       
-      const { data, error } = await (supabase as any)
+      // First try exact match
+      let { data, error } = await (supabase as any)
         .from('user_menu_items')
         .select('*')
         .eq('path', normalizedPath)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return null; // Not found
+      // If not found, try to find a parent menu item for hierarchical paths
+      if (error || !data) {
+        const pathParts = normalizedPath.split('/').filter(part => part.length > 0);
+        if (pathParts.length > 1) {
+          // Try parent paths
+          for (let i = pathParts.length - 1; i > 0; i--) {
+            const parentPath = pathParts.slice(0, i).join('/');
+            const { data: parentData, error: parentError } = await (supabase as any)
+              .from('user_menu_items')
+              .select('*')
+              .eq('path', parentPath)
+              .eq('is_active', true)
+              .maybeSingle();
+            
+            if (!parentError && parentData) {
+              // Found a parent, return it with modified path
+              return {
+                ...parentData,
+                path: normalizedPath
+              } as UserMenuItem;
+            }
+          }
         }
-        console.error('Error fetching menu item by path:', error);
-        throw error;
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching menu item by path:', error);
+          throw error;
+        }
+        return null; // Not found
       }
 
       return data;
