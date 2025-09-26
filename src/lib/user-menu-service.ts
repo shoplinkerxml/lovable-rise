@@ -53,6 +53,45 @@ export interface MenuReorderItem {
 export class UserMenuService {
   
   /**
+   * Auto-assign icon based on menu item properties
+   * Used as fallback when no explicit icon is set
+   */
+  static getAutoIconForMenuItem(item: { title: string; path: string }): string {
+    const title = item.title.toLowerCase();
+    const path = item.path.toLowerCase();
+    
+    // Supplier-related icons
+    if (title.includes('supplier') || title.includes('постачальник')) {
+      return 'Truck';
+    }
+    
+    if (path.includes('supplier') || path.includes('постачальник')) {
+      return 'Truck';
+    }
+    
+    // Shop-related icons
+    if (title.includes('shop') || title.includes('магазин')) {
+      return 'Store';
+    }
+    
+    if (path.includes('shop') || path.includes('магазин')) {
+      return 'Store';
+    }
+    
+    // Payment-related icons
+    if (title.includes('payment') || title.includes('платеж')) {
+      return 'CreditCard';
+    }
+    
+    if (path.includes('payment') || path.includes('платеж')) {
+      return 'CreditCard';
+    }
+    
+    // Return existing icon or default to circle if none
+    return 'circle';
+  }
+  
+  /**
    * Get all menu items for a user
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
@@ -76,9 +115,33 @@ export class UserMenuService {
         throw error;
       }
 
-      console.log('Fetched user menu items:', data); // Debug log
+      // Only apply auto-icon assignment for items that don't have an icon or have the default circle icon
+      // AND are supplier/shop/payment-related
+      const itemsWithIcons = (data || []).map((item: UserMenuItem) => {
+        if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
+            (item.title.toLowerCase().includes('supplier') || 
+             item.title.toLowerCase().includes('постачальник') ||
+             item.title.toLowerCase().includes('shop') || 
+             item.title.toLowerCase().includes('магазин') ||
+             item.title.toLowerCase().includes('payment') || 
+             item.title.toLowerCase().includes('платеж') ||
+             item.path.toLowerCase().includes('supplier') || 
+             item.path.toLowerCase().includes('постачальник') ||
+             item.path.toLowerCase().includes('shop') || 
+             item.path.toLowerCase().includes('магазин') ||
+             item.path.toLowerCase().includes('payment') || 
+             item.path.toLowerCase().includes('платеж'))) {
+          return {
+            ...item,
+            icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path })
+          };
+        }
+        return item;
+      });
+
+      console.log('Fetched user menu items:', itemsWithIcons); // Debug log
       console.log('Active only:', activeOnly); // Debug log
-      return data || [];
+      return itemsWithIcons;
     } catch (error) {
       console.error('Error in getUserMenuItems:', error);
       throw error;
@@ -169,6 +232,24 @@ export class UserMenuService {
         orderIndex = (maxOrderItem?.order_index || 0) + 1;
       }
 
+      // Auto-assign icon only for supplier/shop/payment-related items
+      let icon_name = menuData.icon_name;
+      if (!icon_name && 
+          (menuData.title.toLowerCase().includes('supplier') || 
+           menuData.title.toLowerCase().includes('постачальник') ||
+           menuData.title.toLowerCase().includes('shop') || 
+           menuData.title.toLowerCase().includes('магазин') ||
+           menuData.title.toLowerCase().includes('payment') || 
+           menuData.title.toLowerCase().includes('платеж') ||
+           menuData.path.toLowerCase().includes('supplier') || 
+           menuData.path.toLowerCase().includes('постачальник') ||
+           menuData.path.toLowerCase().includes('shop') || 
+           menuData.path.toLowerCase().includes('магазин') ||
+           menuData.path.toLowerCase().includes('payment') || 
+           menuData.path.toLowerCase().includes('платеж'))) {
+        icon_name = this.getAutoIconForMenuItem({ title: menuData.title, path: menuData.path });
+      }
+
       // Set default content based on page type with better defaults
       const defaultContent = menuData.content_data || {};
       if (!defaultContent.content) {
@@ -223,6 +304,7 @@ export class UserMenuService {
         .insert({
           user_id: userId, // Still store user_id for RLS policy compatibility
           ...menuData,
+          icon_name: icon_name || 'FileText', // Default to FileText instead of circle
           order_index: orderIndex,
           page_type: menuData.page_type || 'content',
           content_data: defaultContent
@@ -261,9 +343,38 @@ export class UserMenuService {
         }
       }
 
+      // Auto-assign icon only for supplier/shop/payment-related items
+      let icon_name = menuData.icon_name;
+      if (menuData.title && !icon_name && 
+          (menuData.title.toLowerCase().includes('supplier') || 
+           menuData.title.toLowerCase().includes('постачальник') ||
+           menuData.title.toLowerCase().includes('shop') || 
+           menuData.title.toLowerCase().includes('магазин') ||
+           menuData.title.toLowerCase().includes('payment') || 
+           menuData.title.toLowerCase().includes('платеж'))) {
+        // We need to get the path to determine the icon
+        const { data: existingItem } = await (supabase as any)
+          .from('user_menu_items')
+          .select('path')
+          .eq('id', itemId)
+          .maybeSingle();
+        
+        if (existingItem) {
+          icon_name = this.getAutoIconForMenuItem({ 
+            title: menuData.title, 
+            path: menuData.path || existingItem.path 
+          });
+        }
+      }
+
+      const updateData = {
+        ...menuData,
+        ...(icon_name !== undefined && { icon_name }) // Only include icon_name if it's defined
+      };
+
       const { data, error } = await (supabase as any)
         .from('user_menu_items')
-        .update(menuData)
+        .update(updateData)
         .eq('id', itemId)
         .select()
         .maybeSingle();
@@ -355,6 +466,26 @@ export class UserMenuService {
         throw error;
       }
 
+      // Only apply auto-icon assignment for supplier/shop/payment-related items
+      if (data && (!data.icon_name || data.icon_name === 'circle' || data.icon_name === 'Circle') &&
+          (data.title.toLowerCase().includes('supplier') || 
+           data.title.toLowerCase().includes('постачальник') ||
+           data.title.toLowerCase().includes('shop') || 
+           data.title.toLowerCase().includes('магазин') ||
+           data.title.toLowerCase().includes('payment') || 
+           data.title.toLowerCase().includes('платеж') ||
+           data.path.toLowerCase().includes('supplier') || 
+           data.path.toLowerCase().includes('постачальник') ||
+           data.path.toLowerCase().includes('shop') || 
+           data.path.toLowerCase().includes('магазин') ||
+           data.path.toLowerCase().includes('payment') || 
+           data.path.toLowerCase().includes('платеж'))) {
+        return {
+          ...data,
+          icon_name: this.getAutoIconForMenuItem({ title: data.title, path: data.path })
+        };
+      }
+
       return data;
     } catch (error) {
       console.error('Error in getMenuItem:', error);
@@ -394,10 +525,29 @@ export class UserMenuService {
             
             if (!parentError && parentData) {
               // Found a parent, return it with modified path
-              return {
+              const result = {
                 ...parentData,
                 path: normalizedPath
               } as UserMenuItem;
+              
+              // Only apply auto-icon assignment for supplier/shop/payment-related items
+              if ((!result.icon_name || result.icon_name === 'circle' || result.icon_name === 'Circle') &&
+                  (result.title.toLowerCase().includes('supplier') || 
+                   result.title.toLowerCase().includes('постачальник') ||
+                   result.title.toLowerCase().includes('shop') || 
+                   result.title.toLowerCase().includes('магазин') ||
+                   result.title.toLowerCase().includes('payment') || 
+                   result.title.toLowerCase().includes('платеж') ||
+                   result.path.toLowerCase().includes('supplier') || 
+                   result.path.toLowerCase().includes('постачальник') ||
+                   result.path.toLowerCase().includes('shop') || 
+                   result.path.toLowerCase().includes('магазин') ||
+                   result.path.toLowerCase().includes('payment') || 
+                   result.path.toLowerCase().includes('платеж'))) {
+                result.icon_name = this.getAutoIconForMenuItem({ title: result.title, path: result.path });
+              }
+              
+              return result;
             }
           }
         }
@@ -407,6 +557,26 @@ export class UserMenuService {
           throw error;
         }
         return null; // Not found
+      }
+
+      // Only apply auto-icon assignment for supplier/shop/payment-related items
+      if (data && (!data.icon_name || data.icon_name === 'circle' || data.icon_name === 'Circle') &&
+          (data.title.toLowerCase().includes('supplier') || 
+           data.title.toLowerCase().includes('постачальник') ||
+           data.title.toLowerCase().includes('shop') || 
+           data.title.toLowerCase().includes('магазин') ||
+           data.title.toLowerCase().includes('payment') || 
+           data.title.toLowerCase().includes('платеж') ||
+           data.path.toLowerCase().includes('supplier') || 
+           data.path.toLowerCase().includes('постачальник') ||
+           data.path.toLowerCase().includes('shop') || 
+           data.path.toLowerCase().includes('магазин') ||
+           data.path.toLowerCase().includes('payment') || 
+           data.path.toLowerCase().includes('платеж'))) {
+        return {
+          ...data,
+          icon_name: this.getAutoIconForMenuItem({ title: data.title, path: data.path })
+        };
       }
 
       return data;
@@ -433,7 +603,31 @@ export class UserMenuService {
         throw error;
       }
 
-      return data || [];
+      // Only apply auto-icon assignment for items that don't have an icon or have the default circle icon
+      // AND are supplier/shop/payment-related
+      const itemsWithIcons = (data || []).map((item: UserMenuItem) => {
+        if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
+            (item.title.toLowerCase().includes('supplier') || 
+             item.title.toLowerCase().includes('постачальник') ||
+             item.title.toLowerCase().includes('shop') || 
+             item.title.toLowerCase().includes('магазин') ||
+             item.title.toLowerCase().includes('payment') || 
+             item.title.toLowerCase().includes('платеж') ||
+             item.path.toLowerCase().includes('supplier') || 
+             item.path.toLowerCase().includes('постачальник') ||
+             item.path.toLowerCase().includes('shop') || 
+             item.path.toLowerCase().includes('магазин') ||
+             item.path.toLowerCase().includes('payment') || 
+             item.path.toLowerCase().includes('платеж'))) {
+          return {
+            ...item,
+            icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path })
+          };
+        }
+        return item;
+      });
+
+      return itemsWithIcons;
     } catch (error) {
       console.error('Error in getChildMenuItems:', error);
       throw error;

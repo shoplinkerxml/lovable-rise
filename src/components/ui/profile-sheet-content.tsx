@@ -86,7 +86,8 @@ export const ProfileSheetContent: React.FC<ProfileSheetContentProps> = ({
       {/* Logout Section */}
       <div className="border-t pt-4">
         <Button 
-          variant="secondary"
+          variant="default"
+          className="w-full"
           onClick={handleLogoutClick}
         >
           {t("logout")}

@@ -372,6 +372,19 @@ const dictionary: Dictionary = {
   menu_item_created: { uk: "Пункт меню створено", en: "Menu item created" },
   failed_create_menu_item: { uk: "Не вдалося створити пункт меню", en: "Failed to create menu item" },
 
+  // User Profile
+  profile_email: { uk: "Електронна пошта", en: "Email" },
+  profile_phone: { uk: "Телефон", en: "Phone" },
+  profile_member_since: { uk: "Учасник з", en: "Member Since" },
+  profile_email_cannot_be_changed: { uk: "Електронну пошту не можна змінити", en: "Email cannot be changed" },
+  profile_change_avatar: { uk: "Змінити аватар", en: "Change Avatar" },
+  profile_uploading: { uk: "Завантаження...", en: "Uploading..." },
+  profile_save_changes: { uk: "Зберегти зміни", en: "Save Changes" },
+  profile_loading: { uk: "Завантаження...", en: "Loading..." },
+  profile_back_to_dashboard: { uk: "Назад до панелі", en: "Back to Dashboard" },
+  profile_personal_information: { uk: "Особиста інформація", en: "Personal Information" },
+  profile_update_info: { uk: "Оновіть інформацію профілю та аватар", en: "Update your profile information and avatar" },
+
 };
 
 // User Statistics

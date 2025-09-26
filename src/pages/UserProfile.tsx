@@ -127,7 +127,7 @@ const UserProfile = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t("profile_loading")}</p>
         </div>
       </div>
     );
@@ -135,33 +135,6 @@ const UserProfile = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold">MarketGrow</span>
-            </div>
-
-            {/* User Actions */}
-            <div className="flex items-center space-x-4">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setLang(lang === "uk" ? "en" : "uk")}
-                className="text-sm"
-              >
-                {lang === "uk" ? "EN" : "UA"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="space-y-6">
@@ -172,28 +145,18 @@ const UserProfile = () => {
             className="mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            {t("profile_back_to_dashboard")}
           </Button>
-
-          {/* Profile Header */}
-          <div className="text-center md:text-left">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {t("user_profile_title")}
-            </h1>
-            <p className="text-gray-600">
-              Manage your account settings and personal information
-            </p>
-          </div>
 
           {/* Profile Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Personal Information
+                {t("profile_personal_information")}
               </CardTitle>
               <CardDescription>
-                Update your profile information and avatar
+                {t("profile_update_info")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -229,7 +192,7 @@ const UserProfile = () => {
                       disabled={uploading}
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {uploading ? "Uploading..." : "Change Avatar"}
+                      {uploading ? t("profile_uploading") : t("profile_change_avatar")}
                     </Button>
                   </div>
                 </div>
@@ -248,18 +211,18 @@ const UserProfile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t("profile_email")}</Label>
                   <Input
                     id="email"
                     value={user?.email || ""}
                     disabled
                     className="bg-gray-50"
                   />
-                  <p className="text-xs text-gray-500">Email cannot be changed</p>
+                  <p className="text-xs text-gray-500">{t("profile_email_cannot_be_changed")}</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="phone">{t("profile_phone")}</Label>
                   <Input
                     id="phone"
                     value={phone}
@@ -269,7 +232,7 @@ const UserProfile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Member Since</Label>
+                  <Label>{t("profile_member_since")}</Label>
                   <Input
                     value={user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                     disabled
@@ -283,10 +246,11 @@ const UserProfile = () => {
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  variant="default"
+                  className="w-full md:w-auto"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Saving..." : "Save Changes"}
+                  {saving ? t("profile_uploading") : t("profile_save_changes")}
                 </Button>
               </div>
             </CardContent>

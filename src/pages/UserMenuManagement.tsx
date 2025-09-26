@@ -39,6 +39,42 @@ const UserMenuManagement = () => {
     setLoading(false);
   }, [menuItems]);
 
+  // Function to determine the appropriate icon based on title or path
+  const getAutoIconForItem = (title: string, path: string): string => {
+    const lowerTitle = title.toLowerCase();
+    const lowerPath = path.toLowerCase();
+    
+    // Check for supplier-related terms
+    if (lowerTitle.includes('supplier') || lowerTitle.includes('постачальник')) {
+      return 'Truck';
+    }
+    
+    if (lowerPath.includes('supplier') || lowerPath.includes('постачальник')) {
+      return 'Truck';
+    }
+    
+    // Check for shop-related terms
+    if (lowerTitle.includes('shop') || lowerTitle.includes('магазин')) {
+      return 'Store';
+    }
+    
+    if (lowerPath.includes('shop') || lowerPath.includes('магазин')) {
+      return 'Store';
+    }
+    
+    // Check for payment-related terms
+    if (lowerTitle.includes('payment') || lowerTitle.includes('платеж')) {
+      return 'CreditCard';
+    }
+    
+    if (lowerPath.includes('payment') || lowerPath.includes('платеж')) {
+      return 'CreditCard';
+    }
+    
+    // Fall back to the default FileText icon
+    return 'FileText';
+  };
+
   const handleCreateItem = async () => {
     try {
       if (!newItem.title || !newItem.path) {
@@ -53,7 +89,13 @@ const UserMenuManagement = () => {
         return;
       }
 
-      await UserMenuService.createMenuItem(user.id, newItem);
+      // Auto-assign icon if not explicitly set
+      const itemToCreate = {
+        ...newItem,
+        icon_name: newItem.icon_name || getAutoIconForItem(newItem.title, newItem.path)
+      };
+
+      await UserMenuService.createMenuItem(user.id, itemToCreate);
       onMenuUpdate();
       setNewItem({
         title: "",
@@ -98,11 +140,14 @@ const UserMenuManagement = () => {
         return;
       }
 
+      // Auto-assign icon if not explicitly set
+      const icon_name = newItem.icon_name || getAutoIconForItem(newItem.title, newItem.path);
+
       const updateData: UpdateUserMenuItem = {
         title: newItem.title,
         path: newItem.path,
         page_type: newItem.page_type,
-        icon_name: newItem.icon_name,
+        icon_name: icon_name,
         description: newItem.description,
         content_data: newItem.content_data
       };
@@ -212,7 +257,14 @@ const UserMenuManagement = () => {
                 <label className="block text-sm font-medium mb-1">{t("title")}</label>
                 <Input
                   value={newItem.title}
-                  onChange={(e) => setNewItem({...newItem, title: e.target.value})}
+                  onChange={(e) => {
+                    const newTitle = e.target.value;
+                    // Auto-update icon when title changes
+                    const newIcon = newItem.icon_name === "FileText" || !newItem.icon_name 
+                      ? getAutoIconForItem(newTitle, newItem.path) 
+                      : newItem.icon_name;
+                    setNewItem({...newItem, title: newTitle, icon_name: newIcon});
+                  }}
                   placeholder={t("enter_title")}
                 />
               </div>
@@ -220,7 +272,14 @@ const UserMenuManagement = () => {
                 <label className="block text-sm font-medium mb-1">{t("path")}</label>
                 <Input
                   value={newItem.path}
-                  onChange={(e) => setNewItem({...newItem, path: e.target.value})}
+                  onChange={(e) => {
+                    const newPath = e.target.value;
+                    // Auto-update icon when path changes
+                    const newIcon = newItem.icon_name === "FileText" || !newItem.icon_name 
+                      ? getAutoIconForItem(newItem.title, newPath) 
+                      : newItem.icon_name;
+                    setNewItem({...newItem, path: newPath, icon_name: newIcon});
+                  }}
                   placeholder={t("enter_path")}
                 />
               </div>

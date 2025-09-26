@@ -39,6 +39,8 @@ import {
   DollarSign,
   Tags,
   ChevronRight,
+  Truck,
+  Store,
   LucideIcon,
 } from 'lucide-react';
 
@@ -98,7 +100,17 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   categories: Layers,
   package: Package,
   products: Package,
+  suppliers: Truck,
+  supplier: Truck,
+  постачальники: Truck,
+  постачальник: Truck,
+  shops: Store,
+  shop: Store,
+  магазини: Store,
+  магазин: Store,
+  Store: Store,
   Package: Package,
+  Truck: Truck,
   
   // Pricing & Commerce
   'credit-card': CreditCard,
@@ -109,6 +121,10 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   money: DollarSign,
   tags: Tags,
   discounts: Tags,
+  'payment-systems': CreditCard,
+  'payment-system': CreditCard,
+  'платежные-системы': CreditCard,
+  'платежная-система': CreditCard,
   CreditCard: CreditCard,
   
   // API & Development
@@ -231,6 +247,9 @@ export const getAutoIcon = (item: { title: string; path: string; page_type?: str
   if (title.includes('content') || title.includes('контент')) return 'file-text';
   if (title.includes('categor') || title.includes('категор')) return 'layers';
   if (title.includes('product') || title.includes('товар')) return 'package';
+  if (title.includes('supplier') || title.includes('постачальник')) return 'truck';
+  if (title.includes('shop') || title.includes('магазин')) return 'store';
+  if (title.includes('payment') || title.includes('платеж')) return 'credit-card';
   if (title.includes('permission') || title.includes('дозвол')) return 'shield';
   if (title.includes('api')) return 'code';
   if (title.includes('media') || title.includes('медіа')) return 'image';
@@ -248,6 +267,9 @@ export const getAutoIcon = (item: { title: string; path: string; page_type?: str
   if (path.includes('/content') || path.includes('/контент')) return 'file-text';
   if (path.includes('/categories') || path.includes('/категорії')) return 'layers';
   if (path.includes('/products') || path.includes('/товари')) return 'package';
+  if (path.includes('/suppliers') || path.includes('/постачальники')) return 'truck';
+  if (path.includes('/shops') || path.includes('/магазины') || path.includes('/магазини')) return 'store';
+  if (path.includes('/payments') || path.includes('/платежи') || path.includes('/платежі')) return 'credit-card';
   if (path.includes('/permissions')) return 'shield';
   if (path.includes('/api')) return 'code';
   if (path.includes('/media')) return 'image';
