@@ -51,6 +51,7 @@ const ContentWorkspace: React.FC = () => {
     contentLoading, 
     contentError, 
     menuLoading,
+    menuItems,
     clearContentError 
   } = useAdmin();
 
@@ -58,6 +59,12 @@ const ContentWorkspace: React.FC = () => {
   const adminPath = useMemo(() => {
     return location.pathname.replace('/admin', '');
   }, [location.pathname]);
+
+  // Check if the active item has children (is a parent item)
+  const isParentItem = useMemo(() => {
+    if (!activeMenuItem) return false;
+    return menuItems.some(item => item.parent_id === activeMenuItem.id);
+  }, [activeMenuItem, menuItems]);
 
   // Determine content skeleton type based on active menu item and route
   const getSkeletonType = () => {
@@ -130,6 +137,24 @@ const ContentWorkspace: React.FC = () => {
       >
         {null}
       </ProgressiveLoader>
+    );
+  }
+
+  // If active item is a parent item with children, show a message
+  if (activeMenuItem && isParentItem) {
+    return (
+      <div className="h-full overflow-auto">
+        <div className="p-4 md:p-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+            <h2 className="text-xl font-semibold text-blue-800 mb-2">
+              Please Select a Submenu Item
+            </h2>
+            <p className="text-blue-600">
+              This menu item contains sub-items. Please select one of the sub-items from the sidebar to view its content.
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 

@@ -129,7 +129,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
               {hasChildren ? (
                 <button
                   onClick={() => {
-                    onItemClick(item);
+                    // For parent items with children, only toggle the submenu, don't navigate
                     toggleSubmenu(item.id);
                   }}
                   onMouseEnter={() => onItemHover(item)}
