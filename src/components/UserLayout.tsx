@@ -473,7 +473,7 @@ const UserLayoutContent = ({
           
           <div className="flex items-center gap-2 md:gap-4">
             {/* Theme Toggle */}
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="hover:bg-transparent cursor-pointer">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="hover:bg-transparent cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400">
               <Sun className="h-5 w-5 hidden dark:block" />
               <Moon className="h-5 w-5 block dark:hidden" />
             </Button>
