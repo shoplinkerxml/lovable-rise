@@ -102,6 +102,17 @@ const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
     created_at: new Date().toISOString(),
     icon_name: 'users',
     section_type: 'main'
+  },
+  '/settings/currency': {
+    id: -10,
+    title: 'Currency',
+    path: '/settings/currency',
+    page_type: 'list',
+    is_active: true,
+    order_index: 100,
+    created_at: new Date().toISOString(),
+    icon_name: 'dollar-sign',
+    section_type: 'settings'
   }
 };
 

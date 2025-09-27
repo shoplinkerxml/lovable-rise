@@ -1,0 +1,353 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { MoreHorizontal, Plus, Edit3, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
+
+interface Currency {
+  id: number;
+  code: string;
+  name: string;
+  rate: number;
+  status: boolean | null;
+  is_base: boolean | null;
+}
+
+const CurrencyManagement = () => {
+  const { t } = useI18n();
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCurrency, setEditingCurrency] = useState<Currency | null>(null);
+  const [formData, setFormData] = useState({
+    code: "",
+    name: "",
+    rate: 1,
+    status: true,
+  });
+
+  useEffect(() => {
+    loadCurrencies();
+  }, []);
+
+  const loadCurrencies = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('currencies')
+        .select('*')
+        .order('code');
+
+      if (error) {
+        console.error("Error loading currencies:", error);
+        toast.error(t("failed_load_currencies"));
+        return;
+      }
+
+      setCurrencies(data || []);
+    } catch (error) {
+      console.error("Error loading currencies:", error);
+      toast.error(t("failed_load_currencies"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCurrency = () => {
+    setEditingCurrency(null);
+    setFormData({
+      code: "",
+      name: "",
+      rate: 1,
+      status: true,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleEditCurrency = (currency: Currency) => {
+    setEditingCurrency(currency);
+    setFormData({
+      code: currency.code,
+      name: currency.name,
+      rate: currency.rate,
+      status: currency.status ?? true,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteCurrency = async (currency: Currency) => {
+    if (currency.is_base) {
+      toast.error(t("cannot_delete_base_currency"));
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('currencies')
+        .delete()
+        .eq('id', currency.id);
+
+      if (error) {
+        console.error("Error deleting currency:", error);
+        toast.error(t("failed_delete_currency"));
+        return;
+      }
+
+      await loadCurrencies();
+      toast.success(t("currency_deleted"));
+    } catch (error) {
+      console.error("Error deleting currency:", error);
+      toast.error(t("failed_delete_currency"));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingCurrency) {
+        // Update existing currency
+        const { error } = await supabase
+          .from('currencies')
+          .update({
+            code: formData.code,
+            name: formData.name,
+            rate: formData.rate,
+            status: formData.status,
+          })
+          .eq('id', editingCurrency.id);
+
+        if (error) {
+          console.error("Error updating currency:", error);
+          if (error.message?.includes('unique')) {
+            toast.error(t("currency_code_exists"));
+          } else {
+            toast.error(t("failed_update_currency"));
+          }
+          return;
+        }
+
+        toast.success(t("currency_updated"));
+      } else {
+        // Create new currency
+        const { error } = await supabase
+          .from('currencies')
+          .insert({
+            code: formData.code,
+            name: formData.name,
+            rate: formData.rate,
+            status: formData.status,
+          });
+
+        if (error) {
+          console.error("Error creating currency:", error);
+          if (error.message?.includes('unique')) {
+            toast.error(t("currency_code_exists"));
+          } else {
+            toast.error(t("failed_create_currency"));
+          }
+          return;
+        }
+
+        toast.success(t("currency_created"));
+      }
+      
+      setIsDialogOpen(false);
+      await loadCurrencies();
+    } catch (error: any) {
+      console.error("Error saving currency:", error);
+      toast.error(editingCurrency ? t("failed_update_currency") : t("failed_create_currency"));
+    }
+  };
+
+  const handleStatusToggle = async (currency: Currency) => {
+    try {
+      const { error } = await supabase
+        .from('currencies')
+        .update({ status: !currency.status })
+        .eq('id', currency.id);
+
+      if (error) {
+        console.error("Error updating currency status:", error);
+        toast.error(t("failed_update_currency_status"));
+        return;
+      }
+
+      await loadCurrencies();
+      toast.success(t("currency_status_updated"));
+    } catch (error) {
+      console.error("Error updating currency status:", error);
+      toast.error(t("failed_update_currency_status"));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">{t("currency_management")}</h1>
+          <p className="text-muted-foreground">{t("manage_currencies")}</p>
+        </div>
+        <Button onClick={handleCreateCurrency}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t("add_currency")}
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("currencies")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("currency_code")}</TableHead>
+                <TableHead>{t("currency_name")}</TableHead>
+                <TableHead>{t("currency_rate")}</TableHead>
+                <TableHead>{t("currency_status")}</TableHead>
+                <TableHead>{t("actions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {currencies.map((currency) => (
+                <TableRow key={currency.id}>
+                  <TableCell className="font-medium">
+                    {currency.code}
+                    {currency.is_base && (
+                      <Badge variant="secondary" className="ml-2">
+                        {t("base_currency")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>{currency.name}</TableCell>
+                  <TableCell>{currency.rate.toFixed(4)}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={currency.status ?? true}
+                      onCheckedChange={() => handleStatusToggle(currency)}
+                      disabled={!!currency.is_base}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditCurrency(currency)}>
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          {t("edit")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteCurrency(currency)}
+                          disabled={!!currency.is_base}
+                          className={currency.is_base ? "text-muted-foreground cursor-not-allowed" : "text-red-600"}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {t("delete")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          
+          {currencies.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">{t("no_currencies_found")}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingCurrency ? t("edit_currency") : t("add_currency")}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="code">{t("currency_code")}</Label>
+              <Input
+                id="code"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                placeholder={t("enter_currency_code")}
+                maxLength={10}
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="name">{t("currency_name")}</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t("enter_currency_name")}
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="rate">{t("currency_rate")}</Label>
+              <Input
+                id="rate"
+                type="number"
+                step="0.0001"
+                value={formData.rate}
+                onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })}
+                placeholder={t("enter_exchange_rate")}
+                required
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label htmlFor="status">{t("status_active")}</Label>
+              <Switch
+                id="status"
+                checked={formData.status}
+                onCheckedChange={(checked) => setFormData({ ...formData, status: checked })}
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                {t("btn_cancel")}
+              </Button>
+              <Button type="submit">
+                {editingCurrency ? t("btn_update") : t("btn_create")}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default CurrencyManagement;

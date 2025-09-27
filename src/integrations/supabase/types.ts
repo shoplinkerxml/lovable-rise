@@ -167,6 +167,33 @@ export type Database = {
           },
         ]
       }
+      currencies: {
+        Row: {
+          id: number
+          code: string
+          name: string
+          rate: number
+          status: boolean | null
+          is_base: boolean | null
+        }
+        Insert: {
+          id?: number
+          code: string
+          name: string
+          rate: number
+          status?: boolean | null
+          is_base?: boolean | null
+        }
+        Update: {
+          id?: number
+          code?: string
+          name?: string
+          rate?: number
+          status?: boolean | null
+          is_base?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -23,9 +23,9 @@ import UserLayout from "@/components/UserLayout";
 import UserDashboard from "./pages/UserDashboard";
 import UserProfile from "./pages/UserProfile";
 import UserMenuContent from "./pages/UserMenuContent";
-import UserMenuManagement from "./pages/UserMenuManagement";
-// Add import for new component
 import UserMenuContentByPath from "./pages/UserMenuContentByPath";
+// Add import for new component
+import CurrencyManagement from "./pages/admin/settings/CurrencyManagement";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +61,11 @@ const App = () => (
               <Route path="*" element={<AdminLayout><Outlet /></AdminLayout>} />
             </Route>
             
+            {/* Admin Settings Routes */}
+            <Route path="/admin" element={<AdminProtected />}>
+              <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
+            </Route>
+            
             {/* User Authentication Routes */}
             <Route path="/user-register" element={<UserRegister />} />
             <Route path="/user-auth" element={<UserAuth />} />
@@ -75,9 +80,9 @@ const App = () => (
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<UserDashboard />} />
                 <Route path="profile" element={<UserProfile />} />
-                <Route path="menu-management" element={<UserMenuManagement />} />
                 <Route path="content/:id" element={<UserMenuContent />} />
                 <Route path=":path/*" element={<UserMenuContentByPath />} />
+                {/* Removed /user/menu-management route as requested */}
               </Route>
             </Route>
             
