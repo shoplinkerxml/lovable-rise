@@ -53,7 +53,16 @@ const CurrencyManagement = () => {
         return;
       }
 
-      setCurrencies(data || []);
+      // Sort currencies to show base currency first
+      const sortedCurrencies = (data || []).sort((a, b) => {
+        // Base currency first
+        if (a.is_base && !b.is_base) return -1;
+        if (!a.is_base && b.is_base) return 1;
+        // Then by code for other currencies
+        return a.code.localeCompare(b.code);
+      });
+
+      setCurrencies(sortedCurrencies);
     } catch (error) {
       console.error("Error loading currencies:", error);
       toast.error(t("failed_load_currencies"));
