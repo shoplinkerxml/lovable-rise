@@ -1,0 +1,536 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { Plus, Edit, Trash2 } from 'lucide-react';
+import { TariffService, type Tariff, type TariffFeature, type TariffLimit, type TariffFeatureInsert, type TariffLimitInsert } from '@/lib/tariff-service';
+
+const AdminTariffFeatures = () => {
+  const [tariffs, setTariffs] = useState<Tariff[]>([]);
+  const [features, setFeatures] = useState<TariffFeature[]>([]);
+  const [limits, setLimits] = useState<TariffLimit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isFeatureDialogOpen, setIsFeatureDialogOpen] = useState(false);
+  const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
+  const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
+  const [editingFeature, setEditingFeature] = useState<TariffFeature | null>(null);
+  const [editingLimit, setEditingLimit] = useState<TariffLimit | null>(null);
+  const [featureFormData, setFeatureFormData] = useState<Partial<TariffFeatureInsert>>({
+    tariff_id: 0,
+    feature_name: '',
+    is_active: true
+  });
+  const [limitFormData, setLimitFormData] = useState<Partial<TariffLimitInsert>>({
+    tariff_id: 0,
+    limit_name: '',
+    value: 0,
+    is_active: true
+  });
+
+  useEffect(() => {
+    fetchTariffs();
+  }, []);
+
+  const fetchTariffs = async () => {
+    try {
+      setLoading(true);
+      const tariffData = await TariffService.getAllTariffs(true);
+      setTariffs(tariffData);
+    } catch (error) {
+      console.error('Error fetching tariffs:', error);
+      toast.error('Failed to load tariffs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFeaturesAndLimits = async (tariffId: number) => {
+    try {
+      const [featureData, limitData] = await Promise.all([
+        TariffService.getTariffFeatures(tariffId),
+        TariffService.getTariffLimits(tariffId)
+      ]);
+      setFeatures(featureData);
+      setLimits(limitData);
+    } catch (error) {
+      console.error('Error fetching features/limits:', error);
+      toast.error('Failed to load features/limits');
+    }
+  };
+
+  const handleSelectTariff = async (tariff: Tariff) => {
+    setSelectedTariff(tariff);
+    await fetchFeaturesAndLimits(tariff.id);
+  };
+
+  const handleCreateFeature = async () => {
+    if (!selectedTariff) return;
+    
+    try {
+      await TariffService.addTariffFeature({
+        ...featureFormData,
+        tariff_id: selectedTariff.id
+      } as TariffFeatureInsert);
+      toast.success('Feature added successfully');
+      setIsFeatureDialogOpen(false);
+      resetFeatureForm();
+      await fetchFeaturesAndLimits(selectedTariff.id);
+    } catch (error) {
+      console.error('Error creating feature:', error);
+      toast.error('Failed to create feature');
+    }
+  };
+
+  const handleUpdateFeature = async () => {
+    if (!editingFeature) return;
+    
+    try {
+      await TariffService.updateTariffFeature(editingFeature.id, featureFormData);
+      toast.success('Feature updated successfully');
+      setIsFeatureDialogOpen(false);
+      resetFeatureForm();
+      if (selectedTariff) {
+        await fetchFeaturesAndLimits(selectedTariff.id);
+      }
+    } catch (error) {
+      console.error('Error updating feature:', error);
+      toast.error('Failed to update feature');
+    }
+  };
+
+  const handleDeleteFeature = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this feature?')) return;
+    
+    try {
+      await TariffService.deleteTariffFeature(id);
+      toast.success('Feature deleted successfully');
+      if (selectedTariff) {
+        await fetchFeaturesAndLimits(selectedTariff.id);
+      }
+    } catch (error) {
+      console.error('Error deleting feature:', error);
+      toast.error('Failed to delete feature');
+    }
+  };
+
+  const handleCreateLimit = async () => {
+    if (!selectedTariff) return;
+    
+    try {
+      await TariffService.addTariffLimit({
+        ...limitFormData,
+        tariff_id: selectedTariff.id
+      } as TariffLimitInsert);
+      toast.success('Limit added successfully');
+      setIsLimitDialogOpen(false);
+      resetLimitForm();
+      await fetchFeaturesAndLimits(selectedTariff.id);
+    } catch (error) {
+      console.error('Error creating limit:', error);
+      toast.error('Failed to create limit');
+    }
+  };
+
+  const handleUpdateLimit = async () => {
+    if (!editingLimit) return;
+    
+    try {
+      await TariffService.updateTariffLimit(editingLimit.id, limitFormData);
+      toast.success('Limit updated successfully');
+      setIsLimitDialogOpen(false);
+      resetLimitForm();
+      if (selectedTariff) {
+        await fetchFeaturesAndLimits(selectedTariff.id);
+      }
+    } catch (error) {
+      console.error('Error updating limit:', error);
+      toast.error('Failed to update limit');
+    }
+  };
+
+  const handleDeleteLimit = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this limit?')) return;
+    
+    try {
+      await TariffService.deleteTariffLimit(id);
+      toast.success('Limit deleted successfully');
+      if (selectedTariff) {
+        await fetchFeaturesAndLimits(selectedTariff.id);
+      }
+    } catch (error) {
+      console.error('Error deleting limit:', error);
+      toast.error('Failed to delete limit');
+    }
+  };
+
+  const resetFeatureForm = () => {
+    setFeatureFormData({
+      tariff_id: selectedTariff?.id || 0,
+      feature_name: '',
+      is_active: true
+    });
+    setEditingFeature(null);
+  };
+
+  const resetLimitForm = () => {
+    setLimitFormData({
+      tariff_id: selectedTariff?.id || 0,
+      limit_name: '',
+      value: 0,
+      is_active: true
+    });
+    setEditingLimit(null);
+  };
+
+  const openCreateFeatureDialog = () => {
+    resetFeatureForm();
+    setIsFeatureDialogOpen(true);
+  };
+
+  const openEditFeatureDialog = (feature: TariffFeature) => {
+    setEditingFeature(feature);
+    setFeatureFormData({
+      tariff_id: feature.tariff_id,
+      feature_name: feature.feature_name,
+      is_active: feature.is_active
+    });
+    setIsFeatureDialogOpen(true);
+  };
+
+  const openCreateLimitDialog = () => {
+    resetLimitForm();
+    setIsLimitDialogOpen(true);
+  };
+
+  const openEditLimitDialog = (limit: TariffLimit) => {
+    setEditingLimit(limit);
+    setLimitFormData({
+      tariff_id: limit.tariff_id,
+      limit_name: limit.limit_name,
+      value: limit.value,
+      is_active: limit.is_active
+    });
+    setIsLimitDialogOpen(true);
+  };
+
+  const handleFeatureSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingFeature) {
+      handleUpdateFeature();
+    } else {
+      handleCreateFeature();
+    }
+  };
+
+  const handleLimitSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingLimit) {
+      handleUpdateLimit();
+    } else {
+      handleCreateLimit();
+    }
+  };
+
+  const handleFeatureChange = (field: keyof TariffFeatureInsert, value: string | number | boolean | null) => {
+    setFeatureFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleLimitChange = (field: keyof TariffLimitInsert, value: string | number | boolean | null) => {
+    setLimitFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Tariff Features & Limits</h1>
+        <p className="text-muted-foreground">
+          Manage features and limits for your tariff plans
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Tariff Plans</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {tariffs.map((tariff) => (
+                <Button
+                  key={tariff.id}
+                  variant={selectedTariff?.id === tariff.id ? "default" : "outline"}
+                  className="w-full justify-start"
+                  onClick={() => handleSelectTariff(tariff)}
+                >
+                  {tariff.name}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {selectedTariff ? (
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>{selectedTariff.name} - Features</CardTitle>
+                  <Dialog open={isFeatureDialogOpen} onOpenChange={(open) => {
+                    setIsFeatureDialogOpen(open);
+                    if (!open) resetFeatureForm();
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button onClick={openCreateFeatureDialog}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Feature
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingFeature ? 'Edit Feature' : 'Add New Feature'}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleFeatureSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="feature_name">Feature Name *</Label>
+                          <Input
+                            id="feature_name"
+                            value={featureFormData.feature_name || ''}
+                            onChange={(e) => handleFeatureChange('feature_name', e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="feature_active"
+                            checked={featureFormData.is_active || false}
+                            onCheckedChange={(checked) => handleFeatureChange('is_active', checked)}
+                          />
+                          <Label htmlFor="feature_active">Active</Label>
+                        </div>
+
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsFeatureDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit">
+                            {editingFeature ? 'Update Feature' : 'Add Feature'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Feature</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {features.map((feature) => (
+                      <TableRow key={feature.id}>
+                        <TableCell className="font-medium">{feature.feature_name}</TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={feature.is_active || false}
+                            onCheckedChange={async (checked) => {
+                              try {
+                                await TariffService.updateTariffFeature(feature.id, { is_active: checked });
+                                await fetchFeaturesAndLimits(selectedTariff.id);
+                                toast.success('Feature status updated');
+                              } catch (error) {
+                                console.error('Error updating feature status:', error);
+                                toast.error('Failed to update feature status');
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditFeatureDialog(feature)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteFeature(feature.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>{selectedTariff.name} - Limits</CardTitle>
+                  <Dialog open={isLimitDialogOpen} onOpenChange={(open) => {
+                    setIsLimitDialogOpen(open);
+                    if (!open) resetLimitForm();
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button onClick={openCreateLimitDialog}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Limit
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingLimit ? 'Edit Limit' : 'Add New Limit'}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleLimitSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="limit_name">Limit Name *</Label>
+                          <Input
+                            id="limit_name"
+                            value={limitFormData.limit_name || ''}
+                            onChange={(e) => handleLimitChange('limit_name', e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="value">Value *</Label>
+                          <Input
+                            id="value"
+                            type="number"
+                            min="0"
+                            value={limitFormData.value || 0}
+                            onChange={(e) => handleLimitChange('value', parseInt(e.target.value) || 0)}
+                            required
+                          />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="limit_active"
+                            checked={limitFormData.is_active || false}
+                            onCheckedChange={(checked) => handleLimitChange('is_active', checked)}
+                          />
+                          <Label htmlFor="limit_active">Active</Label>
+                        </div>
+
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsLimitDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit">
+                            {editingLimit ? 'Update Limit' : 'Add Limit'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Limit</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {limits.map((limit) => (
+                      <TableRow key={limit.id}>
+                        <TableCell className="font-medium">{limit.limit_name}</TableCell>
+                        <TableCell>{limit.value}</TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={limit.is_active || false}
+                            onCheckedChange={async (checked) => {
+                              try {
+                                await TariffService.updateTariffLimit(limit.id, { is_active: checked });
+                                await fetchFeaturesAndLimits(selectedTariff.id);
+                                toast.success('Limit status updated');
+                              } catch (error) {
+                                console.error('Error updating limit status:', error);
+                                toast.error('Failed to update limit status');
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditLimitDialog(limit)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteLimit(limit.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className="lg:col-span-2">
+            <CardContent className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">
+                Select a tariff plan to manage its features and limits
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AdminTariffFeatures;

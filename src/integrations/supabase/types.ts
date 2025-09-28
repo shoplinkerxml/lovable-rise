@@ -175,14 +175,18 @@ export type Database = {
           rate: number
           status: boolean | null
           is_base: boolean | null
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: number
           code: string
           name: string
-          rate: number
+          rate?: number
           status?: boolean | null
           is_base?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: number
@@ -191,8 +195,136 @@ export type Database = {
           rate?: number
           status?: boolean | null
           is_base?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
+      }
+      tariffs: {
+        Row: {
+          id: number
+          name: string
+          description: string | null
+          old_price: number | null
+          new_price: number | null
+          currency: number
+          duration_days: number | null
+          is_free: boolean | null
+          is_lifetime: boolean | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          name: string
+          description?: string | null
+          old_price?: number | null
+          new_price?: number | null
+          currency: number
+          duration_days?: number | null
+          is_free?: boolean | null
+          is_lifetime?: boolean | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          name?: string
+          description?: string | null
+          old_price?: number | null
+          new_price?: number | null
+          currency?: number
+          duration_days?: number | null
+          is_free?: boolean | null
+          is_lifetime?: boolean | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tariffs_currency_fkey"
+            columns: ["currency"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      tariff_features: {
+        Row: {
+          id: number
+          tariff_id: number
+          feature_name: string
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          tariff_id: number
+          feature_name: string
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          tariff_id?: number
+          feature_name?: string
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tariff_features_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      tariff_limits: {
+        Row: {
+          id: number
+          tariff_id: number
+          limit_name: string
+          value: number
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          tariff_id: number
+          limit_name: string
+          value: number
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          tariff_id?: number
+          limit_name?: string
+          value?: number
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tariff_limits_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

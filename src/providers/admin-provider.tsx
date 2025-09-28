@@ -113,6 +113,28 @@ const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
     created_at: new Date().toISOString(),
     icon_name: 'dollar-sign',
     section_type: 'settings'
+  },
+  '/tariff': {
+    id: -11,
+    title: 'Tariff Management',
+    path: '/tariff',
+    page_type: 'list',
+    is_active: true,
+    order_index: 3,
+    created_at: new Date().toISOString(),
+    icon_name: 'credit-card',
+    section_type: 'main'
+  },
+  '/tariff/features': {
+    id: -12,
+    title: 'Tariff Features',
+    path: '/tariff/features',
+    page_type: 'list',
+    is_active: true,
+    order_index: 4,
+    created_at: new Date().toISOString(),
+    icon_name: 'check-circle',
+    section_type: 'main'
   }
 };
 

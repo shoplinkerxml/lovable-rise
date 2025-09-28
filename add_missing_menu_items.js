@@ -44,12 +44,24 @@ async function addMissingMenuItems() {
           .from('user_menu_items')
           .insert({
             user_id: userId,
-            title: 'Tariff',
+            title: 'Тарифні плани',
             path: 'tariff',
             order_index: 3,
-            page_type: 'content',
+            page_type: 'list',
             icon_name: 'CreditCard',
-            description: 'Manage your tariff and billing information'
+            description: 'Manage your tariff and billing information',
+            content_data: {
+              "table_config": {
+                "columns": [
+                  {"key": "icon", "label": "", "type": "text"},
+                  {"key": "name", "label": "Назва тарифу", "type": "text", "sortable": true},
+                  {"key": "new_price", "label": "Ціна", "type": "number", "sortable": true},
+                  {"key": "duration_days", "label": "Термін", "type": "number", "sortable": true},
+                  {"key": "is_active", "label": "Статус", "type": "badge", "sortable": true},
+                  {"key": "actions", "label": "Дії", "type": "text"}
+                ]
+              }
+            }
           });
         
         if (insertError) {

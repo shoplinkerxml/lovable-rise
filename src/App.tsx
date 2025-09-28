@@ -24,8 +24,9 @@ import UserDashboard from "./pages/UserDashboard";
 import UserProfile from "./pages/UserProfile";
 import UserMenuContent from "./pages/UserMenuContent";
 import UserMenuContentByPath from "./pages/UserMenuContentByPath";
-// Add import for new component
 import CurrencyManagement from "./pages/admin/settings/CurrencyManagement";
+import AdminTariffManagement from "./pages/admin/AdminTariffManagement";
+import AdminTariffFeatures from "./pages/admin/AdminTariffFeatures";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -64,6 +65,8 @@ const App = () => (
             {/* Admin Settings Routes */}
             <Route path="/admin" element={<AdminProtected />}>
               <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
+              <Route path="tariff" element={<AdminLayout><AdminTariffManagement /></AdminLayout>} />
+              <Route path="tariff/features" element={<AdminLayout><AdminTariffFeatures /></AdminLayout>} />
             </Route>
             
             {/* User Authentication Routes */}

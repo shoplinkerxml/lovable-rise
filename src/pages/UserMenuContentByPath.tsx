@@ -7,6 +7,7 @@ import { UserProfile } from "@/lib/user-auth-schemas";
 import { useI18n } from "@/providers/i18n-provider";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { toast } from "sonner";
+import TariffPage from "./TariffPage";
 
 interface UserDashboardContextType {
   user: UserProfile;
@@ -150,7 +151,9 @@ const UserMenuContentByPath = () => {
           <CardTitle>{t("content")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {menuItem.page_type === 'content' && menuItem.content_data ? (
+          {menuItem.path === 'tariff' ? (
+            <TariffPage />
+          ) : menuItem.page_type === 'content' && menuItem.content_data ? (
             <div className="prose max-w-none">
               {menuItem.content_data.content ? (
                 <div dangerouslySetInnerHTML={{ __html: menuItem.content_data.content }} />

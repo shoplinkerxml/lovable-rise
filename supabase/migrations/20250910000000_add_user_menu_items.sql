@@ -68,10 +68,12 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- Only create default menu for users with 'user' role
   IF NEW.role = 'user' THEN
-    INSERT INTO public.user_menu_items (user_id, title, path, order_index, page_type, icon_name, description) VALUES
-    (NEW.id, 'Dashboard', 'dashboard', 0, 'dashboard', 'LayoutDashboard', 'Main dashboard with overview'),
-    (NEW.id, 'Profile', 'profile', 1, 'content', 'User', 'Manage your profile settings'),
-    (NEW.id, 'My Menu', 'my-menu', 2, 'content', 'Menu', 'Manage your personal menu items');
+    INSERT INTO public.user_menu_items (user_id, title, path, order_index, page_type, icon_name, description, content_data) VALUES
+    (NEW.id, 'Dashboard', 'dashboard', 0, 'dashboard', 'LayoutDashboard', 'Main dashboard with overview', '{}'::jsonb),
+    (NEW.id, 'Profile', 'profile', 1, 'content', 'User', 'Manage your profile settings', '{}'::jsonb),
+    (NEW.id, 'My Menu', 'my-menu', 2, 'content', 'Menu', 'Manage your personal menu items', '{}'::jsonb),
+    (NEW.id, 'Тарифні плани', 'tariff', 3, 'list', 'CreditCard', 'Manage your tariff and billing information', 
+     '{"table_config": {"columns": [{"key": "icon", "label": "", "type": "text"}, {"key": "name", "label": "Назва тарифу", "type": "text", "sortable": true}, {"key": "new_price", "label": "Ціна", "type": "number", "sortable": true}, {"key": "duration_days", "label": "Термін", "type": "number", "sortable": true}, {"key": "is_active", "label": "Статус", "type": "badge", "sortable": true}, {"key": "actions", "label": "Дії", "type": "text"}]}}'::jsonb);
   END IF;
   RETURN NEW;
 END;

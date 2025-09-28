@@ -4,7 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Download, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Search, Filter, Download, Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy } from "lucide-react";
 
 interface ListPageProps {
   config: any;
@@ -23,19 +29,18 @@ interface TableData {
 }
 
 const defaultColumns: TableColumn[] = [
-  { key: 'id', label: 'ID', type: 'number', sortable: true },
-  { key: 'name', label: 'Name', type: 'text', sortable: true },
-  { key: 'email', label: 'Email', type: 'text', sortable: true },
-  { key: 'status', label: 'Status', type: 'badge', sortable: true },
-  { key: 'created_at', label: 'Created', type: 'date', sortable: true }
+  { key: 'icon', label: '', type: 'text' },
+  { key: 'name', label: 'Назва тарифу', type: 'text', sortable: true },
+  { key: 'new_price', label: 'Ціна', type: 'number', sortable: true },
+  { key: 'duration_days', label: 'Термін', type: 'number', sortable: true },
+  { key: 'is_active', label: 'Статус', type: 'badge', sortable: true },
+  { key: 'actions', label: 'Дії', type: 'text' }
 ];
 
 const defaultData: TableData[] = [
-  { id: 1, name: 'John Doe', email: 'john@example.com', status: 'active', created_at: '2024-01-15' },
-  { id: 2, name: 'Jane Smith', email: 'jane@example.com', status: 'inactive', created_at: '2024-01-20' },
-  { id: 3, name: 'Bob Johnson', email: 'bob@example.com', status: 'pending', created_at: '2024-01-25' },
-  { id: 4, name: 'Alice Brown', email: 'alice@example.com', status: 'active', created_at: '2024-02-01' },
-  { id: 5, name: 'Charlie Wilson', email: 'charlie@example.com', status: 'active', created_at: '2024-02-05' }
+  { id: 1, name: 'Basic Plan', new_price: 0, duration_days: 30, is_free: true, is_active: true, created_at: '2024-01-15' },
+  { id: 2, name: 'Pro Plan', new_price: 19.99, duration_days: 30, is_free: false, is_active: true, created_at: '2024-01-20' },
+  { id: 3, name: 'Enterprise Plan', new_price: 49.99, duration_days: 365, is_free: false, is_active: false, created_at: '2024-01-25' }
 ];
 
 export const ListPage = ({ config, title }: ListPageProps) => {
@@ -94,9 +99,56 @@ export const ListPage = ({ config, title }: ListPageProps) => {
     }
   };
 
-  const renderCellValue = (value: any, column: TableColumn) => {
+  const getTariffIcon = (row: TableData) => {
+    if (row.is_free) return <Package className="h-5 w-5 text-blue-500" />;
+    if (row.is_lifetime) return <Crown className="h-5 w-5 text-yellow-500" />;
+    if (row.new_price && row.new_price > 50) return <Star className="h-5 w-5 text-purple-500" />;
+    return <CreditCard className="h-5 w-5 text-green-500" />;
+  };
+
+  const renderCellValue = (value: any, column: TableColumn, row: TableData) => {
+    // Special handling for tariff icons
+    if (column.key === 'icon') {
+      return getTariffIcon(row);
+    }
+    
+    // Special handling for tariff actions
+    if (column.key === 'actions') {
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>
+              <Edit className="mr-2 h-4 w-4" />
+              <span>Редактировать</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Удалить</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Copy className="mr-2 h-4 w-4" />
+              <span>Дублировать</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+
     switch (column.type) {
       case 'badge':
+        // Special handling for tariff status
+        if (column.key === 'is_active') {
+          const variant = value ? 'default' : 'secondary';
+          const label = value ? 'Active' : 'Inactive';
+          return <Badge variant={variant}>{label}</Badge>;
+        }
+        
         const getVariant = (status: string) => {
           switch (status.toLowerCase()) {
             case 'active': return 'default';
@@ -114,6 +166,29 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         return new Date(value).toLocaleDateString();
       
       case 'number':
+        // Special handling for tariff prices
+        if (column.key === 'new_price') {
+          if (row.is_free) {
+            return <Badge variant="secondary">Free</Badge>;
+          }
+          if (value !== null && value !== undefined) {
+            // Use currency from row data if available, otherwise default to USD
+            const currencyCode = row.currency_data?.code || 'USD';
+            return new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: currencyCode,
+            }).format(value);
+          }
+          return 'N/A';
+        }
+        
+        // Special handling for tariff duration
+        if (column.key === 'duration_days') {
+          if (row.is_lifetime) return 'Lifetime';
+          if (value !== null && value !== undefined) return `${value} days`;
+          return 'N/A';
+        }
+        
         return typeof value === 'number' ? value.toLocaleString() : value;
       
       default:
@@ -191,7 +266,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                   <TableRow key={index}>
                     {columns.map((column) => (
                       <TableCell key={column.key}>
-                        {renderCellValue(row[column.key], column)}
+                        {renderCellValue(row[column.key], column, row)}
                       </TableCell>
                     ))}
                   </TableRow>
