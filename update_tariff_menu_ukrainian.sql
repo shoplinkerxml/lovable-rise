@@ -1,7 +1,7 @@
 -- Update existing tariff menu items to use Ukrainian column headers
 UPDATE public.user_menu_items 
 SET 
-  title = 'Тарифні плани',
+  title = 'menu_pricing',
   content_data = '{
     "table_config": {
       "columns": [

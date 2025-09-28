@@ -64,7 +64,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         setLoading(true);
         // Check if this is a tariff page by looking at the path or title
         if (title === 'Тарифні плани' || title === 'Tariff Plans' || title === 'Tariff Management' || (config?.path === 'tariff' || config?.data === undefined)) {
-          const tariffData = await TariffService.getAllTariffs(true);
+          const tariffData = await TariffService.getAllTariffs(true); // Include inactive
           setData(tariffData);
         } else {
           setData(config?.data || defaultData);
@@ -246,7 +246,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>{config?.title || title}</CardTitle>
+          <CardTitle>{t(title)}</CardTitle>
           <div className="flex items-center gap-2">
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />

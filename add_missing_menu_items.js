@@ -1,35 +1,30 @@
-// Script to add missing menu items for all existing users
 // This script adds tariff, reports, and settings menu items for all users
-
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase configuration - using the same values as in the client.ts file
-const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
-const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjcxMzYyMywiZXhwIjoyMDcyMjg5NjIzfQ.Wz9z9b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5"; // This would need to be a service role key
-
-// Create Supabase client with service role key for admin access
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+// Initialize Supabase client
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function addMissingMenuItems() {
   try {
-    console.log('Starting to add missing menu items...');
+    console.log('Adding missing menu items for all users...');
     
-    // Get all users with role 'user'
+    // Get all users
     const { data: users, error: usersError } = await supabase
       .from('profiles')
-      .select('id')
-      .eq('role', 'user');
+      .select('id');
     
     if (usersError) {
-      console.error('Error fetching users:', usersError);
-      return;
+      throw new Error(`Error fetching users: ${usersError.message}`);
     }
     
     console.log(`Found ${users.length} users`);
     
-    // For each user, check if they have the menu items and add them if missing
+    // For each user, check and add missing menu items
     for (const user of users) {
       const userId = user.id;
+      console.log(`Processing user ${userId}`);
       
       // Check and add tariff menu item
       const { data: tariffItem, error: tariffError } = await supabase
@@ -44,7 +39,7 @@ async function addMissingMenuItems() {
           .from('user_menu_items')
           .insert({
             user_id: userId,
-            title: 'Тарифні плани',
+            title: 'menu_pricing', // Changed from 'Тарифні плани' to 'menu_pricing'
             path: 'tariff',
             order_index: 3,
             page_type: 'list',
