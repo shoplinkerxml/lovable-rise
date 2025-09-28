@@ -265,21 +265,6 @@ export const ListPage = ({ config, title }: ListPageProps) => {
       </CardHeader>
       <CardContent>
         {/* Search and Filter Bar */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-        </div>
 
         {/* Data Table */}
         <div className="rounded-md border">

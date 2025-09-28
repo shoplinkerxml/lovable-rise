@@ -73,7 +73,7 @@ BEGIN
     (NEW.id, 'Profile', 'profile', 1, 'content', 'User', 'Manage your profile settings', '{}'::jsonb),
     (NEW.id, 'My Menu', 'my-menu', 2, 'content', 'Menu', 'Manage your personal menu items', '{}'::jsonb),
     (NEW.id, 'Тарифні плани', 'tariff', 3, 'list', 'CreditCard', 'Manage your tariff and billing information', 
-     '{"table_config": {"columns": [{"key": "icon", "label": "", "type": "text"}, {"key": "name", "label": "Назва тарифу", "type": "text", "sortable": true}, {"key": "new_price", "label": "Ціна", "type": "number", "sortable": true}, {"key": "duration_days", "label": "Термін", "type": "number", "sortable": true}, {"key": "is_active", "label": "Статус", "type": "badge", "sortable": true}, {"key": "actions", "label": "Дії", "type": "text"}]}}'::jsonb);
+     '{"table_config": {"columns": [{"key": "icon", "label": "tariff_icon", "type": "text"}, {"key": "name", "label": "tariff_name", "type": "text", "sortable": true}, {"key": "new_price", "label": "tariff_price", "type": "number", "sortable": true}, {"key": "duration_days", "label": "tariff_term", "type": "number", "sortable": true}, {"key": "is_active", "label": "tariff_status", "type": "badge", "sortable": true}, {"key": "actions", "label": "tariff_actions", "type": "text"}]}}'::jsonb);
   END IF;
   RETURN NEW;
 END;

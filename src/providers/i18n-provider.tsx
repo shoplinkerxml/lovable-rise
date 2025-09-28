@@ -414,6 +414,32 @@ const dictionary: Dictionary = {
   failed_load_currencies: { uk: "Не вдалося завантажити валюти", en: "Failed to load currencies" },
   no_currencies_found: { uk: "Валюти не знайдено", en: "No currencies found" },
   currency_code_exists: { uk: "Валюта з таким кодом вже існує", en: "Currency with this code already exists" },
+  // Tariff Management translations
+  tariff_management: { uk: "Управління тарифами", en: "Tariff Management" },
+  add_new_tariff: { uk: "Додати новий", en: "Add New" },
+  export_tariffs: { uk: "Експорт", en: "Export" },
+  no_tariffs_found: { uk: "Дані не знайдено", en: "No data found" },
+  showing_tariffs: { uk: "Показано", en: "Showing" },
+  to_tariff: { uk: "до", en: "to" },
+  of_tariff: { uk: "з", en: "of" },
+  results_tariff: { uk: "результатів", en: "results" },
+  previous_tariff: { uk: "Назад", en: "Previous" },
+  next_tariff: { uk: "Вперед", en: "Next" },
+  page_tariff: { uk: "Сторінка", en: "Page" },
+  days_tariff: { uk: "днів", en: "days" },
+  lifetime_tariff: { uk: "Безстроково", en: "Lifetime" },
+  free_tariff: { uk: "Безкоштовно", en: "Free" },
+  edit_tariff: { uk: "Редагувати", en: "Edit" },
+  delete_tariff: { uk: "Видалити", en: "Delete" },
+  duplicate_tariff: { uk: "Дублювати", en: "Duplicate" },
+  
+  // Tariff Table Column Headers
+  tariff_icon: { uk: "", en: "" },
+  tariff_name: { uk: "Назва тарифу", en: "Tariff Name" },
+  tariff_price: { uk: "Ціна", en: "Price" },
+  tariff_term: { uk: "Термін", en: "Term" },
+  tariff_status: { uk: "Статус", en: "Status" },
+  tariff_actions: { uk: "Дії", en: "Actions" },
 };
 
 // User Statistics
