@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { TariffService, type Tariff, type TariffFeature, type TariffLimit, type TariffFeatureInsert, type TariffLimitInsert } from '@/lib/tariff-service';
+import { useI18n } from '@/providers/i18n-provider';
 
 const AdminTariffFeatures = () => {
+  const { t } = useI18n();
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
@@ -256,16 +258,16 @@ const AdminTariffFeatures = () => {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Tariff Features & Limits</h1>
+        <h1 className="text-3xl font-bold mb-2">{t('tariff_features_and_limits')}</h1>
         <p className="text-muted-foreground">
-          Manage features and limits for your tariff plans
+          {t('manage_features_and_limits_for_tariff_plans')}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Tariff Plans</CardTitle>
+            <CardTitle>{t('tariff_plans')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -288,7 +290,7 @@ const AdminTariffFeatures = () => {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>{selectedTariff.name} - Features</CardTitle>
+                  <CardTitle>{selectedTariff.name} - {t('tariff_features')}</CardTitle>
                   <Dialog open={isFeatureDialogOpen} onOpenChange={(open) => {
                     setIsFeatureDialogOpen(open);
                     if (!open) resetFeatureForm();
@@ -296,18 +298,18 @@ const AdminTariffFeatures = () => {
                     <DialogTrigger asChild>
                       <Button onClick={openCreateFeatureDialog}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Add Feature
+                        {t('add_feature')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>
-                          {editingFeature ? 'Edit Feature' : 'Add New Feature'}
+                          {editingFeature ? t('edit_feature') : t('add_new_feature')}
                         </DialogTitle>
                       </DialogHeader>
                       <form onSubmit={handleFeatureSubmit} className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="feature_name">Feature Name *</Label>
+                          <Label htmlFor="feature_name">{t('feature_name')} *</Label>
                           <Input
                             id="feature_name"
                             value={featureFormData.feature_name || ''}
@@ -322,7 +324,7 @@ const AdminTariffFeatures = () => {
                             checked={featureFormData.is_active || false}
                             onCheckedChange={(checked) => handleFeatureChange('is_active', checked)}
                           />
-                          <Label htmlFor="feature_active">Active</Label>
+                          <Label htmlFor="feature_active">{t('active')}</Label>
                         </div>
 
                         <div className="flex justify-end space-x-2">
@@ -331,10 +333,10 @@ const AdminTariffFeatures = () => {
                             variant="outline"
                             onClick={() => setIsFeatureDialogOpen(false)}
                           >
-                            Cancel
+                            {t('cancel_tariff')}
                           </Button>
                           <Button type="submit">
-                            {editingFeature ? 'Update Feature' : 'Add Feature'}
+                            {editingFeature ? t('update_feature') : t('add_feature')}
                           </Button>
                         </div>
                       </form>
@@ -346,9 +348,9 @@ const AdminTariffFeatures = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Feature</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t('tariff_features')}</TableHead>
+                      <TableHead>{t('status')}</TableHead>
+                      <TableHead className="text-right">{t('actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -362,10 +364,10 @@ const AdminTariffFeatures = () => {
                               try {
                                 await TariffService.updateTariffFeature(feature.id, { is_active: checked });
                                 await fetchFeaturesAndLimits(selectedTariff.id);
-                                toast.success('Feature status updated');
+                                toast.success(t('feature_status_updated'));
                               } catch (error) {
-                                console.error('Error updating feature status:', error);
-                                toast.error('Failed to update feature status');
+                                console.error(t('error_updating_feature_status'), error);
+                                toast.error(t('failed_update_feature_status'));
                               }
                             }}
                           />
@@ -398,7 +400,7 @@ const AdminTariffFeatures = () => {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>{selectedTariff.name} - Limits</CardTitle>
+                  <CardTitle>{selectedTariff.name} - {t('tariff_limits')}</CardTitle>
                   <Dialog open={isLimitDialogOpen} onOpenChange={(open) => {
                     setIsLimitDialogOpen(open);
                     if (!open) resetLimitForm();
@@ -406,18 +408,18 @@ const AdminTariffFeatures = () => {
                     <DialogTrigger asChild>
                       <Button onClick={openCreateLimitDialog}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Add Limit
+                        {t('add_limit')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>
-                          {editingLimit ? 'Edit Limit' : 'Add New Limit'}
+                          {editingLimit ? t('edit_limit') : t('add_new_limit')}
                         </DialogTitle>
                       </DialogHeader>
                       <form onSubmit={handleLimitSubmit} className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="limit_name">Limit Name *</Label>
+                          <Label htmlFor="limit_name">{t('limit_name')} *</Label>
                           <Input
                             id="limit_name"
                             value={limitFormData.limit_name || ''}
@@ -427,7 +429,7 @@ const AdminTariffFeatures = () => {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="value">Value *</Label>
+                          <Label htmlFor="value">{t('value')} *</Label>
                           <Input
                             id="value"
                             type="number"
@@ -444,7 +446,7 @@ const AdminTariffFeatures = () => {
                             checked={limitFormData.is_active || false}
                             onCheckedChange={(checked) => handleLimitChange('is_active', checked)}
                           />
-                          <Label htmlFor="limit_active">Active</Label>
+                          <Label htmlFor="limit_active">{t('active')}</Label>
                         </div>
 
                         <div className="flex justify-end space-x-2">
@@ -453,10 +455,10 @@ const AdminTariffFeatures = () => {
                             variant="outline"
                             onClick={() => setIsLimitDialogOpen(false)}
                           >
-                            Cancel
+                            {t('cancel_tariff')}
                           </Button>
                           <Button type="submit">
-                            {editingLimit ? 'Update Limit' : 'Add Limit'}
+                            {editingLimit ? t('update_limit') : t('add_limit')}
                           </Button>
                         </div>
                       </form>
@@ -468,10 +470,10 @@ const AdminTariffFeatures = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Limit</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t('tariff_limits')}</TableHead>
+                      <TableHead>{t('value')}</TableHead>
+                      <TableHead>{t('status')}</TableHead>
+                      <TableHead className="text-right">{t('actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -486,10 +488,10 @@ const AdminTariffFeatures = () => {
                               try {
                                 await TariffService.updateTariffLimit(limit.id, { is_active: checked });
                                 await fetchFeaturesAndLimits(selectedTariff.id);
-                                toast.success('Limit status updated');
+                                toast.success(t('limit_status_updated'));
                               } catch (error) {
-                                console.error('Error updating limit status:', error);
-                                toast.error('Failed to update limit status');
+                                console.error(t('error_updating_limit_status'), error);
+                                toast.error(t('failed_update_limit_status'));
                               }
                             }}
                           />
@@ -523,7 +525,7 @@ const AdminTariffFeatures = () => {
           <Card className="lg:col-span-2">
             <CardContent className="flex items-center justify-center h-64">
               <p className="text-muted-foreground">
-                Select a tariff plan to manage its features and limits
+                {t('select_tariff_plan_to_manage_features_limits')}
               </p>
             </CardContent>
           </Card>

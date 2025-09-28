@@ -6,8 +6,10 @@ import { Separator } from '@/components/ui/separator';
 import { TariffService, type TariffWithDetails } from '@/lib/tariff-service';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
+import { useI18n } from '@/providers/i18n-provider';
 
 const TariffPage = () => {
+  const { t } = useI18n();
   const [tariffs, setTariffs] = useState<TariffWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,9 +57,9 @@ const TariffPage = () => {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Choose Your Plan</h1>
+        <h1 className="text-3xl font-bold mb-2">{t('choose_your_plan')}</h1>
         <p className="text-muted-foreground">
-          Select the perfect plan for your needs
+          {t('select_perfect_plan_for_your_needs')}
         </p>
       </div>
 
@@ -71,7 +73,7 @@ const TariffPage = () => {
                   <p className="text-muted-foreground mt-2">{tariff.description}</p>
                 </div>
                 {tariff.is_free && (
-                  <Badge variant="secondary">Free</Badge>
+                  <Badge variant="secondary">{t('free')}</Badge>
                 )}
               </div>
             </CardHeader>
@@ -93,7 +95,7 @@ const TariffPage = () => {
               <Separator className="my-6" />
 
               <div className="space-y-4">
-                <h3 className="font-semibold">Features</h3>
+                <h3 className="font-semibold">{t('tariff_page_features')}</h3>
                 <ul className="space-y-2">
                   {tariff.features.map((feature) => (
                     <li key={feature.id} className="flex items-center">
@@ -109,7 +111,7 @@ const TariffPage = () => {
 
                 <Separator className="my-4" />
 
-                <h3 className="font-semibold">Limits</h3>
+                <h3 className="font-semibold">{t('tariff_page_limits')}</h3>
                 <ul className="space-y-2">
                   {tariff.limits.map((limit) => (
                     <li key={limit.id} className="flex justify-between">
@@ -123,7 +125,7 @@ const TariffPage = () => {
               <div className="mt-8">
                 <Button className="w-full" size="lg">
                   <CreditCard className="mr-2 h-5 w-5" />
-                  Select Plan
+                  {t('select_plan')}
                 </Button>
               </div>
             </CardContent>

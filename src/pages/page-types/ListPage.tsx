@@ -32,11 +32,11 @@ interface TableData {
 
 const defaultColumns: TableColumn[] = [
   { key: 'icon', label: '', type: 'text' },
-  { key: 'name', label: 'Назва тарифу', type: 'text', sortable: true },
-  { key: 'new_price', label: 'Ціна', type: 'number', sortable: true },
-  { key: 'duration_days', label: 'Термін', type: 'number', sortable: true },
-  { key: 'is_active', label: 'Статус', type: 'badge', sortable: true },
-  { key: 'actions', label: 'Дії', type: 'text' }
+  { key: 'name', label: 'tariff_name', type: 'text', sortable: true },
+  { key: 'new_price', label: 'tariff_price', type: 'number', sortable: true },
+  { key: 'duration_days', label: 'tariff_term', type: 'number', sortable: true },
+  { key: 'is_active', label: 'tariff_status', type: 'badge', sortable: true },
+  { key: 'actions', label: 'tariff_actions', type: 'text' }
 ];
 
 const defaultData: TableData[] = [
@@ -157,15 +157,15 @@ export const ListPage = ({ config, title }: ListPageProps) => {
           <DropdownMenuContent align="end">
             <DropdownMenuItem>
               <Edit className="mr-2 h-4 w-4" />
-              <span>Редактировать</span>
+              <span>{t('edit_tariff')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Trash2 className="mr-2 h-4 w-4" />
-              <span>Удалить</span>
+              <span>{t('delete_tariff')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Copy className="mr-2 h-4 w-4" />
-              <span>Дублировать</span>
+              <span>{t('duplicate_tariff')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -177,7 +177,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         // Special handling for tariff status
         if (column.key === 'is_active') {
           const variant = value ? 'default' : 'secondary';
-          const label = value ? 'Active' : 'Inactive';
+          const label = value ? t('status_active') : t('status_inactive');
           return <Badge variant={variant}>{label}</Badge>;
         }
         
@@ -201,7 +201,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         // Special handling for tariff prices
         if (column.key === 'new_price') {
           if (row.is_free) {
-            return <Badge variant="secondary">Free</Badge>;
+            return <Badge variant="secondary">{t('free_tariff')}</Badge>;
           }
           if (value !== null && value !== undefined) {
             // Use currency code from the related currencies table
@@ -222,7 +222,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         
         // Special handling for tariff duration
         if (column.key === 'duration_days') {
-          if (row.is_lifetime) return 'Lifetime';
+          if (row.is_lifetime) return t('lifetime_tariff');
           if (value !== null && value !== undefined) return `${value} ${t('days_tariff')}`;
           return 'N/A';
         }
@@ -270,7 +270,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                     onClick={() => column.sortable && handleSort(column.key)}
                   >
                     <div className="flex items-center gap-2">
-                      {column.label}
+                      {t(column.label as any)}
                       {column.sortable && sortColumn === column.key && (
                         <span className="text-xs">
                           {sortDirection === 'asc' ? '↑' : '↓'}

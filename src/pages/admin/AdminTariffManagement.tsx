@@ -18,8 +18,10 @@ import {
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package } from 'lucide-react';
 import { TariffService, type Tariff, type TariffInsert, type Currency } from '@/lib/tariff-service';
+import { useI18n } from '@/providers/i18n-provider';
 
 const AdminTariffManagement = () => {
+  const { t } = useI18n();
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,16 +203,16 @@ const AdminTariffManagement = () => {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Тарифні плани</h1>
+        <h1 className="text-3xl font-bold mb-2">{t('tariff_management')}</h1>
         <p className="text-muted-foreground">
-          Manage your tariff plans and pricing options
+          {t('manage_tariffs_and_pricing_options')}
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Tariff Plans</CardTitle>
+            <CardTitle>{t('tariff_management')}</CardTitle>
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) resetForm();
@@ -218,19 +220,19 @@ const AdminTariffManagement = () => {
               <DialogTrigger asChild>
                 <Button onClick={openCreateDialog}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add New Tariff
+                  {t('add_new_tariff')}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>
-                    {editingTariff ? 'Edit Tariff' : 'Create New Tariff'}
+                    {editingTariff ? t('edit_tariff') : t('create_new_tariff')}
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Name *</Label>
+                      <Label htmlFor="name">{t('tariff_name')} *</Label>
                       <Input
                         id="name"
                         value={formData.name || ''}
@@ -239,7 +241,7 @@ const AdminTariffManagement = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="currency">Currency</Label>
+                      <Label htmlFor="currency">{t('currency')}</Label>
                       <Select
                         value={formData.currency?.toString() || '1'}
                         onValueChange={(value) => handleChange('currency', parseInt(value))}
@@ -259,7 +261,7 @@ const AdminTariffManagement = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description">{t('description')}</Label>
                     <Textarea
                       id="description"
                       value={formData.description || ''}
@@ -270,7 +272,7 @@ const AdminTariffManagement = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="old_price">Old Price</Label>
+                      <Label htmlFor="old_price">{t('old_price')}</Label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
                           {getCurrencySymbol(formData.currency || 1)}
@@ -287,7 +289,7 @@ const AdminTariffManagement = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="new_price">New Price</Label>
+                      <Label htmlFor="new_price">{t('new_price')}</Label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
                           {getCurrencySymbol(formData.currency || 1)}
@@ -304,7 +306,7 @@ const AdminTariffManagement = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="duration_days">Duration (days)</Label>
+                      <Label htmlFor="duration_days">{t('duration_days')}</Label>
                       <Input
                         id="duration_days"
                         type="number"
@@ -322,7 +324,7 @@ const AdminTariffManagement = () => {
                         checked={formData.is_free || false}
                         onCheckedChange={(checked) => handleChange('is_free', checked)}
                       />
-                      <Label htmlFor="is_free">Free Plan</Label>
+                      <Label htmlFor="is_free">{t('free_plan')}</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
@@ -330,7 +332,7 @@ const AdminTariffManagement = () => {
                         checked={formData.is_lifetime || false}
                         onCheckedChange={(checked) => handleChange('is_lifetime', checked)}
                       />
-                      <Label htmlFor="is_lifetime">Lifetime</Label>
+                      <Label htmlFor="is_lifetime">{t('lifetime')}</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
@@ -338,7 +340,7 @@ const AdminTariffManagement = () => {
                         checked={formData.is_active || false}
                         onCheckedChange={(checked) => handleChange('is_active', checked)}
                       />
-                      <Label htmlFor="is_active">Active</Label>
+                      <Label htmlFor="is_active">{t('active')}</Label>
                     </div>
                   </div>
 
@@ -348,10 +350,10 @@ const AdminTariffManagement = () => {
                       variant="outline"
                       onClick={() => setIsDialogOpen(false)}
                     >
-                      Cancel
+                      {t('cancel_tariff')}
                     </Button>
                     <Button type="submit">
-                      {editingTariff ? 'Update Tariff' : 'Create Tariff'}
+                      {editingTariff ? t('update_tariff') : t('create_tariff')}
                     </Button>
                   </div>
                 </form>
@@ -364,11 +366,11 @@ const AdminTariffManagement = () => {
             <TableHeader>
               <TableRow>
                 <TableHead></TableHead>
-                <TableHead>Название тарифа</TableHead>
-                <TableHead>Цена</TableHead>
-                <TableHead>Термін</TableHead>
-                <TableHead>Статус</TableHead>
-                <TableHead className="text-right">Действия</TableHead>
+                <TableHead>{t('tariff_name')}</TableHead>
+                <TableHead>{t('tariff_price')}</TableHead>
+                <TableHead>{t('tariff_term')}</TableHead>
+                <TableHead>{t('tariff_status')}</TableHead>
+                <TableHead className="text-right">{t('tariff_actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -378,7 +380,7 @@ const AdminTariffManagement = () => {
                   <TableCell className="font-medium">{tariff.name}</TableCell>
                   <TableCell>
                     {tariff.is_free ? (
-                      <Badge variant="secondary">Free</Badge>
+                      <Badge variant="secondary">{t('free_tariff')}</Badge>
                     ) : (
                       <div>
                         {tariff.new_price !== null ? (
@@ -403,12 +405,12 @@ const AdminTariffManagement = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    {tariff.is_lifetime ? 'Lifetime' : 
-                     tariff.duration_days ? `${tariff.duration_days} days` : 'N/A'}
+                    {tariff.is_lifetime ? t('lifetime_tariff') : 
+                     tariff.duration_days ? `${tariff.duration_days} ${t('days_tariff')}` : 'N/A'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={tariff.is_active ? 'default' : 'secondary'}>
-                      {tariff.is_active ? 'Active' : 'Inactive'}
+                      {tariff.is_active ? t('status_active') : t('status_inactive')}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -422,15 +424,15 @@ const AdminTariffManagement = () => {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEditDialog(tariff)}>
                           <Edit className="mr-2 h-4 w-4" />
-                          <span>Редактировать</span>
+                          <span>{t('edit_tariff')}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDelete(tariff.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Удалить</span>
+                          <span>{t('delete_tariff')}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDuplicate(tariff)}>
                           <Copy className="mr-2 h-4 w-4" />
-                          <span>Дублировать</span>
+                          <span>{t('duplicate_tariff')}</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
