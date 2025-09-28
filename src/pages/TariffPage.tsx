@@ -24,14 +24,14 @@ const TariffPage = () => {
       setTariffs(tariffData);
     } catch (error) {
       console.error('Error fetching tariffs:', error);
-      toast.error('Failed to load tariffs');
+      toast.error(t('failed_load_currencies'));
     } finally {
       setLoading(false);
     }
   };
 
   const formatPrice = (price: number | null, currency: { code: string; rate: number } | undefined) => {
-    if (price === null || price === undefined) return 'Free';
+    if (price === null || price === undefined) return t('free_tariff');
     const currencyCode = currency?.code || 'USD';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -40,10 +40,10 @@ const TariffPage = () => {
   };
 
   const formatDuration = (days: number | null) => {
-    if (days === null || days === undefined) return 'Lifetime';
-    if (days === 30) return 'Monthly';
-    if (days === 365) return 'Yearly';
-    return `${days} days`;
+    if (days === null || days === undefined) return t('lifetime_tariff');
+    if (days === 30) return t('pricing_period_monthly');
+    if (days === 365) return t('pricing_period_yearly');
+    return `${days} ${t('days_tariff')}`;
   };
 
   if (loading) {
@@ -72,8 +72,12 @@ const TariffPage = () => {
                   <CardTitle className="text-2xl">{tariff.name}</CardTitle>
                   <p className="text-muted-foreground mt-2">{tariff.description}</p>
                 </div>
-                {tariff.is_free && (
-                  <Badge variant="secondary">{t('free')}</Badge>
+                {tariff.is_free ? (
+                  <Badge variant="secondary">{t('free_tariff')}</Badge>
+                ) : (
+                  <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={tariff.is_active ? 'badge-active' : ''}>
+                    {tariff.is_active ? t('status_active') : t('status_inactive')}
+                  </Badge>
                 )}
               </div>
             </CardHeader>

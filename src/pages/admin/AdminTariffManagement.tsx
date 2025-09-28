@@ -409,7 +409,7 @@ const AdminTariffManagement = () => {
                      tariff.duration_days ? `${tariff.duration_days} ${t('days_tariff')}` : 'N/A'}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={tariff.is_active ? 'default' : 'secondary'}>
+                    <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={tariff.is_active ? 'badge-active' : ''}>
                       {tariff.is_active ? t('status_active') : t('status_inactive')}
                     </Badge>
                   </TableCell>
@@ -422,15 +422,24 @@ const AdminTariffManagement = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(tariff)}>
+                        <DropdownMenuItem 
+                          onClick={() => openEditDialog(tariff)}
+                          className="dropdown-item-hover"
+                        >
                           <Edit className="mr-2 h-4 w-4" />
                           <span>{t('edit_tariff')}</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(tariff.id)}>
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(tariff.id)}
+                          className="dropdown-item-hover"
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           <span>{t('delete_tariff')}</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(tariff)}>
+                        <DropdownMenuItem 
+                          onClick={() => handleDuplicate(tariff)}
+                          className="dropdown-item-hover"
+                        >
                           <Copy className="mr-2 h-4 w-4" />
                           <span>{t('duplicate_tariff')}</span>
                         </DropdownMenuItem>

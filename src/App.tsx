@@ -27,6 +27,7 @@ import UserMenuContentByPath from "./pages/UserMenuContentByPath";
 import CurrencyManagement from "./pages/admin/settings/CurrencyManagement";
 import AdminTariffManagement from "./pages/admin/AdminTariffManagement";
 import AdminTariffFeatures from "./pages/admin/AdminTariffFeatures";
+import TariffPage from "./pages/TariffPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +86,8 @@ const App = () => (
                 <Route path="profile" element={<UserProfile />} />
                 <Route path="content/:id" element={<UserMenuContent />} />
                 <Route path=":path/*" element={<UserMenuContentByPath />} />
+                {/* Add the tariff page route */}
+                <Route path="tariff" element={<TariffPage />} />
                 {/* Removed /user/menu-management route as requested */}
               </Route>
             </Route>

@@ -31,7 +31,7 @@ interface TableData {
 }
 
 const defaultColumns: TableColumn[] = [
-  { key: 'icon', label: '', type: 'text' },
+  { key: 'icon', label: 'tariff_icon', type: 'text' },
   { key: 'name', label: 'tariff_name', type: 'text', sortable: true },
   { key: 'new_price', label: 'tariff_price', type: 'number', sortable: true },
   { key: 'duration_days', label: 'tariff_term', type: 'number', sortable: true },
@@ -63,7 +63,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
       try {
         setLoading(true);
         // Check if this is a tariff page by looking at the path or title
-        if (title === 'Тарифні плани' || title === 'Tariff Plans' || (config?.data === undefined && defaultData === defaultData)) {
+        if (title === 'Тарифні плани' || title === 'Tariff Plans' || title === 'Tariff Management' || (config?.path === 'tariff' || config?.data === undefined)) {
           const tariffData = await TariffService.getAllTariffs(true);
           setData(tariffData);
         } else {
@@ -71,7 +71,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast.error('Failed to load data');
+        toast.error(t('failed_load_currencies'));
         setData(config?.data || defaultData);
       } finally {
         setLoading(false);
@@ -155,15 +155,15 @@ export const ListPage = ({ config, title }: ListPageProps) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>
+            <DropdownMenuItem className="dropdown-item-hover">
               <Edit className="mr-2 h-4 w-4" />
               <span>{t('edit_tariff')}</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem className="dropdown-item-hover">
               <Trash2 className="mr-2 h-4 w-4" />
               <span>{t('delete_tariff')}</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem className="dropdown-item-hover">
               <Copy className="mr-2 h-4 w-4" />
               <span>{t('duplicate_tariff')}</span>
             </DropdownMenuItem>
@@ -178,7 +178,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         if (column.key === 'is_active') {
           const variant = value ? 'default' : 'secondary';
           const label = value ? t('status_active') : t('status_inactive');
-          return <Badge variant={variant}>{label}</Badge>;
+          return <Badge variant={variant} className={value ? 'badge-active' : ''}>{label}</Badge>;
         }
         
         const getVariant = (status: string) => {
@@ -189,10 +189,10 @@ export const ListPage = ({ config, title }: ListPageProps) => {
             default: return 'outline';
           }
         };
-        return <Badge variant={getVariant(value)}>{value}</Badge>;
+        return <Badge variant={getVariant(value)} className={value === 'active' ? 'badge-active' : ''}>{value}</Badge>;
       
       case 'boolean':
-        return <Badge variant={value ? 'default' : 'secondary'}>{value ? 'Yes' : 'No'}</Badge>;
+        return <Badge variant={value ? 'default' : 'secondary'} className={value ? 'badge-active' : ''}>{value ? 'Yes' : 'No'}</Badge>;
       
       case 'date':
         return new Date(value).toLocaleDateString();
@@ -285,7 +285,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
               {paginatedData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
-                    No data found
+                    {t('no_tariffs_found')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -307,9 +307,9 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">
             <p className="text-sm text-muted-foreground">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-              {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)} of{' '}
-              {filteredAndSortedData.length} results
+              {t('showing_tariffs')} {(currentPage - 1) * itemsPerPage + 1} {t('to_tariff')}{' '}
+              {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)} {t('of_tariff')}{' '}
+              {filteredAndSortedData.length} {t('results_tariff')}
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -318,10 +318,10 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                Previous
+                {t('previous_tariff')}
               </Button>
               <span className="text-sm px-2">
-                Page {currentPage} of {totalPages}
+                {t('page_tariff')} {currentPage} {t('of_tariff')} {totalPages}
               </span>
               <Button
                 variant="outline"
@@ -329,7 +329,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
               >
-                Next
+                {t('next_tariff')}
               </Button>
             </div>
           </div>

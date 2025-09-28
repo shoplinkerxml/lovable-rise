@@ -445,7 +445,7 @@ const dictionary: Dictionary = {
   manage_tariffs_and_pricing_options: { uk: "Управління тарифними планами та ціновими опціями", en: "Manage your tariff plans and pricing options" },
   tariff_features: { uk: "Функції", en: "Features" },
   tariff_limits: { uk: "Ліміти", en: "Limits" },
-  select_tariff_plan_to_manage_features_limits: { uk: "Виберіть тарифний план для управління його функціями та лімітами", en: "Select a tariff plan to manage its features and limits" },
+  select_tariff_plan_to_manage_features_limits: { uk: "Виберіть тарифний план для управління його функціями та лімітами", en: "Select a tariff plan to manage its featureseatures and limits" },
   choose_your_plan: { uk: "Оберіть свій план", en: "Choose Your Plan" },
   select_perfect_plan_for_your_needs: { uk: "Оберіть ідеальний план для ваших потреб", en: "Select the perfect plan for your needs" },
   free: { uk: "Безкоштовно", en: "Free" },
@@ -460,6 +460,10 @@ const dictionary: Dictionary = {
   tariff_term: { uk: "Термін", en: "Term" },
   tariff_status: { uk: "Статус", en: "Status" },
   tariff_actions: { uk: "Дії", en: "Actions" },
+  
+  // Additional tariff translations
+  pricing_period_monthly: { uk: "Щомісячно", en: "Monthly" },
+  pricing_period_yearly: { uk: "Щорічно", en: "Yearly" },
 };
 
 // User Statistics
