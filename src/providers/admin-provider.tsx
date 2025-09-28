@@ -116,7 +116,7 @@ const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
   },
   '/tariff': {
     id: -11,
-    title: 'Tariff Management',
+    title: 'Тарифні плани',
     path: '/tariff',
     page_type: 'list',
     is_active: true,

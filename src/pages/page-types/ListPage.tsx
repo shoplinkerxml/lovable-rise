@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +9,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Filter, Download, Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy } from "lucide-react";
+import { Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy } from "lucide-react";
 import { TariffService } from "@/lib/tariff-service";
 import { toast } from "sonner";
+import { useI18n } from "@/providers/i18n-provider";
 
 interface ListPageProps {
   config: any;
@@ -46,6 +46,7 @@ const defaultData: TableData[] = [
 ];
 
 export const ListPage = ({ config, title }: ListPageProps) => {
+  const { t } = useI18n();
   const columns: TableColumn[] = config?.table_config?.columns || defaultColumns;
   const [data, setData] = useState<TableData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,7 +212,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                   {new Intl.NumberFormat('en-US', {
                     style: 'currency',
                     currency: currencyCode,
-                  }).format(value)} {currencyCode}
+                  }).format(value)}
                 </span>
               </div>
             );
@@ -222,7 +223,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         // Special handling for tariff duration
         if (column.key === 'duration_days') {
           if (row.is_lifetime) return 'Lifetime';
-          if (value !== null && value !== undefined) return `${value} days`;
+          if (value !== null && value !== undefined) return `${value} ${t('days_tariff')}`;
           return 'N/A';
         }
         
@@ -249,7 +250,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
           <div className="flex items-center gap-2">
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
-              Add New
+              {t('add_new_tariff')}
             </Button>
           </div>
         </div>
