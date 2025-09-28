@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Filter, Download, Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy, DollarSign, Euro } from "lucide-react";
+import { Search, Filter, Download, Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy } from "lucide-react";
 import { TariffService } from "@/lib/tariff-service";
 import { toast } from "sonner";
 
@@ -134,11 +134,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
   };
 
   const getCurrencyIcon = (currencyCode: string) => {
-    switch (currencyCode?.toUpperCase()) {
-      case 'USD': return <DollarSign className="h-4 w-4" />;
-      case 'EUR': return <Euro className="h-4 w-4" />;
-      default: return <DollarSign className="h-4 w-4" />;
-    }
+    return null;
   };
 
   const renderCellValue = (value: any, column: TableColumn, row: TableData) => {
@@ -211,12 +207,11 @@ export const ListPage = ({ config, title }: ListPageProps) => {
             const currencyCode = row.currency_data?.code || 'USD';
             return (
               <div className="flex items-center">
-                {getCurrencyIcon(currencyCode)}
-                <span className="ml-1">
+                <span>
                   {new Intl.NumberFormat('en-US', {
                     style: 'currency',
                     currency: currencyCode,
-                  }).format(value)}
+                  }).format(value)} {currencyCode}
                 </span>
               </div>
             );
@@ -252,10 +247,6 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         <div className="flex items-center justify-between">
           <CardTitle>{config?.title || title}</CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Add New
