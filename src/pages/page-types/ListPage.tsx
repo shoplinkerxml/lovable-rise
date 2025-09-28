@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Filter, Download, Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy } from "lucide-react";
+import { Search, Filter, Download, Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy, DollarSign, Euro } from "lucide-react";
+import { TariffService } from "@/lib/tariff-service";
+import { toast } from "sonner";
 
 interface ListPageProps {
   config: any;
@@ -45,13 +47,38 @@ const defaultData: TableData[] = [
 
 export const ListPage = ({ config, title }: ListPageProps) => {
   const columns: TableColumn[] = config?.table_config?.columns || defaultColumns;
-  const data: TableData[] = config?.data || defaultData;
+  const [data, setData] = useState<TableData[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = config?.table_config?.itemsPerPage || 10;
+
+  // Fetch tariff data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Check if this is a tariff page by looking at the path or title
+        if (title === 'Тарифні плани' || title === 'Tariff Plans' || (config?.data === undefined && defaultData === defaultData)) {
+          const tariffData = await TariffService.getAllTariffs(true);
+          setData(tariffData);
+        } else {
+          setData(config?.data || defaultData);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data');
+        setData(config?.data || defaultData);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [config, title]);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -104,6 +131,14 @@ export const ListPage = ({ config, title }: ListPageProps) => {
     if (row.is_lifetime) return <Crown className="h-5 w-5 text-yellow-500" />;
     if (row.new_price && row.new_price > 50) return <Star className="h-5 w-5 text-purple-500" />;
     return <CreditCard className="h-5 w-5 text-green-500" />;
+  };
+
+  const getCurrencyIcon = (currencyCode: string) => {
+    switch (currencyCode?.toUpperCase()) {
+      case 'USD': return <DollarSign className="h-4 w-4" />;
+      case 'EUR': return <Euro className="h-4 w-4" />;
+      default: return <DollarSign className="h-4 w-4" />;
+    }
   };
 
   const renderCellValue = (value: any, column: TableColumn, row: TableData) => {
@@ -172,12 +207,19 @@ export const ListPage = ({ config, title }: ListPageProps) => {
             return <Badge variant="secondary">Free</Badge>;
           }
           if (value !== null && value !== undefined) {
-            // Use currency from row data if available, otherwise default to USD
+            // Use currency code from the related currencies table
             const currencyCode = row.currency_data?.code || 'USD';
-            return new Intl.NumberFormat('en-US', {
-              style: 'currency',
-              currency: currencyCode,
-            }).format(value);
+            return (
+              <div className="flex items-center">
+                {getCurrencyIcon(currencyCode)}
+                <span className="ml-1">
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: currencyCode,
+                  }).format(value)}
+                </span>
+              </div>
+            );
           }
           return 'N/A';
         }
@@ -195,6 +237,14 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         return value;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -263,7 +313,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                 </TableRow>
               ) : (
                 paginatedData.map((row, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={row.id || index}>
                     {columns.map((column) => (
                       <TableCell key={column.key}>
                         {renderCellValue(row[column.key], column, row)}
