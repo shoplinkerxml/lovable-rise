@@ -136,6 +136,20 @@ const AdminTariffManagement = () => {
     }
   };
 
+  const handleCreateSampleData = async () => {
+    try {
+      setLoading(true);
+      await TariffService.createSampleData();
+      await fetchTariffs();
+      toast.success('Sample tariff data created successfully!');
+    } catch (error) {
+      console.error('Error creating sample data:', error);
+      toast.error('Failed to create sample data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -209,20 +223,26 @@ const AdminTariffManagement = () => {
     <div className="p-4 md:p-6 space-y-6">
       {/* Page Header with Breadcrumbs */}
       <PageHeader
-        title={pageInfo.title}
+        title={t('menu_pricing')}
         description={t('manage_tariffs_and_pricing_options')}
         breadcrumbItems={breadcrumbs}
         actions={
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('add_new_tariff')}
+          <div className="flex gap-2">
+            {tariffs.length === 0 && (
+              <Button variant="outline" onClick={handleCreateSampleData}>
+                Create Sample Data
               </Button>
-            </DialogTrigger>
+            )}
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button onClick={openCreateDialog}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('add_new_tariff')}
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
@@ -359,6 +379,7 @@ const AdminTariffManagement = () => {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         }
       />
 

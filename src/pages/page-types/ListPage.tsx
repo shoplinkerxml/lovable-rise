@@ -259,7 +259,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
         
         {/* Title and Actions */}
         <PageHeaderComponent
-          title={pageInfo.title}
+          title={isTariffPage ? t('menu_pricing') : pageInfo.title}
           description={isTariffPage ? t('tariff_plans_description') : pageInfo.description}
           actions={
             isTariffPage ? (

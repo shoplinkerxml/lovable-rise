@@ -18,6 +18,8 @@ import FormsCustom from '@/pages/admin/FormsCustom';
 import FormValidation from '@/pages/admin/FormValidation';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import CurrencyManagement from '@/pages/admin/settings/CurrencyManagement';
+import AdminTariffManagement from '@/pages/admin/AdminTariffManagement';
+import AdminTariffFeatures from '@/pages/admin/AdminTariffFeatures';
 
 
 
@@ -42,6 +44,8 @@ const STATIC_COMPONENTS: Record<string, React.ComponentType> = {
   '/forms/validation': FormValidation,
   '/users': AdminUsersPage,
   '/settings/currency': CurrencyManagement,
+  '/tariff': AdminTariffManagement,
+  '/tariff/features': AdminTariffFeatures,
 };
 
 const ContentWorkspace: React.FC = () => {
@@ -74,6 +78,7 @@ const ContentWorkspace: React.FC = () => {
     if (adminPath === '/personal') return 'default';
     if (adminPath === '/users') return 'list';
     if (adminPath === '/settings/currency') return 'list';
+    if (adminPath === '/tariff' || adminPath === '/tariff/features') return 'list';
     
     // Fallback to menu item page_type if available
     if (activeMenuItem?.page_type === 'list') return 'list';

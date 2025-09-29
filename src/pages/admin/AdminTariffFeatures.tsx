@@ -263,7 +263,7 @@ const AdminTariffFeatures = () => {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader
-        title={pageInfo.title}
+        title={t('tariff_features_and_limits')}
         description={t('manage_features_and_limits_for_tariff_plans')}
         breadcrumbItems={breadcrumbs}
       />

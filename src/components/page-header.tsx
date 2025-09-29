@@ -50,10 +50,17 @@ export const PageCardHeader = ({
 }: PageCardHeaderProps) => {
   const { t } = useI18n();
   
+  // Try to translate the title. If it returns with brackets, it means the key wasn't found
+  // and we should display the original title instead
+  const translatedTitle = t(title);
+  const displayTitle = translatedTitle.startsWith('[') && translatedTitle.endsWith(']') 
+    ? title 
+    : translatedTitle;
+  
   return (
     <CardHeader className={className}>
       <div className="flex items-center justify-between">
-        <CardTitle>{t(title)}</CardTitle>
+        <CardTitle>{displayTitle}</CardTitle>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
     </CardHeader>

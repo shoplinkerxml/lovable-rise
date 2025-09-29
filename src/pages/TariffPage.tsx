@@ -62,7 +62,7 @@ const TariffPage = () => {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader
-        title={pageInfo.title}
+        title={t('menu_pricing')}
         description={t('tariff_plans_description')}
         breadcrumbItems={breadcrumbs}
         actions={

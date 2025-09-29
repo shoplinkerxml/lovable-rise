@@ -25,6 +25,8 @@ export class TariffService {
   // Get all tariffs with currency data, features, and limits
   static async getAllTariffs(includeInactive = false) {
     try {
+      console.log('TariffService.getAllTariffs called with includeInactive:', includeInactive);
+      
       let query = supabase
         .from('tariffs')
         .select(`
@@ -40,8 +42,18 @@ export class TariffService {
       }
 
       const { data, error } = await query;
+      
+      console.log('Query result:', { data, error, count: data?.length });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn('No tariffs found in database');
+        return [];
+      }
       
       // Transform the data to match our TariffWithDetails interface
       return data.map(tariff => ({
@@ -317,6 +329,131 @@ export class TariffService {
       return data as Currency[];
     } catch (error) {
       console.error('Error fetching currencies:', error);
+      throw error;
+    }
+  }
+
+  // Create sample tariff data for testing
+  static async createSampleData() {
+    try {
+      console.log('Creating sample tariff data...');
+      
+      // First check if we have currencies
+      const currencies = await this.getAllCurrencies();
+      if (currencies.length === 0) {
+        console.error('No currencies found. Please create currencies first.');
+        return false;
+      }
+      
+      const usdCurrency = currencies.find(c => c.code === 'USD') || currencies[0];
+      
+      // Create sample tariffs
+      const sampleTariffs = [
+        {
+          name: 'Базовий план',
+          description: 'Ідеально для початківців',
+          old_price: 19.99,
+          new_price: 14.99,
+          currency: usdCurrency.id,
+          duration_days: 30,
+          is_free: false,
+          is_lifetime: false,
+          is_active: true
+        },
+        {
+          name: 'Професійний план',
+          description: 'Для професіоналів та малих команд',
+          old_price: 49.99,
+          new_price: 39.99,
+          currency: usdCurrency.id,
+          duration_days: 30,
+          is_free: false,
+          is_lifetime: false,
+          is_active: true
+        },
+        {
+          name: 'Безкоштовний план',
+          description: 'Спробуйте наш сервіс безкоштовно',
+          old_price: null,
+          new_price: null,
+          currency: usdCurrency.id,
+          duration_days: null,
+          is_free: true,
+          is_lifetime: false,
+          is_active: true
+        }
+      ];
+      
+      const createdTariffs = [];
+      for (const tariffData of sampleTariffs) {
+        const tariff = await this.createTariff(tariffData);
+        createdTariffs.push(tariff);
+        console.log('Created tariff:', tariff.name);
+      }
+      
+      // Add sample features and limits
+      for (const tariff of createdTariffs) {
+        if (tariff.is_free) {
+          // Free plan features
+          await this.addTariffFeature({
+            tariff_id: tariff.id,
+            feature_name: 'До 3 проектів',
+            is_active: true
+          });
+          await this.addTariffLimit({
+            tariff_id: tariff.id,
+            limit_name: 'Сховище (ГБ)',
+            value: 5,
+            is_active: true
+          });
+        } else if (tariff.new_price && tariff.new_price < 20) {
+          // Basic plan features
+          await this.addTariffFeature({
+            tariff_id: tariff.id,
+            feature_name: 'До 10 проектів',
+            is_active: true
+          });
+          await this.addTariffFeature({
+            tariff_id: tariff.id,
+            feature_name: 'Базова аналітика',
+            is_active: true
+          });
+          await this.addTariffLimit({
+            tariff_id: tariff.id,
+            limit_name: 'Сховище (ГБ)',
+            value: 50,
+            is_active: true
+          });
+        } else {
+          // Pro plan features
+          await this.addTariffFeature({
+            tariff_id: tariff.id,
+            feature_name: 'Необмежені проекти',
+            is_active: true
+          });
+          await this.addTariffFeature({
+            tariff_id: tariff.id,
+            feature_name: 'Розширена аналітика',
+            is_active: true
+          });
+          await this.addTariffFeature({
+            tariff_id: tariff.id,
+            feature_name: 'Пріоритетна підтримка',
+            is_active: true
+          });
+          await this.addTariffLimit({
+            tariff_id: tariff.id,
+            limit_name: 'Сховище (ГБ)',
+            value: 500,
+            is_active: true
+          });
+        }
+      }
+      
+      console.log('Sample data created successfully!');
+      return true;
+    } catch (error) {
+      console.error('Error creating sample data:', error);
       throw error;
     }
   }
