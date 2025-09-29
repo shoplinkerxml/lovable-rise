@@ -1,7 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, LineChart, PieChart, Activity, Users, DollarSign, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 
 interface DashboardPageProps {
   widgets: any[];
@@ -65,13 +66,11 @@ const ChartWidget = ({ widget }: { widget: Widget }) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {getChartIcon()}
-          {widget.title}
-        </CardTitle>
-      </CardHeader>
       <CardContent>
+        <div className="flex items-center gap-2 mb-4">
+          {getChartIcon()}
+          <h3 className="text-lg font-semibold">{widget.title}</h3>
+        </div>
         <div className="h-64 flex items-center justify-center text-muted-foreground">
           <div className="text-center">
             <div className="mb-2">{getChartIcon()}</div>
@@ -93,10 +92,8 @@ const ProgressWidget = ({ widget }: { widget: Widget }) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{widget.title}</CardTitle>
-      </CardHeader>
       <CardContent className="space-y-4">
+        <h3 className="text-lg font-semibold">{widget.title}</h3>
         {progressItems.map((item: any, index: number) => (
           <div key={index} className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -121,10 +118,8 @@ const ListWidget = ({ widget }: { widget: Widget }) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{widget.title}</CardTitle>
-      </CardHeader>
       <CardContent>
+        <h3 className="text-lg font-semibold mb-4">{widget.title}</h3>
         <div className="space-y-3">
           {items.map((item: any, index: number) => (
             <div key={index} className="flex items-center justify-between border-b pb-2 last:border-b-0">
@@ -155,11 +150,9 @@ const renderWidget = (widget: Widget, index: number) => {
       return <ListWidget key={index} widget={widget} />;
     default:
       return (
-        <Card key={index}>
-          <CardHeader>
-            <CardTitle>{widget.title}</CardTitle>
-          </CardHeader>
+        <Card>
           <CardContent>
+            <h3 className="text-lg font-semibold mb-4">{widget.title}</h3>
             <p className="text-muted-foreground">
               Widget type "{widget.type}" not implemented yet.
             </p>
@@ -181,14 +174,10 @@ export const DashboardPage = ({ widgets, title, data }: DashboardPageProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{title}</h1>
-        {data?.lastUpdated && (
-          <p className="text-sm text-muted-foreground">
-            Last updated: {new Date(data.lastUpdated).toLocaleString()}
-          </p>
-        )}
-      </div>
+      <PageHeader 
+        title={title}
+        description={data?.lastUpdated ? `Last updated: ${new Date(data.lastUpdated).toLocaleString()}` : undefined}
+      />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {widgetsToRender.map((widget, index) => renderWidget(widget, index))}

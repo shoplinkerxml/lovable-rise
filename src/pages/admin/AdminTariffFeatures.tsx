@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -11,9 +11,14 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { TariffService, type Tariff, type TariffFeature, type TariffLimit, type TariffFeatureInsert, type TariffLimitInsert } from '@/lib/tariff-service';
 import { useI18n } from '@/providers/i18n-provider';
+import { PageHeader } from '@/components/PageHeader';
+import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
 
 const AdminTariffFeatures = () => {
   const { t } = useI18n();
+  const breadcrumbs = useBreadcrumbs();
+  const pageInfo = usePageInfo();
+  
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
@@ -256,21 +261,20 @@ const AdminTariffFeatures = () => {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{t('tariff_features_and_limits')}</h1>
-        <p className="text-muted-foreground">
-          {t('manage_features_and_limits_for_tariff_plans')}
-        </p>
-      </div>
+    <div className="p-4 md:p-6 space-y-6">
+      <PageHeader
+        title={pageInfo.title}
+        description={t('manage_features_and_limits_for_tariff_plans')}
+        breadcrumbItems={breadcrumbs}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>{t('tariff_plans')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="p-0">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">{t('tariff_plans')}</h3>
+            </div>
+            <div className="space-y-2 px-6 pb-6">
               {tariffs.map((tariff) => (
                 <Button
                   key={tariff.id}
@@ -288,63 +292,63 @@ const AdminTariffFeatures = () => {
         {selectedTariff ? (
           <div className="lg:col-span-2 space-y-6">
             <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>{selectedTariff.name} - {t('tariff_features')}</CardTitle>
-                  <Dialog open={isFeatureDialogOpen} onOpenChange={(open) => {
-                    setIsFeatureDialogOpen(open);
-                    if (!open) resetFeatureForm();
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button onClick={openCreateFeatureDialog}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        {t('add_feature')}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>
-                          {editingFeature ? t('edit_feature') : t('add_new_feature')}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleFeatureSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="feature_name">{t('feature_name')} *</Label>
-                          <Input
-                            id="feature_name"
-                            value={featureFormData.feature_name || ''}
-                            onChange={(e) => handleFeatureChange('feature_name', e.target.value)}
-                            required
-                          />
-                        </div>
+              <CardContent className="p-0">
+                <div className="p-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">{selectedTariff.name} - {t('tariff_features')}</h3>
+                    <Dialog open={isFeatureDialogOpen} onOpenChange={(open) => {
+                      setIsFeatureDialogOpen(open);
+                      if (!open) resetFeatureForm();
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button onClick={openCreateFeatureDialog}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          {t('add_feature')}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>
+                            {editingFeature ? t('edit_feature') : t('add_new_feature')}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleFeatureSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="feature_name">{t('feature_name')} *</Label>
+                            <Input
+                              id="feature_name"
+                              value={featureFormData.feature_name || ''}
+                              onChange={(e) => handleFeatureChange('feature_name', e.target.value)}
+                              required
+                            />
+                          </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id="feature_active"
-                            checked={featureFormData.is_active || false}
-                            onCheckedChange={(checked) => handleFeatureChange('is_active', checked)}
-                          />
-                          <Label htmlFor="feature_active">{t('active')}</Label>
-                        </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="feature_active"
+                              checked={featureFormData.is_active || false}
+                              onCheckedChange={(checked) => handleFeatureChange('is_active', checked)}
+                            />
+                            <Label htmlFor="feature_active">{t('active')}</Label>
+                          </div>
 
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsFeatureDialogOpen(false)}
-                          >
-                            {t('cancel_tariff')}
-                          </Button>
-                          <Button type="submit">
-                            {editingFeature ? t('update_feature') : t('add_feature')}
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsFeatureDialogOpen(false)}
+                            >
+                              {t('cancel_tariff')}
+                            </Button>
+                            <Button type="submit">
+                              {editingFeature ? t('update_feature') : t('add_feature')}
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -398,75 +402,75 @@ const AdminTariffFeatures = () => {
             </Card>
 
             <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>{selectedTariff.name} - {t('tariff_limits')}</CardTitle>
-                  <Dialog open={isLimitDialogOpen} onOpenChange={(open) => {
-                    setIsLimitDialogOpen(open);
-                    if (!open) resetLimitForm();
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button onClick={openCreateLimitDialog}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        {t('add_limit')}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>
-                          {editingLimit ? t('edit_limit') : t('add_new_limit')}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleLimitSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="limit_name">{t('limit_name')} *</Label>
-                          <Input
-                            id="limit_name"
-                            value={limitFormData.limit_name || ''}
-                            onChange={(e) => handleLimitChange('limit_name', e.target.value)}
-                            required
-                          />
-                        </div>
+              <CardContent className="p-0">
+                <div className="p-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">{selectedTariff.name} - {t('tariff_limits')}</h3>
+                    <Dialog open={isLimitDialogOpen} onOpenChange={(open) => {
+                      setIsLimitDialogOpen(open);
+                      if (!open) resetLimitForm();
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button onClick={openCreateLimitDialog}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          {t('add_limit')}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>
+                            {editingLimit ? t('edit_limit') : t('add_new_limit')}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleLimitSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="limit_name">{t('limit_name')} *</Label>
+                            <Input
+                              id="limit_name"
+                              value={limitFormData.limit_name || ''}
+                              onChange={(e) => handleLimitChange('limit_name', e.target.value)}
+                              required
+                            />
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="value">{t('value')} *</Label>
-                          <Input
-                            id="value"
-                            type="number"
-                            min="0"
-                            value={limitFormData.value || 0}
-                            onChange={(e) => handleLimitChange('value', parseInt(e.target.value) || 0)}
-                            required
-                          />
-                        </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="value">{t('value')} *</Label>
+                            <Input
+                              id="value"
+                              type="number"
+                              min="0"
+                              value={limitFormData.value || 0}
+                              onChange={(e) => handleLimitChange('value', parseInt(e.target.value) || 0)}
+                              required
+                            />
+                          </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id="limit_active"
-                            checked={limitFormData.is_active || false}
-                            onCheckedChange={(checked) => handleLimitChange('is_active', checked)}
-                          />
-                          <Label htmlFor="limit_active">{t('active')}</Label>
-                        </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="limit_active"
+                              checked={limitFormData.is_active || false}
+                              onCheckedChange={(checked) => handleLimitChange('is_active', checked)}
+                            />
+                            <Label htmlFor="limit_active">{t('active')}</Label>
+                          </div>
 
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsLimitDialogOpen(false)}
-                          >
-                            {t('cancel_tariff')}
-                          </Button>
-                          <Button type="submit">
-                            {editingLimit ? t('update_limit') : t('add_limit')}
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsLimitDialogOpen(false)}
+                            >
+                              {t('cancel_tariff')}
+                            </Button>
+                            <Button type="submit">
+                              {editingLimit ? t('update_limit') : t('add_limit')}
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -1,6 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Code } from "lucide-react";
+import { PageCardHeader } from "@/components/page-header";
 
 interface CustomPageProps {
   component?: string;
@@ -19,9 +20,7 @@ export const CustomPage = ({ component, data, title }: CustomPageProps) => {
   if (!component) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
+        <PageCardHeader title={title} />
         <CardContent>
           <Alert>
             <Code className="h-4 w-4" />
@@ -39,9 +38,7 @@ export const CustomPage = ({ component, data, title }: CustomPageProps) => {
   if (!CustomComponent) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
+        <PageCardHeader title={title} />
         <CardContent>
           <Alert>
             <Code className="h-4 w-4" />

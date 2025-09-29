@@ -2,7 +2,7 @@
 UPDATE public.user_menu_items 
 SET 
   page_type = 'list',
-  title = 'Tariff Plans',
+  title = 'menu_pricing',
   content_data = '{
     "table_config": {
       "columns": [

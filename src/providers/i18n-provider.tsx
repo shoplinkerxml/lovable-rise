@@ -50,6 +50,11 @@ const dictionary: Dictionary = {
   menu_currency: { uk: "Валюта", en: "Currency" },
   menu_payment: { uk: "Платіжні системи", en: "Payment Systems" },
   
+  // Page descriptions
+  tariff_plans_description: { uk: "Управління тарифними планами користувачів", en: "Manage user tariff plans" },
+  currency_management_description: { uk: "Управління валютами", en: "Currency management" },
+  payment_systems_description: { uk: "Управління платіжними системами", en: "Payment systems management" },
+  
   // Pricing Section translations
   pricing_title: { uk: "Тарифи для будь-якого масштабу бізнесу", en: "Pricing for any business scale" },
   pricing_subtitle: { uk: "Оберіть план, який допоможе вашому бізнесу заробляти більше вже сьогодні", en: "Choose a plan that will help your business earn more today" },
@@ -314,12 +319,21 @@ const dictionary: Dictionary = {
   breadcrumb_forms: { uk: "Форми", en: "Forms" },
   breadcrumb_settings: { uk: "Налаштування", en: "Settings" },
   breadcrumb_personal: { uk: "Особистий кабінет", en: "Personal" },
-  breadcrumb_profile: { uk: "Профіль", en: "Profile" },
   breadcrumb_elements: { uk: "Елементи", en: "Elements" },
   breadcrumb_layouts: { uk: "Макети", en: "Layouts" },
   breadcrumb_horizontal: { uk: "Горизонтальні", en: "Horizontal" },
   breadcrumb_vertical: { uk: "Вертикальні", en: "Vertical" },
   breadcrumb_custom: { uk: "Користувацькі", en: "Custom" },
+  breadcrumb_validation: { uk: "Валідація", en: "Validation" },
+  
+  // Form Page descriptions
+  form_elements_description: { uk: "Додавайте сюди поля вводу, випадаючі списки, перемикачі тощо.", en: "Add inputs, selects, switches, etc. here." },
+  form_layouts_description: { uk: "Приклади горизонтальних/вертикальних/двоколонкових макетів форм.", en: "Horizontal/Vertical/Two-column layouts examples." },
+  form_horizontal_description: { uk: "Створюйте тут горизонтальні форми.", en: "Build horizontal forms here." },
+  form_vertical_description: { uk: "Створюйте тут вертикальні форми.", en: "Build vertical forms here." },
+  form_custom_description: { uk: "Ваші користувацькі форми тут.", en: "Your custom forms live here." },
+  form_validation_description: { uk: "Демонстрації валідації та допоміжні засоби.", en: "Validation demos and helpers." },
+  
   // User Menu Content
   failed_load_menu_item: { uk: "Не вдалося завантажити пункт меню", en: "Failed to load menu item" },
   menu_item_not_found: { uk: "Пункт меню не знайдено", en: "Menu item not found" },
@@ -445,13 +459,34 @@ const dictionary: Dictionary = {
   manage_tariffs_and_pricing_options: { uk: "Управління тарифними планами та ціновими опціями", en: "Manage your tariff plans and pricing options" },
   tariff_features: { uk: "Функції", en: "Features" },
   tariff_limits: { uk: "Ліміти", en: "Limits" },
-  select_tariff_plan_to_manage_features_limits: { uk: "Виберіть тарифний план для управління його функціями та лімітами", en: "Select a tariff plan to manage its featureseatures and limits" },
+  select_tariff_plan_to_manage_features_limits: { uk: "Виберіть тарифний план для управління його функціями та лімітами", en: "Select a tariff plan to manage its features and limits" },
   choose_your_plan: { uk: "Оберіть свій план", en: "Choose Your Plan" },
   select_perfect_plan_for_your_needs: { uk: "Оберіть ідеальний план для ваших потреб", en: "Select the perfect plan for your needs" },
   free: { uk: "Безкоштовно", en: "Free" },
   tariff_page_features: { uk: "Функції", en: "Features" },
   tariff_page_limits: { uk: "Ліміти", en: "Limits" },
   select_plan: { uk: "Обрати план", en: "Select Plan" },
+  
+  // Tariff Features and Limits translations
+  tariff_features_and_limits: { uk: "Функції та ліміти тарифів", en: "Tariff Features and Limits" },
+  manage_features_and_limits_for_tariff_plans: { uk: "Управління функціями та лімітами для тарифних планів", en: "Manage features and limits for tariff plans" },
+  tariff_plans: { uk: "Тарифні плани", en: "Tariff Plans" },
+  add_feature: { uk: "Додати функцію", en: "Add Feature" },
+  add_limit: { uk: "Додати ліміт", en: "Add Limit" },
+  feature_name: { uk: "Назва функції", en: "Feature Name" },
+  limit_name: { uk: "Назва ліміту", en: "Limit Name" },
+  value: { uk: "Значення", en: "Value" },
+  status: { uk: "Статус", en: "Status" },
+  edit_feature: { uk: "Редагувати функцію", en: "Edit Feature" },
+  edit_limit: { uk: "Редагувати ліміт", en: "Edit Limit" },
+  update_feature: { uk: "Оновити функцію", en: "Update Feature" },
+  update_limit: { uk: "Оновити ліміт", en: "Update Limit" },
+  feature_status_updated: { uk: "Статус функції оновлено", en: "Feature status updated" },
+  limit_status_updated: { uk: "Статус ліміту оновлено", en: "Limit status updated" },
+  failed_update_feature_status: { uk: "Не вдалося оновити статус функції", en: "Failed to update feature status" },
+  failed_update_limit_status: { uk: "Не вдалося оновити статус ліміту", en: "Failed to update limit status" },
+  error_updating_feature_status: { uk: "Помилка оновлення статусу функції", en: "Error updating feature status" },
+  error_updating_limit_status: { uk: "Помилка оновлення статусу ліміту", en: "Error updating limit status" },
   
   // Tariff Table Column Headers
   tariff_icon: { uk: "", en: "" },

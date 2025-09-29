@@ -1,6 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { PageCardHeader } from "@/components/page-header";
 
 interface WelcomePageProps {
   title: string;
@@ -14,11 +15,9 @@ export const WelcomePage = ({ title, description, onEdit }: WelcomePageProps) =>
   return (
     <div className="flex items-center justify-center h-full">
       <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">
-            Welcome to {title}
-          </CardTitle>
-        </CardHeader>
+        <PageCardHeader 
+          title={`Welcome to ${title}`}
+        />
         <CardContent className="text-center space-y-6">
           <div className="space-y-4">
             <p className="text-lg text-muted-foreground">

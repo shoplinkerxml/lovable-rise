@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PageCardHeader } from "@/components/page-header";
 
 const AddMissingMenuItems = () => {
   const [loading, setLoading] = useState(false);
@@ -98,26 +99,7 @@ const AddMissingMenuItems = () => {
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add Missing Menu Items</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="mb-4 text-sm text-muted-foreground">
-          This tool will add the missing Tariff, Reports, and Settings menu items 
-          for all users who don't already have them.
-        </p>
-        <Button 
-          onClick={addMissingMenuItems} 
-          disabled={loading}
-          variant="default"
-        >
-          {loading ? "Adding items..." : "Add Missing Menu Items"}
-        </Button>
-      </CardContent>
-    </Card>
-  );
+  return null; // Removed the Card component as requested
 };
 
 export default AddMissingMenuItems;

@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageCardHeader } from "@/components/page-header";
 
 interface ContentPageProps {
   data: any;
@@ -10,9 +11,7 @@ export const ContentPage = ({ data, title }: ContentPageProps) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
+      <PageCardHeader title={title} />
       <CardContent>
         <div 
           className="prose max-w-none dark:prose-invert" 

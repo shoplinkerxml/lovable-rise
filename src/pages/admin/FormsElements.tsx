@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
 import { useI18n } from "@/providers/i18n-provider";
@@ -17,11 +17,8 @@ const FormsElements = () => {
       />
       
       <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>{t("breadcrumb_elements")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-muted-foreground">Add inputs, selects, switches, etc. here.</div>
+        <CardContent className="p-6">
+          <div className="text-muted-foreground">{t("form_elements_description")}</div>
         </CardContent>
       </Card>
     </div>
@@ -29,5 +26,3 @@ const FormsElements = () => {
 };
 
 export default FormsElements;
-
-

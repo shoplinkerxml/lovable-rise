@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/providers/i18n-provider";
+import { PageCardHeader } from "@/components/page-header";
 
 interface FormPageProps {
   template?: string;
@@ -136,12 +137,10 @@ export const FormPage = ({ template, data, title }: FormPageProps) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{data?.title || title}</CardTitle>
-        {data?.description && (
-          <p className="text-muted-foreground">{data.description}</p>
-        )}
-      </CardHeader>
+      <PageCardHeader 
+        title={data?.title || title}
+        actions={data?.description ? <p className="text-muted-foreground">{data.description}</p> : undefined}
+      />
       <CardContent>
         {template === 'custom' ? (
           <div className="text-muted-foreground">

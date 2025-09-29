@@ -80,12 +80,6 @@ export default function AdminUsersPage() {
   const prefetchUsers = usePrefetchUsers();
   
   // Prefetch next page when current page loads
-  useEffect(() => {
-    if (usersData && pagination.page < Math.ceil(usersData.total / pagination.limit)) {
-      const nextPage = pagination.page + 1;
-      prefetchUsers({ ...filters }, { ...pagination, page: nextPage });
-    }
-  }, [usersData, pagination, filters, prefetchUsers]);
   
   // Handle initial load
   useEffect(() => {
@@ -168,24 +162,13 @@ export default function AdminUsersPage() {
         description={pageInfo.description}
         breadcrumbItems={breadcrumbs}
         actions={
-          <>
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              className="w-full sm:w-auto"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {t("export_users")}
-            </Button>
-            
-            <Button
-              onClick={handleCreateUser}
-              className="w-full sm:w-auto"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {t("add_user")}
-            </Button>
-          </>
+          <Button
+            onClick={handleCreateUser}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {t("add_user")}
+          </Button>
         }
       />
       

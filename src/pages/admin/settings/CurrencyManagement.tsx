@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -12,6 +12,8 @@ import { MoreHorizontal, Plus, Edit3, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
+import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
 
 interface Currency {
   id: number;
@@ -24,6 +26,9 @@ interface Currency {
 
 const CurrencyManagement = () => {
   const { t } = useI18n();
+  const breadcrumbs = useBreadcrumbs();
+  const pageInfo = usePageInfo();
+  
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -208,23 +213,21 @@ const CurrencyManagement = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{t("currency_management")}</h1>
-          <p className="text-muted-foreground">{t("manage_currencies")}</p>
-        </div>
-        <Button onClick={handleCreateCurrency}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t("add_currency")}
-        </Button>
-      </div>
+    <div className="p-4 md:p-6 space-y-6">
+      <PageHeader
+        title={pageInfo.title}
+        description={t('currency_management_description')}
+        breadcrumbItems={breadcrumbs}
+        actions={
+          <Button onClick={handleCreateCurrency}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t("add_currency")}
+          </Button>
+        }
+      />
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t("currencies")}</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>

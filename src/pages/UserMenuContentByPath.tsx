@@ -8,6 +8,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { toast } from "sonner";
 import TariffPage from "./TariffPage";
+import { ListPage } from "@/pages/page-types/ListPage";
 
 interface UserDashboardContextType {
   user: UserProfile;
@@ -151,7 +152,7 @@ const UserMenuContentByPath = () => {
           <CardTitle>{t("content")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {menuItem.path === 'tariff' ? (
+          {(menuItem.path === 'tariff' || menuItem.path?.includes('/tariff') || menuItem.title === 'menu_pricing' || menuItem.title?.includes('Тариф')) ? (
             <TariffPage />
           ) : menuItem.page_type === 'content' && menuItem.content_data ? (
             <div className="prose max-w-none">
@@ -168,9 +169,11 @@ const UserMenuContentByPath = () => {
               <p className="text-muted-foreground">Form content would be displayed here.</p>
             </div>
           ) : menuItem.page_type === 'list' ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">List content would be displayed here.</p>
-            </div>
+            // Render ListPage component for list-type pages
+            <ListPage 
+              config={menuItem.content_data || {}} 
+              title={menuItem.title} 
+            />
           ) : menuItem.page_type === 'dashboard' ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Dashboard content would be displayed here.</p>

@@ -9,6 +9,9 @@ const ADMIN_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: strin
   "/admin/dashboard": { labelKey: "breadcrumb_dashboard", parentPath: "/admin" },
   "/admin/personal": { labelKey: "breadcrumb_personal", parentPath: "/admin" },
   "/admin/users": { labelKey: "breadcrumb_users", parentPath: "/admin" },
+  "/admin/tariff": { labelKey: "menu_pricing", parentPath: "/admin" },
+  "/admin/tariff/features": { labelKey: "tariff_features_and_limits", parentPath: "/admin/tariff" },
+  "/admin/settings/currencies": { labelKey: "currency_management", parentPath: "/admin" },
   "/admin/forms": { labelKey: "breadcrumb_forms", parentPath: "/admin" },
   "/admin/forms/elements": { labelKey: "breadcrumb_elements", parentPath: "/admin/forms" },
   "/admin/forms/layouts": { labelKey: "breadcrumb_layouts", parentPath: "/admin/forms" },
@@ -24,6 +27,7 @@ const USER_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string
   "/user/dashboard": { labelKey: "breadcrumb_dashboard", parentPath: "/user" },
   "/user/profile": { labelKey: "breadcrumb_personal", parentPath: "/user" },
   "/user/settings": { labelKey: "breadcrumb_settings", parentPath: "/user" },
+  "/user/tariff": { labelKey: "menu_pricing", parentPath: "/user" },
 };
 
 export function useBreadcrumbs(): BreadcrumbItem[] {

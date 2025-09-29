@@ -1,9 +1,10 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { PageCardHeader } from "@/components/page-header";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -54,12 +55,10 @@ const DefaultErrorFallback = ({ error, resetError }: { error?: Error; resetError
   return (
     <div className="p-4 md:p-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
-            Something went wrong
-          </CardTitle>
-        </CardHeader>
+        <PageCardHeader 
+          title="Something went wrong"
+          actions={<AlertTriangle className="h-6 w-6 text-destructive" />}
+        />
         <CardContent className="space-y-4">
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />

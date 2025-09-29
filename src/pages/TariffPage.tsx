@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TariffService, type TariffWithDetails } from '@/lib/tariff-service';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
+import { CheckCircle, XCircle, CreditCard, Plus } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
+import { PageHeader } from '@/components/PageHeader';
+import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
 
 const TariffPage = () => {
   const { t } = useI18n();
+  const breadcrumbs = useBreadcrumbs();
+  const pageInfo = usePageInfo();
+  
   const [tariffs, setTariffs] = useState<TariffWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,21 +60,26 @@ const TariffPage = () => {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{t('choose_your_plan')}</h1>
-        <p className="text-muted-foreground">
-          {t('select_perfect_plan_for_your_needs')}
-        </p>
-      </div>
+    <div className="p-4 md:p-6 space-y-6">
+      <PageHeader
+        title={pageInfo.title}
+        description={t('tariff_plans_description')}
+        breadcrumbItems={breadcrumbs}
+        actions={
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('add_new_tariff')}
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tariffs.map((tariff) => (
           <Card key={tariff.id} className="flex flex-col">
-            <CardHeader>
+            <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-2xl">{tariff.name}</CardTitle>
+                  <h3 className="text-2xl font-semibold">{tariff.name}</h3>
                   <p className="text-muted-foreground mt-2">{tariff.description}</p>
                 </div>
                 {tariff.is_free ? (
@@ -80,9 +90,8 @@ const TariffPage = () => {
                   </Badge>
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <div className="mb-6">
+              
+              <div className="my-6">
                 <div className="text-3xl font-bold">
                   {formatPrice(tariff.new_price, tariff.currency_data)}
                   {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && (
@@ -99,7 +108,7 @@ const TariffPage = () => {
               <Separator className="my-6" />
 
               <div className="space-y-4">
-                <h3 className="font-semibold">{t('tariff_page_features')}</h3>
+                <h4 className="font-semibold">{t('tariff_page_features')}</h4>
                 <ul className="space-y-2">
                   {tariff.features.map((feature) => (
                     <li key={feature.id} className="flex items-center">
@@ -115,7 +124,7 @@ const TariffPage = () => {
 
                 <Separator className="my-4" />
 
-                <h3 className="font-semibold">{t('tariff_page_limits')}</h3>
+                <h4 className="font-semibold">{t('tariff_page_limits')}</h4>
                 <ul className="space-y-2">
                   {tariff.limits.map((limit) => (
                     <li key={limit.id} className="flex justify-between">

@@ -1,8 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Home, ArrowLeft, Search } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { PageCardHeader } from "@/components/page-header";
 
 interface NotFoundFallbackProps {
   title?: string;
@@ -29,12 +30,10 @@ export const NotFoundFallback = ({
   return (
     <div className="p-4 md:p-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-6 w-6 text-muted-foreground" />
-            {title}
-          </CardTitle>
-        </CardHeader>
+        <PageCardHeader 
+          title={title}
+          actions={<Search className="h-6 w-6 text-muted-foreground" />}
+        />
         <CardContent className="space-y-4">
           <Alert>
             <AlertDescription>
