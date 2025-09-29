@@ -488,13 +488,19 @@ const dictionary: Dictionary = {
   error_updating_feature_status: { uk: "Помилка оновлення статусу функції", en: "Error updating feature status" },
   error_updating_limit_status: { uk: "Помилка оновлення статусу ліміту", en: "Error updating limit status" },
   
-  // Tariff Table Column Headers
+  // Tariff Table Column Headers - Fixed missing translations that were causing brackets
   tariff_icon: { uk: "", en: "" },
   tariff_name: { uk: "Назва тарифу", en: "Tariff Name" },
   tariff_price: { uk: "Ціна", en: "Price" },
   tariff_term: { uk: "Термін", en: "Term" },
   tariff_status: { uk: "Статус", en: "Status" },
   tariff_actions: { uk: "Дії", en: "Actions" },
+  
+  // Additional missing tariff translations that were causing brackets
+  tariff_duration_days: { uk: "Термін (дні)", en: "Duration (days)" },
+  tariff_new_price: { uk: "Нова ціна", en: "New Price" },
+  tariff_old_price: { uk: "Стара ціна", en: "Old Price" },
+  tariff_is_active: { uk: "Активний", en: "Active" },
   
   // Additional tariff translations
   pricing_period_monthly: { uk: "Щомісячно", en: "Monthly" },

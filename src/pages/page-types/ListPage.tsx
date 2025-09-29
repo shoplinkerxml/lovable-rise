@@ -288,7 +288,8 @@ export const ListPage = ({ config, title }: ListPageProps) => {
                       onClick={() => column.sortable && handleSort(column.key)}
                     >
                       <div className="flex items-center gap-2">
-                        {t(column.label as any)}
+                        {/* Fix for brackets issue: Handle empty labels and translate properly */}
+                        {column.label ? t(column.label as any) : ''}
                         {column.sortable && sortColumn === column.key && (
                           <span className="text-xs">
                             {sortDirection === 'asc' ? '↑' : '↓'}
