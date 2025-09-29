@@ -20,6 +20,7 @@ import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import CurrencyManagement from '@/pages/admin/settings/CurrencyManagement';
 import AdminTariffManagement from '@/pages/admin/AdminTariffManagement';
 import AdminTariffFeatures from '@/pages/admin/AdminTariffFeatures';
+import AdminTariffNew from '@/pages/admin/AdminTariffNew';
 
 
 
@@ -46,6 +47,7 @@ const STATIC_COMPONENTS: Record<string, React.ComponentType> = {
   '/settings/currency': CurrencyManagement,
   '/tariff': AdminTariffManagement,
   '/tariff/features': AdminTariffFeatures,
+  '/tariff/new': AdminTariffNew,
 };
 
 const ContentWorkspace: React.FC = () => {

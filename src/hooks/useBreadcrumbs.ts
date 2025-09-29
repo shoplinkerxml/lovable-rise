@@ -10,6 +10,7 @@ const ADMIN_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: strin
   "/admin/personal": { labelKey: "breadcrumb_personal", parentPath: "/admin" },
   "/admin/users": { labelKey: "breadcrumb_users", parentPath: "/admin" },
   "/admin/tariff": { labelKey: "menu_pricing", parentPath: "/admin" },
+  "/admin/tariff/new": { labelKey: "create_new_tariff", parentPath: "/admin/tariff" },
   "/admin/tariff/features": { labelKey: "tariff_features_and_limits", parentPath: "/admin/tariff" },
   "/admin/settings/currencies": { labelKey: "currency_management", parentPath: "/admin" },
   "/admin/settings/currency": { labelKey: "currency_management", parentPath: "/admin" },
@@ -209,6 +210,11 @@ export function usePageInfo() {
         return {
           title: t("currency_management"),
           description: t("currency_management_description"),
+        };
+      case "/admin/tariff/new":
+        return {
+          title: t("create_new_tariff"),
+          description: t("create_tariff_description"),
         };
       default:
         return {
