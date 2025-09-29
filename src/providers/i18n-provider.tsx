@@ -464,8 +464,11 @@ const dictionary: Dictionary = {
   lifetime_access: { uk: "Пожиттєвий доступ", en: "Lifetime Access" },
   back: { uk: "Назад", en: "Back" },
   saving: { uk: "Збереження...", en: "Saving..." },
-  tariff_created: { uk: "Тариф створено успішно", en: "Tariff created successfully" },
-  failed_create_tariff: { uk: "Не вдалося створити тариф", en: "Failed to create tariff" },
+  tariff_updated: { uk: "Тариф оновлено успішно", en: "Tariff updated successfully" },
+  failed_update_tariff: { uk: "Не вдалося оновити тариф", en: "Failed to update tariff" },
+  update_tariff: { uk: "Редагувати тариф", en: "Edit Tariff" },
+  update_tariff_description: { uk: "Редагування існуючого тарифного плану", en: "Edit existing tariff plan" },
+  failed_load_tariff: { uk: "Не вдалося завантажити тариф", en: "Failed to load tariff" },
   features_will_be_configured_after_creating_tariff: { uk: "Функції будуть налаштовані після створення тарифу", en: "Features will be configured after creating the tariff" },
   save_tariff_first_to_add_features: { uk: "Спочатку збережіть тариф, щоб додати функції", en: "Save the tariff first to add features" },
   limits_will_be_configured_after_creating_tariff: { uk: "Обмеження будуть налаштовані після створення тарифу", en: "Limits will be configured after creating the tariff" },
@@ -534,6 +537,18 @@ const dictionary: Dictionary = {
   tariff_term: { uk: "Термін", en: "Term" },
   tariff_status: { uk: "Статус", en: "Status" },
   tariff_actions: { uk: "Дії", en: "Actions" },
+  
+  // Additional missing tariff translations
+  edit_tariff: { uk: "Редагувати", en: "Edit" },
+  delete_tariff: { uk: "Видалити", en: "Delete" },
+  duplicate_tariff: { uk: "Дублювати", en: "Duplicate" },
+  free_tariff: { uk: "Безкоштовно", en: "Free" },
+  lifetime_tariff: { uk: "Пожиттєво", en: "Lifetime" },
+  days_tariff: { uk: "днів", en: "days" },
+  status_active: { uk: "Активний", en: "Active" },
+  status_inactive: { uk: "Неактивний", en: "Inactive" },
+  no_description: { uk: "Без опису", en: "No description" },
+  loading: { uk: "Завантаження...", en: "Loading..." },
   
   // Additional tariff translations
   pricing_period_monthly: { uk: "Щомісячно", en: "Monthly" },
