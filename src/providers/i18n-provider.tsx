@@ -52,7 +52,6 @@ const dictionary: Dictionary = {
   
   // Page descriptions
   tariff_plans_description: { uk: "Управління тарифними планами користувачів", en: "Manage user tariff plans" },
-  currency_management_description: { uk: "Управління валютами", en: "Currency management" },
   payment_systems_description: { uk: "Управління платіжними системами", en: "Payment systems management" },
   
   // Pricing Section translations
