@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/providers/i18n-provider";
-import { PageCardHeader } from "@/components/page-header";
 
 interface FormPageProps {
   template?: string;
@@ -137,11 +136,10 @@ export const FormPage = ({ template, data, title }: FormPageProps) => {
 
   return (
     <Card>
-      <PageCardHeader 
-        title={data?.title || title}
-        actions={data?.description ? <p className="text-muted-foreground">{data.description}</p> : undefined}
-      />
-      <CardContent>
+      <CardContent className="p-6">
+        {data?.description && (
+          <p className="text-muted-foreground mb-6">{data.description}</p>
+        )}
         {template === 'custom' ? (
           <div className="text-muted-foreground">
             Custom form template "{template}" not implemented yet.

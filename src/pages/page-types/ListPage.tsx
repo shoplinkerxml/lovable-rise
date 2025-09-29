@@ -13,9 +13,6 @@ import { Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, C
 import { TariffService } from "@/lib/tariff-service";
 import { toast } from "sonner";
 import { useI18n } from "@/providers/i18n-provider";
-import { PageHeader as PageHeaderComponent, ActionButton, PageCardHeader } from "@/components/page-header";
-import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
 
 interface ListPageProps {
   config: any;
@@ -50,8 +47,6 @@ const defaultData: TableData[] = [
 
 export const ListPage = ({ config, title }: ListPageProps) => {
   const { t } = useI18n();
-  const breadcrumbs = useBreadcrumbs();
-  const pageInfo = usePageInfo();
   
   const columns: TableColumn[] = config?.table_config?.columns || defaultColumns;
   const [data, setData] = useState<TableData[]>([]);
@@ -252,108 +247,85 @@ export const ListPage = ({ config, title }: ListPageProps) => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        {/* Breadcrumb */}
-        <Breadcrumb items={breadcrumbs} />
-        
-        {/* Title and Actions */}
-        <PageHeaderComponent
-          title={pageInfo.title}
-          description={isTariffPage ? t('tariff_plans_description') : pageInfo.description}
-          actions={
-            isTariffPage ? (
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('add_new_tariff')}
-              </Button>
-            ) : null
-          }
-        />
-      </div>
-      
-      <Card>
-        <CardContent className="p-0">
-          {/* Search and Filter Bar */}
-
-          {/* Data Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
+    <Card>
+      <CardContent className="p-0">
+        {/* Data Table */}
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map((column) => (
+                  <TableHead
+                    key={column.key}
+                    className={column.sortable ? 'cursor-pointer hover:bg-muted/50' : ''}
+                    onClick={() => column.sortable && handleSort(column.key)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {t(column.label as any)}
+                      {column.sortable && sortColumn === column.key && (
+                        <span className="text-xs">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedData.length === 0 ? (
                 <TableRow>
-                  {columns.map((column) => (
-                    <TableHead
-                      key={column.key}
-                      className={column.sortable ? 'cursor-pointer hover:bg-muted/50' : ''}
-                      onClick={() => column.sortable && handleSort(column.key)}
-                    >
-                      <div className="flex items-center gap-2">
-                        {t(column.label as any)}
-                        {column.sortable && sortColumn === column.key && (
-                          <span className="text-xs">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
-                      </div>
-                    </TableHead>
-                  ))}
+                  <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
+                    {t('no_tariffs_found')}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
-                      {t('no_tariffs_found')}
-                    </TableCell>
+              ) : (
+                paginatedData.map((row, index) => (
+                  <TableRow key={row.id || index}>
+                    {columns.map((column) => (
+                      <TableCell key={column.key}>
+                        {renderCellValue(row[column.key], column, row)}
+                      </TableCell>
+                    ))}
                   </TableRow>
-                ) : (
-                  paginatedData.map((row, index) => (
-                    <TableRow key={row.id || index}>
-                      {columns.map((column) => (
-                        <TableCell key={column.key}>
-                          {renderCellValue(row[column.key], column, row)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-muted-foreground">
-                {t('showing_tariffs')} {(currentPage - 1) * itemsPerPage + 1} {t('to_tariff')}{' '}
-                {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)} {t('of_tariff')}{' '}
-                {filteredAndSortedData.length} {t('results_tariff')}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  {t('previous_tariff')}
-                </Button>
-                <span className="text-sm px-2">
-                  {t('page_tariff')} {currentPage} {t('of_tariff')} {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                >
-                  {t('next_tariff')}
-                </Button>
-              </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 p-4">
+            <p className="text-sm text-muted-foreground">
+              {t('showing_tariffs')} {(currentPage - 1) * itemsPerPage + 1} {t('to_tariff')}{' '}
+              {Math.min(currentPage * itemsPerPage, filteredAndSortedData.length)} {t('of_tariff')}{' '}
+              {filteredAndSortedData.length} {t('results_tariff')}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                {t('previous_tariff')}
+              </Button>
+              <span className="text-sm px-2">
+                {t('page_tariff')} {currentPage} {t('of_tariff')} {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                {t('next_tariff')}
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
