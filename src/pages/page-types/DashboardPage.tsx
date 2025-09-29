@@ -2,7 +2,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, LineChart, PieChart, Activity, Users, DollarSign, TrendingUp } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
 
 interface DashboardPageProps {
   widgets: any[];
@@ -173,15 +172,8 @@ export const DashboardPage = ({ widgets, title, data }: DashboardPageProps) => {
   const widgetsToRender = widgets && widgets.length > 0 ? widgets : defaultWidgets;
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title={title}
-        description={data?.lastUpdated ? `Last updated: ${new Date(data.lastUpdated).toLocaleString()}` : undefined}
-      />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {widgetsToRender.map((widget, index) => renderWidget(widget, index))}
-      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {widgetsToRender.map((widget, index) => renderWidget(widget, index))}
     </div>
   );
 };
