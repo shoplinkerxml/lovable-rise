@@ -2,13 +2,23 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { TariffService, type Tariff, type TariffFeature, type TariffLimit, type TariffFeatureInsert, type TariffLimitInsert } from '@/lib/tariff-service';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
@@ -25,6 +35,10 @@ const AdminTariffFeatures = () => {
   const [loading, setLoading] = useState(true);
   const [isFeatureDialogOpen, setIsFeatureDialogOpen] = useState(false);
   const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
+  const [deleteFeatureDialogOpen, setDeleteFeatureDialogOpen] = useState(false);
+  const [deleteLimitDialogOpen, setDeleteLimitDialogOpen] = useState(false);
+  const [featureToDelete, setFeatureToDelete] = useState<TariffFeature | null>(null);
+  const [limitToDelete, setLimitToDelete] = useState<TariffLimit | null>(null);
   const [selectedTariff, setSelectedTariff] = useState<Tariff | null>(null);
   const [editingFeature, setEditingFeature] = useState<TariffFeature | null>(null);
   const [editingLimit, setEditingLimit] = useState<TariffLimit | null>(null);
@@ -111,18 +125,26 @@ const AdminTariffFeatures = () => {
     }
   };
 
-  const handleDeleteFeature = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this feature?')) return;
+  const handleDeleteFeature = async (feature: TariffFeature) => {
+    setFeatureToDelete(feature);
+    setDeleteFeatureDialogOpen(true);
+  };
+
+  const confirmDeleteFeature = async () => {
+    if (!featureToDelete) return;
     
     try {
-      await TariffService.deleteTariffFeature(id);
-      toast.success('Feature deleted successfully');
+      await TariffService.deleteTariffFeature(featureToDelete.id);
+      toast.success(t('feature_deleted_successfully'));
       if (selectedTariff) {
         await fetchFeaturesAndLimits(selectedTariff.id);
       }
     } catch (error) {
       console.error('Error deleting feature:', error);
-      toast.error('Failed to delete feature');
+      toast.error(t('failed_to_delete_feature'));
+    } finally {
+      setDeleteFeatureDialogOpen(false);
+      setFeatureToDelete(null);
     }
   };
 
@@ -388,7 +410,7 @@ const AdminTariffFeatures = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteFeature(feature.id)}
+                              onClick={() => handleDeleteFeature(feature)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -535,6 +557,32 @@ const AdminTariffFeatures = () => {
           </Card>
         )}
       </div>
+
+      {/* Delete Feature Confirmation Dialog */}
+      <AlertDialog open={deleteFeatureDialogOpen} onOpenChange={setDeleteFeatureDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {t('confirm_delete_feature')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('are_you_sure_you_want_to_delete_this_feature')} "{featureToDelete?.feature_name}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteFeatureDialogOpen(false)}>
+              {t('cancel_tariff')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteFeature}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('delete_feature')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -10,8 +10,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle } from 'lucide-react';
 import { TariffService, type Tariff, type TariffInsert, type Currency } from '@/lib/tariff-service';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
@@ -26,6 +36,8 @@ const AdminTariffManagement = () => {
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [tariffToDelete, setTariffToDelete] = useState<Tariff | null>(null);
 
   useEffect(() => {
     fetchTariffs();
@@ -55,16 +67,24 @@ const AdminTariffManagement = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this tariff?')) return;
+  const handleDelete = async (tariff: Tariff) => {
+    setTariffToDelete(tariff);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!tariffToDelete) return;
     
     try {
-      await TariffService.deleteTariff(id);
-      toast.success('Tariff deleted successfully');
+      await TariffService.deleteTariff(tariffToDelete.id);
+      toast.success(t('tariff_deleted_successfully'));
       fetchTariffs();
     } catch (error) {
       console.error('Error deleting tariff:', error);
-      toast.error('Failed to delete tariff');
+      toast.error(t('failed_to_delete_tariff'));
+    } finally {
+      setDeleteDialogOpen(false);
+      setTariffToDelete(null);
     }
   };
 
@@ -218,8 +238,8 @@ const AdminTariffManagement = () => {
                           <span>{t('edit_tariff')}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleDelete(tariff.id)}
-                          className="dropdown-item-hover"
+                          onClick={() => handleDelete(tariff)}
+                          className="dropdown-item-hover text-red-600 focus:text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           <span>{t('delete_tariff')}</span>
@@ -240,6 +260,71 @@ const AdminTariffManagement = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-lg font-semibold">
+                  {t('confirm_delete_tariff')}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm text-gray-600 mt-1">
+                  {t('delete_tariff_warning')}
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          
+          {tariffToDelete && (
+            <div className="my-4 p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                {getTariffIcon(tariffToDelete)}
+                <div>
+                  <h4 className="font-medium text-gray-900">{tariffToDelete.name}</h4>
+                  <p className="text-sm text-gray-600">
+                    {tariffToDelete.description || t('no_description')}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {tariffToDelete.is_free ? (
+                      <Badge variant="secondary" className="text-xs">{t('free_tariff')}</Badge>
+                    ) : (
+                      <span className="text-xs text-gray-500">
+                        {tariffToDelete.new_price !== null ? (
+                          new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: currencies.find(c => c.id === tariffToDelete.currency)?.code || 'USD',
+                          }).format(tariffToDelete.new_price)
+                        ) : 'N/A'}
+                      </span>
+                    )}
+                    <Badge variant={tariffToDelete.is_active ? 'default' : 'secondary'} className="text-xs">
+                      {tariffToDelete.is_active ? t('status_active') : t('status_inactive')}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gray-300 text-gray-700 hover:bg-gray-50">
+              {t('cancel_tariff')}
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t('delete_tariff')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
