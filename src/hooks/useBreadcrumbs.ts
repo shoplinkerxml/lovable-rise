@@ -46,12 +46,28 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
     // Always start with home
     breadcrumbs.push({
       label: t("breadcrumb_home"),
-      href: isUserPath ? "/user" : "/admin",
+      href: isUserPath ? "/user/dashboard" : "/admin/dashboard",
     });
 
     // Find the route in our mapping
     const route = ROUTE_MAPPING[path];
     if (!route) {
+      // Handle dynamic admin tariff edit paths like /admin/tariff/edit/123
+      if (path.startsWith("/admin/tariff/edit/")) {
+        // Add Home -> Tariffs -> Tariff Name
+        breadcrumbs.push({
+          label: t("menu_pricing"),
+          href: "/admin/tariff",
+        });
+        
+        // Extract tariff ID and add as current page
+        const tariffId = path.split("/").pop();
+        breadcrumbs.push({
+          label: `${t('edit_tariff')}`,
+          current: true,
+        });
+        return breadcrumbs;
+      }
       // Handle dynamic user menu paths
       if (isUserPath && path.startsWith("/user/")) {
         // Extract the dynamic part

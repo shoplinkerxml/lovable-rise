@@ -538,6 +538,41 @@ const dictionary: Dictionary = {
   // Additional tariff translations
   pricing_period_monthly: { uk: "Щомісячно", en: "Monthly" },
   pricing_period_yearly: { uk: "Щорічно", en: "Yearly" },
+  
+  // Edit tariff translations
+  edit_tariff_description: { uk: "Редагування тарифного плану", en: "Edit tariff plan" },
+  tariff_updated_successfully: { uk: "Тариф успішно оновлено", en: "Tariff updated successfully" },
+  failed_update_tariff: { uk: "Не вдалося оновити тариф", en: "Failed to update tariff" },
+  tariff_not_found: { uk: "Тариф не знайдено", en: "Tariff not found" },
+  tariff_not_found_description: { uk: "Тариф з вказаним ID не існує або був видалений", en: "The tariff with the specified ID does not exist or has been deleted" },
+  back_to_tariffs: { uk: "Повернутися до тарифів", en: "Back to Tariffs" },
+  failed_load_tariff: { uk: "Не вдалося завантажити тариф", en: "Failed to load tariff" },
+  no_features_configured: { uk: "Функції не налаштовані", en: "No features configured" },
+  no_limits_configured: { uk: "Ліміти не налаштовані", en: "No limits configured" },
+  feature_added_successfully: { uk: "Функцію успішно додано", en: "Feature added successfully" },
+  failed_add_feature: { uk: "Не вдалося додати функцію", en: "Failed to add feature" },
+  feature_removed_successfully: { uk: "Функцію успішно видалено", en: "Feature removed successfully" },
+  failed_remove_feature: { uk: "Не вдалося видалити функцію", en: "Failed to remove feature" },
+  limit_added_successfully: { uk: "Ліміт успішно додано", en: "Limit added successfully" },
+  failed_add_limit: { uk: "Не вдалося додати ліміт", en: "Failed to add limit" },
+  limit_removed_successfully: { uk: "Ліміт успішно видалено", en: "Limit removed successfully" },
+  failed_remove_limit: { uk: "Не вдалося видалити ліміт", en: "Failed to remove limit" },
+  inactive: { uk: "Неактивний", en: "Inactive" },
+  are_you_sure_you_want_to_delete_this_feature: { uk: "Ви впевнені, що хочете видалити цю функцію", en: "Are you sure you want to delete this feature" },
+  feature_deleted_successfully: { uk: "Функцію успішно видалено", en: "Feature deleted successfully" },
+  failed_to_delete_feature: { uk: "Не вдалося видалити функцію", en: "Failed to delete feature" },
+  confirm_delete_feature: { uk: "Підтвердити видалення функції", en: "Confirm Delete Feature" },
+  
+  // Additional validation and permission messages
+  admin_access_required: { uk: "Необхідні права адміністратора", en: "Admin access required" },
+  please_fix_validation_errors: { uk: "Будь ласка, виправте помилки валідації", en: "Please fix validation errors" },
+  currency_required: { uk: "Валюта обов'язкова", en: "Currency is required" },
+  new_price_required: { uk: "Нова ціна обов'язкова для платних тарифів", en: "New price is required for paid tariffs" },
+  price_must_be_non_negative: { uk: "Ціна повинна бути невід'ємною", en: "Price must be non-negative" },
+  duration_must_be_non_negative: { uk: "Тривалість повинна бути невід'ємною", en: "Duration must be non-negative" },
+  invalid_currency_selected: { uk: "Обрано недійсну валюту", en: "Invalid currency selected" },
+  read_only_mode: { uk: "Режим лише для читання", en: "Read-only mode" },
+  user_role_read_only: { uk: "Користувачі можуть лише переглядати дані", en: "Users can only view data" },
 };
 
 // User Statistics

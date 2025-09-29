@@ -21,6 +21,7 @@ import CurrencyManagement from '@/pages/admin/settings/CurrencyManagement';
 import AdminTariffManagement from '@/pages/admin/AdminTariffManagement';
 import AdminTariffFeatures from '@/pages/admin/AdminTariffFeatures';
 import AdminTariffNew from '@/pages/admin/AdminTariffNew';
+import AdminTariffEdit from '@/pages/admin/AdminTariffEdit';
 
 
 
@@ -81,6 +82,7 @@ const ContentWorkspace: React.FC = () => {
     if (adminPath === '/users') return 'list';
     if (adminPath === '/settings/currency') return 'list';
     if (adminPath === '/tariff' || adminPath === '/tariff/features') return 'list';
+    if (adminPath.startsWith('/tariff/edit/') || adminPath === '/tariff/new') return 'form';
     
     // Fallback to menu item page_type if available
     if (activeMenuItem?.page_type === 'list') return 'list';
@@ -94,6 +96,11 @@ const ContentWorkspace: React.FC = () => {
     // Check for static components first
     if (STATIC_COMPONENTS[adminPath]) {
       return STATIC_COMPONENTS[adminPath];
+    }
+    
+    // Handle dynamic routes with parameters
+    if (adminPath.startsWith('/tariff/edit/')) {
+      return AdminTariffEdit;
     }
     
     // For dynamic menu items, return null to render via ContentRenderer

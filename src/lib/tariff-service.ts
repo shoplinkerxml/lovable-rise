@@ -116,8 +116,7 @@ export class TariffService {
         description: data.description,
         old_price: data.old_price,
         new_price: data.new_price,
-        currency_id: (data as any).currency_id,
-        currency_code: (data as any).currency_code,
+        currency: data.currency, // Keep original database field name
         duration_days: data.duration_days,
         is_free: data.is_free,
         is_lifetime: data.is_lifetime,
