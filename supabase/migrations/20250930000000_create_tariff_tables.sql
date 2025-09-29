@@ -17,7 +17,8 @@ CREATE TABLE public.tariffs (
   description TEXT,
   old_price NUMERIC(12, 2) NULL,
   new_price NUMERIC(12, 2) NULL,
-  currency INTEGER NOT NULL,
+  currency_id INTEGER NOT NULL,
+  currency_code CHARACTER VARYING(10) NOT NULL,
   duration_days INTEGER NULL,
   is_free BOOLEAN NULL DEFAULT false,
   is_lifetime BOOLEAN NULL DEFAULT false,
@@ -25,7 +26,7 @@ CREATE TABLE public.tariffs (
   created_at TIMESTAMP WITHOUT TIME ZONE NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITHOUT TIME ZONE NULL DEFAULT NOW(),
   CONSTRAINT tariffs_pkey PRIMARY KEY (id),
-  CONSTRAINT tariffs_currency_fkey FOREIGN KEY (currency) REFERENCES currencies (id)
+  CONSTRAINT tariffs_currency_fkey FOREIGN KEY (currency_id) REFERENCES currencies (id)
 ) TABLESPACE pg_default;
 
 -- Create tariff_features table
@@ -54,7 +55,7 @@ CREATE TABLE public.tariff_limits (
 ) TABLESPACE pg_default;
 
 -- Create indexes for better performance
-CREATE INDEX idx_tariffs_currency ON tariffs(currency);
+CREATE INDEX idx_tariffs_currency_id ON tariffs(currency_id);
 CREATE INDEX idx_tariffs_is_active ON tariffs(is_active);
 CREATE INDEX idx_tariff_features_tariff_id ON tariff_features(tariff_id);
 CREATE INDEX idx_tariff_features_is_active ON tariff_features(is_active);
@@ -183,4 +184,5 @@ CREATE TRIGGER update_tariff_limits_updated_at
 INSERT INTO public.currencies (code, name, rate, status, is_base) VALUES
   ('USD', 'US Dollar', 1.0, true, true),
   ('EUR', 'Euro', 0.85, true, false),
-  ('UAH', 'Ukrainian Hryvnia', 27.0, true, false);
+  ('UAH', 'Ukrainian Hryvnia', 27.0, true, false)
+ON CONFLICT (code) DO NOTHING;

@@ -15,7 +15,20 @@ export type TariffLimitUpdate = Database['public']['Tables']['tariff_limits']['U
 
 export type Currency = Database['public']['Tables']['currencies']['Row'];
 
-export interface TariffWithDetails extends Tariff {
+export interface TariffWithDetails {
+  id: number;
+  name: string;
+  description: string | null;
+  old_price: number | null;
+  new_price: number | null;
+  currency_id: number;
+  currency_code: string;
+  duration_days: number | null;
+  is_free: boolean | null;
+  is_lifetime: boolean | null;
+  is_active: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
   currency_data: Currency;
   features: TariffFeature[];
   limits: TariffLimit[];
@@ -31,9 +44,9 @@ export class TariffService {
         .from('tariffs')
         .select(`
           *,
-          currency_data:currencies(*),
-          tariff_features(*),
-          tariff_limits(*)
+          currency_data:currencies!fk_tariffs_currency(*),
+          tariff_features!tariff_features_tariff_id_fkey(*),
+          tariff_limits!tariff_limits_tariff_id_fkey(*)
         `)
         .order('name');
 
@@ -62,7 +75,8 @@ export class TariffService {
         description: tariff.description,
         old_price: tariff.old_price,
         new_price: tariff.new_price,
-        currency: tariff.currency,
+        currency_id: (tariff as any).currency_id,
+        currency_code: (tariff as any).currency_code,
         duration_days: tariff.duration_days,
         is_free: tariff.is_free,
         is_lifetime: tariff.is_lifetime,
@@ -72,7 +86,7 @@ export class TariffService {
         currency_data: tariff.currency_data,
         features: tariff.tariff_features,
         limits: tariff.tariff_limits
-      })) as TariffWithDetails[];
+      })) as any[];
     } catch (error) {
       console.error('Error fetching tariffs:', error);
       throw error;
@@ -86,9 +100,9 @@ export class TariffService {
         .from('tariffs')
         .select(`
           *,
-          currency_data:currencies(*),
-          tariff_features(*),
-          tariff_limits(*)
+          currency_data:currencies!fk_tariffs_currency(*),
+          tariff_features!tariff_features_tariff_id_fkey(*),
+          tariff_limits!tariff_limits_tariff_id_fkey(*)
         `)
         .eq('id', id)
         .single();
@@ -96,13 +110,14 @@ export class TariffService {
       if (error) throw error;
       
       // Transform the data to match our interface
-      const tariffWithDetails: TariffWithDetails = {
+      const tariffWithDetails = {
         id: data.id,
         name: data.name,
         description: data.description,
         old_price: data.old_price,
         new_price: data.new_price,
-        currency: data.currency,
+        currency_id: (data as any).currency_id,
+        currency_code: (data as any).currency_code,
         duration_days: data.duration_days,
         is_free: data.is_free,
         is_lifetime: data.is_lifetime,
@@ -114,7 +129,7 @@ export class TariffService {
         limits: data.tariff_limits
       };
       
-      return tariffWithDetails;
+      return tariffWithDetails as any;
     } catch (error) {
       console.error('Error fetching tariff:', error);
       throw error;
@@ -124,17 +139,33 @@ export class TariffService {
   // Create a new tariff
   static async createTariff(tariffData: TariffInsert) {
     try {
-      const { data, error } = await supabase
+      // First, create the tariff without joins
+      const { data: createdTariff, error: createError } = await supabase
         .from('tariffs')
         .insert(tariffData)
-        .select(`
-          *,
-          currency_data:currencies(*)
-        `)
+        .select('*')
         .single();
 
-      if (error) throw error;
-      return data as (Tariff & { currency_data: Currency });
+      if (createError) throw createError;
+
+      // Then fetch the currency data separately
+      const { data: currencyData, error: currencyError } = await supabase
+        .from('currencies')
+        .select('*')
+        .eq('id', (createdTariff as any).currency_id)
+        .single();
+
+      if (currencyError) {
+        console.warn('Could not fetch currency data:', currencyError);
+        // Return tariff without currency data if currency fetch fails
+        return createdTariff as Tariff;
+      }
+
+      // Combine the data
+      return {
+        ...createdTariff,
+        currency_data: currencyData
+      } as (Tariff & { currency_data: Currency });
     } catch (error) {
       console.error('Error creating tariff:', error);
       throw error;
@@ -144,18 +175,36 @@ export class TariffService {
   // Update a tariff
   static async updateTariff(id: number, tariffData: TariffUpdate) {
     try {
-      const { data, error } = await supabase
+      // First, update the tariff without joins
+      const { data: updatedTariff, error: updateError } = await supabase
         .from('tariffs')
         .update(tariffData)
         .eq('id', id)
-        .select(`
-          *,
-          currency_data:currencies(*)
-        `)
+        .select('*')
         .single();
 
-      if (error) throw error;
-      return data as (Tariff & { currency_data: Currency });
+      if (updateError) throw updateError;
+
+      // Then fetch the currency data separately if currency_id field exists
+      if ((updatedTariff as any).currency_id) {
+        const { data: currencyData, error: currencyError } = await supabase
+          .from('currencies')
+          .select('*')
+          .eq('id', (updatedTariff as any).currency_id)
+          .single();
+
+        if (currencyError) {
+          console.warn('Could not fetch currency data:', currencyError);
+          return updatedTariff as Tariff;
+        }
+
+        return {
+          ...updatedTariff,
+          currency_data: currencyData
+        } as (Tariff & { currency_data: Currency });
+      }
+
+      return updatedTariff as Tariff;
     } catch (error) {
       console.error('Error updating tariff:', error);
       throw error;
@@ -354,7 +403,8 @@ export class TariffService {
           description: 'Ідеально для початківців',
           old_price: 19.99,
           new_price: 14.99,
-          currency: usdCurrency.id,
+          currency_id: usdCurrency.id,
+          currency_code: usdCurrency.code,
           duration_days: 30,
           is_free: false,
           is_lifetime: false,
@@ -365,7 +415,8 @@ export class TariffService {
           description: 'Для професіоналів та малих команд',
           old_price: 49.99,
           new_price: 39.99,
-          currency: usdCurrency.id,
+          currency_id: usdCurrency.id,
+          currency_code: usdCurrency.code,
           duration_days: 30,
           is_free: false,
           is_lifetime: false,
@@ -376,7 +427,8 @@ export class TariffService {
           description: 'Спробуйте наш сервіс безкоштовно',
           old_price: null,
           new_price: null,
-          currency: usdCurrency.id,
+          currency_id: usdCurrency.id,
+          currency_code: usdCurrency.code,
           duration_days: null,
           is_free: true,
           is_lifetime: false,
@@ -386,7 +438,7 @@ export class TariffService {
       
       const createdTariffs = [];
       for (const tariffData of sampleTariffs) {
-        const tariff = await this.createTariff(tariffData);
+        const tariff = await this.createTariff(tariffData as any);
         createdTariffs.push(tariff);
         console.log('Created tariff:', tariff.name);
       }

@@ -466,6 +466,28 @@ const dictionary: Dictionary = {
   save_tariff_first_to_add_features: { uk: "Спочатку збережіть тариф, щоб додати функції", en: "Save the tariff first to add features" },
   limits_will_be_configured_after_creating_tariff: { uk: "Обмеження будуть налаштовані після створення тарифу", en: "Limits will be configured after creating the tariff" },
   save_tariff_first_to_add_limits: { uk: "Спочатку збережіть тариф, щоб додати обмеження", en: "Save the tariff first to add limits" },
+  
+  // Features and Limits Management
+  add_feature: { uk: "Додати функцію", en: "Add Feature" },
+  delete_feature: { uk: "Видалити функцію", en: "Delete Feature" },
+  feature_name: { uk: "Назва функції", en: "Feature Name" },
+  enter_feature_name: { uk: "Введіть назву функції", en: "Enter feature name" },
+  
+  add_limit: { uk: "Додати обмеження", en: "Add Limit" },
+  delete_limit: { uk: "Видалити обмеження", en: "Delete Limit" },
+  limit_name: { uk: "Назва обмеження", en: "Limit Name" },
+  limit_value: { uk: "Значення", en: "Value" },
+  enter_limit_name: { uk: "Введіть назву обмеження", en: "Enter limit name" },
+  enter_limit_value: { uk: "Введіть значення", en: "Enter value" },
+  
+  // Sample data for testing
+  xml_files_upload: { uk: "Завантаження XML файлів", en: "XML Files Upload" },
+  data_processing_cleaning: { uk: "Обробка та очищення даних", en: "Data Processing and Cleaning" },
+  excel_csv_export: { uk: "Експорт в Excel/CSV", en: "Export to Excel/CSV" },
+  
+  store_count_limit: { uk: "Кількість магазинів", en: "Number of Stores" },
+  supplier_count_limit: { uk: "Кількість постачальників", en: "Number of Suppliers" },
+  product_count_limit: { uk: "Кількість товарів", en: "Number of Products" },
   old_price: { uk: "Стара ціна", en: "Old Price" },
   new_price: { uk: "Нова ціна", en: "New Price" },
   duration_days: { uk: "Тривалість (дні)", en: "Duration (days)" },
@@ -488,14 +510,8 @@ const dictionary: Dictionary = {
   tariff_features_and_limits: { uk: "Функції та ліміти тарифів", en: "Tariff Features and Limits" },
   manage_features_and_limits_for_tariff_plans: { uk: "Управління функціями та лімітами для тарифних планів", en: "Manage features and limits for tariff plans" },
   tariff_plans: { uk: "Тарифні плани", en: "Tariff Plans" },
-  add_feature: { uk: "Додати функцію", en: "Add Feature" },
   add_new_feature: { uk: "Додати нову функцію", en: "Add New Feature" },
-  add_limit: { uk: "Додати ліміт", en: "Add Limit" },
   add_new_limit: { uk: "Додати новий ліміт", en: "Add New Limit" },
-  feature_name: { uk: "Назва функції", en: "Feature Name" },
-  limit_name: { uk: "Назва ліміту", en: "Limit Name" },
-  value: { uk: "Значення", en: "Value" },
-  status: { uk: "Статус", en: "Status" },
   edit_feature: { uk: "Редагувати функцію", en: "Edit Feature" },
   edit_limit: { uk: "Редагувати ліміт", en: "Edit Limit" },
   update_feature: { uk: "Оновити функцію", en: "Update Feature" },

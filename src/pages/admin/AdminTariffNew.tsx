@@ -8,15 +8,25 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
-import { TariffService, type TariffInsert, type Currency } from '@/lib/tariff-service';
+import { TariffService, type TariffInsert, type Currency, type TariffFeature, type TariffLimit } from '@/lib/tariff-service';
 import { toast } from 'sonner';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
 
-interface TariffFormData extends Omit<TariffInsert, 'currency'> {
-  currency: number;
+interface TariffFormData {
+  name: string;
+  description?: string | null;
+  old_price?: number | null;
+  new_price?: number | null;
+  currency_id: number;
+  currency_code: string;
+  duration_days?: number | null;
+  is_free?: boolean | null;
+  is_lifetime?: boolean | null;
+  is_active?: boolean | null;
 }
 
 const AdminTariffNew = () => {
@@ -27,12 +37,18 @@ const AdminTariffNew = () => {
   const [activeTab, setActiveTab] = useState('basic');
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savedTariffId, setSavedTariffId] = useState<number | null>(null);
+  const [features, setFeatures] = useState<TariffFeature[]>([]);
+  const [limits, setLimits] = useState<TariffLimit[]>([]);
+  const [newFeature, setNewFeature] = useState({ feature_name: '', is_active: true });
+  const [newLimit, setNewLimit] = useState({ limit_name: '', value: 0, is_active: true });
   const [formData, setFormData] = useState<TariffFormData>({
     name: '',
     description: '',
     old_price: null,
     new_price: null,
-    currency: 1,
+    currency_id: 1,
+    currency_code: 'USD',
     duration_days: null,
     is_free: false,
     is_lifetime: false,
@@ -83,13 +99,19 @@ const AdminTariffNew = () => {
         return;
       }
       
-      const tariffData: TariffInsert = {
+      const tariffData = {
         ...formData,
         name: formData.name.trim()
       };
       
-      await TariffService.createTariff(tariffData);
+      const createdTariff = await TariffService.createTariff(tariffData as any);
+      setSavedTariffId(createdTariff.id);
       toast.success(t('tariff_created'));
+      
+      // Save features and limits if they exist
+      await saveFeatures(createdTariff.id);
+      await saveLimits(createdTariff.id);
+      
       navigate('/admin/tariff');
     } catch (error) {
       console.error('Error creating tariff:', error);
@@ -102,6 +124,153 @@ const AdminTariffNew = () => {
   const getCurrencySymbol = (currencyId: number) => {
     const currency = currencies.find(c => c.id === currencyId);
     return currency ? currency.code : 'USD';
+  };
+
+  // Features management
+  const addFeature = () => {
+    if (!newFeature.feature_name.trim()) {
+      toast.error(t('enter_feature_name'));
+      return;
+    }
+    const feature: TariffFeature = {
+      id: Date.now(), // Temporary ID for new features
+      tariff_id: savedTariffId || 0,
+      feature_name: newFeature.feature_name,
+      is_active: newFeature.is_active,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setFeatures([...features, feature]);
+    setNewFeature({ feature_name: '', is_active: true });
+  };
+
+  const removeFeature = (index: number) => {
+    setFeatures(features.filter((_, i) => i !== index));
+  };
+
+  const updateFeature = (index: number, field: keyof TariffFeature, value: any) => {
+    const updatedFeatures = [...features];
+    updatedFeatures[index] = { ...updatedFeatures[index], [field]: value };
+    setFeatures(updatedFeatures);
+  };
+
+  // Limits management
+  const addLimit = () => {
+    if (!newLimit.limit_name.trim() || newLimit.value <= 0) {
+      toast.error(t('enter_limit_name'));
+      return;
+    }
+    const limit: TariffLimit = {
+      id: Date.now(), // Temporary ID for new limits
+      tariff_id: savedTariffId || 0,
+      limit_name: newLimit.limit_name,
+      value: newLimit.value,
+      is_active: newLimit.is_active,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setLimits([...limits, limit]);
+    setNewLimit({ limit_name: '', value: 0, is_active: true });
+  };
+
+  const removeLimit = (index: number) => {
+    setLimits(limits.filter((_, i) => i !== index));
+  };
+
+  const updateLimit = (index: number, field: keyof TariffLimit, value: any) => {
+    const updatedLimits = [...limits];
+    updatedLimits[index] = { ...updatedLimits[index], [field]: value };
+    setLimits(updatedLimits);
+  };
+
+  // Save features and limits to database
+  const saveFeatures = async (tariffId: number) => {
+    for (const feature of features) {
+      if (feature.id > 1000000) { // Temporary ID, needs to be created
+        await TariffService.addTariffFeature({
+          tariff_id: tariffId,
+          feature_name: feature.feature_name,
+          is_active: feature.is_active
+        });
+      }
+    }
+  };
+
+  const saveLimits = async (tariffId: number) => {
+    for (const limit of limits) {
+      if (limit.id > 1000000) { // Temporary ID, needs to be created
+        await TariffService.addTariffLimit({
+          tariff_id: tariffId,
+          limit_name: limit.limit_name,
+          value: limit.value,
+          is_active: limit.is_active
+        });
+      }
+    }
+  };
+
+  // Load sample data
+  const loadSampleFeatures = () => {
+    const sampleFeatures: TariffFeature[] = [
+      {
+        id: Date.now() + 1,
+        tariff_id: 0,
+        feature_name: t('xml_files_upload'),
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: Date.now() + 2,
+        tariff_id: 0,
+        feature_name: t('data_processing_cleaning'),
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: Date.now() + 3,
+        tariff_id: 0,
+        feature_name: t('excel_csv_export'),
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+    setFeatures(sampleFeatures);
+  };
+
+  const loadSampleLimits = () => {
+    const sampleLimits: TariffLimit[] = [
+      {
+        id: Date.now() + 1,
+        tariff_id: 0,
+        limit_name: t('store_count_limit'),
+        value: 3,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: Date.now() + 2,
+        tariff_id: 0,
+        limit_name: t('supplier_count_limit'),
+        value: 5,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: Date.now() + 3,
+        tariff_id: 0,
+        limit_name: t('product_count_limit'),
+        value: 100,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+    setLimits(sampleLimits);
   };
 
   return (
@@ -152,8 +321,15 @@ const AdminTariffNew = () => {
                 <div className="space-y-2">
                   <Label htmlFor="currency">{t('currency')}</Label>
                   <Select
-                    value={formData.currency.toString()}
-                    onValueChange={(value) => handleInputChange('currency', parseInt(value))}
+                    value={formData.currency_id.toString()}
+                    onValueChange={(value) => {
+                      const currencyId = parseInt(value);
+                      const selectedCurrency = currencies.find(c => c.id === currencyId);
+                      handleInputChange('currency_id', currencyId);
+                      if (selectedCurrency) {
+                        handleInputChange('currency_code', selectedCurrency.code);
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -185,7 +361,7 @@ const AdminTariffNew = () => {
                   <Label htmlFor="old_price">{t('old_price')}</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                      {getCurrencySymbol(formData.currency)}
+                      {getCurrencySymbol(formData.currency_id)}
                     </span>
                     <Input
                       id="old_price"
@@ -205,7 +381,7 @@ const AdminTariffNew = () => {
                   <Label htmlFor="new_price">{t('new_price')}</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                      {getCurrencySymbol(formData.currency)}
+                      {getCurrencySymbol(formData.currency_id)}
                     </span>
                     <Input
                       id="new_price"
@@ -266,25 +442,226 @@ const AdminTariffNew = () => {
             </TabsContent>
 
             <TabsContent value="features" className="space-y-6 mt-6">
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  {t('features_will_be_configured_after_creating_tariff')}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t('save_tariff_first_to_add_features')}
-                </p>
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">{t('features')}</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={loadSampleFeatures}>
+                    Load Sample
+                  </Button>
+                  <Button onClick={addFeature} size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('add_feature')}
+                  </Button>
+                </div>
               </div>
+
+              {/* Add new feature form */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-feature-name">{t('feature_name')}</Label>
+                      <Input
+                        id="new-feature-name"
+                        value={newFeature.feature_name}
+                        onChange={(e) => setNewFeature({ ...newFeature, feature_name: e.target.value })}
+                        placeholder={t('enter_feature_name')}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="new-feature-active"
+                        checked={newFeature.is_active}
+                        onCheckedChange={(checked) => setNewFeature({ ...newFeature, is_active: checked })}
+                      />
+                      <Label htmlFor="new-feature-active">{t('active')}</Label>
+                    </div>
+                    <Button onClick={addFeature} className="w-full md:w-auto">
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('add_feature')}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Features list */}
+              {features.length > 0 && (
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('feature_name')}</TableHead>
+                          <TableHead className="text-center">{t('status')}</TableHead>
+                          <TableHead className="text-right">{t('tariff_actions')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {features.map((feature, index) => (
+                          <TableRow key={feature.id}>
+                            <TableCell>
+                              <Input
+                                value={feature.feature_name}
+                                onChange={(e) => updateFeature(index, 'feature_name', e.target.value)}
+                                className="border-none p-0 focus-visible:ring-0"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={feature.is_active || false}
+                                onCheckedChange={(checked) => updateFeature(index, 'is_active', checked)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFeature(index)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {features.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    {t('features_will_be_configured_after_creating_tariff')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('save_tariff_first_to_add_features')}
+                  </p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 mt-6">
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  {t('limits_will_be_configured_after_creating_tariff')}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {t('save_tariff_first_to_add_limits')}
-                </p>
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">{t('limits')}</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={loadSampleLimits}>
+                    Load Sample
+                  </Button>
+                  <Button onClick={addLimit} size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('add_limit')}
+                  </Button>
+                </div>
               </div>
+
+              {/* Add new limit form */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-limit-name">{t('limit_name')}</Label>
+                      <Input
+                        id="new-limit-name"
+                        value={newLimit.limit_name}
+                        onChange={(e) => setNewLimit({ ...newLimit, limit_name: e.target.value })}
+                        placeholder={t('enter_limit_name')}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-limit-value">{t('limit_value')}</Label>
+                      <Input
+                        id="new-limit-value"
+                        type="number"
+                        min="0"
+                        value={newLimit.value}
+                        onChange={(e) => setNewLimit({ ...newLimit, value: parseInt(e.target.value) || 0 })}
+                        placeholder={t('enter_limit_value')}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="new-limit-active"
+                        checked={newLimit.is_active}
+                        onCheckedChange={(checked) => setNewLimit({ ...newLimit, is_active: checked })}
+                      />
+                      <Label htmlFor="new-limit-active">{t('active')}</Label>
+                    </div>
+                    <Button onClick={addLimit} className="w-full md:w-auto">
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('add_limit')}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Limits list */}
+              {limits.length > 0 && (
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('limit_name')}</TableHead>
+                          <TableHead className="text-center">{t('limit_value')}</TableHead>
+                          <TableHead className="text-center">{t('status')}</TableHead>
+                          <TableHead className="text-right">{t('tariff_actions')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {limits.map((limit, index) => (
+                          <TableRow key={limit.id}>
+                            <TableCell>
+                              <Input
+                                value={limit.limit_name}
+                                onChange={(e) => updateLimit(index, 'limit_name', e.target.value)}
+                                className="border-none p-0 focus-visible:ring-0"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={limit.value}
+                                onChange={(e) => updateLimit(index, 'value', parseInt(e.target.value) || 0)}
+                                className="border-none p-0 focus-visible:ring-0 text-center"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={limit.is_active || false}
+                                onCheckedChange={(checked) => updateLimit(index, 'is_active', checked)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeLimit(index)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {limits.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    {t('limits_will_be_configured_after_creating_tariff')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('save_tariff_first_to_add_limits')}
+                  </p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>

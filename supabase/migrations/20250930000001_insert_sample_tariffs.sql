@@ -1,8 +1,8 @@
 -- Insert sample tariffs data
-INSERT INTO public.tariffs (name, description, old_price, new_price, currency, duration_days, is_free, is_lifetime, is_active) VALUES
-  ('Basic Plan', 'Perfect for individuals getting started', 19.99, 14.99, 1, 30, false, false, true),
-  ('Pro Plan', 'Ideal for professionals and small teams', 49.99, 39.99, 1, 30, false, false, true),
-  ('Enterprise Plan', 'For large organizations with advanced needs', 99.99, 79.99, 1, 30, false, false, true);
+INSERT INTO public.tariffs (name, description, old_price, new_price, currency_id, currency_code, duration_days, is_free, is_lifetime, is_active) VALUES
+  ('Basic Plan', 'Perfect for individuals getting started', 19.99, 14.99, 1, 'USD', 30, false, false, true),
+  ('Pro Plan', 'Ideal for professionals and small teams', 49.99, 39.99, 1, 'USD', 30, false, false, true),
+  ('Enterprise Plan', 'For large organizations with advanced needs', 99.99, 79.99, 1, 'USD', 30, false, false, true);
 
 -- Insert sample features for each tariff
 INSERT INTO public.tariff_features (tariff_id, feature_name, is_active) VALUES
