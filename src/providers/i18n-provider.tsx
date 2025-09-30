@@ -563,6 +563,11 @@ const dictionary: Dictionary = {
   failed_to_delete_feature: { uk: "Не вдалося видалити функцію", en: "Failed to delete feature" },
   confirm_delete_feature: { uk: "Підтвердити видалення функції", en: "Confirm Delete Feature" },
   
+  select_currency: { uk: "Оберіть валюту", en: "Select Currency" },
+  is_free: { uk: "Безкоштовний", en: "Free" },
+  is_lifetime: { uk: "Довічний", en: "Lifetime" },
+  is_active: { uk: "Активний", en: "Active" },
+  
   // Additional validation and permission messages
   admin_access_required: { uk: "Необхідні права адміністратора", en: "Admin access required" },
   please_fix_validation_errors: { uk: "Будь ласка, виправте помилки валідації", en: "Please fix validation errors" },
