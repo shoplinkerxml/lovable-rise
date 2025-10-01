@@ -89,33 +89,36 @@ export class UserService {
 
     console.log("UserService.getUsers called with:", { filters, pagination });
 
-    // Подготавливаем фильтры
-    const requestFilters: Record<string, any> = {};
-    if (filters.search) requestFilters.name = filters.search;
-    if (filters.status && filters.status !== "all") requestFilters.status = filters.status;
-    if (filters.role && filters.role !== "all") requestFilters.role = filters.role;
+    // Get auth headers
+    const headers = await getAuthHeaders();
+    
+    // Build query parameters
+    const params = new URLSearchParams();
+    params.append('page', pagination.page.toString());
+    params.append('limit', pagination.limit.toString());
+    
+    // Add filters as query parameters
+    if (filters.search) params.append('search', filters.search);
+    if (filters.status && filters.status !== "all") params.append('status', filters.status);
+    if (filters.role && filters.role !== "all") params.append('role', filters.role);
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
 
-    // Подготавливаем данные для запроса
-    const requestBody = {
-      action: "list" as const,
-      limit: pagination.limit,
-      offset: (pagination.page - 1) * pagination.limit,
-      filters: requestFilters,
-      sortBy: filters.sortBy || "created_at",
-      sortOrder: filters.sortOrder || "desc"
-    };
-
-    const { data: responseData, error } = await supabase.functions.invoke("users", {
-      body: requestBody,
+    // Send direct HTTP GET request to Edge Function
+    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/users?${params.toString()}`, {
+      method: 'GET',
+      headers
     });
 
-    console.log("UserService.getUsers response:", { responseData, error });
+    const responseData = await response.json();
+    console.log("UserService.getUsers response:", { status: response.status, responseData });
 
-    if (error) {
-      throw new ApiError(error.message || "Failed to fetch users", error.status || 500);
+    if (!response.ok) {
+      throw new ApiError(responseData.error || "Failed to fetch users", response.status);
     }
 
-    // Преобразуем ответ в ожидаемый формат
+    // Return the response in expected format
     return {
       users: responseData.users || [],
       total: responseData.total || responseData.users?.length || 0,
@@ -138,18 +141,28 @@ export class UserService {
 
     console.log("UserService.createUser called with:", userData);
 
-    const { data: responseData, error } = await supabase.functions.invoke("users", {
-      body: {
-        action: "create",
-        ...userData,
-        email_confirm: true, // Skip email confirmation for admin-created users
-      },
+    // Get auth headers
+    const headers = await getAuthHeaders();
+    
+    // Send direct HTTP POST request to Edge Function
+    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/users`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        email: userData.email,
+        password: userData.password,
+        name: userData.name,
+        phone: userData.phone,
+        role: userData.role || 'user'
+      })
     });
 
-    console.log("UserService.createUser response:", { responseData, error });
+    const responseData = await response.json();
+    console.log("UserService.createUser response:", { status: response.status, responseData });
 
-    if (error) {
-      throw new ApiError(error.message || "Failed to create user", error.status || 500);
+    if (!response.ok) {
+      throw new ApiError(responseData.error || "Failed to create user", response.status);
     }
 
     if (!responseData || !responseData.user) {
@@ -180,12 +193,10 @@ export class UserService {
 
     console.log("UserService.updateUser called with:", { id, cleanData });
 
-    const { data: responseData, error } = await supabase.functions.invoke("users", {
-      body: {
-        action: "update",
-        id,
-        ...cleanData,
-      },
+    // Send PATCH request to Edge Function
+    const { data: responseData, error } = await supabase.functions.invoke(`users/${id}`, {
+      method: 'PATCH',
+      body: cleanData,
     });
 
     console.log("UserService.updateUser response:", { responseData, error });
@@ -213,11 +224,9 @@ export class UserService {
 
     console.log("UserService.getUser called with:", { id });
 
-    const { data: responseData, error } = await supabase.functions.invoke("users", {
-      body: {
-        action: "get",
-        id,
-      },
+    // Send GET request to Edge Function
+    const { data: responseData, error } = await supabase.functions.invoke(`users/${id}`, {
+      method: 'GET'
     });
 
     console.log("UserService.getUser response:", { responseData, error });
@@ -245,11 +254,9 @@ export class UserService {
 
     console.log("UserService.deleteUser called with:", { id });
 
-    const { data: responseData, error } = await supabase.functions.invoke("users", {
-      body: {
-        action: "delete",
-        id,
-      },
+    // Send DELETE request to Edge Function
+    const { data: responseData, error } = await supabase.functions.invoke(`users/${id}`, {
+      method: 'DELETE'
     });
 
     console.log("UserService.deleteUser response:", { responseData, error });
