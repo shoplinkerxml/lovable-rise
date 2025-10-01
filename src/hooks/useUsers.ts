@@ -124,11 +124,25 @@ export function useDeleteUser() {
   
   return useMutation({
     mutationFn: (id: string) => UserService.deleteUser(id),
-    onSuccess: (data) => {
+    onSuccess: (data, userId) => {
+      // Remove user from all lists in cache optimistically
       queryClient.invalidateQueries({ queryKey: userQueries.lists() });
-      queryClient.removeQueries({ queryKey: userQueries.detail(data.id) });
-      toast.success(t("user_deleted_success"), {
-        description: `${data.name} ${t("user_deleted_desc")}`,
+      queryClient.removeQueries({ queryKey: userQueries.detail(userId) });
+      
+      // Show success message based on what was actually deleted
+      let message = t("user_deleted_success");
+      let description = "";
+      
+      if (data.deletedAuth && data.deletedProfile) {
+        description = t("user_fully_deleted");
+      } else if (data.deletedProfile) {
+        description = t("user_profile_deleted");
+      } else if (data.deletedAuth) {
+        description = t("user_auth_deleted");
+      }
+      
+      toast.success(message, {
+        description: description || t("user_deleted_desc"),
       });
     },
     onError: (error: Error) => {

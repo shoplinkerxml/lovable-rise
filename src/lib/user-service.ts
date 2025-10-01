@@ -193,16 +193,22 @@ export class UserService {
 
     console.log("UserService.updateUser called with:", { id, cleanData });
 
-    // Send PATCH request to Edge Function
-    const { data: responseData, error } = await supabase.functions.invoke(`users/${id}`, {
+    // Get auth headers
+    const headers = await getAuthHeaders();
+    
+    // Send direct HTTP PATCH request to Edge Function
+    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/users/${id}`, {
       method: 'PATCH',
-      body: cleanData,
+      headers,
+      body: JSON.stringify(cleanData)
     });
 
-    console.log("UserService.updateUser response:", { responseData, error });
+    const responseData = await response.json();
+    console.log("UserService.updateUser response:", { status: response.status, responseData });
 
-    if (error) {
-      throw new ApiError(error.message || "Failed to update user", error.status || 500);
+    if (!response.ok) {
+      throw new ApiError(responseData.error || "Failed to update user", response.status);
     }
 
     if (!responseData || !responseData.user) {
@@ -224,15 +230,21 @@ export class UserService {
 
     console.log("UserService.getUser called with:", { id });
 
-    // Send GET request to Edge Function
-    const { data: responseData, error } = await supabase.functions.invoke(`users/${id}`, {
-      method: 'GET'
+    // Get auth headers
+    const headers = await getAuthHeaders();
+    
+    // Send direct HTTP GET request to Edge Function
+    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/users/${id}`, {
+      method: 'GET',
+      headers
     });
 
-    console.log("UserService.getUser response:", { responseData, error });
+    const responseData = await response.json();
+    console.log("UserService.getUser response:", { status: response.status, responseData });
 
-    if (error) {
-      throw new ApiError(error.message || "Failed to get user", error.status || 500);
+    if (!response.ok) {
+      throw new ApiError(responseData.error || "Failed to get user", response.status);
     }
 
     if (!responseData || !responseData.user) {
@@ -243,7 +255,7 @@ export class UserService {
   }
 
   /** Удаление пользователя */
-  static async deleteUser(id: string): Promise<UserProfile> {
+  static async deleteUser(id: string): Promise<{success: boolean, deletedAuth: boolean, deletedProfile: boolean}> {
     if (!id) throw new ApiError("User ID is required", 400);
 
     // Validate session before operation
@@ -254,22 +266,32 @@ export class UserService {
 
     console.log("UserService.deleteUser called with:", { id });
 
-    // Send DELETE request to Edge Function
-    const { data: responseData, error } = await supabase.functions.invoke(`users/${id}`, {
-      method: 'DELETE'
+    // Get auth headers
+    const headers = await getAuthHeaders();
+    
+    // Send direct HTTP DELETE request to Edge Function
+    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/users/${id}`, {
+      method: 'DELETE',
+      headers
     });
 
-    console.log("UserService.deleteUser response:", { responseData, error });
+    const responseData = await response.json();
+    console.log("UserService.deleteUser response:", { status: response.status, responseData });
 
-    if (error) {
-      throw new ApiError(error.message || "Failed to delete user", error.status || 500);
+    if (!response.ok) {
+      throw new ApiError(responseData.error || "Failed to delete user", response.status);
     }
 
-    if (!responseData || !responseData.user) {
+    if (!responseData || typeof responseData.success !== 'boolean') {
       throw new ApiError("Invalid response from server", 500);
     }
 
-    return responseData.user;
+    return {
+      success: responseData.success,
+      deletedAuth: responseData.deletedAuth || false,
+      deletedProfile: responseData.deletedProfile || false
+    };
   }
 
   /** Переключение статуса пользователя */
