@@ -99,12 +99,30 @@ const AdminTariffNew = () => {
         return;
       }
       
-      const tariffData = {
-        ...formData,
-        name: formData.name.trim()
+      // Use correct field mapping as per actual database schema
+      const tariffData: any = {
+        name: formData.name.trim(),
+        description: formData.description,
+        currency_id: formData.currency_id, // Use currency_id as per actual database schema
+        currency_code: formData.currency_code, // Include currency_code as required field
+        duration_days: formData.duration_days,
+        is_free: formData.is_free,
+        is_lifetime: formData.is_lifetime,
+        is_active: formData.is_active
       };
       
-      const createdTariff = await TariffService.createTariff(tariffData as any);
+      // Handle prices based on free tariff status
+      if (formData.is_free) {
+        // For free tariffs, explicitly set prices to null
+        tariffData.old_price = null;
+        tariffData.new_price = null;
+      } else {
+        // For paid tariffs, include prices (can be null or actual values)
+        tariffData.old_price = formData.old_price;
+        tariffData.new_price = formData.new_price;
+      }
+      
+      const createdTariff = await TariffService.createTariff(tariffData);
       setSavedTariffId(createdTariff.id);
       toast.success(t('tariff_created'));
       

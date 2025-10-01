@@ -59,6 +59,7 @@ const AdminTariffEdit = () => {
   const [activeTab, setActiveTab] = useState('basic');
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savedTariffId, setSavedTariffId] = useState<number | null>(null);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
   const [newFeature, setNewFeature] = useState({ feature_name: '', is_active: true });
@@ -298,7 +299,7 @@ const AdminTariffEdit = () => {
     });
   };
 
-  // Save features and limits to database
+  // Save features and limits to database - exact copy from AdminTariffNew (for new tariffs only)
   const saveFeatures = async (tariffId: number) => {
     for (const feature of features) {
       if (feature.id > 1000000) { // Temporary ID, needs to be created
@@ -324,18 +325,18 @@ const AdminTariffEdit = () => {
     }
   };
 
-  // Update features for existing tariff
-  const updateFeatures = async (tariffId: number) => {
+  // Save ALL features and limits for edit mode - separate request for each item
+  const saveAllFeatures = async (tariffId: number) => {
     for (const feature of features) {
       if (feature.id > 1000000) {
-        // New feature, create it
+        // New feature - create it
         await TariffService.addTariffFeature({
           tariff_id: tariffId,
           feature_name: feature.feature_name,
           is_active: feature.is_active
         });
       } else {
-        // Existing feature, update it
+        // Existing feature - update it with separate request
         await TariffService.updateTariffFeature(feature.id, {
           feature_name: feature.feature_name,
           is_active: feature.is_active
@@ -344,11 +345,10 @@ const AdminTariffEdit = () => {
     }
   };
 
-  // Update limits for existing tariff
-  const updateLimits = async (tariffId: number) => {
+  const saveAllLimits = async (tariffId: number) => {
     for (const limit of limits) {
       if (limit.id > 1000000) {
-        // New limit, create it
+        // New limit - create it
         await TariffService.addTariffLimit({
           tariff_id: tariffId,
           limit_name: limit.limit_name,
@@ -356,7 +356,7 @@ const AdminTariffEdit = () => {
           is_active: limit.is_active
         });
       } else {
-        // Existing limit, update it
+        // Existing limit - update it with separate request
         await TariffService.updateTariffLimit(limit.id, {
           limit_name: limit.limit_name,
           value: limit.value,
@@ -367,65 +367,78 @@ const AdminTariffEdit = () => {
   };
 
   const handleSave = async () => {
-    // Check admin permissions
-    if (!isAdmin) {
-      toast.error(t('admin_access_required'));
-      return;
-    }
-    
     try {
       setLoading(true);
       
-      // Enhanced validation
-      if (!validateForm()) {
-        toast.error(t('please_fix_validation_errors'));
+      // Validation
+      if (!formData.name.trim()) {
+        toast.error(t('validation_error'));
         return;
       }
       
       if (id) {
-        // Update existing tariff
-        const tariffData = {
+        // Update existing tariff - use correct field mapping as per actual database schema
+        const tariffData: any = {
           name: formData.name.trim(),
           description: formData.description,
-          old_price: formData.old_price,
-          new_price: formData.new_price,
-          currency: formData.currency_id, // Map currency_id to currency for database
+          currency_id: formData.currency_id, // Use currency_id as per actual database schema
+          currency_code: formData.currency_code, // Include currency_code as required field
           duration_days: formData.duration_days,
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
           is_active: formData.is_active
         };
         
-        console.log('Updating tariff data:', tariffData);
-        await TariffService.updateTariff(parseInt(id), tariffData as any);
+        // Handle prices based on free tariff status
+        if (formData.is_free) {
+          // For free tariffs, explicitly set prices to null
+          tariffData.old_price = null;
+          tariffData.new_price = null;
+        } else {
+          // For paid tariffs, include prices (can be null or actual values)
+          tariffData.old_price = formData.old_price;
+          tariffData.new_price = formData.new_price;
+        }
         
-        // Update features and limits
-        await updateFeatures(parseInt(id));
-        await updateLimits(parseInt(id));
+        await TariffService.updateTariff(parseInt(id), tariffData);
+        
+        // Now save ALL features and limits with separate requests for each
+        await saveAllFeatures(parseInt(id));
+        await saveAllLimits(parseInt(id));
         
         toast.success(t('tariff_updated_successfully'));
       } else {
-        // Create new tariff (keep existing logic for new creation)
-        const tariffData = {
+        // Create new tariff - use correct field mapping as per actual database schema
+        const tariffData: any = {
           name: formData.name.trim(),
           description: formData.description,
-          old_price: formData.old_price,
-          new_price: formData.new_price,
-          currency: formData.currency_id, // Map currency_id to currency for database
+          currency_id: formData.currency_id, // Use currency_id as per actual database schema
+          currency_code: formData.currency_code, // Include currency_code as required field
           duration_days: formData.duration_days,
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
           is_active: formData.is_active
         };
         
-        console.log('Creating new tariff data:', tariffData);
-        const createdTariff = await TariffService.createTariff(tariffData as any);
+        // Handle prices based on free tariff status
+        if (formData.is_free) {
+          // For free tariffs, explicitly set prices to null
+          tariffData.old_price = null;
+          tariffData.new_price = null;
+        } else {
+          // For paid tariffs, include prices
+          tariffData.old_price = formData.old_price;
+          tariffData.new_price = formData.new_price;
+        }
+        
+        const createdTariff = await TariffService.createTariff(tariffData);
+        setSavedTariffId(createdTariff.id);
         
         // Save features and limits if they exist
         await saveFeatures(createdTariff.id);
         await saveLimits(createdTariff.id);
         
-        toast.success(t('tariff_created_successfully'));
+        toast.success(t('tariff_created'));
       }
       
       navigate('/admin/tariff');
@@ -445,7 +458,7 @@ const AdminTariffEdit = () => {
     }
     const feature: TariffFeature = {
       id: Date.now(), // Temporary ID for new features
-      tariff_id: 0,
+      tariff_id: savedTariffId || 0,
       feature_name: newFeature.feature_name,
       is_active: newFeature.is_active,
       created_at: new Date().toISOString(),
@@ -518,7 +531,7 @@ const AdminTariffEdit = () => {
     }
     const limit: TariffLimit = {
       id: Date.now(), // Temporary ID for new limits
-      tariff_id: 0,
+      tariff_id: savedTariffId || 0,
       limit_name: newLimit.limit_name,
       value: newLimit.value,
       is_active: newLimit.is_active,
@@ -702,12 +715,10 @@ const AdminTariffEdit = () => {
               <ArrowLeft className="mr-2 h-4 w-4" />
               {t('back')}
             </Button>
-            {isAdmin && (
-              <Button onClick={handleSave} disabled={loading}>
-                <Save className="mr-2 h-4 w-4" />
-                {loading ? t('saving') : (id ? t('update') : t('save'))}
-              </Button>
-            )}
+            <Button onClick={handleSave} disabled={loading}>
+              <Save className="mr-2 h-4 w-4" />
+              {loading ? t('saving') : (id ? t('update') : t('save'))}
+            </Button>
           </div>
         }
       />

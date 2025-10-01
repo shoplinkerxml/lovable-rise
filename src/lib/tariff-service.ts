@@ -102,13 +102,14 @@ export class TariffService {
 
       if (tariffError) throw tariffError;
       
-      // 2. Get currency data separately if valid currency field exists
+      // 2. Get currency data separately if valid currency_id field exists (actual database schema)
       let currencyData = null;
-      if (tariffData.currency && typeof tariffData.currency === 'number') {
+      const currencyId = (tariffData as any).currency_id || (tariffData as any).currency;
+      if (currencyId && typeof currencyId === 'number') {
         const { data: currency, error: currencyError } = await supabase
           .from('currencies')
           .select('*')
-          .eq('id', tariffData.currency)
+          .eq('id', currencyId)
           .single();
           
         if (!currencyError) {
@@ -132,14 +133,14 @@ export class TariffService {
         .eq('is_active', true)
         .order('limit_name');
       
-      // Transform the data to match our interface
+      // Transform the data to match our interface - handle both currency and currency_id fields
       const tariffWithDetails = {
         id: tariffData.id,
         name: tariffData.name,
         description: tariffData.description,
         old_price: tariffData.old_price,
         new_price: tariffData.new_price,
-        currency: tariffData.currency, // Keep original database field name
+        currency: (tariffData as any).currency_id || tariffData.currency, // Support both field names
         duration_days: tariffData.duration_days,
         is_free: tariffData.is_free,
         is_lifetime: tariffData.is_lifetime,
@@ -170,8 +171,8 @@ export class TariffService {
 
       if (createError) throw createError;
 
-      // Then fetch the currency data separately if currency field exists and is valid
-      const currencyField = (createdTariff as any).currency;
+      // Then fetch the currency data separately - handle both currency and currency_id fields
+      const currencyField = (createdTariff as any).currency_id || (createdTariff as any).currency;
       if (currencyField && typeof currencyField === 'number') {
         const { data: currencyData, error: currencyError } = await supabase
           .from('currencies')
@@ -213,8 +214,8 @@ export class TariffService {
 
       if (updateError) throw updateError;
 
-      // Then fetch the currency data separately if currency field exists and is valid
-      const currencyField = (updatedTariff as any).currency;
+      // Then fetch the currency data separately - handle both currency and currency_id fields
+      const currencyField = (updatedTariff as any).currency_id || (updatedTariff as any).currency;
       if (currencyField && typeof currencyField === 'number') {
         const { data: currencyData, error: currencyError } = await supabase
           .from('currencies')
