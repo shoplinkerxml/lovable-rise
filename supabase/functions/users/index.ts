@@ -391,40 +391,52 @@ Deno.serve(async (req) => {
 
     // ---------------- DELETE /users/:id ----------------
     if (req.method === 'DELETE' && userId) {
+      let deletedAuth = false;
+      let deletedProfile = false;
+
       try {
-        // Delete user from auth
+        // Удаление из Auth
         const { error: authError } = await serviceClient.auth.admin.deleteUser(userId);
-        if (authError) {
-          console.error('Auth delete error:', authError);
-          return new Response(JSON.stringify({ error: `Auth delete error: ${authError.message}` }), { 
-            status: 500, 
-            headers: corsHeaders 
-          });
+        if (!authError) {
+          deletedAuth = true;
+          console.log(`Successfully deleted user from auth: ${userId}`);
+        } else {
+          console.warn("Auth delete error:", authError.message);
         }
 
-        // Delete user profile
-        const { data: user, error: profileError } = await serviceClient
+        // Удаление из profiles
+        const { error: profileError } = await serviceClient
           .from('profiles')
           .delete()
-          .eq('id', userId)
-          .select()
-          .maybeSingle();
-          
-        if (profileError) {
-          console.error('Profile delete error:', profileError);
-          return new Response(JSON.stringify({ error: `Profile delete error: ${profileError.message}` }), { 
-            status: 500, 
-            headers: corsHeaders 
-          });
+          .eq('id', userId);
+
+        if (!profileError) {
+          deletedProfile = true;
+          console.log(`Successfully deleted user profile: ${userId}`);
+        } else {
+          console.warn("Profile delete error:", profileError.message);
         }
 
-        return new Response(JSON.stringify({ user }), { headers: corsHeaders });
+        // Формируем ответ
+        if (deletedAuth || deletedProfile) {
+          return new Response(JSON.stringify({
+            success: true,
+            deletedAuth,
+            deletedProfile
+          }), { headers: corsHeaders, status: 200 });
+        } else {
+          return new Response(JSON.stringify({
+            success: false,
+            error: "User not found in auth and profiles"
+          }), { headers: corsHeaders, status: 500 });
+        }
+
       } catch (err) {
-        console.error('Unexpected error in DELETE /users:', err);
-        return new Response(JSON.stringify({ error: `Unexpected error: ${err.message || 'Unknown error'}` }), { 
-          status: 500, 
-          headers: corsHeaders 
-        });
+        console.error("Unexpected error in DELETE /users:", err);
+        return new Response(JSON.stringify({
+          success: false,
+          error: err.message
+        }), { headers: corsHeaders, status: 500 });
       }
     }
 
