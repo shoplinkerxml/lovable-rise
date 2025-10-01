@@ -85,7 +85,7 @@ const AdminTariffEdit = () => {
     checkUserPermissions();
     // Fetch tariff name for breadcrumb if we have an ID
     if (id) {
-      fetchTariffName(parseInt(id));
+      fetchTariffData(parseInt(id));
     }
   }, [id]);
 
@@ -147,16 +147,84 @@ const AdminTariffEdit = () => {
       errors.duration_days = t('duration_must_be_non_negative');
     }
     
-    // Check if currency exists in currencies list
-    const currencyExists = currencies.find(c => c.id === formData.currency_id);
-    if (!currencyExists) {
-      errors.currency_id = t('invalid_currency_selected');
+    // Check if currency exists in currencies list (defensive check)
+    if (formData.currency_id && currencies.length > 0) {
+      const currencyExists = currencies.find(c => c.id === formData.currency_id);
+      if (!currencyExists) {
+        errors.currency_id = t('invalid_currency_selected');
+      }
     }
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
+
+  // Load existing tariff data for editing using TariffService.getTariffById as per memory spec
+  const fetchTariffData = async (tariffId: number) => {
+    try {
+      setLoading(true);
+      console.log('Loading tariff data for ID:', tariffId);
+      
+      // Use TariffService.getTariffById() for loading single tariffs with full relational data
+      const tariffWithDetails = await TariffService.getTariffById(tariffId);
+      
+      if (tariffWithDetails) {
+        // Extract currency code safely
+        let currencyCode = 'USD'; // Default fallback
+        if (tariffWithDetails.currency_data?.code) {
+          currencyCode = tariffWithDetails.currency_data.code;
+        }
+        
+        // Update form data with loaded tariff
+        setFormData({
+          name: tariffWithDetails.name || '',
+          description: tariffWithDetails.description || '',
+          old_price: tariffWithDetails.old_price,
+          new_price: tariffWithDetails.new_price,
+          currency_id: tariffWithDetails.currency || 1,
+          currency_code: currencyCode,
+          duration_days: tariffWithDetails.duration_days,
+          is_free: tariffWithDetails.is_free || false,
+          is_lifetime: tariffWithDetails.is_lifetime || false,
+          is_active: tariffWithDetails.is_active || true
+        });
+        
+        // Load features and limits
+        setFeatures(tariffWithDetails.features || []);
+        setLimits(tariffWithDetails.limits || []);
+        
+        // Update tariff name for breadcrumb
+        setTariffName(tariffWithDetails.name);
+        setCustomBreadcrumbs([
+          {
+            label: t("breadcrumb_home"),
+            href: "/admin/dashboard",
+          },
+          {
+            label: t("menu_pricing"),
+            href: "/admin/tariff",
+          },
+          {
+            label: tariffWithDetails.name,
+            current: true,
+          }
+        ]);
+        
+        console.log('Tariff data loaded successfully:', {
+          tariff: tariffWithDetails.name,
+          features: tariffWithDetails.features?.length || 0,
+          limits: tariffWithDetails.limits?.length || 0
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error fetching tariff data:', error);
+      toast.error(t('failed_load_tariff'));
+    } finally {
+      setLoading(false);
+    }
+  };
   // Fetch only tariff name for breadcrumb
   const fetchTariffName = async (tariffId: number) => {
     try {
@@ -190,8 +258,7 @@ const AdminTariffEdit = () => {
     }
   };
 
-  // Remove the complex fetchTariffData function - we want an empty form like tariff/new
-  // Component starts with default empty values in formData state
+  // When editing existing tariff, load its data. When creating new, start with empty form
 
   const fetchCurrencies = async () => {
     try {
@@ -257,6 +324,48 @@ const AdminTariffEdit = () => {
     }
   };
 
+  // Update features for existing tariff
+  const updateFeatures = async (tariffId: number) => {
+    for (const feature of features) {
+      if (feature.id > 1000000) {
+        // New feature, create it
+        await TariffService.addTariffFeature({
+          tariff_id: tariffId,
+          feature_name: feature.feature_name,
+          is_active: feature.is_active
+        });
+      } else {
+        // Existing feature, update it
+        await TariffService.updateTariffFeature(feature.id, {
+          feature_name: feature.feature_name,
+          is_active: feature.is_active
+        });
+      }
+    }
+  };
+
+  // Update limits for existing tariff
+  const updateLimits = async (tariffId: number) => {
+    for (const limit of limits) {
+      if (limit.id > 1000000) {
+        // New limit, create it
+        await TariffService.addTariffLimit({
+          tariff_id: tariffId,
+          limit_name: limit.limit_name,
+          value: limit.value,
+          is_active: limit.is_active
+        });
+      } else {
+        // Existing limit, update it
+        await TariffService.updateTariffLimit(limit.id, {
+          limit_name: limit.limit_name,
+          value: limit.value,
+          is_active: limit.is_active
+        });
+      }
+    }
+  };
+
   const handleSave = async () => {
     // Check admin permissions
     if (!isAdmin) {
@@ -273,31 +382,56 @@ const AdminTariffEdit = () => {
         return;
       }
       
-      // Map form data to database structure for creating new tariff
-      const tariffData = {
-        name: formData.name.trim(),
-        description: formData.description,
-        old_price: formData.old_price,
-        new_price: formData.new_price,
-        currency: formData.currency_id, // Map currency_id to currency for database
-        duration_days: formData.duration_days,
-        is_free: formData.is_free,
-        is_lifetime: formData.is_lifetime,
-        is_active: formData.is_active
-      };
+      if (id) {
+        // Update existing tariff
+        const tariffData = {
+          name: formData.name.trim(),
+          description: formData.description,
+          old_price: formData.old_price,
+          new_price: formData.new_price,
+          currency: formData.currency_id, // Map currency_id to currency for database
+          duration_days: formData.duration_days,
+          is_free: formData.is_free,
+          is_lifetime: formData.is_lifetime,
+          is_active: formData.is_active
+        };
+        
+        console.log('Updating tariff data:', tariffData);
+        await TariffService.updateTariff(parseInt(id), tariffData as any);
+        
+        // Update features and limits
+        await updateFeatures(parseInt(id));
+        await updateLimits(parseInt(id));
+        
+        toast.success(t('tariff_updated_successfully'));
+      } else {
+        // Create new tariff (keep existing logic for new creation)
+        const tariffData = {
+          name: formData.name.trim(),
+          description: formData.description,
+          old_price: formData.old_price,
+          new_price: formData.new_price,
+          currency: formData.currency_id, // Map currency_id to currency for database
+          duration_days: formData.duration_days,
+          is_free: formData.is_free,
+          is_lifetime: formData.is_lifetime,
+          is_active: formData.is_active
+        };
+        
+        console.log('Creating new tariff data:', tariffData);
+        const createdTariff = await TariffService.createTariff(tariffData as any);
+        
+        // Save features and limits if they exist
+        await saveFeatures(createdTariff.id);
+        await saveLimits(createdTariff.id);
+        
+        toast.success(t('tariff_created_successfully'));
+      }
       
-      console.log('Creating new tariff data:', tariffData);
-      const createdTariff = await TariffService.createTariff(tariffData as any);
-      
-      // Save features and limits if they exist
-      await saveFeatures(createdTariff.id);
-      await saveLimits(createdTariff.id);
-      
-      toast.success(t('tariff_created_successfully'));
       navigate('/admin/tariff');
     } catch (error) {
-      console.error('Error creating tariff:', error);
-      toast.error(t('failed_create_tariff'));
+      console.error('Error saving tariff:', error);
+      toast.error(id ? t('failed_update_tariff') : t('failed_create_tariff'));
     } finally {
       setLoading(false);
     }
@@ -321,14 +455,59 @@ const AdminTariffEdit = () => {
     setNewFeature({ feature_name: '', is_active: true });
   };
 
-  const removeFeature = (index: number) => {
+  const removeFeature = async (index: number) => {
+    const feature = features[index];
+    // If it's an existing feature (has real ID), delete from database
+    if (feature.id <= 1000000 && id) {
+      try {
+        await TariffService.deleteTariffFeature(feature.id);
+        toast.success(t('feature_deleted_successfully'));
+      } catch (error) {
+        console.error('Error deleting feature:', error);
+        toast.error(t('failed_to_delete_feature'));
+        return; // Don't remove from local state if deletion failed
+      }
+    }
+    // Remove from local state
     setFeatures(features.filter((_, i) => i !== index));
   };
 
   const updateFeature = (index: number, field: keyof TariffFeature, value: any) => {
     const updatedFeatures = [...features];
-    updatedFeatures[index] = { ...updatedFeatures[index], [field]: value };
+    updatedFeatures[index] = { ...updatedFeatures[index], [field]: value, updated_at: new Date().toISOString() };
     setFeatures(updatedFeatures);
+  };
+
+  // Save individual feature changes (for edit mode)
+  const saveFeature = async (index: number) => {
+    if (!id) return; // Only for edit mode
+    
+    const feature = features[index];
+    try {
+      if (feature.id > 1000000) {
+        // New feature, create it
+        const createdFeature = await TariffService.addTariffFeature({
+          tariff_id: parseInt(id),
+          feature_name: feature.feature_name,
+          is_active: feature.is_active
+        });
+        // Update the feature with the real ID
+        const updatedFeatures = [...features];
+        updatedFeatures[index] = createdFeature;
+        setFeatures(updatedFeatures);
+        toast.success(t('feature_saved_successfully'));
+      } else {
+        // Existing feature, update it
+        await TariffService.updateTariffFeature(feature.id, {
+          feature_name: feature.feature_name,
+          is_active: feature.is_active
+        });
+        toast.success(t('feature_updated_successfully'));
+      }
+    } catch (error) {
+      console.error('Error saving feature:', error);
+      toast.error(t('failed_save_feature'));
+    }
   };
 
   // Limits management (like in AdminTariffNew)
@@ -350,14 +529,61 @@ const AdminTariffEdit = () => {
     setNewLimit({ limit_name: '', value: 0, is_active: true });
   };
 
-  const removeLimit = (index: number) => {
+  const removeLimit = async (index: number) => {
+    const limit = limits[index];
+    // If it's an existing limit (has real ID), delete from database
+    if (limit.id <= 1000000 && id) {
+      try {
+        await TariffService.deleteTariffLimit(limit.id);
+        toast.success(t('limit_deleted_successfully'));
+      } catch (error) {
+        console.error('Error deleting limit:', error);
+        toast.error(t('failed_to_delete_limit'));
+        return; // Don't remove from local state if deletion failed
+      }
+    }
+    // Remove from local state
     setLimits(limits.filter((_, i) => i !== index));
   };
 
   const updateLimit = (index: number, field: keyof TariffLimit, value: any) => {
     const updatedLimits = [...limits];
-    updatedLimits[index] = { ...updatedLimits[index], [field]: value };
+    updatedLimits[index] = { ...updatedLimits[index], [field]: value, updated_at: new Date().toISOString() };
     setLimits(updatedLimits);
+  };
+
+  // Save individual limit changes (for edit mode)
+  const saveLimit = async (index: number) => {
+    if (!id) return; // Only for edit mode
+    
+    const limit = limits[index];
+    try {
+      if (limit.id > 1000000) {
+        // New limit, create it
+        const createdLimit = await TariffService.addTariffLimit({
+          tariff_id: parseInt(id),
+          limit_name: limit.limit_name,
+          value: limit.value,
+          is_active: limit.is_active
+        });
+        // Update the limit with the real ID
+        const updatedLimits = [...limits];
+        updatedLimits[index] = createdLimit;
+        setLimits(updatedLimits);
+        toast.success(t('limit_saved_successfully'));
+      } else {
+        // Existing limit, update it
+        await TariffService.updateTariffLimit(limit.id, {
+          limit_name: limit.limit_name,
+          value: limit.value,
+          is_active: limit.is_active
+        });
+        toast.success(t('limit_updated_successfully'));
+      }
+    } catch (error) {
+      console.error('Error saving limit:', error);
+      toast.error(t('failed_save_limit'));
+    }
   };
 
   // Load sample data functions (like in AdminTariffNew)
@@ -425,6 +651,11 @@ const AdminTariffEdit = () => {
   };
 
   const getCurrencySymbol = (currencyId: number) => {
+    // Validate currencyId before finding currency
+    if (!currencyId || typeof currencyId !== 'number') {
+      return '$'; // Default fallback
+    }
+    
     const currency = currencies.find(c => c.id === currencyId);
     // Since currency doesn't have symbol property, we'll use a simple mapping
     const symbolMap: Record<string, string> = {
@@ -462,8 +693,8 @@ const AdminTariffEdit = () => {
       )}
       
       <PageHeader
-        title={t('edit_tariff')}
-        description={t('edit_tariff_description')}
+        title={id ? t('edit_tariff') : t('create_tariff')}
+        description={id ? t('edit_tariff_description') : t('create_tariff_description')}
         breadcrumbItems={customBreadcrumbs}
         actions={
           <div className="flex gap-2">
@@ -474,7 +705,7 @@ const AdminTariffEdit = () => {
             {isAdmin && (
               <Button onClick={handleSave} disabled={loading}>
                 <Save className="mr-2 h-4 w-4" />
-                {loading ? t('saving') : t('save')}
+                {loading ? t('saving') : (id ? t('update') : t('save'))}
               </Button>
             )}
           </div>
@@ -483,7 +714,7 @@ const AdminTariffEdit = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('tariff_details')}</CardTitle>
+          <CardTitle>{id ? t('edit_tariff_details') : t('tariff_details')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -722,14 +953,26 @@ const AdminTariffEdit = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeFeature(index)}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex justify-end space-x-2">
+                                  {id && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => saveFeature(index)}
+                                      className="text-green-600 hover:text-green-800"
+                                    >
+                                      <Save className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFeature(index)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
@@ -852,14 +1095,26 @@ const AdminTariffEdit = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeLimit(index)}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex justify-end space-x-2">
+                                  {id && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => saveLimit(index)}
+                                      className="text-green-600 hover:text-green-800"
+                                    >
+                                      <Save className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeLimit(index)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>

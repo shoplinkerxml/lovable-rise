@@ -28,6 +28,7 @@ import CurrencyManagement from "./pages/admin/settings/CurrencyManagement";
 import AdminTariffManagement from "./pages/admin/AdminTariffManagement";
 import AdminTariffFeatures from "./pages/admin/AdminTariffFeatures";
 import AdminTariffNew from "./pages/admin/AdminTariffNew";
+import AdminTariffEdit from "./pages/admin/AdminTariffEdit";
 import TariffPage from "./pages/TariffPage";
 
 const queryClient = new QueryClient({
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
               <Route path="tariff" element={<AdminLayout><AdminTariffManagement /></AdminLayout>} />
               <Route path="tariff/new" element={<AdminLayout><AdminTariffNew /></AdminLayout>} />
+              <Route path="tariff/edit/:id" element={<AdminLayout><AdminTariffEdit /></AdminLayout>} />
               <Route path="tariff/features" element={<AdminLayout><AdminTariffFeatures /></AdminLayout>} />
             </Route>
             

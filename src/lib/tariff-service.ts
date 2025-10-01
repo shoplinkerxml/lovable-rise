@@ -40,14 +40,10 @@ export class TariffService {
     try {
       console.log('TariffService.getAllTariffs called with includeInactive:', includeInactive);
       
+      // Use simple select without joins as per memory specification for data loading
       let query = supabase
         .from('tariffs')
-        .select(`
-          *,
-          currency_data:currencies!fk_tariffs_currency(*),
-          tariff_features!tariff_features_tariff_id_fkey(*),
-          tariff_limits!tariff_limits_tariff_id_fkey(*)
-        `)
+        .select('*')
         .order('name');
 
       if (!includeInactive) {
@@ -69,23 +65,24 @@ export class TariffService {
       }
       
       // Transform the data to match our TariffWithDetails interface
+      // Using separate requests for related data would be done here if needed for full details
       return data.map(tariff => ({
         id: tariff.id,
         name: tariff.name,
         description: tariff.description,
         old_price: tariff.old_price,
         new_price: tariff.new_price,
-        currency_id: (tariff as any).currency_id,
-        currency_code: (tariff as any).currency_code,
+        currency_id: tariff.currency, // Map currency field to currency_id for compatibility
+        currency_code: 'USD', // Default, would be fetched separately if needed
         duration_days: tariff.duration_days,
         is_free: tariff.is_free,
         is_lifetime: tariff.is_lifetime,
         is_active: tariff.is_active,
         created_at: tariff.created_at,
         updated_at: tariff.updated_at,
-        currency_data: tariff.currency_data,
-        features: tariff.tariff_features,
-        limits: tariff.tariff_limits
+        currency_data: null, // Would be populated with separate request if needed
+        features: [], // Would be populated with separate request if needed
+        limits: [] // Would be populated with separate request if needed
       })) as any[];
     } catch (error) {
       console.error('Error fetching tariffs:', error);
@@ -93,39 +90,65 @@ export class TariffService {
     }
   }
 
-  // Get tariff by ID with features and limits
+  // Get tariff by ID with features and limits - uses separate requests as per specification
   static async getTariffById(id: number) {
     try {
-      const { data, error } = await supabase
+      // 1. Get basic tariff data
+      const { data: tariffData, error: tariffError } = await supabase
         .from('tariffs')
-        .select(`
-          *,
-          currency_data:currencies!fk_tariffs_currency(*),
-          tariff_features!tariff_features_tariff_id_fkey(*),
-          tariff_limits!tariff_limits_tariff_id_fkey(*)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (tariffError) throw tariffError;
+      
+      // 2. Get currency data separately if valid currency field exists
+      let currencyData = null;
+      if (tariffData.currency && typeof tariffData.currency === 'number') {
+        const { data: currency, error: currencyError } = await supabase
+          .from('currencies')
+          .select('*')
+          .eq('id', tariffData.currency)
+          .single();
+          
+        if (!currencyError) {
+          currencyData = currency;
+        }
+      }
+      
+      // 3. Get features separately
+      const { data: featuresData } = await supabase
+        .from('tariff_features')
+        .select('*')
+        .eq('tariff_id', id)
+        .eq('is_active', true)
+        .order('feature_name');
+      
+      // 4. Get limits separately
+      const { data: limitsData } = await supabase
+        .from('tariff_limits')
+        .select('*')
+        .eq('tariff_id', id)
+        .eq('is_active', true)
+        .order('limit_name');
       
       // Transform the data to match our interface
       const tariffWithDetails = {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        old_price: data.old_price,
-        new_price: data.new_price,
-        currency: data.currency, // Keep original database field name
-        duration_days: data.duration_days,
-        is_free: data.is_free,
-        is_lifetime: data.is_lifetime,
-        is_active: data.is_active,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        currency_data: data.currency_data,
-        features: data.tariff_features,
-        limits: data.tariff_limits
+        id: tariffData.id,
+        name: tariffData.name,
+        description: tariffData.description,
+        old_price: tariffData.old_price,
+        new_price: tariffData.new_price,
+        currency: tariffData.currency, // Keep original database field name
+        duration_days: tariffData.duration_days,
+        is_free: tariffData.is_free,
+        is_lifetime: tariffData.is_lifetime,
+        is_active: tariffData.is_active,
+        created_at: tariffData.created_at,
+        updated_at: tariffData.updated_at,
+        currency_data: currencyData,
+        features: featuresData || [],
+        limits: limitsData || []
       };
       
       return tariffWithDetails as any;
@@ -147,24 +170,30 @@ export class TariffService {
 
       if (createError) throw createError;
 
-      // Then fetch the currency data separately
-      const { data: currencyData, error: currencyError } = await supabase
-        .from('currencies')
-        .select('*')
-        .eq('id', (createdTariff as any).currency_id)
-        .single();
+      // Then fetch the currency data separately if currency field exists and is valid
+      const currencyField = (createdTariff as any).currency;
+      if (currencyField && typeof currencyField === 'number') {
+        const { data: currencyData, error: currencyError } = await supabase
+          .from('currencies')
+          .select('*')
+          .eq('id', currencyField)
+          .single();
 
-      if (currencyError) {
-        console.warn('Could not fetch currency data:', currencyError);
-        // Return tariff without currency data if currency fetch fails
-        return createdTariff as Tariff;
+        if (currencyError) {
+          console.warn('Could not fetch currency data:', currencyError);
+          // Return tariff without currency data if currency fetch fails
+          return createdTariff as Tariff;
+        }
+
+        // Combine the data
+        return {
+          ...createdTariff,
+          currency_data: currencyData
+        } as (Tariff & { currency_data: Currency });
       }
 
-      // Combine the data
-      return {
-        ...createdTariff,
-        currency_data: currencyData
-      } as (Tariff & { currency_data: Currency });
+      // Return tariff without currency data if no valid currency field
+      return createdTariff as Tariff;
     } catch (error) {
       console.error('Error creating tariff:', error);
       throw error;
@@ -184,12 +213,13 @@ export class TariffService {
 
       if (updateError) throw updateError;
 
-      // Then fetch the currency data separately if currency_id field exists
-      if ((updatedTariff as any).currency_id) {
+      // Then fetch the currency data separately if currency field exists and is valid
+      const currencyField = (updatedTariff as any).currency;
+      if (currencyField && typeof currencyField === 'number') {
         const { data: currencyData, error: currencyError } = await supabase
           .from('currencies')
           .select('*')
-          .eq('id', (updatedTariff as any).currency_id)
+          .eq('id', currencyField)
           .single();
 
         if (currencyError) {
