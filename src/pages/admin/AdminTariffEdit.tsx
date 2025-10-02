@@ -938,8 +938,8 @@ const AdminTariffEdit = () => {
               {/* Add new feature form */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-2 md:col-span-2 lg:col-span-1">
+                  <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
+                    <div className="space-y-2 md:col-span-6">
                       <Label htmlFor="new-feature-name">{t('feature_name')}</Label>
                       <Input
                         id="new-feature-name"
@@ -949,9 +949,9 @@ const AdminTariffEdit = () => {
                         disabled={!isAdmin}
                       />
                     </div>
-                <div className="space-y-2">
+                    <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-feature-active">Активний</Label>
-                      <div className="flex h-10 w-full items-center">
+                      <div className="flex h-10 w-full items-center justify-center">
                         <Switch
                           id="new-feature-active"
                           checked={newFeature.is_active}
@@ -960,7 +960,7 @@ const AdminTariffEdit = () => {
                         />
                       </div>
                     </div>
-                    <div className="flex justify-center md:justify-start">
+                    <div className="flex justify-center md:justify-end md:col-span-2">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1106,8 +1106,8 @@ const AdminTariffEdit = () => {
               {/* Add new limit form */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
+                    <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="new-limit-name">{t('limit_name')}</Label>
                       <Input
                         id="new-limit-name"
@@ -1117,7 +1117,7 @@ const AdminTariffEdit = () => {
                         disabled={!isAdmin}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-limit-value">{t('limit_value')}</Label>
                       <Input
                         id="new-limit-value"
@@ -1127,11 +1127,12 @@ const AdminTariffEdit = () => {
                         onChange={(e) => setNewLimit({ ...newLimit, value: parseInt(e.target.value) || 0 })}
                         placeholder={t('enter_limit_value')}
                         disabled={!isAdmin}
+                        className="text-center"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-limit-active">Активний</Label>
-                      <div className="flex h-10 w-full items-center">
+                      <div className="flex h-10 w-full items-center justify-center">
                         <Switch
                           id="new-limit-active"
                           checked={newLimit.is_active}
@@ -1140,7 +1141,7 @@ const AdminTariffEdit = () => {
                         />
                       </div>
                     </div>
-                    <div className="flex justify-center md:justify-start">
+                    <div className="flex justify-center md:justify-end md:col-span-2">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
