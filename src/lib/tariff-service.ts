@@ -539,4 +539,43 @@ export class TariffService {
       throw error;
     }
   }
+
+  // Get tariff statistics
+  static async getTariffStatistics() {
+    try {
+      // Get total tariffs count
+      const { count: totalTariffs, error: totalError } = await supabase
+        .from('tariffs')
+        .select('*', { count: 'exact', head: true });
+
+      if (totalError) throw totalError;
+
+      // Get active tariffs count
+      const { count: activeTariffs, error: activeError } = await supabase
+        .from('tariffs')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      if (activeError) throw activeError;
+
+      // Get free tariffs count
+      const { count: freeTariffs, error: freeError } = await supabase
+        .from('tariffs')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_free', true)
+        .eq('is_active', true);
+
+      if (freeError) throw freeError;
+
+      return {
+        totalTariffs: totalTariffs || 0,
+        activeTariffs: activeTariffs || 0,
+        freeTariffs: freeTariffs || 0,
+        paidTariffs: (activeTariffs || 0) - (freeTariffs || 0)
+      };
+    } catch (error) {
+      console.error('Error fetching tariff statistics:', error);
+      throw error;
+    }
+  }
 }

@@ -588,6 +588,13 @@ const userStatisticsDictionary = {
   user_statistics: { uk: "Статистика користувачів", en: "User Statistics" },
 };
 
+// Tariff Statistics
+const tariffStatisticsDictionary = {
+  active_tariffs: { uk: "Активні тарифи", en: "Active Tariffs" },
+  tariff_plans: { uk: "тарифних планів", en: "tariff plans" },
+  error_fetch_tariffs: { uk: "Помилка завантаження тарифів", en: "Error fetching tariffs" },
+};
+
 // Error Messages
 const errorMessagesDictionary = {
   profile_not_found: { uk: "Профіль користувача не знайдено. Оновіть сторінку та спробуйте ще раз.", en: "User profile not found. Please refresh and try again." },
@@ -689,7 +696,7 @@ const toastDictionary = {
 };
 
 // Merge dictionaries
-Object.assign(dictionary, userStatisticsDictionary, errorMessagesDictionary, successMessagesDictionary, toastDictionary);
+Object.assign(dictionary, userStatisticsDictionary, tariffStatisticsDictionary, errorMessagesDictionary, successMessagesDictionary, toastDictionary);
 
 type I18nContextType = {
   lang: Lang;
