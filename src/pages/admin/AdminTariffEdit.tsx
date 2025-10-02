@@ -742,7 +742,7 @@ const AdminTariffEdit = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>{id ? 'Редагування тарифу' : 'Деталі тарифу'}</CardTitle>
+          <CardTitle>{t('tariff_details') || 'Tariff Details'}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -879,7 +879,7 @@ const AdminTariffEdit = () => {
                     onCheckedChange={(checked) => handleInputChange('is_free', checked)}
                     disabled={!isAdmin}
                   />
-                  <Label htmlFor="is_free">{t('is_free')}</Label>
+                  <Label htmlFor="is_free">{t('free_plan')}</Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -889,7 +889,7 @@ const AdminTariffEdit = () => {
                     onCheckedChange={(checked) => handleInputChange('is_lifetime', checked)}
                     disabled={!isAdmin}
                   />
-                  <Label htmlFor="is_lifetime">{t('is_lifetime')}</Label>
+                  <Label htmlFor="is_lifetime">{t('lifetime_access')}</Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -899,7 +899,7 @@ const AdminTariffEdit = () => {
                     onCheckedChange={(checked) => handleInputChange('is_active', checked)}
                     disabled={!isAdmin}
                   />
-                  <Label htmlFor="is_active">{t('is_active')}</Label>
+                  <Label htmlFor="is_active">{t('active')}</Label>
                 </div>
               </div>
             </TabsContent>
@@ -950,7 +950,7 @@ const AdminTariffEdit = () => {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="new-feature-active" className="block text-center">Активний</Label>
+                      <Label htmlFor="new-feature-active" className="block text-center">{t('active')}</Label>
                       <div className="flex h-10 w-full items-center justify-center">
                         <Switch
                           id="new-feature-active"
@@ -985,9 +985,9 @@ const AdminTariffEdit = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[60%]">Назва функції</TableHead>
-                          <TableHead className="text-center w-[20%]">Статус</TableHead>
-                          <TableHead className="text-center w-[20%]">Дії</TableHead>
+                          <TableHead className="w-[60%]">{t('feature_name') || 'Feature Name'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1131,7 +1131,7 @@ const AdminTariffEdit = () => {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="new-limit-active" className="block text-center">Активний</Label>
+                      <Label htmlFor="new-limit-active" className="block text-center">{t('active')}</Label>
                       <div className="flex h-10 w-full items-center justify-center">
                         <Switch
                           id="new-limit-active"
@@ -1166,10 +1166,10 @@ const AdminTariffEdit = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[40%]">Назва обмеження</TableHead>
-                          <TableHead className="text-center w-[20%]">Значення</TableHead>
-                          <TableHead className="text-center w-[20%]">Статус</TableHead>
-                          <TableHead className="text-center w-[20%]">Дії</TableHead>
+                          <TableHead className="w-[40%]">{t('limit_name') || 'Limit Name'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('limit_value') || 'Value'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

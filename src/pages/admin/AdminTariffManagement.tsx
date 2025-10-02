@@ -178,7 +178,7 @@ const AdminTariffManagement = () => {
                 <TableHead>{t('tariff_price')}</TableHead>
                 <TableHead>{t('tariff_term')}</TableHead>
                 <TableHead>{t('tariff_status')}</TableHead>
-                <TableHead className="text-right">{t('tariff_actions')}</TableHead>
+                <TableHead className="text-center">{t('tariff_actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -221,7 +221,7 @@ const AdminTariffManagement = () => {
                       {tariff.is_active ? t('status_active') : t('status_inactive')}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
