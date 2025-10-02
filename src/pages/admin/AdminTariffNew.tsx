@@ -521,7 +521,7 @@ const AdminTariffNew = () => {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="new-feature-active">{t('active')}</Label>
+                      <Label htmlFor="new-feature-active" className="block text-center">{t('active')}</Label>
                       <div className="flex h-10 w-full items-center justify-center">
                         <Switch
                           id="new-feature-active"
@@ -530,7 +530,7 @@ const AdminTariffNew = () => {
                         />
                       </div>
                     </div>
-                    <div className="flex justify-center md:justify-end md:col-span-2">
+                    <div className="flex justify-center md:col-span-2">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -557,7 +557,7 @@ const AdminTariffNew = () => {
                         <TableRow>
                           <TableHead className="w-[60%]">{t('feature_name') || 'Feature Name'}</TableHead>
                           <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
-                          <TableHead className="text-right w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -578,7 +578,7 @@ const AdminTariffNew = () => {
                                 />
                               </div>
                             </TableCell>
-                            <TableCell className="text-right w-[20%]">
+                            <TableCell className="text-center w-[20%]">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -653,7 +653,7 @@ const AdminTariffNew = () => {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="new-limit-value">{t('limit_value')}</Label>
+                      <Label htmlFor="new-limit-value" className="block text-center">{t('limit_value')}</Label>
                       <Input
                         id="new-limit-value"
                         type="number"
@@ -665,7 +665,7 @@ const AdminTariffNew = () => {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="new-limit-active">Активний</Label>
+                      <Label htmlFor="new-limit-active" className="block text-center">Активний</Label>
                       <div className="flex h-10 w-full items-center justify-center">
                         <Switch
                           id="new-limit-active"
@@ -674,7 +674,7 @@ const AdminTariffNew = () => {
                         />
                       </div>
                     </div>
-                    <div className="flex justify-center md:justify-end md:col-span-2">
+                    <div className="flex justify-center md:col-span-2">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -702,7 +702,7 @@ const AdminTariffNew = () => {
                           <TableHead className="w-[40%]">{t('limit_name') || 'Limit Name'}</TableHead>
                           <TableHead className="text-center w-[20%]">{t('limit_value') || 'Value'}</TableHead>
                           <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
-                          <TableHead className="text-right w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -732,7 +732,7 @@ const AdminTariffNew = () => {
                                 />
                               </div>
                             </TableCell>
-                            <TableCell className="text-right w-[20%]">
+                            <TableCell className="text-center w-[20%]">
                               <Button
                                 variant="ghost"
                                 size="sm"
