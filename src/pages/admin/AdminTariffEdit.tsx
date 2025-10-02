@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
@@ -691,7 +692,7 @@ const AdminTariffEdit = () => {
   });
   
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Read-only mode banner for non-admin users */}
       {!isAdmin && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -710,29 +711,45 @@ const AdminTariffEdit = () => {
         description={id ? t('edit_tariff_description') : t('create_tariff_description')}
         breadcrumbItems={customBreadcrumbs}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/admin/tariff')}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              {t('back')}
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              <Save className="mr-2 h-4 w-4" />
-              {loading ? t('saving') : (id ? t('update') : t('save'))}
-            </Button>
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/admin/tariff')} className="p-2 sm:p-3">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t('back')}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleSave} disabled={loading} size="sm" className="p-2 sm:p-3">
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{loading ? t('saving') : (id ? t('update') : t('save'))}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         }
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>{id ? t('edit_tariff_details') : t('tariff_details')}</CardTitle>
+          <CardTitle>{id ? t('edit_tariff_details') || 'Edit Tariff Details' : t('tariff_details') || 'Tariff Details'}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">{t('basic_information')}</TabsTrigger>
-              <TabsTrigger value="features">{t('features')}</TabsTrigger>
-              <TabsTrigger value="limits">{t('limits')}</TabsTrigger>
+              <TabsTrigger value="basic">{t('basic_information') || 'Basic Information'}</TabsTrigger>
+              <TabsTrigger value="features">{t('features') || 'Features'}</TabsTrigger>
+              <TabsTrigger value="limits">{t('limits') || 'Limits'}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-6 mt-6">
@@ -888,24 +905,41 @@ const AdminTariffEdit = () => {
             </TabsContent>
 
             <TabsContent value="features" className="space-y-6 mt-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">{t('features')}</h3>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={loadSampleFeatures}>
-                    Load Sample
-                  </Button>
-                  <Button onClick={addFeature} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t('add_feature')}
-                  </Button>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <h3 className="text-lg font-semibold">{t('features') || 'Features'}</h3>
+                <div className="flex flex-wrap gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={loadSampleFeatures} className="p-2">
+                          <span className="text-xs font-medium">📋</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Load Sample</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button onClick={addFeature} size="sm" className="p-2">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('add_feature')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
               {/* Add new feature form */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-2 md:col-span-2 lg:col-span-1">
                       <Label htmlFor="new-feature-name">{t('feature_name')}</Label>
                       <Input
                         id="new-feature-name"
@@ -924,10 +958,20 @@ const AdminTariffEdit = () => {
                       />
                       <Label htmlFor="new-feature-active">{t('active')}</Label>
                     </div>
-                    <Button onClick={addFeature} className="w-full md:w-auto" disabled={!isAdmin}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t('add_feature')}
-                    </Button>
+                    <div className="flex justify-center md:justify-start">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button onClick={addFeature} size="sm" disabled={!isAdmin} className="p-2">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{t('add_feature')}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -939,50 +983,70 @@ const AdminTariffEdit = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{t('feature_name')}</TableHead>
-                          <TableHead className="text-center">{t('status')}</TableHead>
-                          <TableHead className="text-right">{t('tariff_actions')}</TableHead>
+                          <TableHead className="w-[60%]">{t('feature_name') || 'Feature Name'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
+                          <TableHead className="text-right w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {features.map((feature, index) => (
                           <TableRow key={feature.id}>
-                            <TableCell>
+                            <TableCell className="w-[60%]">
                               <Input
                                 value={feature.feature_name}
                                 onChange={(e) => updateFeature(index, 'feature_name', e.target.value)}
-                                className="border-none p-0 focus-visible:ring-0"
+                                className="border-none p-0 focus-visible:ring-0 w-full"
                                 disabled={!isAdmin}
                               />
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Switch
-                                checked={feature.is_active || false}
-                                onCheckedChange={(checked) => updateFeature(index, 'is_active', checked)}
-                                disabled={!isAdmin}
-                              />
+                            <TableCell className="text-center w-[20%]">
+                              <div className="flex justify-center">
+                                <Switch
+                                  checked={feature.is_active || false}
+                                  onCheckedChange={(checked) => updateFeature(index, 'is_active', checked)}
+                                  disabled={!isAdmin}
+                                />
+                              </div>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right w-[20%]">
                               {isAdmin && (
-                                <div className="flex justify-end space-x-2">
+                                <div className="flex justify-end space-x-1">
                                   {id && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => saveFeature(index)}
-                                      className="text-green-600 hover:text-green-800"
-                                    >
-                                      <Save className="h-4 w-4" />
-                                    </Button>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => saveFeature(index)}
+                                            className="text-green-600 hover:text-green-800 p-1"
+                                          >
+                                            <Save className="h-3 w-3" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{t('save')}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeFeature(index)}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeFeature(index)}
+                                          className="text-red-600 hover:text-red-800 p-1"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{t('delete')}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 </div>
                               )}
                             </TableCell>
@@ -1007,23 +1071,40 @@ const AdminTariffEdit = () => {
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 mt-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">{t('limits')}</h3>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={loadSampleLimits}>
-                    Load Sample
-                  </Button>
-                  <Button onClick={addLimit} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t('add_limit')}
-                  </Button>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <h3 className="text-lg font-semibold">{t('limits') || 'Limits'}</h3>
+                <div className="flex flex-wrap gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={loadSampleLimits} className="p-2">
+                          <span className="text-xs font-medium">📋</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Load Sample</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button onClick={addLimit} size="sm" className="p-2">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('add_limit')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
               {/* Add new limit form */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <div className="space-y-2">
                       <Label htmlFor="new-limit-name">{t('limit_name')}</Label>
                       <Input
@@ -1055,10 +1136,20 @@ const AdminTariffEdit = () => {
                       />
                       <Label htmlFor="new-limit-active">{t('active')}</Label>
                     </div>
-                    <Button onClick={addLimit} className="w-full md:w-auto" disabled={!isAdmin}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t('add_limit')}
-                    </Button>
+                    <div className="flex justify-center md:justify-start">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button onClick={addLimit} size="sm" disabled={!isAdmin} className="p-2">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{t('add_limit')}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1070,61 +1161,81 @@ const AdminTariffEdit = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{t('limit_name')}</TableHead>
-                          <TableHead className="text-center">{t('limit_value')}</TableHead>
-                          <TableHead className="text-center">{t('status')}</TableHead>
-                          <TableHead className="text-right">{t('tariff_actions')}</TableHead>
+                          <TableHead className="w-[40%]">{t('limit_name') || 'Limit Name'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('limit_value') || 'Value'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
+                          <TableHead className="text-right w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {limits.map((limit, index) => (
                           <TableRow key={limit.id}>
-                            <TableCell>
+                            <TableCell className="w-[40%]">
                               <Input
                                 value={limit.limit_name}
                                 onChange={(e) => updateLimit(index, 'limit_name', e.target.value)}
-                                className="border-none p-0 focus-visible:ring-0"
+                                className="border-none p-0 focus-visible:ring-0 w-full"
                                 disabled={!isAdmin}
                               />
                             </TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="text-center w-[20%]">
                               <Input
                                 type="number"
                                 min="0"
                                 value={limit.value}
                                 onChange={(e) => updateLimit(index, 'value', parseInt(e.target.value) || 0)}
-                                className="border-none p-0 focus-visible:ring-0 text-center"
+                                className="border-none p-0 focus-visible:ring-0 text-center w-full"
                                 disabled={!isAdmin}
                               />
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Switch
-                                checked={limit.is_active || false}
-                                onCheckedChange={(checked) => updateLimit(index, 'is_active', checked)}
-                                disabled={!isAdmin}
-                              />
+                            <TableCell className="text-center w-[20%]">
+                              <div className="flex justify-center">
+                                <Switch
+                                  checked={limit.is_active || false}
+                                  onCheckedChange={(checked) => updateLimit(index, 'is_active', checked)}
+                                  disabled={!isAdmin}
+                                />
+                              </div>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right w-[20%]">
                               {isAdmin && (
-                                <div className="flex justify-end space-x-2">
+                                <div className="flex justify-end space-x-1">
                                   {id && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => saveLimit(index)}
-                                      className="text-green-600 hover:text-green-800"
-                                    >
-                                      <Save className="h-4 w-4" />
-                                    </Button>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => saveLimit(index)}
+                                            className="text-green-600 hover:text-green-800 p-1"
+                                          >
+                                            <Save className="h-3 w-3" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{t('save')}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeLimit(index)}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeLimit(index)}
+                                          className="text-red-600 hover:text-red-800 p-1"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{t('delete')}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 </div>
                               )}
                             </TableCell>
