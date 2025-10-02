@@ -593,6 +593,8 @@ const tariffStatisticsDictionary = {
   active_tariffs: { uk: "Активні тарифи", en: "Active Tariffs" },
   tariff_plans: { uk: "тарифних планів", en: "tariff plans" },
   error_fetch_tariffs: { uk: "Помилка завантаження тарифів", en: "Error fetching tariffs" },
+  tariff_duplicated_successfully: { uk: "Тариф успішно продубльовано", en: "Tariff duplicated successfully" },
+  failed_to_duplicate_tariff: { uk: "Не вдалося продублювати тариф", en: "Failed to duplicate tariff" },
 };
 
 // Error Messages

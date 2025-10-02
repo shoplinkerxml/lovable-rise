@@ -540,6 +540,86 @@ export class TariffService {
     }
   }
 
+  // Duplicate a tariff with all its features and limits
+  static async duplicateTariff(originalTariffId: number) {
+    try {
+      console.log('Duplicating tariff with ID:', originalTariffId);
+      
+      // 1. Get the original tariff with all its data
+      const originalTariff = await this.getTariffById(originalTariffId);
+      if (!originalTariff) {
+        throw new Error('Original tariff not found');
+      }
+      
+      // 2. Get currency data to ensure we have both currency_id and currency_code
+      let currencyId = originalTariff.currency;
+      let currencyCode = 'USD'; // Default
+      
+      if (currencyId && typeof currencyId === 'number') {
+        const { data: currencyData, error: currencyError } = await supabase
+          .from('currencies')
+          .select('code')
+          .eq('id', currencyId)
+          .single();
+          
+        if (!currencyError && currencyData) {
+          currencyCode = currencyData.code;
+        }
+      }
+      
+      // 3. Prepare the new tariff data with correct field names for REST API
+      const newTariffData: any = {
+        name: `${originalTariff.name} (Copy)`,
+        description: originalTariff.description,
+        old_price: originalTariff.old_price,
+        new_price: originalTariff.new_price,
+        currency_id: currencyId, // Use currency_id for REST API
+        currency_code: currencyCode, // Include currency_code as required
+        duration_days: originalTariff.duration_days,
+        is_free: originalTariff.is_free,
+        is_lifetime: originalTariff.is_lifetime,
+        is_active: false // New duplicates are inactive by default
+      };
+      
+      // 4. Create the new tariff
+      const newTariff = await this.createTariff(newTariffData);
+      console.log('Created duplicate tariff:', newTariff.id);
+      
+      // 5. Duplicate all features
+      if (originalTariff.features && originalTariff.features.length > 0) {
+        for (const feature of originalTariff.features) {
+          const newFeatureData: TariffFeatureInsert = {
+            tariff_id: newTariff.id,
+            feature_name: feature.feature_name,
+            is_active: feature.is_active
+          };
+          await this.addTariffFeature(newFeatureData);
+          console.log('Duplicated feature:', feature.feature_name);
+        }
+      }
+      
+      // 6. Duplicate all limits
+      if (originalTariff.limits && originalTariff.limits.length > 0) {
+        for (const limit of originalTariff.limits) {
+          const newLimitData: TariffLimitInsert = {
+            tariff_id: newTariff.id,
+            limit_name: limit.limit_name,
+            value: limit.value,
+            is_active: limit.is_active
+          };
+          await this.addTariffLimit(newLimitData);
+          console.log('Duplicated limit:', limit.limit_name);
+        }
+      }
+      
+      console.log('Tariff duplication completed successfully');
+      return newTariff;
+    } catch (error) {
+      console.error('Error duplicating tariff:', error);
+      throw error;
+    }
+  }
+
   // Get tariff statistics
   static async getTariffStatistics() {
     try {

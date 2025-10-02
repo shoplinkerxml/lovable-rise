@@ -90,24 +90,12 @@ const AdminTariffManagement = () => {
 
   const handleDuplicate = async (tariff: Tariff) => {
     try {
-      const duplicateData: TariffInsert = {
-        name: `${tariff.name} (Copy)`,
-        description: tariff.description,
-        old_price: tariff.old_price,
-        new_price: tariff.new_price,
-        currency: tariff.currency,
-        duration_days: tariff.duration_days,
-        is_free: tariff.is_free,
-        is_lifetime: tariff.is_lifetime,
-        is_active: false // New duplicates are inactive by default
-      };
-      
-      await TariffService.createTariff(duplicateData);
-      toast.success('Tariff duplicated successfully');
+      await TariffService.duplicateTariff(tariff.id);
+      toast.success(t('tariff_duplicated_successfully'));
       fetchTariffs();
     } catch (error) {
       console.error('Error duplicating tariff:', error);
-      toast.error('Failed to duplicate tariff');
+      toast.error(t('failed_to_duplicate_tariff'));
     }
   };
 
