@@ -42,15 +42,15 @@ const AdminTariffEdit = () => {
   const [tariffName, setTariffName] = useState<string>('');
   const [customBreadcrumbs, setCustomBreadcrumbs] = useState<BreadcrumbItem[]>([
     {
-      label: "Home",
+      label: "Головна",
       href: "/admin/dashboard",
     },
     {
-      label: "Tariffs",
+      label: "Тарифні плани",
       href: "/admin/tariff",
     },
     {
-      label: "Edit Tariff",
+      label: "Редагування тарифу",
       current: true,
     }
   ]);
@@ -200,11 +200,11 @@ const AdminTariffEdit = () => {
         setTariffName(tariffWithDetails.name);
         setCustomBreadcrumbs([
           {
-            label: t("breadcrumb_home"),
+            label: "Головна",
             href: "/admin/dashboard",
           },
           {
-            label: t("menu_pricing"),
+            label: "Тарифні плани",
             href: "/admin/tariff",
           },
           {
@@ -241,11 +241,11 @@ const AdminTariffEdit = () => {
         // Update breadcrumbs with tariff name
         setCustomBreadcrumbs([
           {
-            label: t("breadcrumb_home"),
+            label: "Головна",
             href: "/admin/dashboard",
           },
           {
-            label: t("menu_pricing"),
+            label: "Тарифні плани",
             href: "/admin/tariff",
           },
           {
@@ -742,7 +742,7 @@ const AdminTariffEdit = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>{id ? t('edit_tariff_details') || 'Edit Tariff Details' : t('tariff_details') || 'Tariff Details'}</CardTitle>
+          <CardTitle>{id ? 'Редагування тарифу' : 'Деталі тарифу'}</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -949,14 +949,16 @@ const AdminTariffEdit = () => {
                         disabled={!isAdmin}
                       />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="new-feature-active"
-                        checked={newFeature.is_active}
-                        onCheckedChange={(checked) => setNewFeature({ ...newFeature, is_active: checked })}
-                        disabled={!isAdmin}
-                      />
-                      <Label htmlFor="new-feature-active">{t('active')}</Label>
+                <div className="space-y-2">
+                      <Label htmlFor="new-feature-active">Активний</Label>
+                      <div className="flex h-10 w-full items-center">
+                        <Switch
+                          id="new-feature-active"
+                          checked={newFeature.is_active}
+                          onCheckedChange={(checked) => setNewFeature({ ...newFeature, is_active: checked })}
+                          disabled={!isAdmin}
+                        />
+                      </div>
                     </div>
                     <div className="flex justify-center md:justify-start">
                       <TooltipProvider>
@@ -983,9 +985,9 @@ const AdminTariffEdit = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[60%]">{t('feature_name') || 'Feature Name'}</TableHead>
-                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
-                          <TableHead className="text-right w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
+                          <TableHead className="w-[60%]">Назва функції</TableHead>
+                          <TableHead className="text-center w-[20%]">Статус</TableHead>
+                          <TableHead className="text-right w-[20%]">Дії</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1127,14 +1129,16 @@ const AdminTariffEdit = () => {
                         disabled={!isAdmin}
                       />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="new-limit-active"
-                        checked={newLimit.is_active}
-                        onCheckedChange={(checked) => setNewLimit({ ...newLimit, is_active: checked })}
-                        disabled={!isAdmin}
-                      />
-                      <Label htmlFor="new-limit-active">{t('active')}</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-limit-active">Активний</Label>
+                      <div className="flex h-10 w-full items-center">
+                        <Switch
+                          id="new-limit-active"
+                          checked={newLimit.is_active}
+                          onCheckedChange={(checked) => setNewLimit({ ...newLimit, is_active: checked })}
+                          disabled={!isAdmin}
+                        />
+                      </div>
                     </div>
                     <div className="flex justify-center md:justify-start">
                       <TooltipProvider>
@@ -1161,10 +1165,10 @@ const AdminTariffEdit = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[40%]">{t('limit_name') || 'Limit Name'}</TableHead>
-                          <TableHead className="text-center w-[20%]">{t('limit_value') || 'Value'}</TableHead>
-                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
-                          <TableHead className="text-right w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
+                          <TableHead className="w-[40%]">Назва обмеження</TableHead>
+                          <TableHead className="text-center w-[20%]">Значення</TableHead>
+                          <TableHead className="text-center w-[20%]">Статус</TableHead>
+                          <TableHead className="text-right w-[20%]">Дії</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

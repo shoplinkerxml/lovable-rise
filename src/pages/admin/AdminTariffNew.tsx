@@ -661,13 +661,15 @@ const AdminTariffNew = () => {
                         placeholder={t('enter_limit_value')}
                       />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="new-limit-active"
-                        checked={newLimit.is_active}
-                        onCheckedChange={(checked) => setNewLimit({ ...newLimit, is_active: checked })}
-                      />
-                      <Label htmlFor="new-limit-active">{t('active')}</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-limit-active">Активний</Label>
+                      <div className="flex h-10 w-full items-center">
+                        <Switch
+                          id="new-limit-active"
+                          checked={newLimit.is_active}
+                          onCheckedChange={(checked) => setNewLimit({ ...newLimit, is_active: checked })}
+                        />
+                      </div>
                     </div>
                     <div className="flex justify-center md:justify-start">
                       <TooltipProvider>
