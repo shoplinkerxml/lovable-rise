@@ -986,7 +986,7 @@ const AdminTariffEdit = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[60%]">{t('feature_name') || 'Feature Name'}</TableHead>
-                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('tariff_status') || 'Status'}</TableHead>
                           <TableHead className="text-center w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1168,7 +1168,7 @@ const AdminTariffEdit = () => {
                         <TableRow>
                           <TableHead className="w-[40%]">{t('limit_name') || 'Limit Name'}</TableHead>
                           <TableHead className="text-center w-[20%]">{t('limit_value') || 'Value'}</TableHead>
-                          <TableHead className="text-center w-[20%]">{t('status') || 'Status'}</TableHead>
+                          <TableHead className="text-center w-[20%]">{t('tariff_status') || 'Status'}</TableHead>
                           <TableHead className="text-center w-[20%]">{t('tariff_actions') || 'Actions'}</TableHead>
                         </TableRow>
                       </TableHeader>
