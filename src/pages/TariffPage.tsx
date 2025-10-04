@@ -69,13 +69,25 @@ const TariffPage = () => {
     }
   };
 
-  const formatPrice = (price: number | null, currency: { code: string; rate: number } | undefined) => {
-    if (price === null || price === undefined) return t('free_tariff');
-    const currencyCode = currency?.code || 'USD';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currencyCode,
-    }).format(price);
+  // Function to get currency symbol based on currency code
+  // Uses actual currency symbols for better visual consistency
+  const getCurrencySymbol = (currencyCode: string | undefined) => {
+    if (!currencyCode) return <span className="text-lg font-semibold">$</span>;
+    
+    switch (currencyCode.toUpperCase()) {
+      case 'USD':
+        return <span className="text-lg font-semibold">$</span>;
+      case 'EUR':
+        return <span className="text-lg font-semibold">€</span>;
+      case 'GBP':
+        return <span className="text-lg font-semibold">£</span>;
+      case 'JPY':
+        return <span className="text-lg font-semibold">¥</span>;
+      case 'UAH':
+        return <span className="text-lg font-semibold">₴</span>;
+      default:
+        return <span className="text-lg font-semibold">$</span>; // Default to dollar sign
+    }
   };
 
   const formatDuration = (days: number | null) => {
@@ -161,72 +173,42 @@ const TariffPage = () => {
                   </h3>
                   <p className="text-muted-foreground mt-2">{tariff.description}</p>
                 </div>
-                {tariff.is_free ? (
-                  <Badge variant="secondary">{t('free_tariff')}</Badge>
-                ) : (
-                  <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={tariff.is_active ? 'badge-active' : ''}>
-                    {tariff.is_active ? t('status_active') : t('status_inactive')}
-                  </Badge>
-                )}
               </div>
               
               <div className="my-6">
-                <div className="text-3xl font-bold">
-                  {formatPrice(tariff.new_price, tariff.currency_data)}
-                  {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && (
-                    <span className="text-lg text-muted-foreground line-through ml-2">
-                      {formatPrice(tariff.old_price, tariff.currency_data)}
+                <div className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center gap-2">
+                  {getCurrencySymbol(tariff.currency_data?.code)}
+                  {tariff.new_price !== null && tariff.currency_data ? (
+                    new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: tariff.currency_data.code,
+                    }).format(tariff.new_price).replace(/^[^\d]*/, '')
+                  ) : t('free_tariff')}
+                  {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && tariff.currency_data && (
+                    <span className="text-base sm:text-lg md:text-xl text-muted-foreground line-through ml-2">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: tariff.currency_data.code,
+                      }).format(tariff.old_price).replace(/^[^\d]*/, '')}
                     </span>
                   )}
                 </div>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground text-sm sm:text-base md:text-lg mt-1">
                   {formatDuration(tariff.duration_days)}
                 </p>
               </div>
 
+              {/* Select Plan Button - moved from bottom to here */}
+              <div className="mt-6 mb-6">
+                <Button className="w-full" size="lg">
+                  <CreditCard className="mr-2 h-5 w-5" />
+                  {t('select_plan')}
+                </Button>
+              </div>
+
               <div className="space-y-6">
-                {/* Main Info Section */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Info className="h-5 w-5 text-blue-500" />
-                    <h4 className="font-semibold">{t('basic_information')}</h4>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('tariff_price')}:</span>
-                      <span className="font-medium">
-                        {tariff.is_free ? t('free_tariff') : formatPrice(tariff.new_price, tariff.currency_data)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('tariff_term')}:</span>
-                      <span className="font-medium">{formatDuration(tariff.duration_days)}</span>
-                    </div>
-                    {tariff.currency_data && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t('currency')}:</span>
-                        <span className="font-medium">{tariff.currency_data.code}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('features')}:</span>
-                      <span className="font-medium">{tariff.features.length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('limits')}:</span>
-                      <span className="font-medium">{tariff.limits.length}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
                 {/* Features Section */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Zap className="h-5 w-5 text-green-500" />
-                    <h4 className="font-semibold">{t('tariff_page_features')}</h4>
-                  </div>
                   <div className="space-y-2">
                     {tariff.features.length > 0 ? (
                       tariff.features.map((feature) => {
@@ -257,10 +239,6 @@ const TariffPage = () => {
 
                 {/* Limits Section */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-5 w-5 text-purple-500" />
-                    <h4 className="font-semibold">{t('tariff_page_limits')}</h4>
-                  </div>
                   <div className="space-y-2">
                     {tariff.limits.length > 0 ? (
                       tariff.limits.map((limit) => {
@@ -284,12 +262,6 @@ const TariffPage = () => {
                 </div>
               </div>
 
-              <div className="mt-8">
-                <Button className="w-full" size="lg">
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  {t('select_plan')}
-                </Button>
-              </div>
             </CardContent>
           </Card>
         ))}

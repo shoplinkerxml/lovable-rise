@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle, DollarSign, PoundSterling, JapaneseYen } from 'lucide-react';
 import { TariffService, type Tariff, type TariffInsert, type Currency } from '@/lib/tariff-service';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
@@ -113,15 +113,41 @@ const AdminTariffManagement = () => {
     }
   };
 
-  const getCurrencySymbol = (currencyId: number) => {
-    const currency = currencies.find(c => c.id === currencyId);
-    return currency ? currency.code : 'USD';
+  // Function to get currency symbol based on currency code
+  // Uses actual currency symbols for better visual consistency
+  const getCurrencySymbol = (currencyCode: string | undefined) => {
+    if (!currencyCode) return <span className="text-base font-semibold">$</span>;
+    
+    switch (currencyCode.toUpperCase()) {
+      case 'USD':
+        return <span className="text-base font-semibold">$</span>;
+      case 'EUR':
+        return <span className="text-base font-semibold">€</span>;
+      case 'GBP':
+        return <span className="text-base font-semibold">£</span>;
+      case 'JPY':
+        return <span className="text-base font-semibold">¥</span>;
+      case 'UAH':
+        return <span className="text-base font-semibold">₴</span>;
+      default:
+        return <span className="text-base font-semibold">$</span>; // Default to dollar sign
+    }
   };
 
+  const formatPrice = (price: number | null, currencyCode: string | undefined) => {
+    if (price === null || price === undefined) return 'N/A';
+    const code = currencyCode || 'USD';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+    }).format(price).replace(/^[^\d]*/, '');
+  };
+
+  // Function to get tariff icon based on tariff properties
   const getTariffIcon = (tariff: Tariff) => {
     if (tariff.is_free) return <Package className="h-5 w-5 text-blue-500" />;
     if (tariff.is_lifetime) return <Crown className="h-5 w-5 text-yellow-500" />;
-    if (tariff.new_price && tariff.new_price > 100) return <Star className="h-5 w-5 text-purple-500" />;
+    if (tariff.new_price && tariff.new_price > 50) return <Star className="h-5 w-5 text-purple-500" />;
     return <CreditCard className="h-5 w-5 text-green-500" />;
   };
 
@@ -190,25 +216,22 @@ const AdminTariffManagement = () => {
                       {tariff.is_free ? (
                         <Badge variant="secondary">{t('free_tariff')}</Badge>
                       ) : (
-                        <div>
-                          {tariff.new_price !== null ? (
-                            <span>
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: currencies.find(c => c.id === tariff.currency)?.code || 'USD',
-                              }).format(tariff.new_price)}
-                              {tariff.old_price && tariff.old_price > tariff.new_price && (
-                                <span className="ml-2 text-muted-foreground line-through text-sm">
-                                  {new Intl.NumberFormat('en-US', {
-                                    style: 'currency',
-                                    currency: currencies.find(c => c.id === tariff.currency)?.code || 'USD',
-                                  }).format(tariff.old_price)}
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            'N/A'
-                          )}
+                        <div className="flex items-center gap-1">
+                          {getCurrencySymbol(currencies.find(c => c.id === tariff.currency)?.code)}
+                          <span>
+                            {tariff.new_price !== null ? (
+                              <span>
+                                {formatPrice(tariff.new_price, currencies.find(c => c.id === tariff.currency)?.code)}
+                                {tariff.old_price && tariff.old_price > tariff.new_price && (
+                                  <span className="ml-2 text-muted-foreground line-through text-sm">
+                                    {formatPrice(tariff.old_price, currencies.find(c => c.id === tariff.currency)?.code)}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              'N/A'
+                            )}
+                          </span>
                         </div>
                       )}
                     </TableCell>
@@ -294,14 +317,14 @@ const AdminTariffManagement = () => {
                     {tariffToDelete.is_free ? (
                       <Badge variant="secondary" className="text-xs">{t('free_tariff')}</Badge>
                     ) : (
-                      <span className="text-xs text-gray-500">
-                        {tariffToDelete.new_price !== null ? (
-                          new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: currencies.find(c => c.id === tariffToDelete.currency)?.code || 'USD',
-                          }).format(tariffToDelete.new_price)
-                        ) : 'N/A'}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {getCurrencySymbol(currencies.find(c => c.id === tariffToDelete.currency)?.code)}
+                        <span className="text-xs text-gray-500">
+                          {tariffToDelete.new_price !== null ? (
+                            formatPrice(tariffToDelete.new_price, currencies.find(c => c.id === tariffToDelete.currency)?.code)
+                          ) : 'N/A'}
+                        </span>
+                      </div>
                     )}
                     <Badge variant={tariffToDelete.is_active ? 'default' : 'secondary'} className="text-xs">
                       {tariffToDelete.is_active ? t('status_active') : t('status_inactive')}
