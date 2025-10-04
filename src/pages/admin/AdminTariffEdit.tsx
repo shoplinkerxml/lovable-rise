@@ -447,7 +447,8 @@ const AdminTariffEdit = () => {
         toast.success(t('tariff_created'));
       }
       
-      navigate('/admin/tariff');
+      // Navigate back to tariff management with a flag to indicate fresh data should be loaded
+      navigate('/admin/tariff?refresh=true');
     } catch (error) {
       console.error('Error saving tariff:', error);
       toast.error(id ? t('failed_update_tariff') : t('failed_create_tariff'));

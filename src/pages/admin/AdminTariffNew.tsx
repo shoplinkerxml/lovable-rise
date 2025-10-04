@@ -134,7 +134,8 @@ const AdminTariffNew = () => {
       await saveFeatures(createdTariff.id);
       await saveLimits(createdTariff.id);
       
-      navigate('/admin/tariff');
+      // Navigate back to tariff management with a flag to indicate fresh data should be loaded
+      navigate('/admin/tariff?refresh=true');
     } catch (error) {
       console.error('Error creating tariff:', error);
       toast.error(t('failed_create_tariff'));

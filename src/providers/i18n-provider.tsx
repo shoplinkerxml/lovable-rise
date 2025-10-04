@@ -436,6 +436,7 @@ const dictionary: Dictionary = {
   add_new_tariff: { uk: "Додати новий", en: "Add New" },
   export_tariffs: { uk: "Експорт", en: "Export" },
   no_tariffs_found: { uk: "Дані не знайдено", en: "No data found" },
+  create_sample_data: { uk: "Створити зразки даних", en: "Create Sample Data" },
   showing_tariffs: { uk: "Показано", en: "Showing" },
   to_tariff: { uk: "до", en: "to" },
   of_tariff: { uk: "з", en: "of" },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle, DollarSign, PoundSterling, JapaneseYen } from 'lucide-react';
 import { TariffService, type Tariff, type TariffInsert, type Currency } from '@/lib/tariff-service';
+import TariffCache from '@/lib/tariff-cache';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
@@ -30,6 +31,7 @@ import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
 const AdminTariffManagement = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const breadcrumbs = useBreadcrumbs();
   const pageInfo = usePageInfo();
   
@@ -40,20 +42,67 @@ const AdminTariffManagement = () => {
   const [tariffToDelete, setTariffToDelete] = useState<Tariff | null>(null);
 
   useEffect(() => {
-    fetchTariffs();
+    // Check if we should refresh data
+    const shouldRefresh = new URLSearchParams(location.search).get('refresh') === 'true';
+    
+    if (shouldRefresh) {
+      // Clear cache and fetch fresh data
+      TariffCache.clear();
+      fetchTariffs(false);
+      // Remove the refresh parameter from URL
+      navigate(location.pathname, { replace: true });
+    } else {
+      // Use cache if available
+      fetchTariffs(true);
+    }
+    
     fetchCurrencies();
-  }, []);
+    
+    // Set up periodic refresh
+    const interval = setInterval(() => {
+      if (!loading && document.visibilityState === 'visible') {
+        refreshTariffsInBackground();
+      }
+    }, 30000); // Refresh every 30 seconds when tab is active
+    
+    return () => clearInterval(interval);
+  }, [location.search]);
 
-  const fetchTariffs = async () => {
+  const fetchTariffs = async (useCache = true) => {
     try {
+      // Check if we have valid cached data
+      if (useCache) {
+        const cachedTariffs = TariffCache.get();
+        if (cachedTariffs) {
+          setTariffs(cachedTariffs);
+          setLoading(false);
+          // Refresh data in background
+          refreshTariffsInBackground();
+          return;
+        }
+      }
+      
       setLoading(true);
       const tariffData = await TariffService.getAllTariffs(true);
       setTariffs(tariffData);
+      // Cache the data
+      TariffCache.set(tariffData);
     } catch (error) {
       console.error('Error fetching tariffs:', error);
       toast.error('Failed to load tariffs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshTariffsInBackground = async () => {
+    try {
+      const tariffData = await TariffService.getAllTariffs(true);
+      setTariffs(tariffData);
+      // Update cache
+      TariffCache.set(tariffData);
+    } catch (error) {
+      console.error('Error refreshing tariffs in background:', error);
     }
   };
 
@@ -78,7 +127,9 @@ const AdminTariffManagement = () => {
     try {
       await TariffService.deleteTariff(tariffToDelete.id);
       toast.success(t('tariff_deleted_successfully'));
-      fetchTariffs();
+      // Clear cache and fetch fresh data
+      TariffCache.clear();
+      fetchTariffs(false);
     } catch (error) {
       console.error('Error deleting tariff:', error);
       toast.error(t('failed_to_delete_tariff'));
@@ -92,7 +143,9 @@ const AdminTariffManagement = () => {
     try {
       await TariffService.duplicateTariff(tariff.id);
       toast.success(t('tariff_duplicated_successfully'));
-      fetchTariffs();
+      // Clear cache and fetch fresh data
+      TariffCache.clear();
+      fetchTariffs(false);
     } catch (error) {
       console.error('Error duplicating tariff:', error);
       toast.error(t('failed_to_duplicate_tariff'));
@@ -103,11 +156,27 @@ const AdminTariffManagement = () => {
     try {
       setLoading(true);
       await TariffService.createSampleData();
-      await fetchTariffs();
+      // Clear cache and fetch fresh data
+      TariffCache.clear();
+      await fetchTariffs(false);
       toast.success('Sample tariff data created successfully!');
     } catch (error) {
       console.error('Error creating sample data:', error);
       toast.error('Failed to create sample data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      TariffCache.clear();
+      await fetchTariffs(false);
+      toast.success('Tariffs refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing tariffs:', error);
+      toast.error('Failed to refresh tariffs');
     } finally {
       setLoading(false);
     }
@@ -153,8 +222,66 @@ const AdminTariffManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Page Header with Breadcrumbs */}
+        <PageHeader
+          title={t('menu_pricing')}
+          description={t('manage_tariffs_and_pricing_options')}
+          breadcrumbItems={breadcrumbs}
+          actions={
+            <div className="flex gap-2">
+              <Button variant="outline" disabled>
+                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+              </Button>
+              <Button disabled>
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </Button>
+            </div>
+          }
+        />
+
+        {/* Tariff Table with Skeleton Loaders */}
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead>{t('tariff_name')}</TableHead>
+                  <TableHead>{t('tariff_price')}</TableHead>
+                  <TableHead>{t('tariff_term')}</TableHead>
+                  <TableHead>{t('tariff_status')}</TableHead>
+                  <TableHead className="text-center w-24">{t('tariff_actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Render 5 skeleton rows while loading */}
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <div className="h-5 w-5 bg-gray-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-6 w-16 bg-gray-200 rounded animate-pulse"></div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="h-8 w-8 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -173,6 +300,9 @@ const AdminTariffManagement = () => {
                 Create Sample Data
               </Button>
             )}
+            <Button variant="outline" onClick={handleRefresh}>
+              Refresh
+            </Button>
             <Button onClick={() => navigate('/admin/tariff/new')}>
               <Plus className="mr-2 h-4 w-4" />
               {t('add_new_tariff')}
@@ -198,12 +328,26 @@ const AdminTariffManagement = () => {
             <TableBody>
               {tariffs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <div className="flex flex-col items-center gap-2">
-                      <CreditCard className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        {t('no_tariffs_found')}
-                      </p>
+                  <TableCell colSpan={6} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                        <CreditCard className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-lg text-gray-900">{t('no_tariffs_found')}</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {t('manage_tariffs_and_pricing_options')}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" onClick={handleCreateSampleData}>
+                          {t('create_sample_data')}
+                        </Button>
+                        <Button onClick={() => navigate('/admin/tariff/new')}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          {t('add_new_tariff')}
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
