@@ -34,11 +34,11 @@ export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
-            <div className="h-full flex flex-col">
-              <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} />
-            </div>
-          </SheetContent>
+        <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
+          <div className="h-full flex flex-col">
+            <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} isMobileSheet={true} />
+          </div>
+        </SheetContent>
         </Sheet>
       </>
     );

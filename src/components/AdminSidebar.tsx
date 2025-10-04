@@ -28,6 +28,7 @@ interface AdminSidebarProps {
   collapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
   userProfile?: UserProfile;
+  isMobileSheet?: boolean;
 }
 
 interface SubmenuState {
@@ -41,7 +42,7 @@ interface MenuSectionConfig {
   isCollapsible: boolean;
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, userProfile }) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, userProfile, isMobileSheet = false }) => {
   const { 
     menuItems, 
     activeMenuItem, 
@@ -121,7 +122,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
   };
 
   return (
-    <aside className={`hidden md:flex ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}> 
+    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
       <Logo collapsed={collapsed} className="mb-8" />
       
       <nav className="space-y-1 flex-1">
