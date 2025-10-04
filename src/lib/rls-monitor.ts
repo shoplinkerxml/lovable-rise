@@ -12,8 +12,8 @@
  * - Performance metrics for auth operations
  */
 
-import { supabase } from \"@/integrations/supabase/client\";
-import { SessionValidator, type SessionValidationResult } from \"./session-validation\";
+import { supabase } from "@/integrations/supabase/client";
+import { SessionValidator, type SessionValidationResult } from "./session-validation";
 
 export interface RLSTestResult {
   testName: string;

@@ -25,6 +25,7 @@ import {
 import { useI18n } from "@/providers/i18n-provider";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useCreateUser } from "@/hooks/useUsers";
+import { useToast } from "@/hooks/use-toast";
 
 // Create schema outside component to avoid re-creation
 const createUserSchema = z.object({
@@ -51,6 +52,7 @@ export function CreateUserDialog({
   const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
   const createUserMutation = useCreateUser();
+  const { toast } = useToast();
 
   const form = useForm<CreateUserFormData>({
     resolver: zodResolver(createUserSchema),
@@ -65,8 +67,22 @@ export function CreateUserDialog({
 
   const onSubmit = async (data: CreateUserFormData) => {
     try {
+      // Ensure required fields are provided (schema should handle this, but double-check)
+      if (!data.email || !data.password || !data.name) {
+        toast({
+          title: "Error",
+          description: "Email, password, and name are required",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       await createUserMutation.mutateAsync({
-        ...data,
+        email: data.email,
+        password: data.password,
+        name: data.name,
+        phone: data.phone || "",
+        notify_by_email: data.notify_by_email ?? true,
         role: "user" as const,
       });
       form.reset();

@@ -214,8 +214,7 @@ export class SessionValidator {
       userId: validation.user?.id || null,
       isExpired: validation.timeUntilExpiry ? validation.timeUntilExpiry <= 0 : false,
       expiresIn: validation.timeUntilExpiry,
-      sessionAge: validation.session?.created_at ? 
-        Date.now() - new Date(validation.session.created_at).getTime() : null
+      sessionAge: null // Remove session age tracking as created_at is not available
     };
   }
   

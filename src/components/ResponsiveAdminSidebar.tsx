@@ -23,20 +23,24 @@ export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
 
   if (isMobile) {
     return (
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden fixed top-4 left-4 z-50 bg-background/80 backdrop-blur-sm border shadow-sm"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64">
-          <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} />
-        </SheetContent>
-      </Sheet>
+      <>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden fixed top-4 left-4 z-50 bg-background/80 backdrop-blur-sm border shadow-sm"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
+            <div className="h-full flex flex-col">
+              <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </>
     );
   }
 
