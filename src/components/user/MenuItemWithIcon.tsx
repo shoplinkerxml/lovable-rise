@@ -53,6 +53,12 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
       "Pricing Plans": "menu_pricing",
       "Currency": "menu_currency",
       "Payment Systems": "menu_payment",
+      "Tariff Features": "menu_tariff_features",
+      "Функції тарифів": "menu_tariff_features",
+      "Магазини": "menu_stores",
+      "Stores": "menu_stores",
+      "Постачальники": "menu_suppliers",
+      "Suppliers": "menu_suppliers",
     };
     
     const translationKey = translationMap[title];

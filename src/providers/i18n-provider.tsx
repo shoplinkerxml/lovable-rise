@@ -49,6 +49,9 @@ const dictionary: Dictionary = {
   menu_pricing: { uk: "Тарифні плани", en: "Pricing Plans" },
   menu_currency: { uk: "Валюта", en: "Currency" },
   menu_payment: { uk: "Платіжні системи", en: "Payment Systems" },
+  menu_tariff_features: { uk: "Функції тарифів", en: "Tariff Features" },
+  menu_stores: { uk: "Магазини", en: "Stores" },
+  menu_suppliers: { uk: "Постачальники", en: "Suppliers" },
   
   // Page descriptions
   tariff_plans_description: { uk: "Управління тарифними планами користувачів", en: "Manage user tariff plans" },
