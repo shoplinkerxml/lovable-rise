@@ -26,3 +26,14 @@ dist-ssr
 # Custom ignore directories
 test_validate/
 md/
+
+# Ignore test and utility scripts that were removed
+*_test.js
+*test-*.js
+*test_*.js
+*test-*.sql
+*test_*.sql
+*-test.js
+*testing*.js
+*validate*.txt
+*report*.txt

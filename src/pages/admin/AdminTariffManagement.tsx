@@ -170,80 +170,93 @@ const AdminTariffManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tariffs.map((tariff) => (
-                <TableRow key={tariff.id}>
-                  <TableCell>{getTariffIcon(tariff)}</TableCell>
-                  <TableCell className="font-medium">{tariff.name}</TableCell>
-                  <TableCell>
-                    {tariff.is_free ? (
-                      <Badge variant="secondary">{t('free_tariff')}</Badge>
-                    ) : (
-                      <div>
-                        {tariff.new_price !== null ? (
-                          <span>
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: currencies.find(c => c.id === tariff.currency)?.code || 'USD',
-                            }).format(tariff.new_price)}
-                            {tariff.old_price && tariff.old_price > tariff.new_price && (
-                              <span className="ml-2 text-muted-foreground line-through text-sm">
-                                {new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: currencies.find(c => c.id === tariff.currency)?.code || 'USD',
-                                }).format(tariff.old_price)}
-                              </span>
-                            )}
-                          </span>
-                        ) : (
-                          'N/A'
-                        )}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {tariff.is_lifetime ? t('lifetime_tariff') : 
-                     tariff.duration_days ? `${tariff.duration_days} ${t('days_tariff')}` : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={tariff.is_active ? 'badge-active' : ''}>
-                      {tariff.is_active ? t('status_active') : t('status_inactive')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={() => navigate(`/admin/tariff/edit/${tariff.id}`)}
-                          className="dropdown-item-hover"
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          <span>{t('edit_tariff')}</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(tariff)}
-                          className="dropdown-item-hover text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>{t('delete_tariff')}</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDuplicate(tariff)}
-                          className="dropdown-item-hover"
-                        >
-                          <Copy className="mr-2 h-4 w-4" />
-                          <span>{t('duplicate_tariff')}</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {tariffs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <CreditCard className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        {t('no_tariffs_found')}
+                      </p>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                tariffs.map((tariff) => (
+                  <TableRow key={tariff.id}>
+                    <TableCell>{getTariffIcon(tariff)}</TableCell>
+                    <TableCell className="font-medium">{tariff.name}</TableCell>
+                    <TableCell>
+                      {tariff.is_free ? (
+                        <Badge variant="secondary">{t('free_tariff')}</Badge>
+                      ) : (
+                        <div>
+                          {tariff.new_price !== null ? (
+                            <span>
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: currencies.find(c => c.id === tariff.currency)?.code || 'USD',
+                              }).format(tariff.new_price)}
+                              {tariff.old_price && tariff.old_price > tariff.new_price && (
+                                <span className="ml-2 text-muted-foreground line-through text-sm">
+                                  {new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: currencies.find(c => c.id === tariff.currency)?.code || 'USD',
+                                  }).format(tariff.old_price)}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            'N/A'
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {tariff.is_lifetime ? t('lifetime_tariff') : 
+                       tariff.duration_days ? `${tariff.duration_days} ${t('days_tariff')}` : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={tariff.is_active ? 'badge-active' : ''}>
+                        {tariff.is_active ? t('status_active') : t('status_inactive')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => navigate(`/admin/tariff/edit/${tariff.id}`)}
+                            className="dropdown-item-hover"
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>{t('edit_tariff')}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(tariff)}
+                            className="dropdown-item-hover text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>{t('delete_tariff')}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDuplicate(tariff)}
+                            className="dropdown-item-hover"
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            <span>{t('duplicate_tariff')}</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
