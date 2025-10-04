@@ -15,7 +15,7 @@ import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { TariffService, type TariffInsert, type Currency, type TariffFeature, type TariffLimit } from '@/lib/tariff-service';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, FileText, Sparkles, Shield, Gift, Infinity, Power } from 'lucide-react';
 
 interface TariffFormData {
   name: string;
@@ -335,9 +335,18 @@ const AdminTariffNew = () => {
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">{t('basic_information') || 'Basic Information'}</TabsTrigger>
-              <TabsTrigger value="features">{t('features') || 'Features'}</TabsTrigger>
-              <TabsTrigger value="limits">{t('limits') || 'Limits'}</TabsTrigger>
+              <TabsTrigger value="basic">
+                <FileText className="h-4 w-4 md:hidden" />
+                <span className="hidden md:inline">{t('basic_information') || 'Basic Information'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="features">
+                <Sparkles className="h-4 w-4 md:hidden" />
+                <span className="hidden md:inline">{t('features') || 'Features'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="limits">
+                <Shield className="h-4 w-4 md:hidden" />
+                <span className="hidden md:inline">{t('limits') || 'Limits'}</span>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-6 mt-6">
@@ -453,7 +462,10 @@ const AdminTariffNew = () => {
                     checked={formData.is_free}
                     onCheckedChange={(checked) => handleInputChange('is_free', checked)}
                   />
-                  <Label htmlFor="is_free">{t('free_plan')}</Label>
+                  <Label htmlFor="is_free" className="flex items-center gap-2">
+                    <Gift className="h-4 w-4 md:hidden" />
+                    <span className="hidden md:inline">{t('free_plan')}</span>
+                  </Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -462,7 +474,10 @@ const AdminTariffNew = () => {
                     checked={formData.is_lifetime}
                     onCheckedChange={(checked) => handleInputChange('is_lifetime', checked)}
                   />
-                  <Label htmlFor="is_lifetime">{t('lifetime_access')}</Label>
+                  <Label htmlFor="is_lifetime" className="flex items-center gap-2">
+                    <Infinity className="h-4 w-4 md:hidden" />
+                    <span className="hidden md:inline">{t('lifetime_access')}</span>
+                  </Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -471,7 +486,10 @@ const AdminTariffNew = () => {
                     checked={formData.is_active}
                     onCheckedChange={(checked) => handleInputChange('is_active', checked)}
                   />
-                  <Label htmlFor="is_active">{t('active')}</Label>
+                  <Label htmlFor="is_active" className="flex items-center gap-2">
+                    <Power className="h-4 w-4 md:hidden" />
+                    <span className="hidden md:inline">{t('active')}</span>
+                  </Label>
                 </div>
               </div>
             </TabsContent>
