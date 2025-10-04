@@ -72,21 +72,21 @@ const TariffPage = () => {
   // Function to get currency symbol based on currency code
   // Uses actual currency symbols for better visual consistency
   const getCurrencySymbol = (currencyCode: string | undefined) => {
-    if (!currencyCode) return <span className="text-lg font-semibold">$</span>;
+    if (!currencyCode) return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">$</span>;
     
     switch (currencyCode.toUpperCase()) {
       case 'USD':
-        return <span className="text-lg font-semibold">$</span>;
+        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">$</span>;
       case 'EUR':
-        return <span className="text-lg font-semibold">€</span>;
+        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">€</span>;
       case 'GBP':
-        return <span className="text-lg font-semibold">£</span>;
+        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">£</span>;
       case 'JPY':
-        return <span className="text-lg font-semibold">¥</span>;
+        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">¥</span>;
       case 'UAH':
-        return <span className="text-lg font-semibold">₴</span>;
+        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">₴</span>;
       default:
-        return <span className="text-lg font-semibold">$</span>; // Default to dollar sign
+        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">$</span>; // Default to dollar sign
     }
   };
 
@@ -139,8 +139,85 @@ const TariffPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="p-4 md:p-6 space-y-6">
+        <PageHeader
+          title={t('menu_pricing')}
+          description={t('choose_your_plan_description')}
+          breadcrumbItems={breadcrumbs}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Render 3 skeleton cards while loading */}
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="flex flex-col">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-5 sm:h-6 sm:w-6 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-6 sm:h-8 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                    <div className="h-4 w-32 sm:w-48 bg-gray-200 rounded animate-pulse mt-2"></div>
+                  </div>
+                  <div className="h-6 w-16 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                
+                <div className="my-6">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <div className="flex items-baseline gap-1">
+                      <div className="h-6 sm:h-8 md:h-10 lg:h-12 w-6 sm:w-8 md:w-10 lg:w-12 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-8 sm:h-10 md:h-12 lg:h-16 w-20 sm:w-24 md:w-32 lg:w-40 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <div className="h-4 sm:h-5 md:h-6 lg:h-7 w-4 sm:w-5 md:w-6 lg:w-7 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-5 sm:h-6 md:h-8 lg:h-10 w-16 sm:w-20 md:w-24 lg:w-32 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="h-4 sm:h-5 w-20 sm:w-24 bg-gray-200 rounded animate-pulse mt-2"></div>
+                </div>
+
+                {/* Select Plan Button Skeleton */}
+                <div className="mt-6 mb-6">
+                  <div className="h-10 sm:h-12 w-full bg-gray-200 rounded animate-pulse"></div>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Features Section Skeleton */}
+                  <div>
+                    <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-3"></div>
+                    <div className="space-y-3">
+                      {Array.from({ length: 4 }).map((_, featureIndex) => (
+                        <div key={featureIndex} className="flex items-center gap-2 py-1">
+                          <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+                          <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+                          <div className="h-4 flex-1 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Limits Section Skeleton */}
+                  <div>
+                    <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-3"></div>
+                    <div className="space-y-3">
+                      {Array.from({ length: 3 }).map((_, limitIndex) => (
+                        <div key={limitIndex} className="flex items-center justify-between py-1">
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+                            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                          </div>
+                          <div className="h-6 w-10 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
@@ -159,41 +236,60 @@ const TariffPage = () => {
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-2xl font-semibold flex items-center gap-2">
+                  <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold flex items-center gap-2">
                     {tariff.is_free ? (
-                      <Zap className="h-6 w-6 text-blue-500" />
+                      <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
                     ) : tariff.is_lifetime ? (
-                      <Crown className="h-6 w-6 text-yellow-500" />
+                      <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
                     ) : tariff.new_price && tariff.new_price > 50 ? (
-                      <Star className="h-6 w-6 text-purple-500" />
+                      <Star className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
                     ) : (
-                      <CreditCard className="h-6 w-6 text-green-500" />
+                      <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
                     )}
-                    {tariff.name}
+                    <span className="truncate max-w-[150px] sm:max-w-[200px] md:max-w-[250px]">
+                      {tariff.name}
+                    </span>
                   </h3>
-                  <p className="text-muted-foreground mt-2">{tariff.description}</p>
+                  <p className="text-muted-foreground mt-2 text-xs sm:text-sm md:text-base max-w-[180px] sm:max-w-[250px] md:max-w-[300px] truncate">
+                    {tariff.description}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="my-6">
-                <div className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center gap-2">
-                  {getCurrencySymbol(tariff.currency_data?.code)}
-                  {tariff.new_price !== null && tariff.currency_data ? (
-                    new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: tariff.currency_data.code,
-                    }).format(tariff.new_price).replace(/^[^\d]*/, '')
-                  ) : t('free_tariff')}
+                <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold flex flex-wrap items-baseline gap-2">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold">
+                      {tariff.currency_data?.code === 'USD' ? '$' : 
+                       tariff.currency_data?.code === 'EUR' ? '€' : 
+                       tariff.currency_data?.code === 'GBP' ? '£' : 
+                       tariff.currency_data?.code === 'JPY' ? '¥' : 
+                       tariff.currency_data?.code === 'UAH' ? '₴' : '$'}
+                    </span>
+                    {tariff.new_price !== null && tariff.currency_data ? (
+                      <span>
+                        {new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: tariff.currency_data.code,
+                        }).format(tariff.new_price).replace(/^[^\d]*/, '')}
+                      </span>
+                    ) : (
+                      <span>{t('free_tariff')}</span>
+                    )}
+                  </div>
                   {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && tariff.currency_data && (
-                    <span className="text-base sm:text-lg md:text-xl text-muted-foreground line-through ml-2">
-                      {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: tariff.currency_data.code,
-                      }).format(tariff.old_price).replace(/^[^\d]*/, '')}
+                    <span className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground line-through flex items-baseline gap-1">
+                      {getCurrencySymbol(tariff.currency_data?.code)}
+                      <span>
+                        {new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: tariff.currency_data.code,
+                        }).format(tariff.old_price).replace(/^[^\d]*/, '')}
+                      </span>
                     </span>
                   )}
                 </div>
-                <p className="text-muted-foreground text-sm sm:text-base md:text-lg mt-1">
+                <p className="text-muted-foreground text-xs sm:text-sm md:text-base lg:text-lg mt-2">
                   {formatDuration(tariff.duration_days)}
                 </p>
               </div>
@@ -201,8 +297,8 @@ const TariffPage = () => {
               {/* Select Plan Button - moved from bottom to here */}
               <div className="mt-6 mb-6">
                 <Button className="w-full" size="lg">
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  {t('select_plan')}
+                  <CreditCard className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-sm sm:text-base">{t('select_plan')}</span>
                 </Button>
               </div>
 
@@ -215,14 +311,14 @@ const TariffPage = () => {
                         const IconComponent = getFeatureIcon(feature.feature_name);
                         return (
                           <div key={feature.id} className="flex items-start justify-between py-1">
-                            <div className="flex items-start gap-2">
+                            <div className="flex items-start gap-2 min-w-0">
                               {feature.is_active ? (
                                 <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
                               )}
                               <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <span className={feature.is_active ? "" : "text-muted-foreground line-through"}>
+                              <span className={`text-xs sm:text-sm ${feature.is_active ? "" : "text-muted-foreground line-through"} truncate`}>
                                 {feature.feature_name}
                               </span>
                             </div>
@@ -230,7 +326,7 @@ const TariffPage = () => {
                         );
                       })
                     ) : (
-                      <p className="text-muted-foreground text-sm">{t('no_features_configured')}</p>
+                      <p className="text-muted-foreground text-xs sm:text-sm">{t('no_features_configured')}</p>
                     )}
                   </div>
                 </div>
@@ -245,18 +341,18 @@ const TariffPage = () => {
                         const IconComponent = getLimitIcon(limit.limit_name);
                         return (
                           <div key={limit.id} className="flex items-start justify-between py-1">
-                            <div className="flex items-start gap-2">
+                            <div className="flex items-start gap-2 min-w-0">
                               <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <span>{limit.limit_name}</span>
+                              <span className="text-xs sm:text-sm truncate">{limit.limit_name}</span>
                             </div>
-                            <span className="font-medium bg-muted px-2 py-0.5 rounded text-sm">
+                            <span className="font-medium bg-muted px-2 py-0.5 rounded text-xs sm:text-sm">
                               {limit.value}
                             </span>
                           </div>
                         );
                       })
                     ) : (
-                      <p className="text-muted-foreground text-sm">{t('no_limits_configured')}</p>
+                      <p className="text-muted-foreground text-xs sm:text-sm">{t('no_limits_configured')}</p>
                     )}
                   </div>
                 </div>

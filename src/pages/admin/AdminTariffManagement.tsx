@@ -222,19 +222,19 @@ const AdminTariffManagement = () => {
 
   if (loading) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="p-4 xs:p-5 sm:p-6 space-y-6">
         {/* Page Header with Breadcrumbs */}
         <PageHeader
           title={t('menu_pricing')}
           description={t('manage_tariffs_and_pricing_options')}
           breadcrumbItems={breadcrumbs}
           actions={
-            <div className="flex gap-2">
-              <Button variant="outline" disabled>
-                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled className="text-sm xs:text-base">
+                <div className="h-3 xs:h-4 w-16 xs:w-20 bg-gray-200 rounded animate-pulse"></div>
               </Button>
-              <Button disabled>
-                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              <Button disabled className="text-sm xs:text-base">
+                <div className="h-3 xs:h-4 w-20 xs:w-24 bg-gray-200 rounded animate-pulse"></div>
               </Button>
             </div>
           }
@@ -242,16 +242,16 @@ const AdminTariffManagement = () => {
 
         {/* Tariff Table with Skeleton Loaders */}
         <Card>
-          <CardContent className="p-0">
-            <Table>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="min-w-[500px] xs:min-w-[600px] sm:min-w-[650px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>{t('tariff_name')}</TableHead>
-                  <TableHead>{t('tariff_price')}</TableHead>
-                  <TableHead>{t('tariff_term')}</TableHead>
-                  <TableHead>{t('tariff_status')}</TableHead>
-                  <TableHead className="text-center w-24">{t('tariff_actions')}</TableHead>
+                  <TableHead className="text-xs sm:text-sm md:text-base w-10 xs:w-12"></TableHead>
+                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[80px] xs:min-w-[100px] sm:min-w-[120px]">{t('tariff_name')}</TableHead>
+                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[100px] xs:min-w-[120px] sm:min-w-[140px]">{t('tariff_price')}</TableHead>
+                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[70px] xs:min-w-[80px] sm:min-w-[100px]">{t('tariff_term')}</TableHead>
+                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[70px] xs:min-w-[80px] sm:min-w-[100px]">{t('tariff_status')}</TableHead>
+                  <TableHead className="text-center text-xs sm:text-sm md:text-base w-16 xs:w-20 sm:w-24">{t('tariff_actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -259,22 +259,28 @@ const AdminTariffManagement = () => {
                 {Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <div className="h-5 w-5 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-4 w-4 sm:h-5 sm:w-5 bg-gray-200 rounded animate-pulse"></div>
                     </TableCell>
                     <TableCell>
-                      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-3 sm:h-4 w-20 xs:w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></div>
                     </TableCell>
                     <TableCell>
-                      <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="flex flex-col xs:flex-row gap-1">
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 sm:h-4 w-3 xs:w-4 bg-gray-200 rounded animate-pulse"></div>
+                          <div className="h-3 sm:h-4 w-16 xs:w-20 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                        <div className="h-3 sm:h-4 w-12 xs:w-16 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-3 sm:h-4 w-16 xs:w-20 sm:w-24 bg-gray-200 rounded animate-pulse"></div>
                     </TableCell>
                     <TableCell>
-                      <div className="h-6 w-16 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-5 w-12 xs:h-6 xs:w-16 bg-gray-200 rounded animate-pulse"></div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="h-8 w-8 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                      <div className="h-6 w-6 sm:h-8 sm:w-8 bg-gray-200 rounded animate-pulse mx-auto"></div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -287,23 +293,23 @@ const AdminTariffManagement = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 xs:p-5 sm:p-6 space-y-6">
       {/* Page Header with Breadcrumbs */}
       <PageHeader
         title={t('menu_pricing')}
         description={t('manage_tariffs_and_pricing_options')}
         breadcrumbItems={breadcrumbs}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {tariffs.length === 0 && (
-              <Button variant="outline" onClick={handleCreateSampleData}>
-                Create Sample Data
+              <Button variant="outline" className="text-sm xs:text-base" onClick={handleCreateSampleData}>
+                {t('create_sample_data')}
               </Button>
             )}
-            <Button variant="outline" onClick={handleRefresh}>
-              Refresh
+            <Button variant="outline" className="text-sm xs:text-base" onClick={handleRefresh}>
+              {t('refresh')}
             </Button>
-            <Button onClick={() => navigate('/admin/tariff/new')}>
+            <Button className="text-sm xs:text-base" onClick={() => navigate('/admin/tariff/new')}>
               <Plus className="mr-2 h-4 w-4" />
               {t('add_new_tariff')}
             </Button>
@@ -313,38 +319,38 @@ const AdminTariffManagement = () => {
 
       {/* Tariff Table */}
       <Card>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[500px] xs:min-w-[600px] sm:min-w-[650px]">
             <TableHeader>
               <TableRow>
-                <TableHead></TableHead>
-                <TableHead>{t('tariff_name')}</TableHead>
-                <TableHead>{t('tariff_price')}</TableHead>
-                <TableHead>{t('tariff_term')}</TableHead>
-                <TableHead>{t('tariff_status')}</TableHead>
-                <TableHead className="text-center">{t('tariff_actions')}</TableHead>
+                <TableHead className="text-xs sm:text-sm md:text-base w-10 xs:w-12"></TableHead>
+                <TableHead className="text-xs sm:text-sm md:text-base min-w-[80px] xs:min-w-[100px] sm:min-w-[120px]">{t('tariff_name')}</TableHead>
+                <TableHead className="text-xs sm:text-sm md:text-base min-w-[100px] xs:min-w-[120px] sm:min-w-[140px]">{t('tariff_price')}</TableHead>
+                <TableHead className="text-xs sm:text-sm md:text-base min-w-[70px] xs:min-w-[80px] sm:min-w-[100px]">{t('tariff_term')}</TableHead>
+                <TableHead className="text-xs sm:text-sm md:text-base min-w-[70px] xs:min-w-[80px] sm:min-w-[100px]">{t('tariff_status')}</TableHead>
+                <TableHead className="text-center text-xs sm:text-sm md:text-base w-16 xs:w-20 sm:w-24">{t('tariff_actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tariffs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
+                  <TableCell colSpan={6} className="text-center py-6 xs:py-8 sm:py-10 md:py-12">
                     <div className="flex flex-col items-center gap-4">
-                      <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
-                        <CreditCard className="h-8 w-8 text-muted-foreground" />
+                      <div className="h-10 w-10 xs:h-12 xs:w-12 sm:h-16 sm:w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 xs:h-6 xs:w-6 sm:h-8 sm:w-8 text-muted-foreground" />
                       </div>
                       <div>
-                        <h3 className="font-medium text-lg text-gray-900">{t('no_tariffs_found')}</h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <h3 className="font-medium text-base sm:text-lg md:text-xl text-gray-900">{t('no_tariffs_found')}</h3>
+                        <p className="text-xs sm:text-sm md:text-base text-gray-500 mt-1">
                           {t('manage_tariffs_and_pricing_options')}
                         </p>
                       </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button variant="outline" onClick={handleCreateSampleData}>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Button variant="outline" className="text-xs sm:text-sm" onClick={handleCreateSampleData}>
                           {t('create_sample_data')}
                         </Button>
-                        <Button onClick={() => navigate('/admin/tariff/new')}>
-                          <Plus className="mr-2 h-4 w-4" />
+                        <Button className="text-xs sm:text-sm" onClick={() => navigate('/admin/tariff/new')}>
+                          <Plus className="mr-1 h-3 w-3 xs:mr-2 xs:h-4 xs:w-4" />
                           {t('add_new_tariff')}
                         </Button>
                       </div>
@@ -354,68 +360,76 @@ const AdminTariffManagement = () => {
               ) : (
                 tariffs.map((tariff) => (
                   <TableRow key={tariff.id}>
-                    <TableCell>{getTariffIcon(tariff)}</TableCell>
-                    <TableCell className="font-medium">{tariff.name}</TableCell>
+                    <TableCell>
+                      <div className="h-4 w-4 sm:h-5 sm:w-5">
+                        {getTariffIcon(tariff)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium text-xs sm:text-sm md:text-base max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] md:max-w-xs truncate">{tariff.name}</TableCell>
                     <TableCell>
                       {tariff.is_free ? (
-                        <Badge variant="secondary">{t('free_tariff')}</Badge>
+                        <Badge variant="secondary" className="text-xs sm:text-sm">{t('free_tariff')}</Badge>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          {getCurrencySymbol(currencies.find(c => c.id === tariff.currency)?.code)}
-                          <span>
-                            {tariff.new_price !== null ? (
-                              <span>
-                                {formatPrice(tariff.new_price, currencies.find(c => c.id === tariff.currency)?.code)}
-                                {tariff.old_price && tariff.old_price > tariff.new_price && (
-                                  <span className="ml-2 text-muted-foreground line-through text-sm">
-                                    {formatPrice(tariff.old_price, currencies.find(c => c.id === tariff.currency)?.code)}
-                                  </span>
-                                )}
-                              </span>
-                            ) : (
-                              'N/A'
-                            )}
-                          </span>
+                        <div className="flex flex-col xs:flex-row xs:flex-wrap items-start xs:items-center gap-1 min-w-0">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <div className="text-xs sm:text-sm md:text-base flex-shrink-0">
+                              {getCurrencySymbol(currencies.find(c => c.id === tariff.currency)?.code)}
+                            </div>
+                            <span className="text-xs sm:text-sm md:text-base min-w-0">
+                              {tariff.new_price !== null ? (
+                                <span className="truncate">
+                                  {formatPrice(tariff.new_price, currencies.find(c => c.id === tariff.currency)?.code)}
+                                </span>
+                              ) : (
+                                'N/A'
+                              )}
+                            </span>
+                          </div>
+                          {tariff.old_price && tariff.old_price > tariff.new_price && (
+                            <span className="text-muted-foreground line-through text-xs sm:text-sm md:text-base self-start xs:self-center">
+                              {formatPrice(tariff.old_price, currencies.find(c => c.id === tariff.currency)?.code)}
+                            </span>
+                          )}
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs sm:text-sm md:text-base min-w-0">
                       {tariff.is_lifetime ? t('lifetime_tariff') : 
                        tariff.duration_days ? `${tariff.duration_days} ${t('days_tariff')}` : 'N/A'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={tariff.is_active ? 'badge-active' : ''}>
+                      <Badge variant={tariff.is_active ? 'default' : 'secondary'} className={`text-xs sm:text-xs ${tariff.is_active ? 'badge-active' : ''}`}>
                         {tariff.is_active ? t('status_active') : t('status_inactive')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-6 w-6 sm:h-8 sm:w-8 p-0">
                             <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
+                            <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="text-xs sm:text-sm">
                           <DropdownMenuItem 
                             onClick={() => navigate(`/admin/tariff/edit/${tariff.id}`)}
                             className="dropdown-item-hover"
                           >
-                            <Edit className="mr-2 h-4 w-4" />
+                            <Edit className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                             <span>{t('edit_tariff')}</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDelete(tariff)}
                             className="dropdown-item-hover text-red-600 focus:text-red-600"
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            <Trash2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                             <span>{t('delete_tariff')}</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDuplicate(tariff)}
                             className="dropdown-item-hover"
                           >
-                            <Copy className="mr-2 h-4 w-4" />
+                            <Copy className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                             <span>{t('duplicate_tariff')}</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>

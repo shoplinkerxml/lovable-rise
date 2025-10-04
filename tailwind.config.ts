@@ -17,6 +17,10 @@ export default {
 				'2xl': '1400px'
 			}
 		},
+		screens: {
+			'xs': '475px',
+			...require('tailwindcss/defaultTheme').screens,
+		},
 		extend: {
 			colors: {
 				border: 'hsl(var(--border))',
