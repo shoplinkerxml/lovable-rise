@@ -506,6 +506,7 @@ const dictionary: Dictionary = {
   choose_your_plan: { uk: "Оберіть свій план", en: "Choose Your Plan" },
   select_perfect_plan_for_your_needs: { uk: "Оберіть ідеальний план для ваших потреб", en: "Select the perfect plan for your needs" },
   free: { uk: "Безкоштовно", en: "Free" },
+  choose_your_plan_description: { uk: "Оберіть тарифний план, який найкраще відповідає вашим потребам", en: "Choose a tariff plan that best fits your needs" },
   tariff_page_features: { uk: "Функції", en: "Features" },
   tariff_page_limits: { uk: "Ліміти", en: "Limits" },
   select_plan: { uk: "Обрати план", en: "Select Plan" },
