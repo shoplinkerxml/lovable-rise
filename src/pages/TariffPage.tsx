@@ -208,6 +208,14 @@ const TariffPage = () => {
                         <span className="font-medium">{tariff.currency_data.code}</span>
                       </div>
                     )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('features')}:</span>
+                      <span className="font-medium">{tariff.features.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('limits')}:</span>
+                      <span className="font-medium">{tariff.limits.length}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -224,14 +232,14 @@ const TariffPage = () => {
                       tariff.features.map((feature) => {
                         const IconComponent = getFeatureIcon(feature.feature_name);
                         return (
-                          <div key={feature.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div key={feature.id} className="flex items-start justify-between py-1">
+                            <div className="flex items-start gap-2">
                               {feature.is_active ? (
-                                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                               ) : (
-                                <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                                <XCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
                               )}
-                              <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               <span className={feature.is_active ? "" : "text-muted-foreground line-through"}>
                                 {feature.feature_name}
                               </span>
@@ -258,12 +266,14 @@ const TariffPage = () => {
                       tariff.limits.map((limit) => {
                         const IconComponent = getLimitIcon(limit.limit_name);
                         return (
-                          <div key={limit.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>{limit.limit_name}:</span>
+                          <div key={limit.id} className="flex items-start justify-between py-1">
+                            <div className="flex items-start gap-2">
+                              <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                              <span>{limit.limit_name}</span>
                             </div>
-                            <span className="font-medium">{limit.value}</span>
+                            <span className="font-medium bg-muted px-2 py-0.5 rounded text-sm">
+                              {limit.value}
+                            </span>
                           </div>
                         );
                       })

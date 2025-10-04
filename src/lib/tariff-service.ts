@@ -64,26 +64,60 @@ export class TariffService {
         return [];
       }
       
-      // Transform the data to match our TariffWithDetails interface
-      // Using separate requests for related data would be done here if needed for full details
-      return data.map(tariff => ({
-        id: tariff.id,
-        name: tariff.name,
-        description: tariff.description,
-        old_price: tariff.old_price,
-        new_price: tariff.new_price,
-        currency_id: tariff.currency, // Map currency field to currency_id for compatibility
-        currency_code: 'USD', // Default, would be fetched separately if needed
-        duration_days: tariff.duration_days,
-        is_free: tariff.is_free,
-        is_lifetime: tariff.is_lifetime,
-        is_active: tariff.is_active,
-        created_at: tariff.created_at,
-        updated_at: tariff.updated_at,
-        currency_data: null, // Would be populated with separate request if needed
-        features: [], // Would be populated with separate request if needed
-        limits: [] // Would be populated with separate request if needed
-      })) as any[];
+      // Fetch features and limits for each tariff
+      const tariffsWithDetails = [];
+      for (const tariff of data) {
+        // Get currency data
+        let currencyData = null;
+        const currencyId = (tariff as any).currency_id || (tariff as any).currency;
+        if (currencyId && typeof currencyId === 'number') {
+          const { data: currency, error: currencyError } = await supabase
+            .from('currencies')
+            .select('*')
+            .eq('id', currencyId)
+            .single();
+            
+          if (!currencyError) {
+            currencyData = currency;
+          }
+        }
+        
+        // Get features
+        const { data: featuresData } = await supabase
+          .from('tariff_features')
+          .select('*')
+          .eq('tariff_id', tariff.id)
+          .eq('is_active', true)
+          .order('feature_name');
+        
+        // Get limits
+        const { data: limitsData } = await supabase
+          .from('tariff_limits')
+          .select('*')
+          .eq('tariff_id', tariff.id)
+          .eq('is_active', true)
+          .order('limit_name');
+        
+        tariffsWithDetails.push({
+          id: tariff.id,
+          name: tariff.name,
+          description: tariff.description,
+          old_price: tariff.old_price,
+          new_price: tariff.new_price,
+          currency: (tariff as any).currency_id || tariff.currency,
+          duration_days: tariff.duration_days,
+          is_free: tariff.is_free,
+          is_lifetime: tariff.is_lifetime,
+          is_active: tariff.is_active,
+          created_at: tariff.created_at,
+          updated_at: tariff.updated_at,
+          currency_data: currencyData,
+          features: featuresData || [],
+          limits: limitsData || []
+        });
+      }
+      
+      return tariffsWithDetails as any[];
     } catch (error) {
       console.error('Error fetching tariffs:', error);
       throw error;
