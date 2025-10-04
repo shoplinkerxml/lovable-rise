@@ -31,6 +31,7 @@ interface TariffFormData {
   is_free?: boolean | null;
   is_lifetime?: boolean | null;
   is_active?: boolean | null;
+  sort_order?: number | null;
 }
 
 const AdminTariffEdit = () => {
@@ -78,7 +79,8 @@ const AdminTariffEdit = () => {
     duration_days: null,
     is_free: false,
     is_lifetime: false,
-    is_active: true
+    is_active: true,
+    sort_order: 0
   });
 
   useEffect(() => {
@@ -189,7 +191,8 @@ const AdminTariffEdit = () => {
           duration_days: tariffWithDetails.duration_days,
           is_free: tariffWithDetails.is_free || false,
           is_lifetime: tariffWithDetails.is_lifetime || false,
-          is_active: tariffWithDetails.is_active || true
+          is_active: tariffWithDetails.is_active || true,
+          sort_order: tariffWithDetails.sort_order || 0
         });
         
         // Load features and limits
@@ -387,7 +390,8 @@ const AdminTariffEdit = () => {
           duration_days: formData.duration_days,
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
-          is_active: formData.is_active
+          is_active: formData.is_active,
+          sort_order: formData.sort_order
         };
         
         // Handle prices based on free tariff status
@@ -418,7 +422,8 @@ const AdminTariffEdit = () => {
           duration_days: formData.duration_days,
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
-          is_active: formData.is_active
+          is_active: formData.is_active,
+          sort_order: formData.sort_order
         };
         
         // Handle prices based on free tariff status
@@ -779,37 +784,52 @@ const AdminTariffEdit = () => {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="currency">{t('currency')} *</Label>
-                  <Select
-                    value={formData.currency_id.toString()}
-                    onValueChange={(value) => handleInputChange('currency_id', parseInt(value))}
-                    disabled={!isAdmin}
-                  >
-                    <SelectTrigger className={formErrors.currency_id ? 'border-red-500' : ''}>
-                      <SelectValue placeholder={t('select_currency')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((currency) => {
-                        const symbolMap: Record<string, string> = {
-                          'USD': '$',
-                          'EUR': '€',
-                          'UAH': '₴',
-                          'GBP': '£',
-                          'JPY': '¥'
-                        };
-                        const symbol = symbolMap[currency.code] || currency.code;
-                        return (
-                          <SelectItem key={currency.id} value={currency.id.toString()}>
-                            {currency.code} ({symbol}) - {currency.name}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {formErrors.currency_id && (
-                    <p className="text-sm text-red-600">{formErrors.currency_id}</p>
-                  )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">{t('currency')} *</Label>
+                    <Select
+                      value={formData.currency_id.toString()}
+                      onValueChange={(value) => handleInputChange('currency_id', parseInt(value))}
+                      disabled={!isAdmin}
+                    >
+                      <SelectTrigger className={formErrors.currency_id ? 'border-red-500' : ''}>
+                        <SelectValue placeholder={t('select_currency')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((currency) => {
+                          const symbolMap: Record<string, string> = {
+                            'USD': '$',
+                            'EUR': '€',
+                            'UAH': '₴',
+                            'GBP': '£',
+                            'JPY': '¥'
+                          };
+                          const symbol = symbolMap[currency.code] || currency.code;
+                          return (
+                            <SelectItem key={currency.id} value={currency.id.toString()}>
+                              {currency.code} ({symbol}) - {currency.name}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {formErrors.currency_id && (
+                      <p className="text-sm text-red-600">{formErrors.currency_id}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sort_order">{t('sort_order')}</Label>
+                    <Input
+                      id="sort_order"
+                      type="number"
+                      min="0"
+                      value={formData.sort_order || 0}
+                      onChange={(e) => handleInputChange('sort_order', e.target.value ? parseInt(e.target.value) : 0)}
+                      placeholder={t('enter_sort_order')}
+                      disabled={!isAdmin}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -28,6 +28,7 @@ interface TariffFormData {
   is_free?: boolean | null;
   is_lifetime?: boolean | null;
   is_active?: boolean | null;
+  sort_order?: number | null;
 }
 
 const AdminTariffNew = () => {
@@ -53,7 +54,8 @@ const AdminTariffNew = () => {
     duration_days: null,
     is_free: false,
     is_lifetime: false,
-    is_active: true
+    is_active: true,
+    sort_order: 0
   });
 
   useEffect(() => {
@@ -109,7 +111,8 @@ const AdminTariffNew = () => {
         duration_days: formData.duration_days,
         is_free: formData.is_free,
         is_lifetime: formData.is_lifetime,
-        is_active: formData.is_active
+        is_active: formData.is_active,
+        sort_order: formData.sort_order
       };
       
       // Handle prices based on free tariff status
@@ -362,30 +365,44 @@ const AdminTariffNew = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="currency">{t('currency')}</Label>
-                  <Select
-                    value={formData.currency_id.toString()}
-                    onValueChange={(value) => {
-                      const currencyId = parseInt(value);
-                      const selectedCurrency = currencies.find(c => c.id === currencyId);
-                      handleInputChange('currency_id', currencyId);
-                      if (selectedCurrency) {
-                        handleInputChange('currency_code', selectedCurrency.code);
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((currency) => (
-                        <SelectItem key={currency.id} value={currency.id.toString()}>
-                          {currency.code} - {currency.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">{t('currency')}</Label>
+                    <Select
+                      value={formData.currency_id.toString()}
+                      onValueChange={(value) => {
+                        const currencyId = parseInt(value);
+                        const selectedCurrency = currencies.find(c => c.id === currencyId);
+                        handleInputChange('currency_id', currencyId);
+                        if (selectedCurrency) {
+                          handleInputChange('currency_code', selectedCurrency.code);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency.id} value={currency.id.toString()}>
+                            {currency.code} - {currency.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sort_order">{t('sort_order')}</Label>
+                    <Input
+                      id="sort_order"
+                      type="number"
+                      min="0"
+                      value={formData.sort_order || 0}
+                      onChange={(e) => handleInputChange('sort_order', e.target.value ? parseInt(e.target.value) : 0)}
+                      placeholder={t('enter_sort_order')}
+                    />
+                  </div>
                 </div>
               </div>
 

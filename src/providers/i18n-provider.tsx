@@ -513,6 +513,8 @@ const dictionary: Dictionary = {
   tariff_page_features: { uk: "Функції", en: "Features" },
   tariff_page_limits: { uk: "Ліміти", en: "Limits" },
   select_plan: { uk: "Обрати план", en: "Select Plan" },
+  sort_order: { uk: "Порядковий номер", en: "Sort Order" },
+  enter_sort_order: { uk: "Введіть порядковий номер", en: "Enter sort order" },
   
   // Tariff Features and Limits translations
   tariff_features_and_limits: { uk: "Функції та ліміти тарифів", en: "Tariff Features and Limits" },

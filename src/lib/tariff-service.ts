@@ -29,6 +29,7 @@ export interface TariffWithDetails {
   is_active: boolean | null;
   created_at: string | null;
   updated_at: string | null;
+  sort_order: number | null;
   currency_data: Currency;
   features: TariffFeature[];
   limits: TariffLimit[];
@@ -44,7 +45,7 @@ export class TariffService {
       let query = supabase
         .from('tariffs')
         .select('*')
-        .order('name');
+        .order('sort_order', { ascending: true });
 
       if (!includeInactive) {
         query = query.eq('is_active', true);
@@ -111,6 +112,7 @@ export class TariffService {
           is_active: tariff.is_active,
           created_at: tariff.created_at,
           updated_at: tariff.updated_at,
+          sort_order: tariff.sort_order,
           currency_data: currencyData,
           features: featuresData || [],
           limits: limitsData || []
@@ -181,6 +183,7 @@ export class TariffService {
         is_active: tariffData.is_active,
         created_at: tariffData.created_at,
         updated_at: tariffData.updated_at,
+        sort_order: tariffData.sort_order,
         currency_data: currencyData,
         features: featuresData || [],
         limits: limitsData || []
