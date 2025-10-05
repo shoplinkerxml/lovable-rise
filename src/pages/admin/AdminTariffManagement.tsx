@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle, DollarSign, PoundSterling, JapaneseYen } from 'lucide-react';
+import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle, DollarSign, PoundSterling, JapaneseYen, Rocket, Banknote, TrendingUp, Zap } from 'lucide-react';
 import { TariffService, type Tariff, type TariffInsert, type Currency } from '@/lib/tariff-service';
 import TariffCache from '@/lib/tariff-cache';
 import { useI18n } from '@/providers/i18n-provider';
@@ -213,11 +213,52 @@ const AdminTariffManagement = () => {
   };
 
   // Function to get tariff icon based on tariff properties
+  // Updated to use price-tier-based approach similar to user tariff page
   const getTariffIcon = (tariff: Tariff) => {
-    if (tariff.is_free) return <Package className="h-5 w-5 text-blue-500" />;
-    if (tariff.is_lifetime) return <Crown className="h-5 w-5 text-yellow-500" />;
-    if (tariff.new_price && tariff.new_price > 50) return <Star className="h-5 w-5 text-purple-500" />;
-    return <CreditCard className="h-5 w-5 text-green-500" />;
+    // Determine icon based on price tier and sort order
+    if (tariff.is_free) {
+      return <Zap className="h-5 w-5 text-blue-500" />;
+    }
+    
+    if (tariff.is_lifetime) {
+      return <Crown className="h-5 w-5 text-yellow-500" />;
+    }
+    
+    // For paid tariffs, determine icon based on price relative to other tariffs
+    const paidTariffs = tariffs.filter(t => !t.is_free && t.new_price !== null);
+    
+    if (paidTariffs.length <= 1) {
+      // If only one paid tariff, use default icon
+      return <CreditCard className="h-5 w-5 text-green-500" />;
+    }
+    
+    // Sort paid tariffs by price
+    const sortedTariffs = [...paidTariffs].sort((a, b) => {
+      const priceA = a.new_price || 0;
+      const priceB = b.new_price || 0;
+      return priceA - priceB;
+    });
+    
+    // Find position of current tariff
+    const currentIndex = sortedTariffs.findIndex(t => t.id === tariff.id);
+    
+    if (currentIndex === -1) {
+      return <CreditCard className="h-5 w-5 text-green-500" />;
+    }
+    
+    // Determine icon based on price tier
+    const tier = currentIndex / sortedTariffs.length;
+    
+    if (tier < 0.33) {
+      // Entry level - Rocket icon
+      return <Rocket className="h-5 w-5 text-blue-500" />;
+    } else if (tier < 0.66) {
+      // Mid tier - Money bag icon
+      return <Banknote className="h-5 w-5 text-green-500" />;
+    } else {
+      // Premium tier - Chart with upward trend
+      return <TrendingUp className="h-5 w-5 text-purple-500" />;
+    }
   };
 
   if (loading) {
@@ -386,9 +427,15 @@ const AdminTariffManagement = () => {
                             </span>
                           </div>
                           {tariff.old_price && tariff.old_price > tariff.new_price && (
-                            <span className="text-muted-foreground line-through text-xs sm:text-sm md:text-base self-start xs:self-center">
-                              {formatPrice(tariff.old_price, currencies.find(c => c.id === tariff.currency)?.code)}
-                            </span>
+                            <>
+                              <span className="text-muted-foreground line-through text-xs sm:text-sm md:text-base self-start xs:self-center
+                                             [@media(max-width:1180px)]:text-[0.625rem] [@media(max-width:1180px)]:sm:text-[0.75rem] [@media(max-width:1180px)]:md:text-xs">
+                                {formatPrice(tariff.old_price, currencies.find(c => c.id === tariff.currency)?.code)}
+                              </span>
+                              <Badge variant="destructive" className="text-xs self-start xs:self-center">
+                                {Math.round(((tariff.old_price - tariff.new_price) / tariff.old_price) * 100)}%
+                              </Badge>
+                            </>
                           )}
                         </div>
                       )}

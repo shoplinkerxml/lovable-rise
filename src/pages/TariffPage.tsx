@@ -38,7 +38,9 @@ import {
   Store,
   Truck,
   Package,
-  User
+  User,
+  Rocket,
+  Banknote
 } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
@@ -95,6 +97,54 @@ const TariffPage = () => {
     if (days === 30) return t('pricing_period_monthly');
     if (days === 365) return t('pricing_period_yearly');
     return `${days} ${t('days_tariff')}`;
+  };
+
+  // Function to get relevant icon for a tariff based on price and sort order
+  const getTariffIcon = (tariff: TariffWithDetails) => {
+    // Determine icon based on price tier and sort order
+    if (tariff.is_free) {
+      return <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />;
+    }
+    
+    if (tariff.is_lifetime) {
+      return <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />;
+    }
+    
+    // For paid tariffs, determine icon based on price relative to other tariffs
+    const paidTariffs = tariffs.filter(t => !t.is_free && t.new_price !== null) as TariffWithDetails[];
+    
+    if (paidTariffs.length <= 1) {
+      // If only one paid tariff, use default icon
+      return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
+    }
+    
+    // Sort paid tariffs by price
+    const sortedTariffs = [...paidTariffs].sort((a, b) => {
+      const priceA = a.new_price || 0;
+      const priceB = b.new_price || 0;
+      return priceA - priceB;
+    });
+    
+    // Find position of current tariff
+    const currentIndex = sortedTariffs.findIndex(t => t.id === tariff.id);
+    
+    if (currentIndex === -1) {
+      return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
+    }
+    
+    // Determine icon based on price tier
+    const tier = currentIndex / sortedTariffs.length;
+    
+    if (tier < 0.33) {
+      // Entry level - Rocket icon
+      return <Rocket className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />;
+    } else if (tier < 0.66) {
+      // Mid tier - Money bag icon
+      return <Banknote className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
+    } else {
+      // Premium tier - Chart with upward trend
+      return <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />;
+    }
   };
 
   // Function to get relevant icon for a feature
@@ -237,20 +287,12 @@ const TariffPage = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold flex items-center gap-2">
-                    {tariff.is_free ? (
-                      <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
-                    ) : tariff.is_lifetime ? (
-                      <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
-                    ) : tariff.new_price && tariff.new_price > 50 ? (
-                      <Star className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
-                    ) : (
-                      <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
-                    )}
+                    {getTariffIcon(tariff)}
                     <span className="truncate max-w-[150px] sm:max-w-[200px] md:max-w-[250px]">
                       {tariff.name}
                     </span>
                   </h3>
-                  <p className="text-muted-foreground mt-2 text-xs sm:text-sm md:text-base max-w-[180px] sm:max-w-[250px] md:max-w-[300px] truncate">
+                  <p className="text-muted-foreground mt-2 text-xs sm:text-sm md:text-base max-w-[180px] sm:max-w-[250px] md:max-w-[300px]">
                     {tariff.description}
                   </p>
                 </div>
@@ -276,9 +318,17 @@ const TariffPage = () => {
                     ) : (
                       <span>{t('free_tariff')}</span>
                     )}
+                    {!tariff.is_free && !tariff.is_lifetime && (
+                      <span className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground">
+                        {t('per_month')}
+                      </span>
+                    )}
                   </div>
-                  {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && tariff.currency_data && (
-                    <span className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground line-through flex items-baseline gap-1">
+                </div>
+                {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && tariff.currency_data && (
+                  <div className="flex flex-wrap items-center justify-between mt-2 gap-2">
+                    <span className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground line-through flex items-baseline gap-1 
+                                   [@media(max-width:1180px)]:text-sm [@media(max-width:1180px)]:sm:text-base [@media(max-width:1180px)]:md:text-lg">
                       {getCurrencySymbol(tariff.currency_data?.code)}
                       <span>
                         {new Intl.NumberFormat('en-US', {
@@ -287,19 +337,14 @@ const TariffPage = () => {
                         }).format(tariff.old_price).replace(/^[^\d]*/, '')}
                       </span>
                     </span>
-                  )}
-                </div>
+                    <Badge variant="destructive" className="text-xs sm:text-sm whitespace-nowrap">
+                      {Math.round(((tariff.old_price - tariff.new_price) / tariff.old_price) * 100)}% {t('discount')}
+                    </Badge>
+                  </div>
+                )}
                 <p className="text-muted-foreground text-xs sm:text-sm md:text-base lg:text-lg mt-2">
-                  {formatDuration(tariff.duration_days)}
+                  {tariff.is_lifetime ? t('lifetime_tariff') : ''}
                 </p>
-              </div>
-
-              {/* Select Plan Button - moved from bottom to here */}
-              <div className="mt-6 mb-6">
-                <Button className="w-full" size="lg">
-                  <CreditCard className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="text-sm sm:text-base">{t('select_plan')}</span>
-                </Button>
               </div>
 
               <div className="space-y-6">
@@ -358,6 +403,13 @@ const TariffPage = () => {
                 </div>
               </div>
 
+              {/* Select Plan Button - moved to the bottom */}
+              <div className="mt-6">
+                <Button className="w-full" size="lg">
+                  {getTariffIcon(tariff)}
+                  <span className="ml-2 text-sm sm:text-base">{t('select_plan')}</span>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}

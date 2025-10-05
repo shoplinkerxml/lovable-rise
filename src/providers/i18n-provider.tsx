@@ -364,7 +364,7 @@ const dictionary: Dictionary = {
   enter_menu_item_title: { uk: "Введіть назву пункту меню", en: "Enter menu item title" },
   path: { uk: "Шлях", en: "Path" },
   enter_path_or_leave_empty: { uk: "Введіть шлях або залиште порожнім", en: "Enter path or leave empty" },
-  parent_menu_item: { uk: "Батьківський пункт меню", en: "Parent Menu Item" },
+  parent_menu_item: { uk: "Батьківський пункт пункт меню", en: "Parent Menu Item" },
   select_parent_menu_item: { uk: "Оберіть батьківський пункт меню", en: "Select parent menu item" },
   no_parent: { uk: "Немає батьківського", en: "No parent" },
   icon: { uk: "Іконка", en: "Icon" },
@@ -516,6 +516,8 @@ const dictionary: Dictionary = {
   select_plan: { uk: "Обрати план", en: "Select Plan" },
   sort_order: { uk: "Порядковий номер", en: "Sort Order" },
   enter_sort_order: { uk: "Введіть порядковий номер", en: "Enter sort order" },
+  discount: { uk: "Знижка", en: "Discount" },
+  per_month: { uk: "/міс.", en: "/mo" },
   
   // Tariff Features and Limits translations
   tariff_features_and_limits: { uk: "Функції та ліміти тарифів", en: "Tariff Features and Limits" },
