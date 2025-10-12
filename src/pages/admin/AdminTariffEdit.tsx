@@ -189,9 +189,9 @@ const AdminTariffEdit = () => {
           currency_id: tariffWithDetails.currency || 1,
           currency_code: currencyCode,
           duration_days: tariffWithDetails.duration_days,
-          is_free: tariffWithDetails.is_free || false,
-          is_lifetime: tariffWithDetails.is_lifetime || false,
-          is_active: tariffWithDetails.is_active || true,
+          is_free: tariffWithDetails.is_free ?? false,
+          is_lifetime: tariffWithDetails.is_lifetime ?? false,
+          is_active: tariffWithDetails.is_active ?? true,
           sort_order: tariffWithDetails.sort_order || 0
         });
         
