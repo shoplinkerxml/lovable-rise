@@ -19,6 +19,7 @@ import { ProfileService } from '@/lib/profile-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface TariffFormData {
   name: string;
@@ -706,10 +707,7 @@ const AdminTariffEdit = () => {
   if (isInitialLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">{t('loading')}...</p>
-        </div>
+        <Spinner className="h-12 w-12" />
       </div>
     );
   }
