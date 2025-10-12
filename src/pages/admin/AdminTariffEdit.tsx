@@ -61,6 +61,7 @@ const AdminTariffEdit = () => {
   const [activeTab, setActiveTab] = useState('basic');
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [savedTariffId, setSavedTariffId] = useState<number | null>(null);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
@@ -90,6 +91,9 @@ const AdminTariffEdit = () => {
     // Fetch tariff name for breadcrumb if we have an ID
     if (id) {
       fetchTariffData(parseInt(id));
+    } else {
+      // For new tariff, set loading to false immediately
+      setIsInitialLoading(false);
     }
   }, [id]);
 
@@ -168,6 +172,7 @@ const AdminTariffEdit = () => {
   const fetchTariffData = async (tariffId: number) => {
     try {
       setLoading(true);
+      setIsInitialLoading(true);
       console.log('Loading tariff data for ID:', tariffId);
       
       // Use TariffService.getTariffById() for loading single tariffs with full relational data
@@ -228,6 +233,7 @@ const AdminTariffEdit = () => {
       toast.error(t('failed_load_tariff'));
     } finally {
       setLoading(false);
+      setIsInitialLoading(false);
     }
   };
   // Fetch only tariff name for breadcrumb
@@ -696,6 +702,17 @@ const AdminTariffEdit = () => {
     currencies: currencies.length,
     customBreadcrumbsLength: customBreadcrumbs.length
   });
+  
+  if (isInitialLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">{t('loading')}...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
