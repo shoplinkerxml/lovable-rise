@@ -281,27 +281,70 @@ const TariffPage = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tariffs.map((tariff) => (
-          <Card key={tariff.id} className="flex flex-col">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold flex items-center gap-2">
-                    {getTariffIcon(tariff)}
-                    <span className="truncate max-w-[150px] sm:max-w-[200px] md:max-w-[250px]">
-                      {tariff.name}
-                    </span>
-                  </h3>
-                  <p className="text-muted-foreground mt-2 text-xs sm:text-sm md:text-base max-w-[180px] sm:max-w-[250px] md:max-w-[300px]">
-                    {tariff.description}
-                  </p>
+        {tariffs.map((tariff, index) => {
+          const isPopular = index === 1; // Middle tariff as popular
+          return (
+            <Card 
+              key={tariff.id} 
+              className={`flex flex-col relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                isPopular ? 'border-2 border-primary shadow-lg' : ''
+              }`}
+            >
+              {isPopular && (
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-4 py-1 text-xs font-semibold rounded-bl-lg">
+                  {t('popular') || 'Popular'}
                 </div>
-              </div>
+              )}
+              
+              <CardContent className="p-6 flex flex-col h-full">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      {getTariffIcon(tariff)}
+                      <h3 className="text-2xl font-bold">
+                        {tariff.name}
+                      </h3>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      {tariff.description}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="my-6">
-                <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold flex flex-wrap items-baseline gap-2">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold">
+                {/* Pricing Section - Reorganized */}
+                <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+                  {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && tariff.currency_data ? (
+                    <>
+                      {/* Old Price */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg text-muted-foreground line-through flex items-baseline gap-1">
+                          <span className="text-base">
+                            {tariff.currency_data?.code === 'USD' ? '$' : 
+                             tariff.currency_data?.code === 'EUR' ? '€' : 
+                             tariff.currency_data?.code === 'GBP' ? '£' : 
+                             tariff.currency_data?.code === 'JPY' ? '¥' : 
+                             tariff.currency_data?.code === 'UAH' ? '₴' : '$'}
+                          </span>
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: tariff.currency_data.code,
+                          }).format(tariff.old_price).replace(/^[^\d]*/, '')}
+                        </span>
+                      </div>
+                      
+                      {/* Discount Badge */}
+                      <div className="mb-3">
+                        <Badge variant="destructive" className="text-xs font-semibold">
+                          -{Math.round(((tariff.old_price - tariff.new_price) / tariff.old_price) * 100)}% {t('discount')}
+                        </Badge>
+                      </div>
+                    </>
+                  ) : null}
+                  
+                  {/* New Price */}
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-4xl font-bold">
                       {tariff.currency_data?.code === 'USD' ? '$' : 
                        tariff.currency_data?.code === 'EUR' ? '€' : 
                        tariff.currency_data?.code === 'GBP' ? '£' : 
@@ -309,110 +352,110 @@ const TariffPage = () => {
                        tariff.currency_data?.code === 'UAH' ? '₴' : '$'}
                     </span>
                     {tariff.new_price !== null && tariff.currency_data ? (
-                      <span>
+                      <span className="text-5xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
                         {new Intl.NumberFormat('en-US', {
                           style: 'currency',
                           currency: tariff.currency_data.code,
                         }).format(tariff.new_price).replace(/^[^\d]*/, '')}
                       </span>
                     ) : (
-                      <span>{t('free_tariff')}</span>
-                    )}
-                    {!tariff.is_free && !tariff.is_lifetime && (
-                      <span className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground">
-                        {t('per_month')}
+                      <span className="text-5xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                        {t('free_tariff')}
                       </span>
                     )}
+                  </div>
+                  
+                  {/* Period or Lifetime */}
+                  <div className="text-sm text-muted-foreground">
+                    {tariff.is_lifetime ? (
+                      <Badge variant="secondary" className="mt-1">
+                        <Crown className="h-3 w-3 mr-1" />
+                        {t('lifetime_tariff')}
+                      </Badge>
+                    ) : !tariff.is_free ? (
+                      <span>{t('per_month')}</span>
+                    ) : null}
                   </div>
                 </div>
-                {tariff.old_price && tariff.new_price && tariff.old_price > tariff.new_price && tariff.currency_data && (
-                  <div className="flex flex-wrap items-center justify-between mt-2 gap-2">
-                    <span className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground line-through flex items-baseline gap-1 
-                                   [@media(max-width:1180px)]:text-sm [@media(max-width:1180px)]:sm:text-base [@media(max-width:1180px)]:md:text-lg">
-                      {getCurrencySymbol(tariff.currency_data?.code)}
-                      <span>
-                        {new Intl.NumberFormat('en-US', {
-                          style: 'currency',
-                          currency: tariff.currency_data.code,
-                        }).format(tariff.old_price).replace(/^[^\d]*/, '')}
-                      </span>
-                    </span>
-                    <Badge variant="destructive" className="text-xs sm:text-sm whitespace-nowrap">
-                      {Math.round(((tariff.old_price - tariff.new_price) / tariff.old_price) * 100)}% {t('discount')}
-                    </Badge>
-                  </div>
-                )}
-                <p className="text-muted-foreground text-xs sm:text-sm md:text-base lg:text-lg mt-2">
-                  {tariff.is_lifetime ? t('lifetime_tariff') : ''}
-                </p>
-              </div>
 
-              <div className="space-y-6">
-                {/* Features Section */}
-                <div>
-                  <div className="space-y-2">
-                    {tariff.features.length > 0 ? (
-                      tariff.features.map((feature) => {
-                        const IconComponent = getFeatureIcon(feature.feature_name);
-                        return (
-                          <div key={feature.id} className="flex items-start justify-between py-1">
-                            <div className="flex items-start gap-2 min-w-0">
+                {/* Features & Limits */}
+                <div className="space-y-4 flex-grow">
+                  {/* Features Section */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <Star className="h-4 w-4 text-primary" />
+                      {t('features') || 'Features'}
+                    </h4>
+                    <div className="space-y-2">
+                      {tariff.features.length > 0 ? (
+                        tariff.features.slice(0, 5).map((feature) => {
+                          const IconComponent = getFeatureIcon(feature.feature_name);
+                          return (
+                            <div key={feature.id} className="flex items-start gap-2">
                               {feature.is_active ? (
                                 <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
                               )}
                               <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <span className={`text-xs sm:text-sm ${feature.is_active ? "" : "text-muted-foreground line-through"} truncate`}>
+                              <span className={`text-sm ${feature.is_active ? "" : "text-muted-foreground line-through"}`}>
                                 {feature.feature_name}
                               </span>
                             </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-muted-foreground text-xs sm:text-sm">{t('no_features_configured')}</p>
-                    )}
+                          );
+                        })
+                      ) : (
+                        <p className="text-muted-foreground text-xs">{t('no_features_configured')}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <Separator />
+                  <Separator />
 
-                {/* Limits Section */}
-                <div>
-                  <div className="space-y-2">
-                    {tariff.limits.length > 0 ? (
-                      tariff.limits.map((limit) => {
-                        const IconComponent = getLimitIcon(limit.limit_name);
-                        return (
-                          <div key={limit.id} className="flex items-start justify-between py-1">
-                            <div className="flex items-start gap-2 min-w-0">
-                              <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                              <span className="text-xs sm:text-sm truncate">{limit.limit_name}</span>
+                  {/* Limits Section */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      {t('limits') || 'Limits'}
+                    </h4>
+                    <div className="space-y-2">
+                      {tariff.limits.length > 0 ? (
+                        tariff.limits.map((limit) => {
+                          const IconComponent = getLimitIcon(limit.limit_name);
+                          return (
+                            <div key={limit.id} className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span className="text-sm">{limit.limit_name}</span>
+                              </div>
+                              <Badge variant="outline" className="font-semibold">
+                                {limit.value}
+                              </Badge>
                             </div>
-                            <span className="font-medium bg-muted px-2 py-0.5 rounded text-xs sm:text-sm">
-                              {limit.value}
-                            </span>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-muted-foreground text-xs sm:text-sm">{t('no_limits_configured')}</p>
-                    )}
+                          );
+                        })
+                      ) : (
+                        <p className="text-muted-foreground text-xs">{t('no_limits_configured')}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Select Plan Button - moved to the bottom */}
-              <div className="mt-6">
-                <Button className="w-full" size="lg">
-                  {getTariffIcon(tariff)}
-                  <span className="ml-2 text-sm sm:text-base">{t('select_plan')}</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                {/* Select Plan Button */}
+                <div className="mt-6">
+                  <Button 
+                    className={`w-full ${isPopular ? 'bg-primary hover:bg-primary/90 shadow-lg' : ''}`}
+                    size="lg"
+                    variant={isPopular ? "default" : "outline"}
+                  >
+                    <Rocket className="h-4 w-4 mr-2" />
+                    <span className="font-semibold">{t('select_plan')}</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
