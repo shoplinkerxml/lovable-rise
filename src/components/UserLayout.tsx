@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from "@/components/ui/sheet-no-overlay";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sun, Moon, AlignJustify } from "lucide-react";
 import { ProfileTrigger } from "@/components/ui/profile-trigger";
@@ -209,6 +210,7 @@ const UserLayout = () => {
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,6 +318,8 @@ const UserLayout = () => {
         uiUserProfile={uiUserProfile}
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
         toggleTheme={toggleTheme}
         lang={lang}
         setLang={setLang}
@@ -334,6 +338,8 @@ const UserLayoutContent = ({
   uiUserProfile,
   sidebarCollapsed,
   setSidebarCollapsed,
+  mobileMenuOpen,
+  setMobileMenuOpen,
   toggleTheme,
   lang,
   setLang,
@@ -347,6 +353,8 @@ const UserLayoutContent = ({
   uiUserProfile: UIUserProfile;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
   toggleTheme: () => void;
   lang: string;
   setLang: (lang: string) => void;
@@ -375,6 +383,8 @@ const UserLayoutContent = ({
   // Handle menu item click
   const handleMenuClick = (item: UserMenuItem) => {
     navigateToMenuItem(item);
+    // Close mobile menu after navigation
+    setMobileMenuOpen(false);
   };
 
   // Check if item is active
@@ -389,6 +399,62 @@ const UserLayoutContent = ({
 
   return (
     <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
+      {/* Mobile Menu Sheet */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
+          <div className="h-full flex flex-col p-4 gap-3">
+            {/* Logo/Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">UG</span>
+                </div>
+                <span className="font-semibold text-lg">UserGrow</span>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <nav className="space-y-1 flex-1">
+              {menuLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {menuSections.map((section, sectionIndex) => {
+                    if (!section.items.length) return null;
+                    
+                    return (
+                      <div key={section.key}>
+                        {sectionIndex > 0 && (
+                          <div className="py-2">
+                            <div className="border-t border-gray-200" />
+                          </div>
+                        )}
+                        
+                        <MenuSection
+                          title={section.key === 'main' ? undefined : t(section.titleKey as any)}
+                          type={section.key === 'main' ? 'main' : 'settings'}
+                          items={section.items}
+                          collapsed={false}
+                          isCollapsible={section.isCollapsible}
+                          children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))}
+                          onItemClick={handleMenuClick}
+                          isActiveItem={isActiveItem}
+                          buildTree={buildTree}
+                        />
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* User Sidebar */}
       <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
         {/* Logo/Header */}
@@ -464,8 +530,14 @@ const UserLayoutContent = ({
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="md:hidden"
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  setMobileMenuOpen(!mobileMenuOpen);
+                } else {
+                  setSidebarCollapsed(!sidebarCollapsed);
+                }
+              }}
+              className="md:inline-flex"
             >
               <AlignJustify className="h-5 w-5" />
             </Button>

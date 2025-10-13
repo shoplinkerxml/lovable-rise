@@ -33,7 +33,13 @@ export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
           <div className="h-full flex flex-col">
-            <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} isMobileSheet={true} />
+            <AdminSidebar 
+              collapsed={false} 
+              onCollapseChange={() => setMobileOpen(false)} 
+              userProfile={userProfile} 
+              isMobileSheet={true}
+              onMobileClose={() => setMobileOpen(false)}
+            />
           </div>
         </SheetContent>
       </Sheet>

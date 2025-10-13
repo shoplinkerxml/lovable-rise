@@ -29,6 +29,7 @@ interface AdminSidebarProps {
   onCollapseChange?: (collapsed: boolean) => void;
   userProfile?: UserProfile;
   isMobileSheet?: boolean;
+  onMobileClose?: () => void;
 }
 
 interface SubmenuState {
@@ -42,7 +43,7 @@ interface MenuSectionConfig {
   isCollapsible: boolean;
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, userProfile, isMobileSheet = false }) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, userProfile, isMobileSheet = false, onMobileClose }) => {
   const { 
     menuItems, 
     activeMenuItem, 
@@ -83,6 +84,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
   // Handle menu item click
   const handleMenuClick = (item: MenuItemData) => {
     navigateToMenuItem(item);
+    // Close mobile menu after navigation
+    if (isMobileSheet && onMobileClose) {
+      onMobileClose();
+    }
   };
 
   // Handle menu item hover for preloading
