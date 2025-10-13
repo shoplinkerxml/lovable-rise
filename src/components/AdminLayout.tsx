@@ -27,6 +27,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
 
   const signOut = async () => {
@@ -51,7 +52,13 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
   return (
     <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
       {/* Responsive Sidebar */}
-      <AdminSidebar collapsed={sidebarCollapsed} onCollapseChange={setSidebarCollapsed} userProfile={userProfile} />
+      <AdminSidebar 
+        collapsed={sidebarCollapsed} 
+        onCollapseChange={setSidebarCollapsed} 
+        userProfile={userProfile}
+        mobileOpen={mobileMenuOpen}
+        onMobileOpenChange={setMobileMenuOpen}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
@@ -61,7 +68,14 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  setMobileMenuOpen(!mobileMenuOpen);
+                } else {
+                  setSidebarCollapsed(!sidebarCollapsed);
+                }
+              }}
+              className="md:inline-flex"
             >
               <AlignJustify className="h-5 w-5" />
             </Button>

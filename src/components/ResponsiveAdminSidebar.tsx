@@ -11,36 +11,32 @@ interface ResponsiveAdminSidebarProps {
   collapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
   userProfile?: UserProfile;
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
 }
 
 export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
   collapsed = false,
   onCollapseChange,
   userProfile,
+  mobileOpen: controlledMobileOpen,
+  onMobileOpenChange,
 }) => {
   const isMobile = useIsMobile();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [internalMobileOpen, setInternalMobileOpen] = useState(false);
+  
+  const mobileOpen = controlledMobileOpen !== undefined ? controlledMobileOpen : internalMobileOpen;
+  const setMobileOpen = onMobileOpenChange || setInternalMobileOpen;
 
   if (isMobile) {
     return (
-      <>
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden fixed top-4 left-4 z-50 bg-background/80 backdrop-blur-sm border shadow-sm"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
           <div className="h-full flex flex-col">
             <AdminSidebar collapsed={false} onCollapseChange={() => setMobileOpen(false)} userProfile={userProfile} isMobileSheet={true} />
           </div>
         </SheetContent>
-        </Sheet>
-      </>
+      </Sheet>
     );
   }
 
