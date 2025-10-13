@@ -291,8 +291,9 @@ const TariffPage = () => {
               }`}
             >
               {isPopular && (
-                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-4 py-1 text-xs font-semibold rounded-bl-lg">
-                  {t('popular') || 'Popular'}
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-bl-lg flex items-center gap-1.5 shadow-lg">
+                  <Star className="h-3.5 w-3.5 fill-current" />
+                  <span className="text-xs font-bold tracking-wide">{t('popular') || 'Popular'}</span>
                 </div>
               )}
               
@@ -343,8 +344,8 @@ const TariffPage = () => {
                   ) : null}
                   
                   {/* New Price */}
-                  <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-4xl font-bold">
+                  <div className="flex flex-wrap items-baseline gap-1 mb-1">
+                    <span className="text-2xl sm:text-3xl font-bold" style={{ color: '#069668' }}>
                       {tariff.currency_data?.code === 'USD' ? '$' : 
                        tariff.currency_data?.code === 'EUR' ? '€' : 
                        tariff.currency_data?.code === 'GBP' ? '£' : 
@@ -352,30 +353,35 @@ const TariffPage = () => {
                        tariff.currency_data?.code === 'UAH' ? '₴' : '$'}
                     </span>
                     {tariff.new_price !== null && tariff.currency_data ? (
-                      <span className="text-5xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                        {new Intl.NumberFormat('en-US', {
-                          style: 'currency',
-                          currency: tariff.currency_data.code,
-                        }).format(tariff.new_price).replace(/^[^\d]*/, '')}
-                      </span>
+                      <>
+                        <span className="text-3xl sm:text-4xl font-bold" style={{ color: '#069668' }}>
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: tariff.currency_data.code,
+                          }).format(tariff.new_price).replace(/^[^\d]*/, '')}
+                        </span>
+                        {!tariff.is_lifetime && !tariff.is_free && (
+                          <span className="text-sm sm:text-base text-muted-foreground ml-1">
+                            {t('per_month')}
+                          </span>
+                        )}
+                      </>
                     ) : (
-                      <span className="text-5xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                      <span className="text-3xl sm:text-4xl font-bold" style={{ color: '#069668' }}>
                         {t('free_tariff')}
                       </span>
                     )}
                   </div>
                   
-                  {/* Period or Lifetime */}
-                  <div className="text-sm text-muted-foreground">
-                    {tariff.is_lifetime ? (
-                      <Badge variant="secondary" className="mt-1">
+                  {/* Lifetime Badge */}
+                  {tariff.is_lifetime && (
+                    <div className="mt-2">
+                      <Badge variant="secondary" className="text-xs">
                         <Crown className="h-3 w-3 mr-1" />
                         {t('lifetime_tariff')}
                       </Badge>
-                    ) : !tariff.is_free ? (
-                      <span>{t('per_month')}</span>
-                    ) : null}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Features & Limits */}
