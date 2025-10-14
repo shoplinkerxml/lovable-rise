@@ -514,10 +514,23 @@ const dictionary: Dictionary = {
   tariff_page_features: { uk: "Функції", en: "Features" },
   tariff_page_limits: { uk: "Ліміти", en: "Limits" },
   select_plan: { uk: "Обрати план", en: "Select Plan" },
+  active_tariff_button: { uk: "Активний тариф", en: "Active Plan" },
   sort_order: { uk: "Порядковий номер", en: "Sort Order" },
   enter_sort_order: { uk: "Введіть порядковий номер", en: "Enter sort order" },
   discount: { uk: "Знижка", en: "Discount" },
   per_month: { uk: "/міс.", en: "/mo" },
+  
+  // Demo trial alert
+  demo_trial_title_prefix: { uk: "Розпочніть", en: "Start your" },
+  demo_trial_title_suffix: { uk: "-денний безкоштовний пробний період", en: "-day free trial" },
+  demo_trial_desc: { uk: "Під час якого діють певні обмеження", en: "During which certain limitations apply" },
+  
+  // Tariff selection alert
+  tariff_select_title_prefix: { uk: "Обрано", en: "Selected" },
+  tariff_select_title_suffix: { uk: "-денний план", en: "-day plan" },
+  tariff_select_desc: { uk: "Цей план має наступні обмеження", en: "This plan has the following limits" },
+  active_tariff_title: { uk: "Активний тарифний план", en: "Active tariff plan" },
+  end_date: { uk: "Дата закінчення", en: "End date" },
   
   // Tariff Features and Limits translations
   tariff_features_and_limits: { uk: "Функції та ліміти тарифів", en: "Tariff Features and Limits" },

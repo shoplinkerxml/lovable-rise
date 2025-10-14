@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
+import { supabase } from '@/integrations/supabase/client';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
 
 const TariffPage = () => {
@@ -53,9 +54,28 @@ const TariffPage = () => {
   
   const [tariffs, setTariffs] = useState<TariffWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTariffId, setActiveTariffId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTariffs();
+  }, []);
+
+  useEffect(() => {
+    async function fetchActive() {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth.user?.id;
+        if (!uid) return;
+        const { data: sub } = await (supabase as any)
+          .from('user_subscriptions')
+          .select('tariff_id')
+          .eq('user_id', uid)
+          .eq('is_active', true)
+          .maybeSingle();
+        setActiveTariffId(sub?.tariff_id ?? null);
+      } catch {}
+    }
+    fetchActive();
   }, []);
 
   const fetchTariffs = async () => {
@@ -290,7 +310,7 @@ const TariffPage = () => {
               key={tariff.id} 
               className={`flex flex-col relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
                 isPopular ? 'border-2 border-primary shadow-lg' : ''
-              }`}
+              } ${activeTariffId === tariff.id ? 'border-emerald-500 ring-2 ring-emerald-200' : ''}`}
             >
               {isPopular && (
                 <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-bl-lg flex items-center gap-1.5 shadow-lg">
@@ -450,15 +470,66 @@ const TariffPage = () => {
                 </div>
 
                 {/* Select Plan Button */}
-                <div className="mt-6">
+                <div className="mt-6 space-y-4">
                   <Button 
                     className={`w-full ${isPopular ? 'bg-primary hover:bg-primary/90 shadow-lg' : ''}`}
                     size="lg"
                     variant={isPopular ? "default" : "outline"}
+                    disabled={activeTariffId === tariff.id}
+                    onClick={async () => {
+                      try {
+                        // Получаем текущего пользователя
+                        const { data } = await supabase.auth.getUser();
+                        const userId = data.user?.id;
+                        if (!userId) {
+                          toast.error(t('please_log_in'));
+                          return;
+                        }
+                        // Деактивируем предыдущие подписки
+                        await (supabase as any)
+                          .from('user_subscriptions')
+                          .update({ is_active: false })
+                          .eq('user_id', userId)
+                          .eq('is_active', true);
+                        // Получаем duration_days выбранного тарифа
+                        const { data: tariffRow } = await (supabase as any)
+                          .from('tariffs')
+                          .select('duration_days')
+                          .eq('id', tariff.id)
+                          .maybeSingle();
+                        const start = new Date();
+                        let endDate: string | null = null;
+                        if (tariffRow?.duration_days) {
+                          endDate = new Date(start.getTime() + tariffRow.duration_days * 24 * 60 * 60 * 1000).toISOString();
+                        }
+                        // Создаём новую активную подписку
+                        const { error: insertError } = await (supabase as any)
+                          .from('user_subscriptions')
+                          .insert({
+                            user_id: userId,
+                            tariff_id: tariff.id,
+                            start_date: start.toISOString(),
+                            end_date: endDate,
+                            is_active: true
+                          });
+                        if (insertError) {
+                          toast.error(t('failed_update_tariff'));
+                          return;
+                        }
+                        toast.success(t('tariff_updated_successfully'));
+                        // Перенаправляем на dashboard
+                        window.location.href = '/user/dashboard';
+                      } catch (e) {
+                        console.error('Activate tariff error:', e);
+                        toast.error(t('failed_update_tariff'));
+                      }
+                    }}
                   >
                     <Rocket className="h-4 w-4 mr-2" />
-                    <span className="font-semibold">{t('select_plan')}</span>
+                    <span className="font-semibold">{activeTariffId === tariff.id ? t('active_tariff_button') : t('select_plan')}</span>
                   </Button>
+
+
                 </div>
               </CardContent>
             </Card>

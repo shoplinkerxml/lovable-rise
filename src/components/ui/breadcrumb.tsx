@@ -20,14 +20,14 @@ const Breadcrumb = React.forwardRef<HTMLElement, BreadcrumbProps>(
     return (
       <nav
         ref={ref}
-        className={cn("flex items-center space-x-1 text-sm", className)}
+        className={cn("flex items-center space-x-2 text-sm py-2", className)}
         aria-label="Breadcrumb"
       >
-        <ol className="flex items-center space-x-1">
+        <ol className="flex items-center space-x-2">
           {items.map((item, index) => (
-            <li key={index} className="flex items-center">
+            <li key={index} className="flex items-center px-1">
               {index > 0 && (
-                <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground mx-2" />
               )}
               {item.current ? (
                 <span className="font-medium text-foreground" aria-current="page">

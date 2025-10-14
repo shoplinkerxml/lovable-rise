@@ -433,6 +433,50 @@ export class UserAuthService {
           }, session.access_token);
           
           console.log('Profile created successfully for authenticated user');
+
+          // Ensure demo subscription for hidden free tariff (is_free=true, visible=false)
+          try {
+            const { data: existing } = await (supabase as any)
+              .from('user_subscriptions')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (!existing) {
+              const { data: demoTariff } = await (supabase as any)
+                .from('tariffs')
+                .select('*')
+                .eq('is_free', true)
+                .eq('visible', false)
+                .eq('is_active', true)
+                .order('sort_order', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+              if (demoTariff) {
+                await (supabase as any)
+                  .from('user_subscriptions')
+                  .update({ is_active: false })
+                  .eq('user_id', session.user.id)
+                  .eq('is_active', true);
+                const start = new Date();
+                let endDate: string | null = null;
+                if (demoTariff.duration_days) {
+                  endDate = new Date(start.getTime() + demoTariff.duration_days * 24 * 60 * 60 * 1000).toISOString();
+                }
+                await (supabase as any)
+                  .from('user_subscriptions')
+                  .insert({
+                    user_id: session.user.id,
+                    tariff_id: demoTariff.id,
+                    start_date: start.toISOString(),
+                    end_date: endDate,
+                    is_active: true
+                  });
+              }
+            }
+          } catch (e) {
+            console.warn('[QODER] Demo activation during OAuth callback failed:', e);
+          }
         } catch (profileError) {
           console.error('Profile creation in callback failed:', profileError);
           return {
@@ -515,6 +559,50 @@ export class UserAuthService {
           }
         }
         
+        // Ensure demo subscription for hidden free tariff (is_free=true, visible=false)
+        try {
+          const { data: existing } = await (supabase as any)
+            .from('user_subscriptions')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (!existing) {
+            const { data: demoTariff } = await (supabase as any)
+              .from('tariffs')
+              .select('*')
+              .eq('is_free', true)
+              .eq('visible', false)
+              .eq('is_active', true)
+              .order('sort_order', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            if (demoTariff) {
+              await (supabase as any)
+                .from('user_subscriptions')
+                .update({ is_active: false })
+                .eq('user_id', authData.user.id)
+                .eq('is_active', true);
+              const start = new Date();
+              let endDate: string | null = null;
+              if (demoTariff.duration_days) {
+                endDate = new Date(start.getTime() + demoTariff.duration_days * 24 * 60 * 60 * 1000).toISOString();
+              }
+              await (supabase as any)
+                .from('user_subscriptions')
+                .insert({
+                  user_id: authData.user.id,
+                  tariff_id: demoTariff.id,
+                  start_date: start.toISOString(),
+                  end_date: endDate,
+                  is_active: true
+                });
+            }
+          }
+        } catch (e) {
+          console.warn('[QODER] Demo activation during login failed:', e);
+        }
+
         // Validate user role
         if (profile && profile.role !== 'user') {
           // If admin or manager, they should use admin interface
