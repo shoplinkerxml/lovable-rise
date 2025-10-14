@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import UserLayout from '../components/UserLayout';
 import { UserMenuService, UserMenuItem } from '../lib/user-menu-service';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

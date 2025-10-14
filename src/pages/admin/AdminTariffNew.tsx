@@ -164,9 +164,7 @@ const AdminTariffNew = () => {
       id: Date.now(), // Temporary ID for new features
       tariff_id: savedTariffId || 0,
       feature_name: newFeature.feature_name,
-      is_active: newFeature.is_active,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      is_active: newFeature.is_active
     };
     setFeatures([...features, feature]);
     setNewFeature({ feature_name: '', is_active: true });
@@ -193,9 +191,7 @@ const AdminTariffNew = () => {
       tariff_id: savedTariffId || 0,
       limit_name: newLimit.limit_name,
       value: newLimit.value,
-      is_active: newLimit.is_active,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      is_active: newLimit.is_active
     };
     setLimits([...limits, limit]);
     setNewLimit({ limit_name: '', value: 0, is_active: true });
@@ -244,25 +240,19 @@ const AdminTariffNew = () => {
         id: Date.now() + 1,
         tariff_id: 0,
         feature_name: t('xml_files_upload'),
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       },
       {
         id: Date.now() + 2,
         tariff_id: 0,
         feature_name: t('data_processing_cleaning'),
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       },
       {
         id: Date.now() + 3,
         tariff_id: 0,
         feature_name: t('excel_csv_export'),
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       }
     ];
     setFeatures(sampleFeatures);
@@ -275,27 +265,21 @@ const AdminTariffNew = () => {
         tariff_id: 0,
         limit_name: t('store_count_limit'),
         value: 3,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       },
       {
         id: Date.now() + 2,
         tariff_id: 0,
         limit_name: t('supplier_count_limit'),
         value: 5,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       },
       {
         id: Date.now() + 3,
         tariff_id: 0,
         limit_name: t('product_count_limit'),
         value: 100,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       }
     ];
     setLimits(sampleLimits);

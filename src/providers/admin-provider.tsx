@@ -252,15 +252,15 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
       // Map database rows to MenuItemData format
       const menuItemsData: MenuItemData[] = (data || []).map(item => ({
         ...item,
-        page_type: (item.page_type as 'content' | 'form' | 'dashboard' | 'list' | 'custom') || 'content',
-        content_data: item.content_data || {},
-        meta_data: item.meta_data || {},
-        section_type: (item.section_type as 'dashboard' | 'main' | 'settings') || 'main',
-        icon_name: item.icon_name || null,
-        has_separator: item.has_separator || false,
-        description: item.description || null,
-        badge_text: item.badge_text || null,
-        badge_color: item.badge_color || null,
+        page_type: 'content' as const,
+        content_data: {},
+        meta_data: {},
+        section_type: 'main' as const,
+        icon_name: null,
+        has_separator: false,
+        description: null,
+        badge_text: null,
+        badge_color: null,
       }));
 
       setMenuItems(menuItemsData);

@@ -105,7 +105,8 @@ export class TariffService {
           description: tariff.description,
           old_price: tariff.old_price,
           new_price: tariff.new_price,
-          currency: (tariff as any).currency_id || tariff.currency,
+          currency_id: tariff.currency_id,
+          currency_code: tariff.currency_code,
           duration_days: tariff.duration_days,
           is_free: tariff.is_free,
           is_lifetime: tariff.is_lifetime,
@@ -169,14 +170,15 @@ export class TariffService {
         .eq('is_active', true)
         .order('limit_name');
       
-      // Transform the data to match our interface - handle both currency and currency_id fields
+      // Transform the data to match our interface
       const tariffWithDetails = {
         id: tariffData.id,
         name: tariffData.name,
         description: tariffData.description,
         old_price: tariffData.old_price,
         new_price: tariffData.new_price,
-        currency: (tariffData as any).currency_id || tariffData.currency, // Support both field names
+        currency_id: tariffData.currency_id,
+        currency_code: tariffData.currency_code,
         duration_days: tariffData.duration_days,
         is_free: tariffData.is_free,
         is_lifetime: tariffData.is_lifetime,
