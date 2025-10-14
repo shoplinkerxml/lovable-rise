@@ -12,6 +12,7 @@ export interface MenuItemWithIconProps {
   variant?: 'default' | 'dashboard' | 'child';
   onClick: (item: UserMenuItem) => void;
   onHover?: (item: UserMenuItem) => void;
+  disabled?: boolean;
 }
 
 export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
@@ -21,6 +22,7 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
   variant = 'default',
   onClick,
   onHover,
+  disabled = false,
 }) => {
   const { t } = useI18n();
 
@@ -75,9 +77,11 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
     child: "px-3 py-1.5 ml-2", // Child items with additional left margin
   };
 
-  const stateClasses = isActive
+  const stateClasses = disabled
+    ? "opacity-50 cursor-not-allowed pointer-events-none"
+    : (isActive
     ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50 shadow-sm"
-    : "hover:bg-emerald-50 hover:text-[#10b981] border border-transparent hover:border-emerald-200/30 hover:shadow-sm";
+    : "hover:bg-emerald-50 hover:text-[#10b981] border border-transparent hover:border-emerald-200/30 hover:shadow-sm");
 
   const iconSize = variant === 'dashboard' ? "w-5 h-5" : "w-4 h-4";
   const iconMargin = collapsed ? "" : "mr-3"; // 12px gap between icon and text
@@ -108,7 +112,7 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
 
   const button = (
     <button
-      onClick={() => onClick(item)}
+      onClick={() => { if (!disabled) onClick(item); }}
       onMouseEnter={() => onHover && onHover(item)}
       className={cn(baseClasses, variantClasses[variant], stateClasses)}
       aria-label={collapsed ? translatedTitle : undefined}

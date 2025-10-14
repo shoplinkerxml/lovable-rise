@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TariffService, type TariffWithDetails } from '@/lib/tariff-service';
+import { SubscriptionValidationService } from '@/lib/subscription-validation-service';
 import { toast } from 'sonner';
 import { 
   CheckCircle, 
@@ -66,13 +67,15 @@ const TariffPage = () => {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth.user?.id;
         if (!uid) return;
-        const { data: sub } = await (supabase as any)
-          .from('user_subscriptions')
-          .select('tariff_id')
-          .eq('user_id', uid)
-          .eq('is_active', true)
-          .maybeSingle();
-        setActiveTariffId(sub?.tariff_id ?? null);
+        
+        // Use validation service to check and deactivate expired subscriptions
+        const result = await SubscriptionValidationService.ensureValidSubscription(uid);
+        
+        if (result.hasValidSubscription && result.subscription) {
+          setActiveTariffId(result.subscription.tariff_id ?? null);
+        } else {
+          setActiveTariffId(null);
+        }
       } catch {}
     }
     fetchActive();

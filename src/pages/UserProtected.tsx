@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
+import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
 
 const UserProtected = () => {
   const [ready, setReady] = useState(false);
@@ -41,6 +42,14 @@ const UserProtected = () => {
         if (session && currentUser) {
           // Check if user has 'user' role
           if (currentUser.role === 'user') {
+            // Validate subscription and deactivate if expired
+            try {
+              await SubscriptionValidationService.ensureValidSubscription(currentUser.id);
+            } catch (subError) {
+              console.error('[UserProtected] Subscription validation error:', subError);
+              // Continue anyway - subscription validation is non-blocking
+            }
+            
             setAuthenticated(true);
             setUser(currentUser);
             setSessionError(null);

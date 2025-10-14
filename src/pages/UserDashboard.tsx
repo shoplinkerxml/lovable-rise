@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { TariffService } from "@/lib/tariff-service";
 import { supabase } from "@/integrations/supabase/client";
+import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
 interface UserDashboardContextType {
   user: UserProfileType;
   menuItems: UserMenuItem[];
@@ -48,81 +49,38 @@ const UserDashboard = () => {
   useEffect(() => {
     async function loadSubscription() {
       try {
-        const { data, error } = await (supabase as any)
-          .from('user_subscriptions')
-          .select('*, tariffs(*)')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (!error && data) {
+        // Use new validation service that checks end_date and deactivates expired subscriptions
+        const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
+        
+        if (result.hasValidSubscription && result.subscription) {
+          const data = result.subscription;
           const end = data.end_date ? new Date(data.end_date) : null;
           setEndDate(end ? end.toISOString() : null);
           setTariffName(data.tariffs?.name || null);
           setDurationDays(data.tariffs?.duration_days ?? null);
-          const isExpired = end ? end.getTime() < Date.now() : false;
-          setExpired(isExpired);
-          const tariffId = data.tariffs?.id ?? data.tariff_id;
-          setIsDemo((data.tariffs?.is_free === true) && (data.tariffs?.visible === false));
+          setExpired(false); // If subscription is valid, it's not expired
+          setIsDemo(result.isDemo);
           setIsLifetime(data.tariffs?.is_lifetime === true);
+          
+          const tariffId = data.tariffs?.id ?? data.tariff_id;
           if (tariffId) {
             try {
               const limitsData = await TariffService.getTariffLimits(tariffId);
               setLimits(limitsData || []);
             } catch {}
           }
-        } else if (!error && !data) {
-          // No active subscription found — try auto-activating hidden free demo tariff
-          try {
-            const { data: demoTariff } = await (supabase as any)
-              .from('tariffs')
-              .select('*')
-              .eq('is_free', true)
-              .eq('visible', false)
-              .eq('is_active', true)
-              .order('sort_order', { ascending: true })
-              .limit(1)
-              .maybeSingle();
-            if (demoTariff) {
-              await (supabase as any)
-                .from('user_subscriptions')
-                .update({ is_active: false })
-                .eq('user_id', user.id)
-                .eq('is_active', true);
-              const start = new Date();
-              let endDate: string | null = null;
-              if (demoTariff.duration_days) {
-                endDate = new Date(start.getTime() + demoTariff.duration_days * 24 * 60 * 60 * 1000).toISOString();
-              }
-              const { data: newSub, error: insertErr } = await (supabase as any)
-                .from('user_subscriptions')
-                .insert({
-                  user_id: user.id,
-                  tariff_id: demoTariff.id,
-                  start_date: start.toISOString(),
-                  end_date: endDate,
-                  is_active: true
-                })
-                .select('*, tariffs(*)')
-                .maybeSingle();
-              if (!insertErr && newSub) {
-                const end = newSub.end_date ? new Date(newSub.end_date) : null;
-                setEndDate(end ? end.toISOString() : null);
-                setTariffName(newSub.tariffs?.name || demoTariff.name || null);
-                setDurationDays(demoTariff.duration_days ?? null);
-                setExpired(false);
-                setIsDemo(true);
-                setIsLifetime(false);
-                try {
-                  const limitsData = await TariffService.getTariffLimits(demoTariff.id);
-                  setLimits(limitsData || []);
-                } catch {}
-              }
-            }
-          } catch (e) {
-            // Silent if demo activation fails
-          }
+        } else {
+          // No valid subscription
+          setEndDate(null);
+          setTariffName(null);
+          setDurationDays(null);
+          setExpired(false);
+          setIsDemo(false);
+          setIsLifetime(false);
+          setLimits([]);
         }
       } catch (e) {
+        console.error('Error loading subscription:', e);
         // Silent fail, no alert
       }
     }

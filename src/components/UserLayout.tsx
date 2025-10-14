@@ -16,6 +16,7 @@ import { ProfileService } from "@/lib/profile-service";
 import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
+import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MenuSection } from "@/components/user/MenuSection";
@@ -88,6 +89,7 @@ const UserMenuProvider: React.FC<{
   const [menuLoading, setMenuLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const [hasAccess, setHasAccess] = useState(true);
 
   // Load menu items on mount
   const loadMenuItems = async () => {
@@ -108,6 +110,11 @@ const UserMenuProvider: React.FC<{
   const refreshMenuItems = async () => {
     await loadMenuItems();
   };
+
+  // Initialize menu items on mount
+  useEffect(() => {
+    loadMenuItems();
+  }, [userId]);
 
   // Find active menu item based on current path with static route fallback
   const findActiveMenuItem = (currentPath: string, items: UserMenuItem[]) => {
@@ -168,9 +175,27 @@ const UserMenuProvider: React.FC<{
     }
   };
 
-  // Initialize menu items on mount
+  // Check active subscription access based on end_date
   useEffect(() => {
-    loadMenuItems();
+    async function checkAccess() {
+      try {
+        // Use new validation service that checks end_date and deactivates expired subscriptions
+        const result = await SubscriptionValidationService.ensureValidSubscription(userId);
+        setHasAccess(result.hasValidSubscription);
+      } catch (error) {
+        console.error('Error checking subscription access:', error);
+        setHasAccess(true); // fail open on error
+      }
+    }
+    checkAccess();
+    const onFocus = () => checkAccess();
+    const onVisibility = () => { if (!document.hidden) checkAccess(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [userId]);
 
   // Update active menu item when location changes
@@ -346,12 +371,36 @@ const UserLayoutContent = ({
   } = useUserMenu();
   const location = useLocation();
   const navigate = useNavigate();
+  const [hasAccess, setHasAccess] = useState(true);
+
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        // Use new validation service that checks end_date and deactivates expired subscriptions
+        const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
+        setHasAccess(result.hasValidSubscription);
+      } catch (error) {
+        console.error('Error checking subscription access:', error);
+        setHasAccess(true); // fail open on error
+      }
+    }
+    checkAccess();
+    const onFocus = () => checkAccess();
+    const onVisibility = () => { if (!document.hidden) checkAccess(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [user.id]);
 
   // Organize menu items into sections
+  const effectiveMenuItems = menuItems;
   const menuSections = [{
     key: 'main',
     titleKey: 'menu_main',
-    items: menuItems.filter(item => !item.parent_id),
+    items: effectiveMenuItems.filter(item => !item.parent_id),
     isCollapsible: false
   }];
 
@@ -399,7 +448,7 @@ const UserLayoutContent = ({
                             <div className="border-t border-gray-200" />
                           </div>}
                         
-                        <MenuSection title={section.key === 'main' ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={false} isCollapsible={section.isCollapsible} children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} />
+                        <MenuSection title={section.key === 'main' ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={false} isCollapsible={section.isCollapsible} children={effectiveMenuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} hasAccess={hasAccess} />
                       </div>;
               })}
                 </>}
@@ -412,13 +461,20 @@ const UserLayoutContent = ({
       <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
         {/* Logo/Header */}
         <div className="flex items-center justify-between mb-6">
-          {!sidebarCollapsed && <div className="flex items-center gap-2">
+          {sidebarCollapsed ? (
+            <div className="flex items-center justify-center w-full">
+              <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">UG</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
                 <span className="text-white font-semibold text-sm">UG</span>
               </div>
               <span className="font-semibold text-lg">UserGrow</span>
-            </div>}
-          
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -434,7 +490,7 @@ const UserLayoutContent = ({
                         <div className="border-t border-gray-200" />
                       </div>}
                     
-                    <MenuSection title={section.key === 'main' ? undefined : sidebarCollapsed ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={sidebarCollapsed} isCollapsible={section.isCollapsible} children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} />
+                    <MenuSection title={section.key === 'main' ? undefined : sidebarCollapsed ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={sidebarCollapsed} isCollapsible={section.isCollapsible} children={effectiveMenuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} hasAccess={hasAccess} />
                   </div>;
           })}
             </>}
