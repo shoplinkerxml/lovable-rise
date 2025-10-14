@@ -402,6 +402,8 @@ const AdminTariffEdit = () => {
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
           is_active: formData.is_active,
+          visible: formData.visible,
+          popular: formData.popular,
           sort_order: formData.sort_order
         };
         
