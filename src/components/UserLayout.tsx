@@ -46,7 +46,6 @@ const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
     icon_name: 'user'
   }
 };
-
 interface UserMenuContextState {
   menuItems: UserMenuItem[];
   activeMenuItem: UserMenuItem | null;
@@ -55,9 +54,7 @@ interface UserMenuContextState {
   navigateToMenuItem: (item: UserMenuItem) => void;
   refreshMenuItems: () => Promise<void>;
 }
-
 const UserMenuContext = createContext<UserMenuContextState | null>(null);
-
 export const useUserMenu = () => {
   const context = useContext(UserMenuContext);
   if (!context) {
@@ -65,9 +62,10 @@ export const useUserMenu = () => {
   }
   return context;
 };
-
 function buildTree(items: UserMenuItem[]): Record<number | "root", UserMenuItem[]> {
-  const map: Record<number | "root", UserMenuItem[]> = { root: [] };
+  const map: Record<number | "root", UserMenuItem[]> = {
+    root: []
+  };
   for (const it of items) {
     const key = (it.parent_id ?? "root") as number | "root";
     if (!map[key]) map[key] = [];
@@ -78,8 +76,13 @@ function buildTree(items: UserMenuItem[]): Record<number | "root", UserMenuItem[
   }
   return map;
 }
-
-const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> = ({ children, userId }) => {
+const UserMenuProvider: React.FC<{
+  children: React.ReactNode;
+  userId: string;
+}> = ({
+  children,
+  userId
+}) => {
   const [menuItems, setMenuItems] = useState<UserMenuItem[]>([]);
   const [activeMenuItem, setActiveMenuItemState] = useState<UserMenuItem | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
@@ -109,7 +112,7 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
   // Find active menu item based on current path with static route fallback
   const findActiveMenuItem = (currentPath: string, items: UserMenuItem[]) => {
     const userPath = currentPath.replace('/user', '');
-    
+
     // First try to find in loaded menu items from database
     // For database items, the path is stored without the leading slash
     const menuItem = items.find(item => {
@@ -118,11 +121,10 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
       const normalizedUserPath = userPath.startsWith('/') ? userPath.substring(1) : userPath;
       return itemPath === normalizedUserPath;
     });
-    
     if (menuItem) {
       return menuItem;
     }
-    
+
     // For static routes, create virtual menu item if not found in database
     const normalizedUserPath = userPath.startsWith('/') ? userPath : `/${userPath}`;
     if (STATIC_ROUTES[normalizedUserPath]) {
@@ -131,7 +133,8 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
         // Ensure all required fields are present
         id: STATIC_ROUTES[normalizedUserPath].id!,
         title: STATIC_ROUTES[normalizedUserPath].title!,
-        path: STATIC_ROUTES[normalizedUserPath].path!.substring(1), // Remove leading slash
+        path: STATIC_ROUTES[normalizedUserPath].path!.substring(1),
+        // Remove leading slash
         page_type: STATIC_ROUTES[normalizedUserPath].page_type!,
         is_active: STATIC_ROUTES[normalizedUserPath].is_active!,
         order_index: STATIC_ROUTES[normalizedUserPath].order_index!,
@@ -139,7 +142,6 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
         updated_at: STATIC_ROUTES[normalizedUserPath].updated_at!
       } as UserMenuItem;
     }
-    
     return null;
   };
 
@@ -154,11 +156,15 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
     // Handle static routes (negative IDs) differently from database routes
     if (item.id < 0) {
       // Static routes already have the correct path format
-      navigate(`/user${item.path}`, { replace: false });
+      navigate(`/user${item.path}`, {
+        replace: false
+      });
     } else {
       // Database routes should not have leading slash
       const cleanPath = item.path.startsWith('/') ? item.path.substring(1) : item.path;
-      navigate(`/user/${cleanPath}`, { replace: false });
+      navigate(`/user/${cleanPath}`, {
+        replace: false
+      });
     }
   };
 
@@ -170,7 +176,7 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
   // Update active menu item when location changes
   useEffect(() => {
     const userPath = location.pathname.replace('/user', '');
-    
+
     // Handle static routes immediately, even during menu loading
     const normalizedUserPath = userPath.startsWith('/') ? userPath : `/${userPath}`;
     if (STATIC_ROUTES[normalizedUserPath]) {
@@ -180,7 +186,7 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
       }
       return;
     }
-    
+
     // For dynamic routes, wait for menu items to load
     if (menuItems.length > 0) {
       const activeItem = findActiveMenuItem(location.pathname, menuItems);
@@ -189,25 +195,24 @@ const UserMenuProvider: React.FC<{ children: React.ReactNode; userId: string }> 
       }
     }
   }, [location.pathname, menuItems, activeMenuItem?.id, findActiveMenuItem, setActiveMenuItem]);
-
   const contextValue: UserMenuContextState = {
     menuItems,
     activeMenuItem,
     menuLoading,
     setActiveMenuItem,
     navigateToMenuItem,
-    refreshMenuItems,
+    refreshMenuItems
   };
-
-  return (
-    <UserMenuContext.Provider value={contextValue}>
+  return <UserMenuContext.Provider value={contextValue}>
       {children}
-    </UserMenuContext.Provider>
-  );
+    </UserMenuContext.Provider>;
 };
-
 const UserLayout = () => {
-  const { t, lang, setLang } = useI18n();
+  const {
+    t,
+    lang,
+    setLang
+  } = useI18n();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -215,18 +220,19 @@ const UserLayout = () => {
   const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
-
   useEffect(() => {
     loadUserData();
   }, []);
-
   const loadUserData = async () => {
     try {
       setLoading(true);
-      
+
       // Get current user
-      const { user: currentUser, session, error } = await UserAuthService.getCurrentUser();
-      
+      const {
+        user: currentUser,
+        session,
+        error
+      } = await UserAuthService.getCurrentUser();
       if (error || !currentUser || !session) {
         toast.error(t("please_log_in"));
         return;
@@ -234,13 +240,9 @@ const UserLayout = () => {
 
       // Try to get existing profile first
       const profile = await ProfileService.getProfile(currentUser.id);
-      
       if (profile) {
         // Use existing profile data
-        const finalAvatarUrl = profile.avatar_url && profile.avatar_url.trim() !== '' 
-          ? profile.avatar_url 
-          : '/placeholder.svg';
-        
+        const finalAvatarUrl = profile.avatar_url && profile.avatar_url.trim() !== '' ? profile.avatar_url : '/placeholder.svg';
         setUser({
           id: currentUser.id,
           email: currentUser.email || '',
@@ -251,7 +253,7 @@ const UserLayout = () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
-        
+
         // Set UI user profile for the header - ensure role is correctly set to 'user'
         setUiUserProfile({
           id: currentUser.id,
@@ -272,68 +274,39 @@ const UserLayout = () => {
       setLoading(false);
     }
   };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     window.location.href = "/user-auth";
   };
-
   const handleProfileNavigation = (path: string) => {
     setProfileSheetOpen(false);
     navigate(path);
   };
-
   const handleLogout = () => {
     setProfileSheetOpen(false);
     signOut();
   };
-
   const toggleTheme = () => {
     document.documentElement.classList.toggle("dark");
   };
-
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
+    return <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+      </div>;
   }
-
   if (!user || !uiUserProfile) {
-    return (
-      <div className="flex h-screen items-center justify-center">
+    return <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
           <p className="text-muted-foreground">Please log in to access your dashboard.</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <UserMenuProvider userId={user.id}>
-      <UserLayoutContent 
-        user={user}
-        uiUserProfile={uiUserProfile}
-        sidebarCollapsed={sidebarCollapsed}
-        setSidebarCollapsed={setSidebarCollapsed}
-        mobileMenuOpen={mobileMenuOpen}
-        setMobileMenuOpen={setMobileMenuOpen}
-        toggleTheme={toggleTheme}
-        lang={lang}
-        setLang={setLang}
-        t={t}
-        profileSheetOpen={profileSheetOpen}
-        setProfileSheetOpen={setProfileSheetOpen}
-        handleProfileNavigation={handleProfileNavigation}
-        handleLogout={handleLogout}
-      />
-    </UserMenuProvider>
-  );
+  return <UserMenuProvider userId={user.id}>
+      <UserLayoutContent user={user} uiUserProfile={uiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
+    </UserMenuProvider>;
 };
-
-const UserLayoutContent = ({ 
+const UserLayoutContent = ({
   user,
   uiUserProfile,
   sidebarCollapsed,
@@ -364,21 +337,23 @@ const UserLayoutContent = ({
   handleProfileNavigation: (path: string) => void;
   handleLogout: () => void;
 }) => {
-  const { menuItems, menuLoading, activeMenuItem, navigateToMenuItem, refreshMenuItems } = useUserMenu();
+  const {
+    menuItems,
+    menuLoading,
+    activeMenuItem,
+    navigateToMenuItem,
+    refreshMenuItems
+  } = useUserMenu();
   const location = useLocation();
   const navigate = useNavigate();
 
   // Organize menu items into sections
-  const menuSections = [
-    {
-      key: 'main',
-      titleKey: 'menu_main',
-      items: menuItems.filter(item => 
-        !item.parent_id
-      ),
-      isCollapsible: false
-    }
-  ];
+  const menuSections = [{
+    key: 'main',
+    titleKey: 'menu_main',
+    items: menuItems.filter(item => !item.parent_id),
+    isCollapsible: false
+  }];
 
   // Handle menu item click
   const handleMenuClick = (item: UserMenuItem) => {
@@ -390,15 +365,14 @@ const UserLayoutContent = ({
   // Check if item is active
   const isActiveItem = (item: UserMenuItem) => {
     // For static routes, compare with the full path
-    if (item.id < 0) { // Static routes have negative IDs
+    if (item.id < 0) {
+      // Static routes have negative IDs
       return activeMenuItem?.id === item.id || location.pathname === `/user${item.path}`;
     }
     // For database routes, compare with the path without leading slash
     return activeMenuItem?.id === item.id || location.pathname === `/user/${item.path}`;
   };
-
-  return (
-    <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
+  return <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
@@ -415,41 +389,20 @@ const UserLayoutContent = ({
 
             {/* Navigation */}
             <nav className="space-y-1 flex-1">
-              {menuLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>
-                  ))}
-                </div>
-              ) : (
-                <>
+              {menuLoading ? <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>)}
+                </div> : <>
                   {menuSections.map((section, sectionIndex) => {
-                    if (!section.items.length) return null;
-                    
-                    return (
-                      <div key={section.key}>
-                        {sectionIndex > 0 && (
-                          <div className="py-2">
+                if (!section.items.length) return null;
+                return <div key={section.key}>
+                        {sectionIndex > 0 && <div className="py-2">
                             <div className="border-t border-gray-200" />
-                          </div>
-                        )}
+                          </div>}
                         
-                        <MenuSection
-                          title={section.key === 'main' ? undefined : t(section.titleKey as any)}
-                          type={section.key === 'main' ? 'main' : 'settings'}
-                          items={section.items}
-                          collapsed={false}
-                          isCollapsible={section.isCollapsible}
-                          children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))}
-                          onItemClick={handleMenuClick}
-                          isActiveItem={isActiveItem}
-                          buildTree={buildTree}
-                        />
-                      </div>
-                    );
-                  })}
-                </>
-              )}
+                        <MenuSection title={section.key === 'main' ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={false} isCollapsible={section.isCollapsible} children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} />
+                      </div>;
+              })}
+                </>}
             </nav>
           </div>
         </SheetContent>
@@ -459,66 +412,32 @@ const UserLayoutContent = ({
       <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
         {/* Logo/Header */}
         <div className="flex items-center justify-between mb-6">
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2">
+          {!sidebarCollapsed && <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
                 <span className="text-white font-semibold text-sm">UG</span>
               </div>
               <span className="font-semibold text-lg">UserGrow</span>
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="h-8 w-8 p-0"
-          >
-            {sidebarCollapsed ? (
-              <AlignJustify className="h-4 w-4" />
-            ) : (
-              <AlignJustify className="h-4 w-4" />
-            )}
-          </Button>
+            </div>}
+          
         </div>
 
         {/* Navigation */}
         <nav className="space-y-1 flex-1">
-          {menuLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>
-              ))}
-            </div>
-          ) : (
-            <>
+          {menuLoading ? <div className="space-y-2">
+              {[...Array(5)].map((_, i) => <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>)}
+            </div> : <>
               {menuSections.map((section, sectionIndex) => {
-                if (!section.items.length) return null;
-                
-                return (
-                  <div key={section.key}>
+            if (!section.items.length) return null;
+            return <div key={section.key}>
                     {/* Section separator */}
-                    {sectionIndex > 0 && (
-                      <div className="py-2">
+                    {sectionIndex > 0 && <div className="py-2">
                         <div className="border-t border-gray-200" />
-                      </div>
-                    )}
+                      </div>}
                     
-                    <MenuSection
-                      title={section.key === 'main' ? undefined : (sidebarCollapsed ? undefined : t(section.titleKey as any))}
-                      type={section.key === 'main' ? 'main' : 'settings'}
-                      items={section.items}
-                      collapsed={sidebarCollapsed}
-                      isCollapsible={section.isCollapsible}
-                      children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))}
-                      onItemClick={handleMenuClick}
-                      isActiveItem={isActiveItem}
-                      buildTree={buildTree}
-                    />
-                  </div>
-                );
-              })}
-            </>
-          )}
+                    <MenuSection title={section.key === 'main' ? undefined : sidebarCollapsed ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={sidebarCollapsed} isCollapsible={section.isCollapsible} children={menuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} />
+                  </div>;
+          })}
+            </>}
         </nav>
       </aside>
 
@@ -527,18 +446,13 @@ const UserLayoutContent = ({
         {/* Header */}
         <header className="h-16 border-b bg-background flex items-center px-4 md:px-6 justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => {
-                if (window.innerWidth < 768) {
-                  setMobileMenuOpen(!mobileMenuOpen);
-                } else {
-                  setSidebarCollapsed(!sidebarCollapsed);
-                }
-              }}
-              className="md:inline-flex"
-            >
+            <Button variant="ghost" size="icon" onClick={() => {
+            if (window.innerWidth < 768) {
+              setMobileMenuOpen(!mobileMenuOpen);
+            } else {
+              setSidebarCollapsed(!sidebarCollapsed);
+            }
+          }} className="md:inline-flex">
               <AlignJustify className="h-5 w-5" />
             </Button>
           </div>
@@ -566,22 +480,13 @@ const UserLayoutContent = ({
             {/* User Profile */}
             <SheetNoOverlay open={profileSheetOpen} onOpenChange={setProfileSheetOpen}>
               <SheetNoOverlayTrigger asChild>
-                <ProfileTrigger
-                  userProfile={uiUserProfile}
-                  position="header"
-                  onClick={() => setProfileSheetOpen(true)}
-                />
+                <ProfileTrigger userProfile={uiUserProfile} position="header" onClick={() => setProfileSheetOpen(true)} />
               </SheetNoOverlayTrigger>
               <SheetNoOverlayContent side="right" className="w-96">
                 <SheetNoOverlayHeader>
                   <SheetNoOverlayTitle>{t("user_profile")}</SheetNoOverlayTitle>
                 </SheetNoOverlayHeader>
-                <ProfileSheetContent
-                  userProfile={uiUserProfile}
-                  onNavigate={handleProfileNavigation}
-                  onLogout={handleLogout}
-                  onClose={() => setProfileSheetOpen(false)}
-                />
+                <ProfileSheetContent userProfile={uiUserProfile} onNavigate={handleProfileNavigation} onLogout={handleLogout} onClose={() => setProfileSheetOpen(false)} />
               </SheetNoOverlayContent>
             </SheetNoOverlay>
           </div>
@@ -590,12 +495,14 @@ const UserLayoutContent = ({
         {/* Content */}
         <main className="flex-1 overflow-hidden">
           <div className="h-full">
-            <Outlet context={{ user, menuItems, onMenuUpdate: refreshMenuItems }} />
+            <Outlet context={{
+            user,
+            menuItems,
+            onMenuUpdate: refreshMenuItems
+          }} />
           </div>
         </main>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default UserLayout;
