@@ -183,6 +183,8 @@ export class TariffService {
         is_free: tariffData.is_free,
         is_lifetime: tariffData.is_lifetime,
         is_active: tariffData.is_active,
+        visible: tariffData.visible,
+        popular: tariffData.popular,
         created_at: tariffData.created_at,
         updated_at: tariffData.updated_at,
         sort_order: tariffData.sort_order,

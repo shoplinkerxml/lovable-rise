@@ -196,12 +196,14 @@ const AdminTariffEdit = () => {
           description: tariffWithDetails.description || '',
           old_price: tariffWithDetails.old_price,
           new_price: tariffWithDetails.new_price,
-          currency_id: tariffWithDetails.currency || 1,
+          currency_id: tariffWithDetails.currency_id || 1,
           currency_code: currencyCode,
           duration_days: tariffWithDetails.duration_days,
           is_free: tariffWithDetails.is_free ?? false,
           is_lifetime: tariffWithDetails.is_lifetime ?? false,
           is_active: tariffWithDetails.is_active ?? true,
+          visible: tariffWithDetails.visible ?? true,
+          popular: tariffWithDetails.popular ?? false,
           sort_order: tariffWithDetails.sort_order || 0
         });
         
