@@ -20,7 +20,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power, Star, Eye } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-
 interface TariffFormData {
   name: string;
   description?: string | null;
@@ -36,31 +35,30 @@ interface TariffFormData {
   popular?: boolean | null;
   sort_order?: number | null;
 }
-
 const AdminTariffEdit = () => {
   console.log('AdminTariffEdit component rendered');
-  const { t } = useI18n();
+  const {
+    t
+  } = useI18n();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const {
+    id
+  } = useParams<{
+    id: string;
+  }>();
   const defaultBreadcrumbs = useBreadcrumbs();
   const [tariffName, setTariffName] = useState<string>('');
-  const [customBreadcrumbs, setCustomBreadcrumbs] = useState<BreadcrumbItem[]>([
-    {
-      label: "Головна",
-      href: "/admin/dashboard",
-    },
-    {
-      label: "Тарифні плани",
-      href: "/admin/tariff",
-    },
-    {
-      label: "Редагування тарифу",
-      current: true,
-    }
-  ]);
-  
+  const [customBreadcrumbs, setCustomBreadcrumbs] = useState<BreadcrumbItem[]>([{
+    label: "Головна",
+    href: "/admin/dashboard"
+  }, {
+    label: "Тарифні плани",
+    href: "/admin/tariff"
+  }, {
+    label: "Редагування тарифу",
+    current: true
+  }]);
   console.log('Tariff ID from params:', id);
-  
   const [activeTab, setActiveTab] = useState('basic');
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,11 +66,20 @@ const AdminTariffEdit = () => {
   const [savedTariffId, setSavedTariffId] = useState<number | null>(null);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
-  const [newFeature, setNewFeature] = useState({ feature_name: '', is_active: true });
-  const [newLimit, setNewLimit] = useState({ limit_name: '', value: 0, is_active: true });
+  const [newFeature, setNewFeature] = useState({
+    feature_name: '',
+    is_active: true
+  });
+  const [newLimit, setNewLimit] = useState({
+    limit_name: '',
+    value: 0,
+    is_active: true
+  });
   const [isAdmin, setIsAdmin] = useState<boolean>(true); // Default to true to avoid empty page
   const [userRole, setUserRole] = useState<string>('admin'); // Default to admin
-  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [formErrors, setFormErrors] = useState<{
+    [key: string]: string;
+  }>({});
   const [formData, setFormData] = useState<TariffFormData>({
     name: '',
     description: '',
@@ -88,7 +95,6 @@ const AdminTariffEdit = () => {
     popular: false,
     sort_order: 0
   });
-
   useEffect(() => {
     // Fetch currencies and check permissions on component mount
     fetchCurrencies();
@@ -101,11 +107,14 @@ const AdminTariffEdit = () => {
       setIsInitialLoading(false);
     }
   }, [id]);
-
   const checkUserPermissions = async () => {
     try {
       console.log('Checking user permissions...');
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (user) {
         try {
           const role = await ProfileService.getUserRole(user.id);
@@ -130,36 +139,33 @@ const AdminTariffEdit = () => {
       setUserRole('admin');
     }
   };
-
   const validateForm = (): boolean => {
-    const errors: {[key: string]: string} = {};
-    
+    const errors: {
+      [key: string]: string;
+    } = {};
+
     // Required fields validation
     if (!formData.name.trim()) {
       errors.name = t('validation_error');
     }
-    
     if (!formData.currency_id) {
       errors.currency_id = t('currency_required');
     }
-    
     if (!formData.is_free && !formData.new_price) {
       errors.new_price = t('new_price_required');
     }
-    
+
     // Numeric validation - non-negative values
     if (formData.old_price !== null && formData.old_price < 0) {
       errors.old_price = t('price_must_be_non_negative');
     }
-    
     if (formData.new_price !== null && formData.new_price < 0) {
       errors.new_price = t('price_must_be_non_negative');
     }
-    
     if (formData.duration_days !== null && formData.duration_days < 0) {
       errors.duration_days = t('duration_must_be_non_negative');
     }
-    
+
     // Check if currency exists in currencies list (defensive check)
     if (formData.currency_id && currencies.length > 0) {
       const currencyExists = currencies.find(c => c.id === formData.currency_id);
@@ -167,11 +173,9 @@ const AdminTariffEdit = () => {
         errors.currency_id = t('invalid_currency_selected');
       }
     }
-    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
 
   // Load existing tariff data for editing using TariffService.getTariffById as per memory spec
   const fetchTariffData = async (tariffId: number) => {
@@ -179,17 +183,16 @@ const AdminTariffEdit = () => {
       setLoading(true);
       setIsInitialLoading(true);
       console.log('Loading tariff data for ID:', tariffId);
-      
+
       // Use TariffService.getTariffById() for loading single tariffs with full relational data
       const tariffWithDetails = await TariffService.getTariffById(tariffId);
-      
       if (tariffWithDetails) {
         // Extract currency code safely
         let currencyCode = 'USD'; // Default fallback
         if (tariffWithDetails.currency_data?.code) {
           currencyCode = tariffWithDetails.currency_data.code;
         }
-        
+
         // Update form data with loaded tariff
         setFormData({
           name: tariffWithDetails.name || '',
@@ -206,35 +209,29 @@ const AdminTariffEdit = () => {
           popular: tariffWithDetails.popular ?? false,
           sort_order: tariffWithDetails.sort_order || 0
         });
-        
+
         // Load features and limits
         setFeatures(tariffWithDetails.features || []);
         setLimits(tariffWithDetails.limits || []);
-        
+
         // Update tariff name for breadcrumb
         setTariffName(tariffWithDetails.name);
-        setCustomBreadcrumbs([
-          {
-            label: "Головна",
-            href: "/admin/dashboard",
-          },
-          {
-            label: "Тарифні плани",
-            href: "/admin/tariff",
-          },
-          {
-            label: tariffWithDetails.name,
-            current: true,
-          }
-        ]);
-        
+        setCustomBreadcrumbs([{
+          label: "Головна",
+          href: "/admin/dashboard"
+        }, {
+          label: "Тарифні плани",
+          href: "/admin/tariff"
+        }, {
+          label: tariffWithDetails.name,
+          current: true
+        }]);
         console.log('Tariff data loaded successfully:', {
           tariff: tariffWithDetails.name,
           features: tariffWithDetails.features?.length || 0,
           limits: tariffWithDetails.limits?.length || 0
         });
       }
-      
     } catch (error) {
       console.error('Error fetching tariff data:', error);
       toast.error(t('failed_load_tariff'));
@@ -246,29 +243,23 @@ const AdminTariffEdit = () => {
   // Fetch only tariff name for breadcrumb
   const fetchTariffName = async (tariffId: number) => {
     try {
-      const { data: simpleTariff, error } = await supabase
-        .from('tariffs')
-        .select('id, name')
-        .eq('id', tariffId)
-        .single();
-      
+      const {
+        data: simpleTariff,
+        error
+      } = await supabase.from('tariffs').select('id, name').eq('id', tariffId).single();
       if (!error && simpleTariff) {
         setTariffName(simpleTariff.name);
         // Update breadcrumbs with tariff name
-        setCustomBreadcrumbs([
-          {
-            label: "Головна",
-            href: "/admin/dashboard",
-          },
-          {
-            label: "Тарифні плани",
-            href: "/admin/tariff",
-          },
-          {
-            label: simpleTariff.name,
-            current: true,
-          }
-        ]);
+        setCustomBreadcrumbs([{
+          label: "Головна",
+          href: "/admin/dashboard"
+        }, {
+          label: "Тарифні плани",
+          href: "/admin/tariff"
+        }, {
+          label: simpleTariff.name,
+          current: true
+        }]);
       }
     } catch (error) {
       console.error('Error fetching tariff name:', error);
@@ -287,23 +278,24 @@ const AdminTariffEdit = () => {
       toast.error(t('failed_load_currencies'));
     }
   };
-
   const handleInputChange = (field: keyof TariffFormData, value: string | number | boolean | null) => {
     setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+
       // Business rules
       if (field === 'is_free' && value === true) {
         // If free tariff is selected, set prices to null
         newData.old_price = null;
         newData.new_price = null;
       }
-      
       if (field === 'is_lifetime' && value === true) {
         // If lifetime access is selected, set duration to null
         newData.duration_days = null;
       }
-      
+
       // Update currency code when currency_id changes
       if (field === 'currency_id' && typeof value === 'number') {
         const selectedCurrency = currencies.find(c => c.id === value);
@@ -311,7 +303,6 @@ const AdminTariffEdit = () => {
           newData.currency_code = selectedCurrency.code;
         }
       }
-      
       return newData;
     });
   };
@@ -319,7 +310,8 @@ const AdminTariffEdit = () => {
   // Save features and limits to database - exact copy from AdminTariffNew (for new tariffs only)
   const saveFeatures = async (tariffId: number) => {
     for (const feature of features) {
-      if (feature.id > 1000000) { // Temporary ID, needs to be created
+      if (feature.id > 1000000) {
+        // Temporary ID, needs to be created
         await TariffService.addTariffFeature({
           tariff_id: tariffId,
           feature_name: feature.feature_name,
@@ -328,10 +320,10 @@ const AdminTariffEdit = () => {
       }
     }
   };
-
   const saveLimits = async (tariffId: number) => {
     for (const limit of limits) {
-      if (limit.id > 1000000) { // Temporary ID, needs to be created
+      if (limit.id > 1000000) {
+        // Temporary ID, needs to be created
         await TariffService.addTariffLimit({
           tariff_id: tariffId,
           limit_name: limit.limit_name,
@@ -361,7 +353,6 @@ const AdminTariffEdit = () => {
       }
     }
   };
-
   const saveAllLimits = async (tariffId: number) => {
     for (const limit of limits) {
       if (limit.id > 1000000) {
@@ -382,24 +373,24 @@ const AdminTariffEdit = () => {
       }
     }
   };
-
   const handleSave = async () => {
     try {
       setLoading(true);
-      
+
       // Validation
       if (!formData.name.trim()) {
         toast.error(t('validation_error'));
         return;
       }
-      
       if (id) {
         // Update existing tariff - use correct field mapping as per actual database schema
         const tariffData: any = {
           name: formData.name.trim(),
           description: formData.description,
-          currency_id: formData.currency_id, // Use currency_id as per actual database schema
-          currency_code: formData.currency_code, // Include currency_code as required field
+          currency_id: formData.currency_id,
+          // Use currency_id as per actual database schema
+          currency_code: formData.currency_code,
+          // Include currency_code as required field
           duration_days: formData.duration_days,
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
@@ -408,7 +399,7 @@ const AdminTariffEdit = () => {
           popular: formData.popular,
           sort_order: formData.sort_order
         };
-        
+
         // Handle prices based on free tariff status
         if (formData.is_free) {
           // For free tariffs, explicitly set prices to null
@@ -419,28 +410,28 @@ const AdminTariffEdit = () => {
           tariffData.old_price = formData.old_price;
           tariffData.new_price = formData.new_price;
         }
-        
         await TariffService.updateTariff(parseInt(id), tariffData);
-        
+
         // Now save ALL features and limits with separate requests for each
         await saveAllFeatures(parseInt(id));
         await saveAllLimits(parseInt(id));
-        
         toast.success(t('tariff_updated_successfully'));
       } else {
         // Create new tariff - use correct field mapping as per actual database schema
         const tariffData: any = {
           name: formData.name.trim(),
           description: formData.description,
-          currency_id: formData.currency_id, // Use currency_id as per actual database schema
-          currency_code: formData.currency_code, // Include currency_code as required field
+          currency_id: formData.currency_id,
+          // Use currency_id as per actual database schema
+          currency_code: formData.currency_code,
+          // Include currency_code as required field
           duration_days: formData.duration_days,
           is_free: formData.is_free,
           is_lifetime: formData.is_lifetime,
           is_active: formData.is_active,
           sort_order: formData.sort_order
         };
-        
+
         // Handle prices based on free tariff status
         if (formData.is_free) {
           // For free tariffs, explicitly set prices to null
@@ -451,17 +442,15 @@ const AdminTariffEdit = () => {
           tariffData.old_price = formData.old_price;
           tariffData.new_price = formData.new_price;
         }
-        
         const createdTariff = await TariffService.createTariff(tariffData);
         setSavedTariffId(createdTariff.id);
-        
+
         // Save features and limits if they exist
         await saveFeatures(createdTariff.id);
         await saveLimits(createdTariff.id);
-        
         toast.success(t('tariff_created'));
       }
-      
+
       // Navigate back to tariff management with a flag to indicate fresh data should be loaded
       navigate('/admin/tariff?refresh=true');
     } catch (error) {
@@ -479,15 +468,18 @@ const AdminTariffEdit = () => {
       return;
     }
     const feature: TariffFeature = {
-      id: Date.now(), // Temporary ID for new features
+      id: Date.now(),
+      // Temporary ID for new features
       tariff_id: savedTariffId || 0,
       feature_name: newFeature.feature_name,
       is_active: newFeature.is_active
     };
     setFeatures([...features, feature]);
-    setNewFeature({ feature_name: '', is_active: true });
+    setNewFeature({
+      feature_name: '',
+      is_active: true
+    });
   };
-
   const removeFeature = async (index: number) => {
     const feature = features[index];
     // If it's an existing feature (has real ID), delete from database
@@ -504,17 +496,19 @@ const AdminTariffEdit = () => {
     // Remove from local state
     setFeatures(features.filter((_, i) => i !== index));
   };
-
   const updateFeature = (index: number, field: keyof TariffFeature, value: any) => {
     const updatedFeatures = [...features];
-    updatedFeatures[index] = { ...updatedFeatures[index], [field]: value };
+    updatedFeatures[index] = {
+      ...updatedFeatures[index],
+      [field]: value
+    };
     setFeatures(updatedFeatures);
   };
 
   // Save individual feature changes (for edit mode)
   const saveFeature = async (index: number) => {
     if (!id) return; // Only for edit mode
-    
+
     const feature = features[index];
     try {
       if (feature.id > 1000000) {
@@ -550,16 +544,20 @@ const AdminTariffEdit = () => {
       return;
     }
     const limit: TariffLimit = {
-      id: Date.now(), // Temporary ID for new limits
+      id: Date.now(),
+      // Temporary ID for new limits
       tariff_id: savedTariffId || 0,
       limit_name: newLimit.limit_name,
       value: newLimit.value,
       is_active: newLimit.is_active
     };
     setLimits([...limits, limit]);
-    setNewLimit({ limit_name: '', value: 0, is_active: true });
+    setNewLimit({
+      limit_name: '',
+      value: 0,
+      is_active: true
+    });
   };
-
   const removeLimit = async (index: number) => {
     const limit = limits[index];
     // If it's an existing limit (has real ID), delete from database
@@ -576,17 +574,19 @@ const AdminTariffEdit = () => {
     // Remove from local state
     setLimits(limits.filter((_, i) => i !== index));
   };
-
   const updateLimit = (index: number, field: keyof TariffLimit, value: any) => {
     const updatedLimits = [...limits];
-    updatedLimits[index] = { ...updatedLimits[index], [field]: value };
+    updatedLimits[index] = {
+      ...updatedLimits[index],
+      [field]: value
+    };
     setLimits(updatedLimits);
   };
 
   // Save individual limit changes (for edit mode)
   const saveLimit = async (index: number) => {
     if (!id) return; // Only for edit mode
-    
+
     const limit = limits[index];
     try {
       if (limit.id > 1000000) {
@@ -619,62 +619,51 @@ const AdminTariffEdit = () => {
 
   // Load sample data functions (like in AdminTariffNew)
   const loadSampleFeatures = () => {
-    const sampleFeatures: TariffFeature[] = [
-      {
-        id: Date.now() + 1,
-        tariff_id: 0,
-        feature_name: t('xml_files_upload'),
-        is_active: true
-      },
-      {
-        id: Date.now() + 2,
-        tariff_id: 0,
-        feature_name: t('data_processing_cleaning'),
-        is_active: true
-      },
-      {
-        id: Date.now() + 3,
-        tariff_id: 0,
-        feature_name: t('excel_csv_export'),
-        is_active: true
-      }
-    ];
+    const sampleFeatures: TariffFeature[] = [{
+      id: Date.now() + 1,
+      tariff_id: 0,
+      feature_name: t('xml_files_upload'),
+      is_active: true
+    }, {
+      id: Date.now() + 2,
+      tariff_id: 0,
+      feature_name: t('data_processing_cleaning'),
+      is_active: true
+    }, {
+      id: Date.now() + 3,
+      tariff_id: 0,
+      feature_name: t('excel_csv_export'),
+      is_active: true
+    }];
     setFeatures(sampleFeatures);
   };
-
   const loadSampleLimits = () => {
-    const sampleLimits: TariffLimit[] = [
-      {
-        id: Date.now() + 1,
-        tariff_id: 0,
-        limit_name: t('store_count_limit'),
-        value: 3,
-        is_active: true
-      },
-      {
-        id: Date.now() + 2,
-        tariff_id: 0,
-        limit_name: t('supplier_count_limit'),
-        value: 5,
-        is_active: true
-      },
-      {
-        id: Date.now() + 3,
-        tariff_id: 0,
-        limit_name: t('product_count_limit'),
-        value: 100,
-        is_active: true
-      }
-    ];
+    const sampleLimits: TariffLimit[] = [{
+      id: Date.now() + 1,
+      tariff_id: 0,
+      limit_name: t('store_count_limit'),
+      value: 3,
+      is_active: true
+    }, {
+      id: Date.now() + 2,
+      tariff_id: 0,
+      limit_name: t('supplier_count_limit'),
+      value: 5,
+      is_active: true
+    }, {
+      id: Date.now() + 3,
+      tariff_id: 0,
+      limit_name: t('product_count_limit'),
+      value: 100,
+      is_active: true
+    }];
     setLimits(sampleLimits);
   };
-
   const getCurrencySymbol = (currencyId: number) => {
     // Validate currencyId before finding currency
     if (!currencyId || typeof currencyId !== 'number') {
       return '$'; // Default fallback
     }
-    
     const currency = currencies.find(c => c.id === currencyId);
     // Since currency doesn't have symbol property, we'll use a simple mapping
     const symbolMap: Record<string, string> = {
@@ -684,7 +673,7 @@ const AdminTariffEdit = () => {
       'GBP': '£',
       'JPY': '¥'
     };
-    return currency ? (symbolMap[currency.code] || currency.code) : '$';
+    return currency ? symbolMap[currency.code] || currency.code : '$';
   };
 
   // Simplified rendering without loading states
@@ -695,20 +684,14 @@ const AdminTariffEdit = () => {
     currencies: currencies.length,
     customBreadcrumbsLength: customBreadcrumbs.length
   });
-  
   if (isInitialLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
+    return <div className="flex items-center justify-center min-h-[400px]">
         <Spinner className="h-12 w-12" />
-      </div>
-    );
+      </div>;
   }
-  
-  return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+  return <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Read-only mode banner for non-admin users */}
-      {!isAdmin && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      {!isAdmin && <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-2">
             <Lock className="h-5 w-5 text-blue-600" />
             <div>
@@ -716,15 +699,9 @@ const AdminTariffEdit = () => {
               <p className="text-sm text-blue-600">{t('user_role_read_only')}</p>
             </div>
           </div>
-        </div>
-      )}
+        </div>}
       
-      <PageHeader
-        title={id ? t('edit_tariff') : t('create_tariff')}
-        description={id ? t('edit_tariff_description') : t('create_tariff_description')}
-        breadcrumbItems={customBreadcrumbs}
-        actions={
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+      <PageHeader title={id ? t('edit_tariff') : t('create_tariff')} description={id ? t('edit_tariff_description') : t('create_tariff_description')} breadcrumbItems={customBreadcrumbs} actions={<div className="flex flex-wrap gap-2 sm:gap-3">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -745,13 +722,11 @@ const AdminTariffEdit = () => {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{loading ? t('saving') : (id ? t('update') : t('save'))}</p>
+                  <p>{loading ? t('saving') : id ? t('update') : t('save')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </div>
-        }
-      />
+          </div>} />
 
       <Card>
         <CardHeader>
@@ -778,79 +753,46 @@ const AdminTariffEdit = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">{t('tariff_name')} *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder={t('enter_tariff_name')}
-                    required
-                    disabled={!isAdmin}
-                    className={formErrors.name ? 'border-red-500' : ''}
-                  />
-                  {formErrors.name && (
-                    <p className="text-sm text-red-600">{formErrors.name}</p>
-                  )}
+                  <Input id="name" value={formData.name} onChange={e => handleInputChange('name', e.target.value)} placeholder={t('enter_tariff_name')} required disabled={!isAdmin} className={formErrors.name ? 'border-red-500' : ''} />
+                  {formErrors.name && <p className="text-sm text-red-600">{formErrors.name}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="currency">{t('currency')} *</Label>
-                    <Select
-                      value={formData.currency_id.toString()}
-                      onValueChange={(value) => handleInputChange('currency_id', parseInt(value))}
-                      disabled={!isAdmin}
-                    >
+                    <Select value={formData.currency_id.toString()} onValueChange={value => handleInputChange('currency_id', parseInt(value))} disabled={!isAdmin}>
                       <SelectTrigger className={formErrors.currency_id ? 'border-red-500' : ''}>
                         <SelectValue placeholder={t('select_currency')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {currencies.map((currency) => {
-                          const symbolMap: Record<string, string> = {
-                            'USD': '$',
-                            'EUR': '€',
-                            'UAH': '₴',
-                            'GBP': '£',
-                            'JPY': '¥'
-                          };
-                          const symbol = symbolMap[currency.code] || currency.code;
-                          return (
-                            <SelectItem key={currency.id} value={currency.id.toString()}>
+                        {currencies.map(currency => {
+                        const symbolMap: Record<string, string> = {
+                          'USD': '$',
+                          'EUR': '€',
+                          'UAH': '₴',
+                          'GBP': '£',
+                          'JPY': '¥'
+                        };
+                        const symbol = symbolMap[currency.code] || currency.code;
+                        return <SelectItem key={currency.id} value={currency.id.toString()}>
                               {currency.code} ({symbol}) - {currency.name}
-                            </SelectItem>
-                          );
-                        })}
+                            </SelectItem>;
+                      })}
                       </SelectContent>
                     </Select>
-                    {formErrors.currency_id && (
-                      <p className="text-sm text-red-600">{formErrors.currency_id}</p>
-                    )}
+                    {formErrors.currency_id && <p className="text-sm text-red-600">{formErrors.currency_id}</p>}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="sort_order">{t('sort_order')}</Label>
-                    <Input
-                      id="sort_order"
-                      type="number"
-                      min="0"
-                      value={formData.sort_order || 0}
-                      onChange={(e) => handleInputChange('sort_order', e.target.value ? parseInt(e.target.value) : 0)}
-                      placeholder={t('enter_sort_order')}
-                      disabled={!isAdmin}
-                    />
+                    <Input id="sort_order" type="number" min="0" value={formData.sort_order || 0} onChange={e => handleInputChange('sort_order', e.target.value ? parseInt(e.target.value) : 0)} placeholder={t('enter_sort_order')} disabled={!isAdmin} />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">{t('description')}</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description || ''}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder={t('enter_tariff_description')}
-                  rows={3}
-                  disabled={!isAdmin}
-                />
+                <Textarea id="description" value={formData.description || ''} onChange={e => handleInputChange('description', e.target.value)} placeholder={t('enter_tariff_description')} rows={3} disabled={!isAdmin} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -860,17 +802,7 @@ const AdminTariffEdit = () => {
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
                       {getCurrencySymbol(formData.currency_id)}
                     </span>
-                    <Input
-                      id="old_price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="pl-12"
-                      value={formData.old_price || ''}
-                      onChange={(e) => handleInputChange('old_price', e.target.value ? parseFloat(e.target.value) : null)}
-                      disabled={formData.is_free}
-                      placeholder="0.00"
-                    />
+                    <Input id="old_price" type="number" min="0" step="0.01" className="pl-12" value={formData.old_price || ''} onChange={e => handleInputChange('old_price', e.target.value ? parseFloat(e.target.value) : null)} disabled={formData.is_free} placeholder="0.00" />
                   </div>
                 </div>
 
@@ -880,97 +812,54 @@ const AdminTariffEdit = () => {
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
                       {getCurrencySymbol(formData.currency_id)}
                     </span>
-                    <Input
-                      id="new_price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="pl-12"
-                      value={formData.new_price || ''}
-                      onChange={(e) => handleInputChange('new_price', e.target.value ? parseFloat(e.target.value) : null)}
-                      disabled={formData.is_free}
-                      placeholder="0.00"
-                    />
+                    <Input id="new_price" type="number" min="0" step="0.01" className="pl-12" value={formData.new_price || ''} onChange={e => handleInputChange('new_price', e.target.value ? parseFloat(e.target.value) : null)} disabled={formData.is_free} placeholder="0.00" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="duration_days">{t('duration_days')}</Label>
-                  <Input
-                    id="duration_days"
-                    type="number"
-                    min="1"
-                    value={formData.duration_days || ''}
-                    onChange={(e) => handleInputChange('duration_days', e.target.value ? parseInt(e.target.value) : null)}
-                    disabled={formData.is_lifetime}
-                    placeholder={t('enter_duration_days')}
-                  />
+                  <Input id="duration_days" type="number" min="1" value={formData.duration_days || ''} onChange={e => handleInputChange('duration_days', e.target.value ? parseInt(e.target.value) : null)} disabled={formData.is_lifetime} placeholder={t('enter_duration_days')} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_free"
-                    checked={formData.is_free || false}
-                    onCheckedChange={(checked) => handleInputChange('is_free', checked)}
-                    disabled={!isAdmin}
-                  />
+                  <Switch id="is_free" checked={formData.is_free || false} onCheckedChange={checked => handleInputChange('is_free', checked)} disabled={!isAdmin} />
                   <Label htmlFor="is_free" className="flex items-center gap-2 cursor-pointer">
                     <Gift className="h-4 w-4 text-blue-500" />
-                    <span className="hidden sm:inline">{t('free_plan') || 'Безкоштовний план'}</span>
+                    
                   </Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_lifetime"
-                    checked={formData.is_lifetime || false}
-                    onCheckedChange={(checked) => handleInputChange('is_lifetime', checked)}
-                    disabled={!isAdmin}
-                  />
+                  <Switch id="is_lifetime" checked={formData.is_lifetime || false} onCheckedChange={checked => handleInputChange('is_lifetime', checked)} disabled={!isAdmin} />
                   <Label htmlFor="is_lifetime" className="flex items-center gap-2 cursor-pointer">
                     <Infinity className="h-4 w-4 text-purple-500" />
-                    <span className="hidden sm:inline">{t('lifetime_access') || 'Пожиттєвий доступ'}</span>
+                    
                   </Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active || false}
-                    onCheckedChange={(checked) => handleInputChange('is_active', checked)}
-                    disabled={!isAdmin}
-                  />
+                  <Switch id="is_active" checked={formData.is_active || false} onCheckedChange={checked => handleInputChange('is_active', checked)} disabled={!isAdmin} />
                   <Label htmlFor="is_active" className="flex items-center gap-2 cursor-pointer">
                     <Power className="h-4 w-4 text-green-500" />
-                    <span className="hidden sm:inline">{t('active') || 'Активний'}</span>
+                    
                   </Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    id="popular"
-                    checked={formData.popular || false}
-                    onCheckedChange={(checked) => handleInputChange('popular', checked)}
-                    disabled={!isAdmin}
-                  />
+                  <Switch id="popular" checked={formData.popular || false} onCheckedChange={checked => handleInputChange('popular', checked)} disabled={!isAdmin} />
                   <Label htmlFor="popular" className="flex items-center gap-2 cursor-pointer">
                     <Star className="h-4 w-4 text-yellow-500" />
-                    <span className="hidden sm:inline">{t('popular') || 'Популярний'}</span>
+                    
                   </Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    id="visible"
-                    checked={formData.visible || false}
-                    onCheckedChange={(checked) => handleInputChange('visible', checked)}
-                    disabled={!isAdmin}
-                  />
+                  <Switch id="visible" checked={formData.visible || false} onCheckedChange={checked => handleInputChange('visible', checked)} disabled={!isAdmin} />
                   <Label htmlFor="visible" className="flex items-center gap-2 cursor-pointer">
                     <Eye className="h-4 w-4 text-indigo-500" />
-                    <span className="hidden sm:inline">{t('visible_to_user') || 'Виводити у юзера'}</span>
+                    
                   </Label>
                 </div>
               </div>
@@ -1013,23 +902,18 @@ const AdminTariffEdit = () => {
                   <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
                     <div className="space-y-2 md:col-span-6">
                       <Label htmlFor="new-feature-name">{t('feature_name')}</Label>
-                      <Input
-                        id="new-feature-name"
-                        value={newFeature.feature_name}
-                        onChange={(e) => setNewFeature({ ...newFeature, feature_name: e.target.value })}
-                        placeholder={t('enter_feature_name')}
-                        disabled={!isAdmin}
-                      />
+                      <Input id="new-feature-name" value={newFeature.feature_name} onChange={e => setNewFeature({
+                      ...newFeature,
+                      feature_name: e.target.value
+                    })} placeholder={t('enter_feature_name')} disabled={!isAdmin} />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-feature-active" className="block text-center">{t('active')}</Label>
                       <div className="flex h-10 w-full items-center justify-center">
-                        <Switch
-                          id="new-feature-active"
-                          checked={newFeature.is_active}
-                          onCheckedChange={(checked) => setNewFeature({ ...newFeature, is_active: checked })}
-                          disabled={!isAdmin}
-                        />
+                        <Switch id="new-feature-active" checked={newFeature.is_active} onCheckedChange={checked => setNewFeature({
+                        ...newFeature,
+                        is_active: checked
+                      })} disabled={!isAdmin} />
                       </div>
                     </div>
                     <div className="flex justify-center md:col-span-2">
@@ -1051,8 +935,7 @@ const AdminTariffEdit = () => {
               </Card>
 
               {/* Features list */}
-              {features.length > 0 && (
-                <Card>
+              {features.length > 0 && <Card>
                   <CardContent className="p-0">
                     <Table>
                       <TableHeader>
@@ -1063,38 +946,21 @@ const AdminTariffEdit = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {features.map((feature, index) => (
-                          <TableRow key={feature.id}>
+                        {features.map((feature, index) => <TableRow key={feature.id}>
                             <TableCell className="w-[60%]">
-                              <Input
-                                value={feature.feature_name}
-                                onChange={(e) => updateFeature(index, 'feature_name', e.target.value)}
-                                className="border-none p-0 focus-visible:ring-0 w-full"
-                                disabled={!isAdmin}
-                              />
+                              <Input value={feature.feature_name} onChange={e => updateFeature(index, 'feature_name', e.target.value)} className="border-none p-0 focus-visible:ring-0 w-full" disabled={!isAdmin} />
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
                               <div className="flex justify-center">
-                                <Switch
-                                  checked={feature.is_active || false}
-                                  onCheckedChange={(checked) => updateFeature(index, 'is_active', checked)}
-                                  disabled={!isAdmin}
-                                />
+                                <Switch checked={feature.is_active || false} onCheckedChange={checked => updateFeature(index, 'is_active', checked)} disabled={!isAdmin} />
                               </div>
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
-                              {isAdmin && (
-                                <div className="flex justify-center space-x-1">
-                                  {id && (
-                                    <TooltipProvider>
+                              {isAdmin && <div className="flex justify-center space-x-1">
+                                  {id && <TooltipProvider>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => saveFeature(index)}
-                                            className="text-green-600 hover:text-green-800 p-1"
-                                          >
+                                          <Button variant="outline" size="sm" onClick={() => saveFeature(index)} className="text-green-600 hover:text-green-800 p-1">
                                             <Save className="h-3 w-3" />
                                           </Button>
                                         </TooltipTrigger>
@@ -1102,17 +968,11 @@ const AdminTariffEdit = () => {
                                           <p>{t('save')}</p>
                                         </TooltipContent>
                                       </Tooltip>
-                                    </TooltipProvider>
-                                  )}
+                                    </TooltipProvider>}
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => removeFeature(index)}
-                                          className="text-red-600 hover:text-red-800 p-1"
-                                        >
+                                        <Button variant="ghost" size="sm" onClick={() => removeFeature(index)} className="text-red-600 hover:text-red-800 p-1">
                                           <Trash2 className="h-3 w-3" />
                                         </Button>
                                       </TooltipTrigger>
@@ -1121,27 +981,22 @@ const AdminTariffEdit = () => {
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
-                                </div>
-                              )}
+                                </div>}
                             </TableCell>
-                          </TableRow>
-                        ))}
+                          </TableRow>)}
                       </TableBody>
                     </Table>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
 
-              {features.length === 0 && (
-                <div className="text-center py-8">
+              {features.length === 0 && <div className="text-center py-8">
                   <p className="text-muted-foreground mb-4">
                     {t('features_will_be_configured_after_creating_tariff')}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {t('save_tariff_first_to_add_features')}
                   </p>
-                </div>
-              )}
+                </div>}
             </TabsContent>
 
             <TabsContent value="limits" className="space-y-6 mt-6">
@@ -1181,36 +1036,25 @@ const AdminTariffEdit = () => {
                   <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
                     <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="new-limit-name">{t('limit_name')}</Label>
-                      <Input
-                        id="new-limit-name"
-                        value={newLimit.limit_name}
-                        onChange={(e) => setNewLimit({ ...newLimit, limit_name: e.target.value })}
-                        placeholder={t('enter_limit_name')}
-                        disabled={!isAdmin}
-                      />
+                      <Input id="new-limit-name" value={newLimit.limit_name} onChange={e => setNewLimit({
+                      ...newLimit,
+                      limit_name: e.target.value
+                    })} placeholder={t('enter_limit_name')} disabled={!isAdmin} />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-limit-value" className="block text-center">{t('limit_value')}</Label>
-                      <Input
-                        id="new-limit-value"
-                        type="number"
-                        min="0"
-                        value={newLimit.value}
-                        onChange={(e) => setNewLimit({ ...newLimit, value: parseInt(e.target.value) || 0 })}
-                        placeholder={t('enter_limit_value')}
-                        disabled={!isAdmin}
-                        className="text-center"
-                      />
+                      <Input id="new-limit-value" type="number" min="0" value={newLimit.value} onChange={e => setNewLimit({
+                      ...newLimit,
+                      value: parseInt(e.target.value) || 0
+                    })} placeholder={t('enter_limit_value')} disabled={!isAdmin} className="text-center" />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-limit-active" className="block text-center">{t('active')}</Label>
                       <div className="flex h-10 w-full items-center justify-center">
-                        <Switch
-                          id="new-limit-active"
-                          checked={newLimit.is_active}
-                          onCheckedChange={(checked) => setNewLimit({ ...newLimit, is_active: checked })}
-                          disabled={!isAdmin}
-                        />
+                        <Switch id="new-limit-active" checked={newLimit.is_active} onCheckedChange={checked => setNewLimit({
+                        ...newLimit,
+                        is_active: checked
+                      })} disabled={!isAdmin} />
                       </div>
                     </div>
                     <div className="flex justify-center md:col-span-2">
@@ -1232,8 +1076,7 @@ const AdminTariffEdit = () => {
               </Card>
 
               {/* Limits list */}
-              {limits.length > 0 && (
-                <Card>
+              {limits.length > 0 && <Card>
                   <CardContent className="p-0">
                     <Table>
                       <TableHeader>
@@ -1245,48 +1088,24 @@ const AdminTariffEdit = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {limits.map((limit, index) => (
-                          <TableRow key={limit.id}>
+                        {limits.map((limit, index) => <TableRow key={limit.id}>
                             <TableCell className="w-[40%]">
-                              <Input
-                                value={limit.limit_name}
-                                onChange={(e) => updateLimit(index, 'limit_name', e.target.value)}
-                                className="border-none p-0 focus-visible:ring-0 w-full"
-                                disabled={!isAdmin}
-                              />
+                              <Input value={limit.limit_name} onChange={e => updateLimit(index, 'limit_name', e.target.value)} className="border-none p-0 focus-visible:ring-0 w-full" disabled={!isAdmin} />
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={limit.value}
-                                onChange={(e) => updateLimit(index, 'value', parseInt(e.target.value) || 0)}
-                                className="border-none p-0 focus-visible:ring-0 text-center w-full"
-                                disabled={!isAdmin}
-                              />
+                              <Input type="number" min="0" value={limit.value} onChange={e => updateLimit(index, 'value', parseInt(e.target.value) || 0)} className="border-none p-0 focus-visible:ring-0 text-center w-full" disabled={!isAdmin} />
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
                               <div className="flex justify-center">
-                                <Switch
-                                  checked={limit.is_active || false}
-                                  onCheckedChange={(checked) => updateLimit(index, 'is_active', checked)}
-                                  disabled={!isAdmin}
-                                />
+                                <Switch checked={limit.is_active || false} onCheckedChange={checked => updateLimit(index, 'is_active', checked)} disabled={!isAdmin} />
                               </div>
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
-                              {isAdmin && (
-                                <div className="flex justify-center space-x-1">
-                                  {id && (
-                                    <TooltipProvider>
+                              {isAdmin && <div className="flex justify-center space-x-1">
+                                  {id && <TooltipProvider>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => saveLimit(index)}
-                                            className="text-green-600 hover:text-green-800 p-1"
-                                          >
+                                          <Button variant="outline" size="sm" onClick={() => saveLimit(index)} className="text-green-600 hover:text-green-800 p-1">
                                             <Save className="h-3 w-3" />
                                           </Button>
                                         </TooltipTrigger>
@@ -1294,17 +1113,11 @@ const AdminTariffEdit = () => {
                                           <p>{t('save')}</p>
                                         </TooltipContent>
                                       </Tooltip>
-                                    </TooltipProvider>
-                                  )}
+                                    </TooltipProvider>}
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => removeLimit(index)}
-                                          className="text-red-600 hover:text-red-800 p-1"
-                                        >
+                                        <Button variant="ghost" size="sm" onClick={() => removeLimit(index)} className="text-red-600 hover:text-red-800 p-1">
                                           <Trash2 className="h-3 w-3" />
                                         </Button>
                                       </TooltipTrigger>
@@ -1313,33 +1126,26 @@ const AdminTariffEdit = () => {
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
-                                </div>
-                              )}
+                                </div>}
                             </TableCell>
-                          </TableRow>
-                        ))}
+                          </TableRow>)}
                       </TableBody>
                     </Table>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
 
-              {limits.length === 0 && (
-                <div className="text-center py-8">
+              {limits.length === 0 && <div className="text-center py-8">
                   <p className="text-muted-foreground mb-4">
                     {t('limits_will_be_configured_after_creating_tariff')}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {t('save_tariff_first_to_add_limits')}
                   </p>
-                </div>
-              )}
+                </div>}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default AdminTariffEdit;
