@@ -30,6 +30,8 @@ export interface TariffWithDetails {
   created_at: string | null;
   updated_at: string | null;
   sort_order: number | null;
+  visible: boolean | null;
+  popular: boolean | null;
   currency_data: Currency;
   features: TariffFeature[];
   limits: TariffLimit[];
@@ -48,7 +50,7 @@ export class TariffService {
         .order('sort_order', { ascending: true });
 
       if (!includeInactive) {
-        query = query.eq('is_active', true);
+        query = query.eq('is_active', true).eq('visible', true);
       }
 
       const { data, error } = await query;
@@ -105,8 +107,8 @@ export class TariffService {
           description: tariff.description,
           old_price: tariff.old_price,
           new_price: tariff.new_price,
-          currency_id: tariff.currency_id,
-          currency_code: tariff.currency_code,
+          currency_id: ((tariff as any).currency_id || (tariff as any).currency),
+          currency_code: currencyData ? (currencyData as any).code : undefined,
           duration_days: tariff.duration_days,
           is_free: tariff.is_free,
           is_lifetime: tariff.is_lifetime,
@@ -114,6 +116,8 @@ export class TariffService {
           created_at: tariff.created_at,
           updated_at: tariff.updated_at,
           sort_order: tariff.sort_order,
+          visible: (tariff as any).visible ?? true,
+          popular: (tariff as any).popular ?? false,
           currency_data: currencyData,
           features: featuresData || [],
           limits: limitsData || []
@@ -177,14 +181,14 @@ export class TariffService {
         description: tariffData.description,
         old_price: tariffData.old_price,
         new_price: tariffData.new_price,
-        currency_id: tariffData.currency_id,
-        currency_code: tariffData.currency_code,
+        currency_id: ((tariffData as any).currency_id || (tariffData as any).currency),
+        currency_code: currencyData ? (currencyData as any).code : undefined,
         duration_days: tariffData.duration_days,
         is_free: tariffData.is_free,
         is_lifetime: tariffData.is_lifetime,
         is_active: tariffData.is_active,
-        visible: tariffData.visible,
-        popular: tariffData.popular,
+        visible: (tariffData as any).visible ?? true,
+        popular: (tariffData as any).popular ?? false,
         created_at: tariffData.created_at,
         updated_at: tariffData.updated_at,
         sort_order: tariffData.sort_order,
