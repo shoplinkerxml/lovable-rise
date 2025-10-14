@@ -245,15 +245,25 @@ export class TariffService {
   // Update a tariff
   static async updateTariff(id: number, tariffData: TariffUpdate) {
     try {
+      console.log('Updating tariff:', { id, tariffData });
+      
       // First, update the tariff without joins
       const { data: updatedTariff, error: updateError } = await supabase
         .from('tariffs')
         .update(tariffData)
         .eq('id', id)
         .select('*')
-        .single();
+        .maybeSingle();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
+      
+      if (!updatedTariff) {
+        console.error('No tariff returned after update - possible RLS issue');
+        throw new Error('Failed to update tariff - no data returned');
+      }
 
       // Then fetch the currency data separately - handle both currency and currency_id fields
       const currencyField = (updatedTariff as any).currency_id || (updatedTariff as any).currency;
