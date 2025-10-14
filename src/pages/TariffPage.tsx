@@ -62,7 +62,9 @@ const TariffPage = () => {
     try {
       setLoading(true);
       const tariffData = await TariffService.getAllTariffs();
-      setTariffs(tariffData);
+      // Filter only visible tariffs for users
+      const visibleTariffs = tariffData.filter((tariff: any) => tariff.visible !== false);
+      setTariffs(visibleTariffs);
     } catch (error) {
       console.error('Error fetching tariffs:', error);
       toast.error(t('failed_load_currencies'));
@@ -281,8 +283,8 @@ const TariffPage = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tariffs.map((tariff, index) => {
-          const isPopular = index === 1; // Middle tariff as popular
+        {tariffs.map((tariff: any) => {
+          const isPopular = tariff.popular === true;
           return (
             <Card 
               key={tariff.id} 

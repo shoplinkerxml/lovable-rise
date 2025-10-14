@@ -18,7 +18,7 @@ import { TariffService, type Currency, type TariffFeature, type TariffLimit } fr
 import { ProfileService } from '@/lib/profile-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power, Star, Eye } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 
 interface TariffFormData {
@@ -32,6 +32,8 @@ interface TariffFormData {
   is_free?: boolean | null;
   is_lifetime?: boolean | null;
   is_active?: boolean | null;
+  visible?: boolean | null;
+  popular?: boolean | null;
   sort_order?: number | null;
 }
 
@@ -82,6 +84,8 @@ const AdminTariffEdit = () => {
     is_free: false,
     is_lifetime: false,
     is_active: true,
+    visible: true,
+    popular: false,
     sort_order: 0
   });
 
@@ -916,7 +920,7 @@ const AdminTariffEdit = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="is_free"
@@ -924,9 +928,9 @@ const AdminTariffEdit = () => {
                     onCheckedChange={(checked) => handleInputChange('is_free', checked)}
                     disabled={!isAdmin}
                   />
-                  <Label htmlFor="is_free" className="flex items-center gap-2">
-                    <Gift className="h-4 w-4 md:hidden" />
-                    <span className="hidden md:inline">{t('free_plan')}</span>
+                  <Label htmlFor="is_free" className="flex items-center gap-2 cursor-pointer">
+                    <Gift className="h-4 w-4 text-blue-500" />
+                    <span className="hidden sm:inline">{t('free_plan') || 'Безкоштовний план'}</span>
                   </Label>
                 </div>
 
@@ -937,9 +941,9 @@ const AdminTariffEdit = () => {
                     onCheckedChange={(checked) => handleInputChange('is_lifetime', checked)}
                     disabled={!isAdmin}
                   />
-                  <Label htmlFor="is_lifetime" className="flex items-center gap-2">
-                    <Infinity className="h-4 w-4 md:hidden" />
-                    <span className="hidden md:inline">{t('lifetime_access')}</span>
+                  <Label htmlFor="is_lifetime" className="flex items-center gap-2 cursor-pointer">
+                    <Infinity className="h-4 w-4 text-purple-500" />
+                    <span className="hidden sm:inline">{t('lifetime_access') || 'Пожиттєвий доступ'}</span>
                   </Label>
                 </div>
 
@@ -950,9 +954,35 @@ const AdminTariffEdit = () => {
                     onCheckedChange={(checked) => handleInputChange('is_active', checked)}
                     disabled={!isAdmin}
                   />
-                  <Label htmlFor="is_active" className="flex items-center gap-2">
-                    <Power className="h-4 w-4 md:hidden" />
-                    <span className="hidden md:inline">{t('active')}</span>
+                  <Label htmlFor="is_active" className="flex items-center gap-2 cursor-pointer">
+                    <Power className="h-4 w-4 text-green-500" />
+                    <span className="hidden sm:inline">{t('active') || 'Активний'}</span>
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="popular"
+                    checked={formData.popular || false}
+                    onCheckedChange={(checked) => handleInputChange('popular', checked)}
+                    disabled={!isAdmin}
+                  />
+                  <Label htmlFor="popular" className="flex items-center gap-2 cursor-pointer">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    <span className="hidden sm:inline">{t('popular') || 'Популярний'}</span>
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="visible"
+                    checked={formData.visible || false}
+                    onCheckedChange={(checked) => handleInputChange('visible', checked)}
+                    disabled={!isAdmin}
+                  />
+                  <Label htmlFor="visible" className="flex items-center gap-2 cursor-pointer">
+                    <Eye className="h-4 w-4 text-indigo-500" />
+                    <span className="hidden sm:inline">{t('visible_to_user') || 'Виводити у юзера'}</span>
                   </Label>
                 </div>
               </div>

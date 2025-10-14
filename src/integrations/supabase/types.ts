@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      currencies: {
+        Row: {
+          code: string
+          id: number
+          is_base: boolean | null
+          name: string
+          rate: number
+          status: boolean | null
+        }
+        Insert: {
+          code: string
+          id?: number
+          is_base?: boolean | null
+          name: string
+          rate: number
+          status?: boolean | null
+        }
+        Update: {
+          code?: string
+          id?: number
+          is_base?: boolean | null
+          name?: string
+          rate?: number
+          status?: boolean | null
+        }
+        Relationships: []
+      }
       menu_items: {
         Row: {
           created_at: string
@@ -23,16 +50,6 @@ export type Database = {
           parent_id: number | null
           path: string
           title: string
-          page_type: string
-          content_data: Json | null
-          template_name: string | null
-          meta_data: Json | null
-          icon_name: string | null
-          section_type: string | null
-          has_separator: boolean | null
-          description: string | null
-          badge_text: string | null
-          badge_color: string | null
         }
         Insert: {
           created_at?: string
@@ -42,16 +59,6 @@ export type Database = {
           parent_id?: number | null
           path: string
           title: string
-          page_type?: string
-          content_data?: Json | null
-          template_name?: string | null
-          meta_data?: Json | null
-          icon_name?: string | null
-          section_type?: string | null
-          has_separator?: boolean | null
-          description?: string | null
-          badge_text?: string | null
-          badge_color?: string | null
         }
         Update: {
           created_at?: string
@@ -61,16 +68,6 @@ export type Database = {
           parent_id?: number | null
           path?: string
           title?: string
-          page_type?: string
-          content_data?: Json | null
-          template_name?: string | null
-          meta_data?: Json | null
-          icon_name?: string | null
-          section_type?: string | null
-          has_separator?: boolean | null
-          description?: string | null
-          badge_text?: string | null
-          badge_color?: string | null
         }
         Relationships: [
           {
@@ -91,39 +88,217 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string
           id: string
-          name: string
+          name: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
-          avatar_url: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email: string
           id: string
-          name: string
+          name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
-          avatar_url?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           id?: string
-          name?: string
+          name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
-          avatar_url?: string | null
         }
         Relationships: []
+      }
+      tariff_features: {
+        Row: {
+          feature_name: string
+          id: number
+          is_active: boolean | null
+          tariff_id: number
+        }
+        Insert: {
+          feature_name: string
+          id?: number
+          is_active?: boolean | null
+          tariff_id: number
+        }
+        Update: {
+          feature_name?: string
+          id?: number
+          is_active?: boolean | null
+          tariff_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_tariff_features_tariff"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tariff_features_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tariff_limits: {
+        Row: {
+          id: number
+          is_active: boolean | null
+          limit_name: string
+          tariff_id: number
+          value: number
+        }
+        Insert: {
+          id?: number
+          is_active?: boolean | null
+          limit_name: string
+          tariff_id: number
+          value: number
+        }
+        Update: {
+          id?: number
+          is_active?: boolean | null
+          limit_name?: string
+          tariff_id?: number
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_tariff_limits_tariff"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tariff_limits_tariff_id_fkey"
+            columns: ["tariff_id"]
+            isOneToOne: false
+            referencedRelation: "tariffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tariffs: {
+        Row: {
+          created_at: string | null
+          currency_code: string
+          currency_id: number | null
+          description: string | null
+          duration_days: number | null
+          id: number
+          is_active: boolean | null
+          is_free: boolean | null
+          is_lifetime: boolean | null
+          name: string
+          new_price: number | null
+          old_price: number | null
+          popular: boolean
+          sort_order: number
+          updated_at: string | null
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string | null
+          currency_code: string
+          currency_id?: number | null
+          description?: string | null
+          duration_days?: number | null
+          id?: number
+          is_active?: boolean | null
+          is_free?: boolean | null
+          is_lifetime?: boolean | null
+          name: string
+          new_price?: number | null
+          old_price?: number | null
+          popular?: boolean
+          sort_order?: number
+          updated_at?: string | null
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string | null
+          currency_code?: string
+          currency_id?: number | null
+          description?: string | null
+          duration_days?: number | null
+          id?: number
+          is_active?: boolean | null
+          is_free?: boolean | null
+          is_lifetime?: boolean | null
+          name?: string
+          new_price?: number | null
+          old_price?: number | null
+          popular?: boolean
+          sort_order?: number
+          updated_at?: string | null
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_tariffs_currency"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_menu_items: {
+        Row: {
+          created_at: string
+          id: number
+          is_active: boolean
+          order_index: number
+          parent_id: number | null
+          path: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          is_active?: boolean
+          order_index?: number
+          parent_id?: number | null
+          path: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          is_active?: boolean
+          order_index?: number
+          parent_id?: number | null
+          path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_user_menu_items_parent_id"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "user_menu_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_permissions: {
         Row: {
@@ -167,166 +342,46 @@ export type Database = {
           },
         ]
       }
-      currencies: {
+      user_subscriptions: {
         Row: {
+          end_date: string | null
           id: number
-          code: string
-          name: string
-          rate: number
-          status: boolean | null
-          is_base: boolean | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: number
-          code: string
-          name: string
-          rate?: number
-          status?: boolean | null
-          is_base?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: number
-          code?: string
-          name?: string
-          rate?: number
-          status?: boolean | null
-          is_base?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      tariffs: {
-        Row: {
-          id: number
-          name: string
-          description: string | null
-          old_price: number | null
-          new_price: number | null
-          currency: number
-          duration_days: number | null
-          is_free: boolean | null
-          is_lifetime: boolean | null
-          is_active: boolean | null
-          created_at: string | null
-          updated_at: string | null
-          sort_order: number | null
-        }
-        Insert: {
-          id?: number
-          name: string
-          description?: string | null
-          old_price?: number | null
-          new_price?: number | null
-          currency: number
-          duration_days?: number | null
-          is_free?: boolean | null
-          is_lifetime?: boolean | null
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-          sort_order?: number | null
-        }
-        Update: {
-          id?: number
-          name?: string
-          description?: string | null
-          old_price?: number | null
-          new_price?: number | null
-          currency?: number
-          duration_days?: number | null
-          is_free?: boolean | null
-          is_lifetime?: boolean | null
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-          sort_order?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tariffs_currency_fkey"
-            columns: ["currency"]
-            isOneToOne: false
-            referencedRelation: "currencies"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      tariff_features: {
-        Row: {
-          id: number
+          is_active: boolean
+          start_date: string
           tariff_id: number
-          feature_name: string
-          is_active: boolean | null
-          created_at: string | null
-          updated_at: string | null
+          user_id: string
         }
         Insert: {
+          end_date?: string | null
           id?: number
+          is_active?: boolean
+          start_date?: string
           tariff_id: number
-          feature_name: string
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
+          user_id: string
         }
         Update: {
+          end_date?: string | null
           id?: number
+          is_active?: boolean
+          start_date?: string
           tariff_id?: number
-          feature_name?: string
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "tariff_features_tariff_id_fkey"
+            foreignKeyName: "user_subscriptions_tariff_id_fkey"
             columns: ["tariff_id"]
             isOneToOne: false
             referencedRelation: "tariffs"
             referencedColumns: ["id"]
-          }
-        ]
-      }
-      tariff_limits: {
-        Row: {
-          id: number
-          tariff_id: number
-          limit_name: string
-          value: number
-          is_active: boolean | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: number
-          tariff_id: number
-          limit_name: string
-          value: number
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: number
-          tariff_id?: number
-          limit_name?: string
-          value?: number
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
+          },
           {
-            foreignKeyName: "tariff_limits_tariff_id_fkey"
-            columns: ["tariff_id"]
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "tariffs"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
     }
