@@ -221,19 +221,6 @@ const AdminUserDetails = () => {
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbs} />
 
-      {/* Active Tariff Alert */}
-      {activeSubscription && <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="flex items-center gap-2">
-            {activeSubscription.tariffs.is_lifetime ? <Crown className="h-4 w-4 text-yellow-600" /> : <CreditCard className="h-4 w-4 text-emerald-700" />}
-            {t('active_tariff_title') || 'Активний тарифний план'}
-          </AlertTitle>
-          <AlertDescription>
-            <strong>{activeSubscription.tariffs.name}</strong>
-            {activeSubscription.end_date && <> — {t('end_date') || 'Дата закінчення'}: {format(new Date(activeSubscription.end_date), 'dd.MM.yyyy')}</>}
-          </AlertDescription>
-        </Alert>}
-
       {/* Info Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Active Tariff Card */}
@@ -248,10 +235,13 @@ const AdminUserDetails = () => {
             <div className="text-2xl font-bold">
               {activeSubscription ? activeSubscription.tariffs.name : t('no_tariff') || 'Немає'}
             </div>
-            {activeSubscription?.tariffs.new_price && <p className="text-xs text-muted-foreground">
+            {activeSubscription?.tariffs.new_price && <p className="text-xs text-muted-foreground mt-1">
                 {getCurrencySymbol(activeSubscription.tariffs.currency_data.code)}
                 {activeSubscription.tariffs.new_price}
                 {!activeSubscription.tariffs.is_lifetime && '/міс'}
+              </p>}
+            {activeSubscription?.end_date && <p className="text-xs text-muted-foreground mt-2">
+                {t('end_date')}: {format(new Date(activeSubscription.end_date), 'dd.MM.yyyy')}
               </p>}
           </CardContent>
         </Card>
