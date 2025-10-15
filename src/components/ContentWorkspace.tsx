@@ -22,6 +22,7 @@ import AdminTariffManagement from '@/pages/admin/AdminTariffManagement';
 import AdminTariffFeatures from '@/pages/admin/AdminTariffFeatures';
 import AdminTariffNew from '@/pages/admin/AdminTariffNew';
 import AdminTariffEdit from '@/pages/admin/AdminTariffEdit';
+import AdminUserDetails from '@/pages/admin/AdminUserDetails';
 
 
 
@@ -101,6 +102,11 @@ const ContentWorkspace: React.FC = () => {
     // Handle dynamic routes with parameters
     if (adminPath.startsWith('/tariff/edit/')) {
       return AdminTariffEdit;
+    }
+    
+    // Handle user details route
+    if (adminPath.startsWith('/users/')) {
+      return AdminUserDetails;
     }
     
     // For dynamic menu items, return null to render via ContentRenderer

@@ -12,7 +12,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Crown, CreditCard, AlertCircle, MoreHorizontal, Plus, Trash2, XCircle, CheckCircle2 } from "lucide-react";
+import { Crown, CreditCard, AlertCircle, MoreHorizontal, Plus, Trash2, XCircle, CheckCircle2, TrendingUp } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -38,10 +38,24 @@ interface Subscription {
     name: string;
     new_price: number | null;
     is_lifetime: boolean;
+    duration_days: number | null;
     currency_data: {
       code: string;
       symbol: string;
     };
+  };
+}
+
+interface Tariff {
+  id: number;
+  name: string;
+  new_price: number | null;
+  duration_days: number | null;
+  is_lifetime: boolean;
+  is_popular: boolean;
+  currency: {
+    code: string;
+    symbol: string;
   };
 }
 
@@ -53,12 +67,13 @@ const AdminUserDetails = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [activeSubscription, setActiveSubscription] = useState<Subscription | null>(null);
   const [subscriptionHistory, setSubscriptionHistory] = useState<Subscription[]>([]);
+  const [availableTariffs, setAvailableTariffs] = useState<Tariff[]>([]);
   const [loading, setLoading] = useState(true);
 
   const breadcrumbs: BreadcrumbItem[] = [
     { label: t('menu_main') || 'Головна', href: '/admin/dashboard' },
     { label: t('menu_users') || 'Користувачі', href: '/admin/users' },
-    { label: user?.name || '', current: true }
+    { label: user?.name || '...', current: true }
   ];
 
   useEffect(() => {
@@ -108,6 +123,7 @@ const AdminUserDetails = () => {
             name,
             new_price,
             is_lifetime,
+            duration_days,
             currency:currencies(code, symbol)
           )
         `)
@@ -115,6 +131,33 @@ const AdminUserDetails = () => {
         .order('created_at', { ascending: false });
 
       setSubscriptionHistory((history as any) || []);
+
+      // Load all available tariffs with currency
+      try {
+        const { data: tariffsData, error: tariffsError } = await (supabase as any)
+          .from('tariffs')
+          .select('*')
+          .eq('is_visible', true)
+          .order('sort_order', { ascending: true });
+
+        if (!tariffsError && tariffsData) {
+          // Load currency data for each tariff
+          const tariffsWithCurrency = await Promise.all(
+            tariffsData.map(async (tariff: any) => {
+              const { data: currency } = await (supabase as any)
+                .from('currencies')
+                .select('*')
+                .eq('id', tariff.currency_id)
+                .single();
+              return { ...tariff, currency: currency || { code: 'USD', symbol: '$' } };
+            })
+          );
+          setAvailableTariffs(tariffsWithCurrency);
+        }
+      } catch (error) {
+        console.error('Error loading tariffs:', error);
+        setAvailableTariffs([]);
+      }
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -251,6 +294,100 @@ const AdminUserDetails = () => {
         </CardContent>
       </Card>
 
+      {/* Available Tariffs Section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">{t('available_tariffs')}</h2>
+          <p className="text-muted-foreground">
+            {t('manage_user_subscriptions')}
+          </p>
+        </div>
+        
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {availableTariffs.map((tariff) => {
+            const userSubscription = subscriptionHistory.find(sub => sub.tariff_id === tariff.id);
+            const isActive = userSubscription?.is_active || false;
+            
+            return (
+              <Card key={tariff.id} className={isActive ? 'border-emerald-500 shadow-md' : ''}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    {tariff.name}
+                  </CardTitle>
+                  {tariff.is_lifetime ? (
+                    <Crown className="h-4 w-4 text-yellow-600" />
+                  ) : (
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {tariff.new_price ? (
+                      <>
+                        {getCurrencySymbol(tariff.currency.code)}
+                        {tariff.new_price}
+                      </>
+                    ) : (
+                      t('free') || 'Безкоштовно'
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {tariff.is_lifetime ? (
+                      t('lifetime') || 'Безстроково'
+                    ) : (
+                      `${tariff.duration_days} ${t('days') || 'днів'}`
+                    )}
+                  </p>
+                  
+                  {/* Subscription Status */}
+                  <div className="mt-4 flex items-center gap-2">
+                    {isActive ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-600">Активна</span>
+                      </>
+                    ) : userSubscription ? (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span className="text-sm text-red-600">Неактивна</span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Не придбано</span>
+                    )}
+                  </div>
+                  
+                  {/* End Date if active */}
+                  {isActive && userSubscription?.end_date && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {t('end_date') || 'Закінчення'}: {format(new Date(userSubscription.end_date), 'dd.MM.yyyy')}
+                    </p>
+                  )}
+                  
+                  {/* Action Button */}
+                  <Button 
+                    className="w-full mt-4" 
+                    variant={isActive ? 'outline' : 'default'}
+                    size="sm"
+                  >
+                    {isActive ? (
+                      <>
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Деактивувати
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Активувати
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Subscription History Table */}
       <Card>
         <CardHeader>
@@ -326,16 +463,8 @@ const AdminUserDetails = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Додати / Add
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Деактивувати / Deactivate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Видалити / Delete
+                            Видалити
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

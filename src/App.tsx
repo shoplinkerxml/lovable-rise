@@ -63,9 +63,6 @@ const App = () => (
             
             {/* Admin Authentication Routes */}
             <Route path="/admin-auth" element={<AdminAuth />} />
-            <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>              
-              <Route path="*" element={<AdminLayout><Outlet /></AdminLayout>} />
-            </Route>
             
             {/* Admin Settings Routes */}
             <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>
@@ -75,6 +72,7 @@ const App = () => (
               <Route path="tariff/edit/:id" element={<AdminLayout><AdminTariffEdit /></AdminLayout>} />
               <Route path="tariff/features" element={<AdminLayout><AdminTariffFeatures /></AdminLayout>} />
               <Route path="users/:id" element={<AdminLayout><AdminUserDetails /></AdminLayout>} />
+              <Route path="*" element={<AdminLayout><Outlet /></AdminLayout>} />
             </Route>
             
             {/* User Authentication Routes */}
