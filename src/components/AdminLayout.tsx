@@ -50,7 +50,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
   };
 
   return (
-    <div className="h-screen bg-emerald-50/40 dark:bg-neutral-950 flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden" style={{ backgroundColor: 'hsl(151.8, 81%, 95.9%)' }}>
       {/* Responsive Sidebar */}
       <AdminSidebar 
         collapsed={sidebarCollapsed} 
@@ -63,7 +63,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="sticky top-0 z-50 h-16 border-b bg-background flex items-center px-4 md:px-6 justify-between shrink-0">
+        <header className="sticky top-0 z-50 h-16 bg-white dark:bg-neutral-900 shadow-sm rounded-lg mx-4 mt-4 flex items-center px-4 md:px-6 justify-between shrink-0">
           <div className="flex items-center gap-3">
             <Button 
               variant="ghost" 
@@ -129,8 +129,12 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
         </header>
 
         {/* Content Workspace */}
-        <main className="flex-1 overflow-y-auto">
-          <ContentWorkspace />
+        <main className="flex-1 overflow-y-auto" style={{ backgroundColor: 'hsl(151.8, 81%, 95.9%)' }}>
+          <div className="p-4 md:p-6 min-h-full">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-md min-h-[calc(100vh-8rem)]">
+              <ContentWorkspace />
+            </div>
+          </div>
         </main>
       </div>
     </div>

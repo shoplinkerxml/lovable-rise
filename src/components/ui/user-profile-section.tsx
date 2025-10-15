@@ -5,6 +5,9 @@ import { ProfileSheetContent } from './profile-sheet-content';
 import { UserProfile } from './profile-types';
 import { useI18n } from '@/providers/i18n-provider';
 import { useNavigate } from 'react-router-dom';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './dropdown-menu';
+import { MoreHorizontal, User, LogOut } from 'lucide-react';
+import { Button } from './button';
 
 export interface UserProfileSectionProps {
   collapsed?: boolean;
@@ -36,15 +39,39 @@ export const UserProfileSection: React.FC<UserProfileSectionProps> = ({
   };
 
   return (
-    <div className="mt-auto border-t pt-4">
+    <div className="mt-auto">
       <SheetNoOverlay open={isProfileSheetOpen} onOpenChange={setIsProfileSheetOpen}>
         <SheetNoOverlayTrigger asChild>
-          <ProfileTrigger
-            userProfile={userProfile}
-            position="sidebar"
-            collapsed={collapsed}
-            onClick={handleProfileClick}
-          />
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <ProfileTrigger
+                userProfile={userProfile}
+                position="sidebar"
+                collapsed={collapsed}
+                onClick={handleProfileClick}
+              />
+            </div>
+            {!collapsed && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => handleNavigate('/admin/personal')}>
+                    <User className="mr-2 h-4 w-4" />
+                    {t('profile') || 'Profile'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {t('logout') || 'Log out'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </SheetNoOverlayTrigger>
         <SheetNoOverlayContent side="right" className="w-96">
           <SheetNoOverlayHeader>

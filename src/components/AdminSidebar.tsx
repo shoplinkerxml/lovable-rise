@@ -127,7 +127,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
   };
 
   return (
-    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col h-screen overflow-hidden`}>
+    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 flex-col h-screen overflow-hidden`} style={{ backgroundColor: 'hsl(151.8, 81%, 95.9%)' }}>
       <div className="p-4">
         <Logo collapsed={collapsed} className="mb-8" />
       </div>
@@ -145,7 +145,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
                   {/* Section separator */}
                   {sectionIndex > 0 && (
                     <div className="py-2">
-                      <div className="border-t border-gray-200" />
+                      <div className="border-t border-gray-100 dark:border-neutral-800" />
                     </div>
                   )}
                   
@@ -168,7 +168,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
         )}
       </nav>
       
-      <div className="p-4 border-t">
+      <div className="p-4">
         <UserProfileSection collapsed={collapsed} onLogout={signOut} userProfile={userProfile || defaultUserProfile} />
       </div>
     </aside>

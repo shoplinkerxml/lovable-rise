@@ -16,6 +16,7 @@ const dictionary: Dictionary = {
   sidebar_forms: { uk: "Форми", en: "Forms" },
   search: { uk: "Пошук", en: "Search" },
   logout: { uk: "Вийти", en: "Logout" },
+  profile: { uk: "Профіль", en: "Profile" },
   user_profile: { uk: "Профіль користувача", en: "User Profile" },
   menu_profile: { uk: "Мій профіль", en: "My Profile" },
   menu_profile_desc: { uk: "Налаштування облікового запису", en: "Account settings" },
