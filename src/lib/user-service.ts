@@ -37,6 +37,10 @@ export interface UserProfile {
   created_at: string;
   updated_at: string;
   avatar_url?: string;
+  subscription?: {
+    tariff_name: string | null;
+    is_active: boolean;
+  };
 }
 
 export interface UserFilters {

@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { 
+import {
   MoreHorizontal, 
   ArrowUpDown, 
   ArrowUp, 
@@ -28,7 +28,9 @@ import {
   Trash2,
   Mail,
   Phone,
-  User
+  User,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { StatusToggle } from "./StatusToggle";
@@ -43,6 +45,10 @@ interface UserProfile {
   created_at: string;
   updated_at: string;
   avatar_url?: string;
+  subscription?: {
+    tariff_name: string | null;
+    is_active: boolean;
+  };
 }
 
 interface UsersTableProps {
@@ -82,6 +88,16 @@ const LoadingSkeleton = () => (
     {/* Phone Column */}
     <TableCell className="hidden md:table-cell">
       <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+    </TableCell>
+
+    {/* Tariff Column */}
+    <TableCell className="hidden lg:table-cell">
+      <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+    </TableCell>
+
+    {/* Subscription Status Column */}
+    <TableCell className="hidden lg:table-cell">
+      <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse"></div>
     </TableCell>
 
     {/* Created Date Column */}
@@ -256,6 +272,8 @@ export function UsersTable({
               {t("table_email")}
             </SortableHeader>
             <TableHead className="hidden md:table-cell">{t("table_phone")}</TableHead>
+            <TableHead className="hidden lg:table-cell">Тариф</TableHead>
+            <TableHead className="hidden lg:table-cell">Статус</TableHead>
             <SortableHeader
               column="created_at"
               sortBy={sortBy}
@@ -275,7 +293,7 @@ export function UsersTable({
             ))
           ) : users.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8">
+              <TableCell colSpan={8} className="text-center py-8">
                 <div className="flex flex-col items-center gap-2">
                   <User className="h-8 w-8 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
@@ -325,6 +343,34 @@ export function UsersTable({
                     </a>
                   ) : (
                     <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+
+                {/* Tariff Column */}
+                <TableCell className="hidden lg:table-cell">
+                  {user.subscription?.tariff_name ? (
+                    <span className="text-sm font-medium">
+                      {user.subscription.tariff_name}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
+
+                {/* Subscription Status Column */}
+                <TableCell className="hidden lg:table-cell">
+                  {user.subscription?.tariff_name ? (
+                    user.subscription.is_active ? (
+                      <div className="flex items-center" title="Активна">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center" title="Неактивна">
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
                   )}
                 </TableCell>
 

@@ -155,7 +155,37 @@ Deno.serve(async (req) => {
       const { data: users, error, count } = await query;
       if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
 
-      return new Response(JSON.stringify({ users: users || [], total: count ?? 0, page, limit }), { headers: corsHeaders });
+      // Fetch subscription data for each user
+      const usersWithSubscriptions = await Promise.all(
+        (users || []).map(async (user) => {
+          const { data: subscription, error: subError } = await serviceClient
+            .from('user_subscriptions')
+            .select(`
+              tariff_id,
+              is_active,
+              tariffs (
+                name
+              )
+            `)
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (subError) {
+            console.error('Error fetching subscription for user:', user.id, subError);
+          }
+
+          return {
+            ...user,
+            subscription: subscription ? {
+              tariff_name: subscription.tariffs ? (subscription.tariffs as any).name : null,
+              is_active: subscription.is_active
+            } : null
+          };
+        })
+      );
+
+      return new Response(JSON.stringify({ users: usersWithSubscriptions, total: count ?? 0, page, limit }), { headers: corsHeaders });
     }
 
     // ---------------- GET /users/:id ----------------
