@@ -127,10 +127,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
   };
 
   return (
-    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
-      <Logo collapsed={collapsed} className="mb-8" />
+    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col h-screen overflow-hidden`}>
+      <div className="p-4">
+        <Logo collapsed={collapsed} className="mb-8" />
+      </div>
       
-      <nav className="space-y-1 flex-1">
+      <nav className="space-y-1 flex-1 overflow-y-auto px-4">
         {menuLoading ? (
           <MenuSkeleton />
         ) : (
@@ -166,7 +168,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
         )}
       </nav>
       
-      <UserProfileSection collapsed={collapsed} onLogout={signOut} userProfile={userProfile || defaultUserProfile} />
+      <div className="p-4 border-t">
+        <UserProfileSection collapsed={collapsed} onLogout={signOut} userProfile={userProfile || defaultUserProfile} />
+      </div>
     </aside>
   );
 };

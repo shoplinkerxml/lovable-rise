@@ -50,7 +50,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
   };
 
   return (
-    <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
+    <div className="h-screen bg-emerald-50/40 dark:bg-neutral-950 flex overflow-hidden">
       {/* Responsive Sidebar */}
       <AdminSidebar 
         collapsed={sidebarCollapsed} 
@@ -61,7 +61,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="sticky top-0 z-50 h-16 border-b bg-background flex items-center px-4 md:px-6 justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -129,7 +129,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
         </header>
 
         {/* Content Workspace */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
           <ContentWorkspace />
         </main>
       </div>

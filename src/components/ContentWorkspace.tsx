@@ -139,9 +139,7 @@ const ContentWorkspace: React.FC = () => {
           fallback={<ContentSkeleton type={getSkeletonType()} />}
           delay={50}
         >
-          <div className="h-full overflow-auto">
-            <ContentComponent />
-          </div>
+          <ContentComponent />
         </ProgressiveLoader>
       </ErrorBoundary>
     );
@@ -163,16 +161,14 @@ const ContentWorkspace: React.FC = () => {
   // If active item is a parent item with children, show a message
   if (activeMenuItem && isParentItem) {
     return (
-      <div className="h-full overflow-auto">
-        <div className="p-4 md:p-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-            <h2 className="text-xl font-semibold text-blue-800 mb-2">
-              Please Select a Submenu Item
-            </h2>
-            <p className="text-blue-600">
-              This menu item contains sub-items. Please select one of the sub-items from the sidebar to view its content.
-            </p>
-          </div>
+      <div className="p-4 md:p-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+          <h2 className="text-xl font-semibold text-blue-800 mb-2">
+            Please Select a Submenu Item
+          </h2>
+          <p className="text-blue-600">
+            This menu item contains sub-items. Please select one of the sub-items from the sidebar to view its content.
+          </p>
         </div>
       </div>
     );
@@ -187,10 +183,8 @@ const ContentWorkspace: React.FC = () => {
           fallback={<ContentSkeleton type={getSkeletonType()} />}
           delay={50}
         >
-          <div className="h-full overflow-auto">
-            <div className="p-4 md:p-6">
-              <ContentRenderer menuItem={activeMenuItem} />
-            </div>
+          <div className="p-4 md:p-6">
+            <ContentRenderer menuItem={activeMenuItem} />
           </div>
         </ProgressiveLoader>
       </ErrorBoundary>
