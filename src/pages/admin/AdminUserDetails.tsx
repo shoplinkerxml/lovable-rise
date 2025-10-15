@@ -97,7 +97,7 @@ const AdminUserDetails = () => {
       // Load active subscription
       const { data: activeSub, error: activeSubError } = await supabase
         .from('user_subscriptions')
-        .select('*,tariffs(id,name,new_price,is_lifetime,duration_days,currency_id)')
+        .select('id,user_id,tariff_id,start_date,end_date,is_active,tariffs(id,name,new_price,is_lifetime,duration_days,currency_id)')
         .eq('user_id', id)
         .eq('is_active', true)
         .maybeSingle();
@@ -112,12 +112,21 @@ const AdminUserDetails = () => {
         if (tariffData.currency_id) {
           const { data: currency, error: currencyError } = await supabase
             .from('currencies')
-            .select('code,symbol')
+            .select('code')
             .eq('id', tariffData.currency_id)
             .single();
           
           if (!currencyError && currency) {
-            tariffData.currency_data = currency;
+            const symbolMap: Record<string, string> = {
+              'USD': '$',
+              'EUR': '€',
+              'GBP': '£',
+              'UAH': '₴'
+            };
+            tariffData.currency_data = {
+              code: currency.code,
+              symbol: symbolMap[currency.code] || currency.code
+            };
           } else {
             console.error('Currency error:', currencyError);
             tariffData.currency_data = { code: 'UAH', symbol: '₴' };
@@ -132,39 +141,56 @@ const AdminUserDetails = () => {
       // Load subscription history
       const { data: history, error: historyError } = await supabase
         .from('user_subscriptions')
-        .select('*,tariffs(name,new_price,is_lifetime,duration_days,currency_id)')
+        .select('id,user_id,tariff_id,start_date,end_date,is_active,tariffs(name,new_price,is_lifetime,duration_days,currency_id)')
         .eq('user_id', id)
-        .order('created_at', { ascending: false });
+        .order('start_date', { ascending: false });
+      
+      console.log('Subscription history query result:', { history, historyError });
       
       if (historyError) {
         console.error('Subscription history error:', historyError);
         setSubscriptionHistory([]);
       } else if (history && history.length > 0) {
+        console.log('Found', history.length, 'subscriptions for user');
         // Load currencies for all subscriptions
         const historyWithCurrency = await Promise.all(
           history.map(async (sub: any) => {
             if (sub.tariffs?.currency_id) {
               const { data: currency } = await supabase
                 .from('currencies')
-                .select('code,symbol')
+                .select('code')
                 .eq('id', sub.tariffs.currency_id)
                 .single();
-              sub.tariffs.currency_data = currency || { code: 'UAH', symbol: '₴' };
+              
+              // Add symbol based on code
+              const symbolMap: Record<string, string> = {
+                'USD': '$',
+                'EUR': '€',
+                'GBP': '£',
+                'UAH': '₴'
+              };
+              
+              sub.tariffs.currency_data = {
+                code: currency?.code || 'UAH',
+                symbol: symbolMap[currency?.code || 'UAH'] || currency?.code || '₴'
+              };
             } else {
               sub.tariffs.currency_data = { code: 'UAH', symbol: '₴' };
             }
             return sub;
           })
         );
+        console.log('Subscriptions with currency:', historyWithCurrency);
         setSubscriptionHistory(historyWithCurrency);
       } else {
+        console.log('No subscriptions found for user');
         setSubscriptionHistory([]);
       }
 
       // Load all available tariffs
       const { data: tariffsData, error: tariffsError } = await supabase
         .from('tariffs')
-        .select('id,name,new_price,duration_days,is_lifetime,is_popular,currency_id,sort_order')
+        .select('id,name,new_price,duration_days,is_lifetime,popular,currency_id,sort_order')
         .eq('visible', true)
         .order('sort_order', { ascending: true });
       
@@ -177,12 +203,23 @@ const AdminUserDetails = () => {
           tariffsData.map(async (tariff: any) => {
             const { data: currency } = await supabase
               .from('currencies')
-              .select('code,symbol')
+              .select('code')
               .eq('id', tariff.currency_id)
               .single();
+            
+            const symbolMap: Record<string, string> = {
+              'USD': '$',
+              'EUR': '€',
+              'GBP': '£',
+              'UAH': '₴'
+            };
+            
             return {
               ...tariff,
-              currency: currency || { code: 'USD', symbol: '$' }
+              currency: {
+                code: currency?.code || 'USD',
+                symbol: symbolMap[currency?.code || 'USD'] || '$'
+              }
             };
           })
         );
