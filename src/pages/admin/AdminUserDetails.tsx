@@ -94,63 +94,99 @@ const AdminUserDetails = () => {
       setUser(profile);
 
       // Load active subscription
-      const {
-        data: activeSub
-      } = await supabase.from('user_subscriptions').select(`
-          *,
-          tariffs (
-            name,
-            new_price,
-            is_lifetime,
-            currency:currencies(code, symbol)
-          )
-        `).eq('user_id', id).eq('is_active', true).maybeSingle();
+      // Load active subscription
+      const { data: activeSub, error: activeSubError } = await supabase
+        .from('user_subscriptions')
+        .select('*,tariffs(id,name,new_price,is_lifetime,duration_days,currency_id)')
+        .eq('user_id', id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (activeSubError) {
+        console.error('Active subscription error:', activeSubError);
+      }
+      
+      // Load currency for active subscription
+      if (activeSub?.tariffs) {
+        const tariffData = activeSub.tariffs as any;
+        if (tariffData.currency_id) {
+          const { data: currency, error: currencyError } = await supabase
+            .from('currencies')
+            .select('code,symbol')
+            .eq('id', tariffData.currency_id)
+            .single();
+          
+          if (!currencyError && currency) {
+            tariffData.currency_data = currency;
+          } else {
+            console.error('Currency error:', currencyError);
+            tariffData.currency_data = { code: 'UAH', symbol: '₴' };
+          }
+        } else {
+          tariffData.currency_data = { code: 'UAH', symbol: '₴' };
+        }
+      }
+      
       setActiveSubscription(activeSub as any);
 
       // Load subscription history
-      const {
-        data: history
-      } = await supabase.from('user_subscriptions').select(`
-          *,
-          tariffs (
-            name,
-            new_price,
-            is_lifetime,
-            duration_days,
-            currency:currencies(code, symbol)
-          )
-        `).eq('user_id', id).order('created_at', {
-        ascending: false
-      });
-      setSubscriptionHistory(history as any || []);
+      const { data: history, error: historyError } = await supabase
+        .from('user_subscriptions')
+        .select('*,tariffs(name,new_price,is_lifetime,duration_days,currency_id)')
+        .eq('user_id', id)
+        .order('created_at', { ascending: false });
+      
+      if (historyError) {
+        console.error('Subscription history error:', historyError);
+        setSubscriptionHistory([]);
+      } else if (history && history.length > 0) {
+        // Load currencies for all subscriptions
+        const historyWithCurrency = await Promise.all(
+          history.map(async (sub: any) => {
+            if (sub.tariffs?.currency_id) {
+              const { data: currency } = await supabase
+                .from('currencies')
+                .select('code,symbol')
+                .eq('id', sub.tariffs.currency_id)
+                .single();
+              sub.tariffs.currency_data = currency || { code: 'UAH', symbol: '₴' };
+            } else {
+              sub.tariffs.currency_data = { code: 'UAH', symbol: '₴' };
+            }
+            return sub;
+          })
+        );
+        setSubscriptionHistory(historyWithCurrency);
+      } else {
+        setSubscriptionHistory([]);
+      }
 
-      // Load all available tariffs with currency
-      try {
-        const {
-          data: tariffsData,
-          error: tariffsError
-        } = await (supabase as any).from('tariffs').select('*').eq('is_visible', true).order('sort_order', {
-          ascending: true
-        });
-        if (!tariffsError && tariffsData) {
-          // Load currency data for each tariff
-          const tariffsWithCurrency = await Promise.all(tariffsData.map(async (tariff: any) => {
-            const {
-              data: currency
-            } = await (supabase as any).from('currencies').select('*').eq('id', tariff.currency_id).single();
+      // Load all available tariffs
+      const { data: tariffsData, error: tariffsError } = await supabase
+        .from('tariffs')
+        .select('id,name,new_price,duration_days,is_lifetime,is_popular,currency_id,sort_order')
+        .eq('visible', true)
+        .order('sort_order', { ascending: true });
+      
+      if (tariffsError) {
+        console.error('Tariffs error:', tariffsError);
+        setAvailableTariffs([]);
+      } else if (tariffsData) {
+        // Load currency for each tariff
+        const tariffsWithCurrency = await Promise.all(
+          tariffsData.map(async (tariff: any) => {
+            const { data: currency } = await supabase
+              .from('currencies')
+              .select('code,symbol')
+              .eq('id', tariff.currency_id)
+              .single();
             return {
               ...tariff,
-              currency: currency || {
-                code: 'USD',
-                symbol: '$'
-              }
+              currency: currency || { code: 'USD', symbol: '$' }
             };
-          }));
-          setAvailableTariffs(tariffsWithCurrency);
-        }
-      } catch (error) {
-        console.error('Error loading tariffs:', error);
-        setAvailableTariffs([]);
+          })
+        );
+        setAvailableTariffs(tariffsWithCurrency);
       }
     } catch (error) {
       console.error('Error loading user data:', error);
