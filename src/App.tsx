@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import AdminAuth from "./pages/AdminAuth";
 import AdminProtected from "./pages/AdminProtected";
 import AdminLayout from "@/components/AdminLayout";
+import { AdminRoute, UserRoute } from "@/components/ProtectedRoutes";
 
 import AuthCallback from "./pages/AuthCallback";
 import UserAuth from "./pages/UserAuth";
@@ -61,12 +62,12 @@ const App = () => (
             
             {/* Admin Authentication Routes */}
             <Route path="/admin-auth" element={<AdminAuth />} />
-            <Route path="/admin" element={<AdminProtected />}>              
+            <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>              
               <Route path="*" element={<AdminLayout><Outlet /></AdminLayout>} />
             </Route>
             
             {/* Admin Settings Routes */}
-            <Route path="/admin" element={<AdminProtected />}>
+            <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>
               <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
               <Route path="tariff" element={<AdminLayout><AdminTariffManagement /></AdminLayout>} />
               <Route path="tariff/new" element={<AdminLayout><AdminTariffNew /></AdminLayout>} />
@@ -83,7 +84,7 @@ const App = () => (
 
             
             {/* Protected User Routes */}
-            <Route path="/user" element={<UserProtected />}>              
+            <Route path="/user" element={<UserRoute><UserProtected /></UserRoute>}>              
               <Route element={<UserLayout />}>                
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<UserDashboard />} />
