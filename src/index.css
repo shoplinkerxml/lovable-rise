@@ -37,6 +37,12 @@ All colors MUST be HSL.
     --ring: 158 62% 30%;
 
     --radius: 0.5rem;
+
+    /* Admin Layout Colors */
+    --admin-page-bg: 151.8 81% 95.9%;
+    --admin-sidebar-bg: 151.8 81% 95.9%;
+    --admin-header-bg: 0 0% 100%;
+    --admin-content-bg: 0 0% 100%;
   }
 
   .dark {
@@ -67,6 +73,12 @@ All colors MUST be HSL.
     --border: 158 20% 25%;
     --input: 158 20% 25%;
     --ring: 158 62% 40%;
+
+    /* Admin Layout Colors - Dark Mode */
+    --admin-page-bg: 158 30% 8%;
+    --admin-sidebar-bg: 158 30% 8%;
+    --admin-header-bg: 158 30% 12%;
+    --admin-content-bg: 158 30% 12%;
   }
 }
 
@@ -123,6 +135,23 @@ All colors MUST be HSL.
   
   .bg-primary-lighter {
     background-color: hsl(var(--primary-lighter));
+  }
+
+  /* Admin Layout Utilities */
+  .bg-admin-page {
+    background-color: hsl(var(--admin-page-bg));
+  }
+
+  .bg-admin-sidebar {
+    background-color: hsl(var(--admin-sidebar-bg));
+  }
+
+  .bg-admin-header {
+    background-color: hsl(var(--admin-header-bg));
+  }
+
+  .bg-admin-content {
+    background-color: hsl(var(--admin-content-bg));
   }
 }
 

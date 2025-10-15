@@ -78,6 +78,12 @@ export default {
     				'3': 'hsl(var(--chart-3))',
     				'4': 'hsl(var(--chart-4))',
     				'5': 'hsl(var(--chart-5))'
+    			},
+    			admin: {
+    				'page-bg': 'hsl(var(--admin-page-bg))',
+    				'sidebar-bg': 'hsl(var(--admin-sidebar-bg))',
+    				'header-bg': 'hsl(var(--admin-header-bg))',
+    				'content-bg': 'hsl(var(--admin-content-bg))'
     			}
     		},
     		borderRadius: {
