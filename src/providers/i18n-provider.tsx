@@ -578,7 +578,11 @@ const dictionary: Dictionary = {
   // Edit tariff translations
   edit_tariff_description: { uk: "Редагування тарифного плану", en: "Edit tariff plan" },
   tariff_updated_successfully: { uk: "Тариф успішно оновлено", en: "Tariff updated successfully" },
+  tariff_deactivated_successfully: { uk: "Тариф успішно деактивовано", en: "Tariff deactivated successfully" },
   failed_update_tariff: { uk: "Не вдалося оновити тариф", en: "Failed to update tariff" },
+  cannot_delete_active_subscription: { uk: "Не можна видалити активну підписку", en: "Cannot delete active subscription" },
+  failed_delete_subscription: { uk: "Не вдалося видалити підписку", en: "Failed to delete subscription" },
+  subscription_deleted_successfully: { uk: "Підписку успішно видалено", en: "Subscription deleted successfully" },
   tariff_not_found: { uk: "Тариф не знайдено", en: "Tariff not found" },
   tariff_not_found_description: { uk: "Тариф з вказаним ID не існує або був видалений", en: "The tariff with the specified ID does not exist or has been deleted" },
   back_to_tariffs: { uk: "Повернутися до тарифів", en: "Back to Tariffs" },

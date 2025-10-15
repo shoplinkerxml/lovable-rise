@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
@@ -11,6 +11,7 @@ import { Crown, CreditCard, AlertCircle, MoreHorizontal, Plus, Trash2, XCircle, 
 import { useI18n } from "@/providers/i18n-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 interface UserProfile {
   id: string;
@@ -231,6 +232,135 @@ const AdminUserDetails = () => {
       setLoading(false);
     }
   };
+  
+  // Handle tariff activation
+  const handleActivateTariff = async (tariffId: number) => {
+    if (!id) return;
+    
+    try {
+      // 1. Деактивируем все активные подписки пользователя
+      const { error: deactivateError } = await supabase
+        .from('user_subscriptions')
+        .update({ is_active: false })
+        .eq('user_id', id)
+        .eq('is_active', true);
+      
+      if (deactivateError) {
+        console.error('Deactivate error:', deactivateError);
+        toast.error(t('failed_update_tariff') || 'Не вдалося оновити тариф');
+        return;
+      }
+      
+      // 2. Получаем duration_days выбранного тарифа
+      const { data: tariffData, error: tariffError } = await supabase
+        .from('tariffs')
+        .select('duration_days,is_lifetime')
+        .eq('id', tariffId)
+        .single();
+      
+      if (tariffError) {
+        console.error('Tariff fetch error:', tariffError);
+        toast.error(t('failed_update_tariff') || 'Не вдалося оновити тариф');
+        return;
+      }
+      
+      // 3. Рассчитываем даты
+      const start = new Date();
+      let endDate: string | null = null;
+      
+      // Если тариф не lifetime и есть duration_days, рассчитываем end_date
+      if (!tariffData.is_lifetime && tariffData.duration_days) {
+        endDate = new Date(start.getTime() + tariffData.duration_days * 24 * 60 * 60 * 1000).toISOString();
+      }
+      
+      // 4. Создаем новую активную подписку
+      const { error: insertError } = await supabase
+        .from('user_subscriptions')
+        .insert({
+          user_id: id,
+          tariff_id: tariffId,
+          start_date: start.toISOString(),
+          end_date: endDate,
+          is_active: true
+        });
+      
+      if (insertError) {
+        console.error('Insert subscription error:', insertError);
+        toast.error(t('failed_update_tariff') || 'Не вдалося оновити тариф');
+        return;
+      }
+      
+      toast.success(t('tariff_updated_successfully') || 'Тариф успішно оновлено');
+      
+      // 5. Перезагружаем данные
+      await loadUserData();
+      
+    } catch (error) {
+      console.error('Activate tariff error:', error);
+      toast.error(t('failed_update_tariff') || 'Не вдалося оновити тариф');
+    }
+  };
+  
+  // Handle tariff deactivation
+  const handleDeactivateTariff = async (subscriptionId: number) => {
+    if (!id) return;
+    
+    try {
+      // Просто меняем is_active на false
+      const { error: updateError } = await supabase
+        .from('user_subscriptions')
+        .update({ is_active: false })
+        .eq('id', subscriptionId);
+      
+      if (updateError) {
+        console.error('Deactivate error:', updateError);
+        toast.error(t('failed_update_tariff') || 'Не вдалося деактивувати тариф');
+        return;
+      }
+      
+      toast.success(t('tariff_deactivated_successfully') || 'Тариф успішно деактивовано');
+      
+      // Перезагружаем данные
+      await loadUserData();
+      
+    } catch (error) {
+      console.error('Deactivate tariff error:', error);
+      toast.error(t('failed_update_tariff') || 'Не вдалося деактивувати тариф');
+    }
+  };
+  
+  // Handle subscription deletion
+  const handleDeleteSubscription = async (subscriptionId: number, isActive: boolean) => {
+    if (isActive) {
+      toast.error(t('cannot_delete_active_subscription') || 'Не можна видалити активну підписку');
+      return;
+    }
+    
+    if (!id) return;
+    
+    try {
+      const { error: deleteError } = await supabase
+        .from('user_subscriptions')
+        .delete()
+        .eq('id', subscriptionId);
+      
+      if (deleteError) {
+        console.error('Delete subscription error:', deleteError);
+        toast.error(t('failed_delete_subscription') || 'Не вдалося видалити підписку');
+        return;
+      }
+      
+      toast.success(t('subscription_deleted_successfully') || 'Підписку успішно видалено');
+      
+      // Перезагружаем данные
+      await loadUserData();
+      
+    } catch (error) {
+      console.error('Delete subscription error:', error);
+      toast.error(t('failed_delete_subscription') || 'Не вдалося видалити підписку');
+    }
+  };
+  
   const getCurrencySymbol = (code: string) => {
     const symbols: Record<string, string> = {
       'USD': '$',
@@ -369,7 +499,18 @@ const AdminUserDetails = () => {
                     </p>}
                   
                   {/* Action Button */}
-                  <Button className="w-full mt-4" variant={isActive ? 'outline' : 'default'} size="sm">
+                  <Button 
+                    className="w-full mt-4" 
+                    variant={isActive ? 'outline' : 'default'} 
+                    size="sm"
+                    onClick={() => {
+                      if (isActive && userSubscription) {
+                        handleDeactivateTariff(userSubscription.id);
+                      } else {
+                        handleActivateTariff(tariff.id);
+                      }
+                    }}
+                  >
                     {isActive ? <>
                         <XCircle className="mr-2 h-4 w-4" />
                         Деактивувати
@@ -442,9 +583,13 @@ const AdminUserDetails = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem 
+                            disabled={sub.is_active}
+                            onClick={() => handleDeleteSubscription(sub.id, sub.is_active)}
+                            className={sub.is_active ? 'opacity-50 cursor-not-allowed' : ''}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Видалити
+                            {t('delete') || 'Видалити'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
