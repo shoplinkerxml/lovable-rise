@@ -67,47 +67,71 @@ export class TariffService {
         return [];
       }
       
-      // Fetch features and limits for each tariff
-      const tariffsWithDetails = [];
-      for (const tariff of data) {
-        // Get currency data
-        let currencyData = null;
-        const currencyId = (tariff as any).currency_id || (tariff as any).currency;
-        if (currencyId && typeof currencyId === 'number') {
-          const { data: currency, error: currencyError } = await supabase
-            .from('currencies')
-            .select('*')
-            .eq('id', currencyId)
-            .single();
-            
-          if (!currencyError) {
-            currencyData = currency;
-          }
+      // Оптимизация: получаем все данные 3 запросами вместо 3*N
+      const tariffIds = data.map(t => t.id);
+      const currencyIds = [...new Set(data.map(t => (t as any).currency_id || (t as any).currency).filter(Boolean))];
+      
+      // 1. Получаем все валюты одним запросом
+      const currenciesMap = new Map();
+      if (currencyIds.length > 0) {
+        const { data: currencies } = await supabase
+          .from('currencies')
+          .select('*')
+          .in('id', currencyIds);
+        
+        if (currencies) {
+          currencies.forEach(c => currenciesMap.set(c.id, c));
         }
+      }
+      
+      // 2. Получаем все функции одним запросом
+      const featuresMap = new Map();
+      const { data: allFeatures } = await supabase
+        .from('tariff_features')
+        .select('*')
+        .in('tariff_id', tariffIds)
+        .eq('is_active', true)
+        .order('feature_name');
+      
+      if (allFeatures) {
+        allFeatures.forEach(f => {
+          if (!featuresMap.has(f.tariff_id)) {
+            featuresMap.set(f.tariff_id, []);
+          }
+          featuresMap.get(f.tariff_id).push(f);
+        });
+      }
+      
+      // 3. Получаем все лимиты одним запросом
+      const limitsMap = new Map();
+      const { data: allLimits } = await supabase
+        .from('tariff_limits')
+        .select('*')
+        .in('tariff_id', tariffIds)
+        .eq('is_active', true)
+        .order('limit_name');
+      
+      if (allLimits) {
+        allLimits.forEach(l => {
+          if (!limitsMap.has(l.tariff_id)) {
+            limitsMap.set(l.tariff_id, []);
+          }
+          limitsMap.get(l.tariff_id).push(l);
+        });
+      }
+      
+      // Собираем результат из Mapов
+      const tariffsWithDetails = data.map(tariff => {
+        const currencyId = (tariff as any).currency_id || (tariff as any).currency;
+        const currencyData = currencyId ? currenciesMap.get(currencyId) : null;
         
-        // Get features
-        const { data: featuresData } = await supabase
-          .from('tariff_features')
-          .select('*')
-          .eq('tariff_id', tariff.id)
-          .eq('is_active', true)
-          .order('feature_name');
-        
-        // Get limits
-        const { data: limitsData } = await supabase
-          .from('tariff_limits')
-          .select('*')
-          .eq('tariff_id', tariff.id)
-          .eq('is_active', true)
-          .order('limit_name');
-        
-        tariffsWithDetails.push({
+        return {
           id: tariff.id,
           name: tariff.name,
           description: tariff.description,
           old_price: tariff.old_price,
           new_price: tariff.new_price,
-          currency_id: ((tariff as any).currency_id || (tariff as any).currency),
+          currency_id: currencyId,
           currency_code: currencyData ? (currencyData as any).code : undefined,
           duration_days: tariff.duration_days,
           is_free: tariff.is_free,
@@ -119,10 +143,10 @@ export class TariffService {
           visible: (tariff as any).visible ?? true,
           popular: (tariff as any).popular ?? false,
           currency_data: currencyData,
-          features: featuresData || [],
-          limits: limitsData || []
-        });
-      }
+          features: featuresMap.get(tariff.id) || [],
+          limits: limitsMap.get(tariff.id) || []
+        };
+      });
       
       return tariffsWithDetails as any[];
     } catch (error) {

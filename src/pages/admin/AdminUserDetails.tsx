@@ -274,7 +274,7 @@ const AdminUserDetails = () => {
       }
       
       // 4. Создаем новую активную подписку
-      const { error: insertError } = await supabase
+      const { data: newSub, error: insertError } = await supabase
         .from('user_subscriptions')
         .insert({
           user_id: id,
@@ -282,7 +282,9 @@ const AdminUserDetails = () => {
           start_date: start.toISOString(),
           end_date: endDate,
           is_active: true
-        });
+        })
+        .select('id,user_id,tariff_id,start_date,end_date,is_active,tariffs(id,name,new_price,is_lifetime,duration_days,currency_id)')
+        .single();
       
       if (insertError) {
         console.error('Insert subscription error:', insertError);
@@ -292,8 +294,36 @@ const AdminUserDetails = () => {
       
       toast.success(t('tariff_updated_successfully') || 'Тариф успішно оновлено');
       
-      // 5. Перезагружаем данные
-      await loadUserData();
+      // 5. Обновляем только состояние подписок без полной перезагрузки
+      // Обновляем активную подписку
+      if (newSub?.tariffs) {
+        const tariffData = newSub.tariffs as any;
+        if (tariffData.currency_id) {
+          const { data: currency } = await supabase
+            .from('currencies')
+            .select('code')
+            .eq('id', tariffData.currency_id)
+            .single();
+          
+          const symbolMap: Record<string, string> = {
+            'USD': '$', 'EUR': '€', 'GBP': '£', 'UAH': '₴'
+          };
+          
+          tariffData.currency_data = {
+            code: currency?.code || 'UAH',
+            symbol: symbolMap[currency?.code || 'UAH'] || '₴'
+          };
+        } else {
+          tariffData.currency_data = { code: 'UAH', symbol: '₴' };
+        }
+        
+        setActiveSubscription(newSub as any);
+      }
+      
+      // Обновляем историю подписок
+      setSubscriptionHistory(prev => 
+        prev.map(sub => ({ ...sub, is_active: false })).concat(newSub as any)
+      );
       
     } catch (error) {
       console.error('Activate tariff error:', error);
@@ -320,8 +350,13 @@ const AdminUserDetails = () => {
       
       toast.success(t('tariff_deactivated_successfully') || 'Тариф успішно деактивовано');
       
-      // Перезагружаем данные
-      await loadUserData();
+      // Обновляем только состояние без полной перезагрузки
+      setActiveSubscription(null);
+      setSubscriptionHistory(prev => 
+        prev.map(sub => 
+          sub.id === subscriptionId ? { ...sub, is_active: false } : sub
+        )
+      );
       
     } catch (error) {
       console.error('Deactivate tariff error:', error);
@@ -352,8 +387,10 @@ const AdminUserDetails = () => {
       
       toast.success(t('subscription_deleted_successfully') || 'Підписку успішно видалено');
       
-      // Перезагружаем данные
-      await loadUserData();
+      // Обновляем только историю без полной перезагрузки
+      setSubscriptionHistory(prev => 
+        prev.filter(sub => sub.id !== subscriptionId)
+      );
       
     } catch (error) {
       console.error('Delete subscription error:', error);

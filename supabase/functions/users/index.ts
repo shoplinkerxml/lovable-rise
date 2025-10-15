@@ -155,37 +155,45 @@ Deno.serve(async (req) => {
       const { data: users, error, count } = await query;
       if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
 
-      // Fetch subscription data for each user
-      const usersWithSubscriptions = await Promise.all(
-        (users || []).map(async (user) => {
-          const { data: subscription, error: subError } = await serviceClient
-            .from('user_subscriptions')
-            .select(`
-              tariff_id,
-              is_active,
-              tariffs (
-                name
-              )
-            `)
-            .eq('user_id', user.id)
-            .eq('is_active', true)
-            .maybeSingle();
+      // Оптимизированный запрос подписок - ОДИН запрос вместо N запросов
+      if (users && users.length > 0) {
+        const userIds = users.map(u => u.id);
+        
+        // Получаем все активные подписки одним запросом
+        const { data: subscriptions } = await serviceClient
+          .from('user_subscriptions')
+          .select(`
+            user_id,
+            tariff_id,
+            is_active,
+            tariffs (
+              name
+            )
+          `)
+          .in('user_id', userIds)
+          .eq('is_active', true);
+        
+        // Создаем Map для быстрого поиска
+        const subscriptionMap = new Map();
+        if (subscriptions) {
+          subscriptions.forEach(sub => {
+            subscriptionMap.set(sub.user_id, {
+              tariff_name: sub.tariffs ? (sub.tariffs as any).name : null,
+              is_active: sub.is_active
+            });
+          });
+        }
+        
+        // Добавляем подписки к пользователям
+        const usersWithSubscriptions = users.map(user => ({
+          ...user,
+          subscription: subscriptionMap.get(user.id) || null
+        }));
+        
+        return new Response(JSON.stringify({ users: usersWithSubscriptions, total: count ?? 0, page, limit }), { headers: corsHeaders });
+      }
 
-          if (subError) {
-            console.error('Error fetching subscription for user:', user.id, subError);
-          }
-
-          return {
-            ...user,
-            subscription: subscription ? {
-              tariff_name: subscription.tariffs ? (subscription.tariffs as any).name : null,
-              is_active: subscription.is_active
-            } : null
-          };
-        })
-      );
-
-      return new Response(JSON.stringify({ users: usersWithSubscriptions, total: count ?? 0, page, limit }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ users: users || [], total: count ?? 0, page, limit }), { headers: corsHeaders });
     }
 
     // ---------------- GET /users/:id ----------------
