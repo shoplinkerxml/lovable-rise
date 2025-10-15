@@ -30,6 +30,7 @@ import AdminTariffManagement from "./pages/admin/AdminTariffManagement";
 import AdminTariffFeatures from "./pages/admin/AdminTariffFeatures";
 import AdminTariffNew from "./pages/admin/AdminTariffNew";
 import AdminTariffEdit from "./pages/admin/AdminTariffEdit";
+import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import TariffPage from "./pages/TariffPage";
 
 const queryClient = new QueryClient({
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="tariff/new" element={<AdminLayout><AdminTariffNew /></AdminLayout>} />
               <Route path="tariff/edit/:id" element={<AdminLayout><AdminTariffEdit /></AdminLayout>} />
               <Route path="tariff/features" element={<AdminLayout><AdminTariffFeatures /></AdminLayout>} />
+              <Route path="users/:id" element={<AdminLayout><AdminUserDetails /></AdminLayout>} />
             </Route>
             
             {/* User Authentication Routes */}

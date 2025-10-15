@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ interface UserProfile {
 
 export default function AdminUsersPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const breadcrumbs = useBreadcrumbs();
   const pageInfo = usePageInfo();
   
@@ -101,6 +103,10 @@ export default function AdminUsersPage() {
   const handleDeleteUser = (user: UserProfile) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
+  };
+  
+  const handleViewUserDetails = (user: UserProfile) => {
+    navigate(`/admin/users/${user.id}`);
   };
   
   const handleStatusToggle = async (userId: string, newStatus: "active" | "inactive") => {
@@ -246,6 +252,7 @@ export default function AdminUsersPage() {
             loading={isLoading && !isInitialLoad}
             onEditUser={handleEditUser}
             onDeleteUser={handleDeleteUser}
+            onViewUserDetails={handleViewUserDetails}
             onStatusToggle={handleStatusToggle}
             statusToggleLoading={toggleUserStatusMutation.isPending}
             sortBy={filters.sortBy}

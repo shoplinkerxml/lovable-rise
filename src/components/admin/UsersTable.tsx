@@ -30,7 +30,8 @@ import {
   Phone,
   User,
   CheckCircle2,
-  XCircle
+  XCircle,
+  FileText
 } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { StatusToggle } from "./StatusToggle";
@@ -56,6 +57,7 @@ interface UsersTableProps {
   loading?: boolean;
   onEditUser: (user: UserProfile) => void;
   onDeleteUser: (user: UserProfile) => void;
+  onViewUserDetails: (user: UserProfile) => void;
   onStatusToggle: (userId: string, newStatus: "active" | "inactive") => void;
   statusToggleLoading?: boolean;
   sortBy?: string;
@@ -189,10 +191,12 @@ const UserActionsDropdown = ({
   user,
   onEdit,
   onDelete,
+  onViewDetails,
 }: {
   user: UserProfile;
   onEdit: () => void;
   onDelete: () => void;
+  onViewDetails: () => void;
 }) => {
   const { t } = useI18n();
 
@@ -205,6 +209,11 @@ const UserActionsDropdown = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onViewDetails} className="cursor-pointer">
+          <FileText className="mr-2 h-4 w-4" />
+          {t("view_details") || "Докладніше"}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
           <Edit className="mr-2 h-4 w-4" />
           {t("edit_action")}
@@ -241,6 +250,7 @@ export function UsersTable({
   loading = false,
   onEditUser,
   onDeleteUser,
+  onViewUserDetails,
   onStatusToggle,
   statusToggleLoading = false,
   sortBy,
@@ -390,6 +400,7 @@ export function UsersTable({
                     user={user}
                     onEdit={() => onEditUser(user)}
                     onDelete={() => onDeleteUser(user)}
+                    onViewDetails={() => onViewUserDetails(user)}
                   />
                 </TableCell>
               </TableRow>
