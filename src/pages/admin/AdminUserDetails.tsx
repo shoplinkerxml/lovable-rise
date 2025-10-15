@@ -16,6 +16,7 @@ import { Crown, CreditCard, AlertCircle, MoreHorizontal, Plus, Trash2, XCircle, 
 import { useI18n } from "@/providers/i18n-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 
 interface UserProfile {
   id: string;
@@ -293,6 +294,9 @@ const AdminUserDetails = () => {
           Дані відсутні
         </CardContent>
       </Card>
+
+      {/* User Activity Chart */}
+      <ChartAreaInteractive />
 
       {/* Available Tariffs Section */}
       <div className="space-y-4">
