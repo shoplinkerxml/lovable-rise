@@ -1,12 +1,11 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from "@/components/ui/sheet-no-overlay";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sun, Moon, AlignJustify } from "lucide-react";
+import { Sun, Moon, AlignJustify, LogOut, MoreHorizontal } from "lucide-react";
 import { ProfileTrigger } from "@/components/ui/profile-trigger";
 import { ProfileSheetContent } from "@/components/ui/profile-sheet-content";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
@@ -424,8 +423,8 @@ const UserLayoutContent = ({
   return <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
-          <div className="h-full flex flex-col p-4 gap-3">
+        <SheetContent side="left" className="p-0 w-64 flex flex-col h-full">
+          <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
             {/* Logo/Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
@@ -436,8 +435,8 @@ const UserLayoutContent = ({
               </div>
             </div>
 
-            {/* Navigation */}
-            <nav className="space-y-1 flex-1">
+            {/* Navigation - Scrollable */}
+            <nav className="space-y-1 flex-1 overflow-y-auto">
               {menuLoading ? <div className="space-y-2">
                   {[...Array(5)].map((_, i) => <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>)}
                 </div> : <>
@@ -453,14 +452,44 @@ const UserLayoutContent = ({
               })}
                 </>}
             </nav>
+
+            {/* User Menu - Mobile (Fixed at bottom) */}
+            <div className="pt-4 border-t shrink-0">
+              <div className="flex items-center gap-3 px-2 py-2">
+                <Avatar className="h-10 w-10 shrink-0">
+                  <AvatarImage src={user.avatar_url} alt={user.name} />
+                  <AvatarFallback className="bg-emerald-100 text-emerald-600 font-semibold">
+                    {user.name?.charAt(0).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t('logout')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
 
-      {/* User Sidebar */}
-      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background p-4 flex-col gap-3`}>
-        {/* Logo/Header */}
-        <div className="flex items-center justify-between mb-6">
+      {/* User Sidebar - Desktop */}
+      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col h-screen overflow-hidden`}>
+        <div className="p-4 shrink-0">
+          {/* Logo/Header */}
+          <div className="flex items-center justify-between mb-6">
           {sidebarCollapsed ? (
             <div className="flex items-center justify-center w-full">
               <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center">
@@ -475,10 +504,11 @@ const UserLayoutContent = ({
               <span className="font-semibold text-lg">UserGrow</span>
             </div>
           )}
+          </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="space-y-1 flex-1">
+        {/* Navigation - Scrollable */}
+        <nav className="space-y-1 flex-1 overflow-y-auto px-4">
           {menuLoading ? <div className="space-y-2">
               {[...Array(5)].map((_, i) => <div key={i} className="h-8 bg-gray-200 rounded animate-pulse"></div>)}
             </div> : <>
@@ -495,6 +525,56 @@ const UserLayoutContent = ({
           })}
             </>}
         </nav>
+
+        {/* User Menu - Desktop (Fixed at bottom) */}
+        <div className="p-4 border-t shrink-0">
+          {sidebarCollapsed ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="w-full" title={user.name}>
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={user.avatar_url} alt={user.name} />
+                    <AvatarFallback className="bg-emerald-100 text-emerald-600 font-semibold">
+                      {user.name?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  {t('logout')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarImage src={user.avatar_url} alt={user.name} />
+                <AvatarFallback className="bg-emerald-100 text-emerald-600 font-semibold">
+                  {user.name?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{user.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {t('logout')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -549,7 +629,7 @@ const UserLayoutContent = ({
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
           <div className="h-full">
             <Outlet context={{
             user,
