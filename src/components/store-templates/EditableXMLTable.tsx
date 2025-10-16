@@ -379,17 +379,70 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
   };
 
   const handleAddField = () => {
-    const newField: EditableRow = {
-      id: Date.now(),
-      path: `${category.toLowerCase()}.new_field`,
-      type: 'string',
-      required: false,
-      sample: '',
-      category: category,
-      order: data.length
-    };
+    const timestamp = Date.now();
     
-    setData(prev => [...prev, newField]);
+    if (category === 'Валюти') {
+      // Для валют создаем пару полей: @id и @rate
+      const basePath = `yml_catalog.shop.currencies.currency[${filteredData.length}]`;
+      const newFields: EditableRow[] = [
+        {
+          id: timestamp,
+          path: `${basePath}.@id`,
+          type: 'string',
+          required: false,
+          sample: 'UAH',
+          category: category,
+          order: data.length
+        },
+        {
+          id: timestamp + 1,
+          path: `${basePath}.@rate`,
+          type: 'string',
+          required: false,
+          sample: '1',
+          category: category,
+          order: data.length + 1
+        }
+      ];
+      setData(prev => [...prev, ...newFields]);
+    } else if (category === 'Характеристики товару') {
+      // Для характеристик создаем пару полей: @name и _text
+      const basePath = `yml_catalog.shop.offers.offer.param[${filteredData.length}]`;
+      const newFields: EditableRow[] = [
+        {
+          id: timestamp,
+          path: `${basePath}.@name`,
+          type: 'string',
+          required: false,
+          sample: 'Нова характеристика',
+          category: category,
+          order: data.length
+        },
+        {
+          id: timestamp + 1,
+          path: `${basePath}._text`,
+          type: 'string',
+          required: false,
+          sample: 'Значення',
+          category: category,
+          order: data.length + 1
+        }
+      ];
+      setData(prev => [...prev, ...newFields]);
+    } else {
+      // Для остальных категорий - обычное поле
+      const newField: EditableRow = {
+        id: timestamp,
+        path: `${category.toLowerCase()}.new_field`,
+        type: 'string',
+        required: false,
+        sample: '',
+        category: category,
+        order: data.length
+      };
+      setData(prev => [...prev, newField]);
+    }
+    
     toast.success('Поле додано');
   };
 

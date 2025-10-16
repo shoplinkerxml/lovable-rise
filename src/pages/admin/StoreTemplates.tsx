@@ -8,9 +8,9 @@ import { useState } from 'react';
 import { 
   XMLUploader, 
   TemplatesList, 
-  MappingTable, 
   TemplatePreview 
 } from '@/components/store-templates';
+import { SimpleMappingView } from '@/components/store-templates/SimpleMappingView';
 import { ParametersTable } from '@/components/store-templates/ParametersTableSimple';
 import { useI18n } from '@/providers/i18n-provider';
 import { XMLStructure, MappingRule } from '@/lib/xml-template-service';
@@ -188,7 +188,7 @@ export const StoreTemplates = () => {
 
           <TabsContent value="mapping" className="mt-6">
             {xmlStructure && (
-              <MappingTable
+              <SimpleMappingView
                 xmlFields={xmlStructure.fields}
                 systemFields={systemFields}
                 mappings={mappings}
