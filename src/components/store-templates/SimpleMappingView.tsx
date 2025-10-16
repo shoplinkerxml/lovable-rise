@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Zap, Link2, ArrowRight } from 'lucide-react';
-import { toast } from 'sonner';
+import { Search, Check } from 'lucide-react';
 import { XMLField, MappingRule } from '@/lib/xml-template-service';
 
 interface SimpleMappingViewProps {
@@ -32,70 +29,6 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const autoMatch = () => {
-    const suggestions: Record<string, string> = {
-      'price': 'price', 'ціна': 'price',
-      'name': 'name', 'назва': 'name', 'title': 'name',
-      'description': 'description', 'опис': 'description',
-      'currency': 'currency', 'валюта': 'currency',
-      'category': 'category_id', 'категорія': 'category_id',
-      'image': 'images', 'picture': 'images', 'зображення': 'images',
-      'url': 'url', 'link': 'url', 'посилання': 'url',
-      'sku': 'sku', 'артикул': 'sku',
-      'id': 'external_id',
-      'stock': 'stock_quantity', 'quantity': 'stock_quantity', 'кількість': 'stock_quantity',
-      'vendor': 'vendor', 'виробник': 'vendor',
-      'brand': 'brand', 'бренд': 'brand'
-    };
-
-    const newMappings: MappingRule[] = [];
-    xmlFields.forEach(field => {
-      const lower = field.path.toLowerCase();
-      for (const [key, value] of Object.entries(suggestions)) {
-        if (lower.includes(key)) {
-          newMappings.push({
-            sourceField: field.path,
-            targetField: value,
-            transformation: { type: 'direct', params: {} }
-          });
-          break;
-        }
-      }
-    });
-
-    onMappingChange(newMappings);
-    toast.success(`Автоматично зв'язано ${newMappings.length} полів`);
-  };
-
-  const updateMapping = (xmlPath: string, systemFieldId: string | null) => {
-    let newMappings = [...mappings];
-    const existingIndex = newMappings.findIndex(m => m.sourceField === xmlPath);
-    
-    if (systemFieldId === null) {
-      if (existingIndex >= 0) {
-        newMappings.splice(existingIndex, 1);
-      }
-    } else {
-      const newMapping: MappingRule = {
-        sourceField: xmlPath,
-        targetField: systemFieldId,
-        transformation: { type: 'direct', params: {} }
-      };
-
-      if (existingIndex >= 0) {
-        newMappings[existingIndex] = newMapping;
-      } else {
-        newMappings.push(newMapping);
-      }
-    }
-    
-    onMappingChange(newMappings);
-  };
-
-  const getCurrentMapping = (xmlPath: string) => {
-    return mappings.find(m => m.sourceField === xmlPath);
-  };
-
   const filteredFields = xmlFields.filter(field => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -114,25 +47,35 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
   };
 
   const groupedFields = groupByCategory(filteredFields);
-  const mappedCount = mappings.length;
-  const totalCount = xmlFields.length;
+  
+  // Правильный порядок категорий
+  const categoryOrder = [
+    'Основна інформація',
+    'Валюти',
+    'Категорії',
+    'Параметри товару',
+    'Характеристики товару',
+    'Інше'
+  ];
+  
+  const sortedCategories = categoryOrder.filter(cat => groupedFields[cat]);
+  // Добавляем категории, которых нет в заданном порядке
+  Object.keys(groupedFields).forEach(cat => {
+    if (!categoryOrder.includes(cat)) {
+      sortedCategories.push(cat);
+    }
+  });
 
   return (
     <div className="space-y-4">
       {/* Заголовок */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Зв'язування полів</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Знайдено {totalCount} полів у XML, зв'язано {mappedCount}
-              </p>
-            </div>
-            <Button onClick={autoMatch} className="gap-2">
-              <Zap className="h-4 w-4" />
-              Автозаповнення
-            </Button>
+          <div>
+            <CardTitle className="text-lg">Перевірка парсингу</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Перевірте чи правильно розпізнались поля з XML файлу
+            </p>
           </div>
         </CardHeader>
       </Card>
@@ -148,96 +91,255 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
         />
       </div>
 
-      {/* Список полів */}
+      {/* Список полів по категоріям */}
       <div className="space-y-4">
-        {Object.keys(groupedFields).map(category => (
+        {sortedCategories.map(category => (
           <Card key={category}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{category}</CardTitle>
+            <CardHeader className="pb-3 bg-muted/50">
+              <CardTitle className="text-base flex items-center gap-2">
+                {category}
+                <Badge variant="secondary" className="text-xs">
+                  {groupedFields[category].length} полів
+                </Badge>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {groupedFields[category].map((field, idx) => {
-                const currentMapping = getCurrentMapping(field.path);
-                const isMapped = !!currentMapping;
-                const systemField = isMapped 
-                  ? systemFields.find(f => f.id === currentMapping.targetField)
-                  : null;
-
-                return (
-                  <div
-                    key={idx}
-                    className={`p-3 rounded-lg border-2 transition-colors ${
-                      isMapped ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* XML поле */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">
-                            {field.path.split('.').pop()}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {field.type}
-                          </Badge>
-                        </div>
-                        {field.sample && (
-                          <div className="text-xs text-muted-foreground truncate mt-1">
-                            Приклад: {field.sample}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Стрілка */}
-                      {isMapped && (
-                        <ArrowRight className="h-4 w-4 text-green-600 flex-shrink-0" />
-                      )}
-                      {!isMapped && (
-                        <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      )}
-
-                      {/* Системне поле */}
-                      <div className="flex-1">
-                        <Select
-                          value={currentMapping?.targetField || ''}
-                          onValueChange={(value) => updateMapping(field.path, value || null)}
-                        >
-                          <SelectTrigger className={isMapped ? 'border-green-300' : ''}>
-                            <SelectValue placeholder="Вибрати поле..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-muted-foreground">
-                              Не зв'язувати
-                            </SelectItem>
-                            {systemFields.map(sField => (
-                              <SelectItem key={sField.id} value={sField.id}>
-                                <div className="flex items-center gap-2">
-                                  <span>{sField.label}</span>
-                                  {sField.required && (
-                                    <span className="text-red-500 text-xs">*</span>
-                                  )}
-                                  <Badge variant="outline" className="text-xs">
-                                    {sField.type}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {systemField && (
-                          <div className="text-xs text-green-600 mt-1">
-                            ✓ {systemField.label}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Ліва колонка: що було в XML */}
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pb-2 border-b">
+                    Поля в XML файлі
                   </div>
-                );
-              })}
+                  {groupedFields[category].map((field, idx) => {
+                    // Для валют і характеристик показуємо пари
+                    if (category === 'Валюти' && field.path.includes('@id')) {
+                      const ratePath = field.path.replace('@id', '@rate');
+                      const rateField = xmlFields.find(f => f.path === ratePath);
+                      return (
+                        <div key={idx} className="p-3 bg-card border border-border rounded-lg">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm break-words">
+                                {field.path}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Приклад:</span> {field.sample || '-'} (курс: {rateField?.sample || '-'})
+                              </div>
+                            </div>
+                            <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          </div>
+                        </div>
+                      );
+                    } else if (category === 'Категорії' && field.path.includes('@id')) {
+                      const basePath = field.path.replace('.@id', '');
+                      const nameField = xmlFields.find(f => f.path === basePath + '._text' || f.path === basePath);
+                      return (
+                        <div key={idx} className="p-3 bg-card border border-border rounded-lg">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm break-words">
+                                {field.path}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Приклад:</span> ID: {field.sample || '-'}, Назва: {nameField?.sample || '-'}
+                              </div>
+                            </div>
+                            <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          </div>
+                        </div>
+                      );
+                    } else if (category === 'Характеристики товару' && field.path.includes('@name')) {
+                      const basePath = field.path.replace('.@name', '');
+                      const textField = xmlFields.find(f => f.path === basePath + '._text' || f.path === basePath);
+                      return (
+                        <div key={idx} className="p-3 bg-card border border-border rounded-lg">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm break-words">
+                                {field.path}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Приклад:</span> {field.sample || '-'} = {textField?.sample || '-'}
+                              </div>
+                            </div>
+                            <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          </div>
+                        </div>
+                      );
+                    } else if (
+                      (category === 'Валюти' && field.path.includes('@rate')) ||
+                      (category === 'Категорії' && (field.path.includes('._text') || (!field.path.includes('@id') && field.path.includes('category')))) ||
+                      (category === 'Характеристики товару' && (field.path.includes('._text') || (!field.path.includes('@name') && field.path.includes('param'))))
+                    ) {
+                      return null;
+                    }
+                    
+                    return (
+                      <div key={idx} className="p-3 bg-card border border-border rounded-lg">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm break-words">
+                              {field.path}
+                            </div>
+                            {field.sample && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Приклад:</span> {field.sample}
+                              </div>
+                            )}
+                          </div>
+                          <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Права колонка: що розпарсилось */}
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pb-2 border-b">
+                    Що розпарсилось
+                  </div>
+                  {groupedFields[category].map((field, idx) => {
+                    const isManuallyAdded = field.path.includes('new_field') || 
+                                           field.path.includes('old_price') ||
+                                           (field.order && field.order >= 100);
+                    
+                    if (category === 'Валюти' && field.path.includes('@id')) {
+                      const ratePath = field.path.replace('@id', '@rate');
+                      const rateField = xmlFields.find(f => f.path === ratePath);
+                      return (
+                        <div key={idx} className="p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="font-medium text-sm text-green-900">
+                                  {field.sample || field.path.split('.').pop()}
+                                </div>
+                                {isManuallyAdded && (
+                                  <Badge variant="outline" className="text-xs bg-yellow-100 border-yellow-300 text-yellow-800">
+                                    Додано вручну
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-green-700 mt-1 break-words">
+                                <span className="font-medium">Курс:</span> {rateField?.sample || '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else if (category === 'Категорії' && field.path.includes('@id')) {
+                      const basePath = field.path.replace('.@id', '');
+                      const nameField = xmlFields.find(f => f.path === basePath + '._text' || f.path === basePath);
+                      return (
+                        <div key={idx} className="p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="font-medium text-sm text-green-900">
+                                  {nameField?.sample || field.path.split('.').pop()}
+                                </div>
+                                {isManuallyAdded && (
+                                  <Badge variant="outline" className="text-xs bg-yellow-100 border-yellow-300 text-yellow-800">
+                                    Додано вручну
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-green-700 mt-1 break-words">
+                                <span className="font-medium">ID:</span> {field.sample || '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else if (category === 'Характеристики товару' && field.path.includes('@name')) {
+                      const basePath = field.path.replace('.@name', '');
+                      const textField = xmlFields.find(f => f.path === basePath + '._text' || f.path === basePath);
+                      return (
+                        <div key={idx} className="p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="font-medium text-sm text-green-900">
+                                  {field.sample || field.path.split('.').pop()}
+                                </div>
+                                {isManuallyAdded && (
+                                  <Badge variant="outline" className="text-xs bg-yellow-100 border-yellow-300 text-yellow-800">
+                                    Додано вручну
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-green-700 mt-1 break-words">
+                                <span className="font-medium">Значення:</span> {textField?.sample || '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else if (
+                      (category === 'Валюти' && field.path.includes('@rate')) ||
+                      (category === 'Категорії' && (field.path.includes('._text') || (!field.path.includes('@id') && field.path.includes('category')))) ||
+                      (category === 'Характеристики товару' && (field.path.includes('._text') || (!field.path.includes('@name') && field.path.includes('param'))))
+                    ) {
+                      return null;
+                    }
+                    
+                    return (
+                      <div key={idx} className="p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="font-medium text-sm text-green-900">
+                                {field.path.split('.').pop()}
+                              </div>
+                              {isManuallyAdded && (
+                                <Badge variant="outline" className="text-xs bg-yellow-100 border-yellow-300 text-yellow-800">
+                                  Додано вручну
+                                </Badge>
+                              )}
+                            </div>
+                            {field.sample && (
+                              <div className="text-xs text-green-700 mt-1 break-words">
+                                <span className="font-medium">Приклад:</span> {field.sample}
+                              </div>
+                            )}
+                            {field.required && (
+                              <Badge variant="destructive" className="text-xs mt-1">
+                                Обов'язкове
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Статистика */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center gap-8">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-600">{xmlFields.length}</div>
+              <div className="text-sm text-muted-foreground">Полів розпарсено</div>
+            </div>
+            <div className="h-12 w-px bg-border" />
+            <div className="text-center">
+              <div className="text-3xl font-bold text-primary">{Object.keys(groupedFields).length}</div>
+              <div className="text-sm text-muted-foreground">Категорій знайдено</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

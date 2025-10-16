@@ -160,16 +160,13 @@ export const StoreTemplates = () => {
 
       {(viewMode === 'create' || viewMode === 'edit') && (
         <Tabs defaultValue="upload" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload">1. {t('tab_upload')}</TabsTrigger>
             <TabsTrigger value="structure" disabled={!xmlStructure}>
               2. {t('tab_structure')}
             </TabsTrigger>
             <TabsTrigger value="mapping" disabled={!xmlStructure}>
-              3. {t('tab_mapping')}
-            </TabsTrigger>
-            <TabsTrigger value="preview" disabled={!xmlStructure}>
-              4. {t('tab_preview')}
+              3. Перевірка парсингу
             </TabsTrigger>
           </TabsList>
 
@@ -188,72 +185,60 @@ export const StoreTemplates = () => {
 
           <TabsContent value="mapping" className="mt-6">
             {xmlStructure && (
-              <SimpleMappingView
-                xmlFields={xmlStructure.fields}
-                systemFields={systemFields}
-                mappings={mappings}
-                onMappingChange={setMappings}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="preview" className="mt-6">
-            <div className="space-y-6">
-              {/* Поля для налаштування шаблону */}
-              <div className="space-y-4 border rounded-lg p-4">
-                <h3 className="text-lg font-medium">{t('template_settings')}</h3>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="template-name">{t('template_name')} *</Label>
-                    <Input
-                      id="template-name"
-                      placeholder={t('enter_template_name')}
-                      value={templateName}
-                      onChange={(e) => setTemplateName(e.target.value)}
-                    />
+              <div className="space-y-6">
+                <SimpleMappingView
+                  xmlFields={xmlStructure.fields}
+                  systemFields={systemFields}
+                  mappings={mappings}
+                  onMappingChange={setMappings}
+                />
+                
+                {/* Блок збереження шаблону */}
+                <div className="space-y-4 border rounded-lg p-4">
+                  <h3 className="text-lg font-medium">{t('template_settings')}</h3>
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="template-name">{t('template_name')} *</Label>
+                      <Input
+                        id="template-name"
+                        placeholder={t('enter_template_name')}
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="marketplace">Маркетплейс</Label>
+                      <Input
+                        id="marketplace"
+                        placeholder="Rozetka, Prom, Amazon..."
+                        value={marketplace}
+                        onChange={(e) => setMarketplace(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="template-desc">{t('template_description')}</Label>
+                      <Textarea
+                        id="template-desc"
+                        placeholder={t('enter_template_description')}
+                        value={templateDescription}
+                        onChange={(e) => setTemplateDescription(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="marketplace">Маркетплейс</Label>
-                    <Input
-                      id="marketplace"
-                      placeholder="Rozetka, Prom, Amazon..."
-                      value={marketplace}
-                      onChange={(e) => setMarketplace(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="template-desc">{t('template_description')}</Label>
-                    <Textarea
-                      id="template-desc"
-                      placeholder={t('enter_template_description')}
-                      value={templateDescription}
-                      onChange={(e) => setTemplateDescription(e.target.value)}
-                      rows={3}
-                    />
+                  
+                  {/* Кнопки збереження */}
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setViewMode('list')} disabled={saving}>
+                      {t('cancel')}
+                    </Button>
+                    <Button onClick={handleSaveTemplate} disabled={saving}>
+                      {saving ? t('saving') : t('save_template')}
+                    </Button>
                   </div>
                 </div>
               </div>
-
-              {/* Превью шаблону */}
-              <TemplatePreview
-                templateName={templateName}
-                marketplace={marketplace}
-                description={templateDescription}
-                mappings={mappings}
-                systemFields={systemFields}
-                sampleData={xmlStructure ? {} : undefined}
-              />
-
-              {/* Кнопки збереження */}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setViewMode('list')} disabled={saving}>
-                  {t('cancel')}
-                </Button>
-                <Button onClick={handleSaveTemplate} disabled={saving}>
-                  {saving ? t('saving') : t('save_template')}
-                </Button>
-              </div>
-            </div>
+            )}
           </TabsContent>
         </Tabs>
       )}
