@@ -26,8 +26,9 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import {
-  ChevronDownIcon,
   GripVerticalIcon,
+  MoreVerticalIcon,
+  PencilIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -86,42 +87,122 @@ interface EditableXMLTableProps {
 function DraggableRow({ 
   row, 
   onUpdate, 
-  onDelete 
+  onDelete,
+  category,
+  allData
 }: { 
   row: Row<EditableRow>; 
   onUpdate: (id: number, field: Partial<EditableRow>) => void;
   onDelete: (id: number) => void;
+  category: string;
+  allData: EditableRow[];
 }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
 
   const [isEditing, setIsEditing] = React.useState(false);
-  const [editedPath, setEditedPath] = React.useState(row.original.path);
-  const [editedSample, setEditedSample] = React.useState(row.original.sample || '');
+  const [editedName, setEditedName] = React.useState('');
+  const [editedValue, setEditedValue] = React.useState('');
+
+  // Инициализация значений при открытии редактирования
+  const initEditValues = React.useCallback(() => {
+    if (category === 'Валюти' || category === 'Характеристики товару') {
+      setEditedName(row.original.sample || '');
+      
+      if (category === 'Валюти' && row.original.path.includes('@id')) {
+        const ratePath = row.original.path.replace('@id', '@rate');
+        const rateField = allData.find(f => f.path === ratePath);
+        setEditedValue(rateField?.sample || '');
+      } else if (category === 'Характеристики товару' && row.original.path.includes('@name')) {
+        const basePath = row.original.path.replace('.@name', '');
+        const textField = allData.find(f => f.path === basePath + '._text' || f.path === basePath);
+        setEditedValue(textField?.sample || '');
+      }
+    } else {
+      setEditedName(row.original.path);
+      setEditedValue(row.original.sample || '');
+    }
+  }, [category, row.original.path, row.original.sample, allData]);
 
   const handleSave = () => {
-    onUpdate(row.original.id, {
-      path: editedPath,
-      sample: editedSample
-    });
+    if (category === 'Валюти') {
+      onUpdate(row.original.id, { sample: editedName });
+      const ratePath = row.original.path.replace('@id', '@rate');
+      const rateField = allData.find(f => f.path === ratePath);
+      if (rateField) {
+        onUpdate(rateField.id, { sample: editedValue });
+      }
+    } else if (category === 'Характеристики товару') {
+      onUpdate(row.original.id, { sample: editedName });
+      const basePath = row.original.path.replace('.@name', '');
+      const textField = allData.find(f => f.path === basePath + '._text' || f.path === basePath);
+      if (textField) {
+        onUpdate(textField.id, { sample: editedValue });
+      }
+    } else {
+      onUpdate(row.original.id, {
+        path: editedName,
+        sample: editedValue
+      });
+    }
     setIsEditing(false);
-    toast.success('Поле оновлено');
+    toast.success('Зміни збережено локально');
+  };
+
+  const handleStartEdit = () => {
+    initEditValues();
+    setIsEditing(true);
   };
 
   const handleCancel = () => {
-    setEditedPath(row.original.path);
-    setEditedSample(row.original.sample || '');
     setIsEditing(false);
   };
 
-  // Получить короткое имя (последние 2 сегмента пути)
-  const getShortName = (path: string) => {
-    const parts = path.split('.');
+  // Получить короткое имя для отображения
+  const getDisplayName = (field: EditableRow, category: string) => {
+    if (category === 'Валюти') {
+      // Для валют показываем currency[0].@id как название валюты
+      return field.sample || field.path.split('.').pop() || '';
+    } else if (category === 'Характеристики товару') {
+      // Для характеристик показываем sample из поля с @name (это название характеристики)
+      return field.sample || field.path.split('.').pop() || '';
+    }
+    // Для остальных - последние 2 сегмента пути
+    const parts = field.path.split('.');
     if (parts.length >= 2) {
       return parts.slice(-2).join('.');
     }
-    return path;
+    return field.path;
+  };
+
+  // Получить значение для отображения
+  const getDisplayValue = (field: EditableRow, category: string) => {
+    if (category === 'Валюти') {
+      // Для валют во втором столбце показываем rate из следующего поля
+      const path = field.path;
+      if (path.includes('@id')) {
+        const ratePath = path.replace('@id', '@rate');
+        const rateField = allData.find(f => f.path === ratePath);
+        if (rateField) {
+          return rateField.sample || '-';
+        }
+      }
+      return field.sample || '-';
+    } else if (category === 'Характеристики товару') {
+      // Для характеристик берем значение из поля с _text (которое может быть до или после @name)
+      const path = field.path;
+      if (path.includes('@name')) {
+        // Убираем .@name из пути и ищем поле с ._text
+        const basePath = path.replace('.@name', '');
+        const textField = allData.find(f => f.path === basePath + '._text' || f.path === basePath);
+        if (textField) {
+          return textField.sample || '-';
+        }
+      }
+      return field.sample || '-';
+    }
+    return field.sample || '-';
   };
 
   return (
@@ -140,26 +221,26 @@ function DraggableRow({
       <TableCell className="font-mono text-sm">
         {isEditing ? (
           <Input
-            value={editedPath}
-            onChange={(e) => setEditedPath(e.target.value)}
+            value={editedName}
+            onChange={(e) => setEditedName(e.target.value)}
             className="h-8 text-sm"
           />
         ) : (
-          <span onClick={() => setIsEditing(true)} className="cursor-pointer hover:bg-muted px-2 py-1 rounded">
-            {getShortName(row.original.path)}
+          <span onClick={handleStartEdit} className="cursor-pointer hover:bg-muted px-2 py-1 rounded">
+            {getDisplayName(row.original, category)}
           </span>
         )}
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
         {isEditing ? (
           <Input
-            value={editedSample}
-            onChange={(e) => setEditedSample(e.target.value)}
+            value={editedValue}
+            onChange={(e) => setEditedValue(e.target.value)}
             className="h-8 text-sm"
           />
         ) : (
-          <span onClick={() => setIsEditing(true)} className="cursor-pointer hover:bg-muted px-2 py-1 rounded">
-            {row.original.sample || '-'}
+          <span onClick={handleStartEdit} className="cursor-pointer hover:bg-muted px-2 py-1 rounded">
+            {getDisplayValue(row.original, category)}
           </span>
         )}
       </TableCell>
@@ -186,13 +267,14 @@ function DraggableRow({
         ) : (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8">
-                Дії
-                <ChevronDownIcon className="ml-1 h-3 w-3" />
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVerticalIcon className="h-4 w-4" />
+                <span className="sr-only">Дії</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <DropdownMenuItem onClick={handleStartEdit}>
+                <PencilIcon className="mr-2 h-4 w-4" />
                 Редагувати
               </DropdownMenuItem>
               <DropdownMenuItem 
@@ -211,13 +293,25 @@ function DraggableRow({
 }
 
 export function EditableXMLTable({ category, fields, onFieldsChange }: EditableXMLTableProps) {
-  // Преобразуем fields в EditableRow с уникальными id
+  // Локальный state - инициализируем ОДИН РАЗ и НИКОГДА не трогаем из props
   const [data, setData] = React.useState<EditableRow[]>(() => 
     fields.map((field, index) => ({
       ...field,
       id: Date.now() + index
     }))
   );
+
+  // НЕТ useEffect - НИКАКОЙ синхронизации с props
+
+  // Фильтруем данные для отображения и объединяем пары
+  const filteredData = React.useMemo(() => {
+    if (category === 'Валюти') {
+      return data.filter(field => field.path.includes('@id'));
+    } else if (category === 'Характеристики товару') {
+      return data.filter(field => field.path.includes('@name'));
+    }
+    return data;
+  }, [data, category]);
 
   const sortableId = React.useId();
   const sensors = useSensors(
@@ -227,8 +321,8 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
   );
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data]
+    () => filteredData?.map(({ id }) => id) || [],
+    [filteredData]
   );
 
   const columns: ColumnDef<EditableRow>[] = [
@@ -239,7 +333,7 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
     },
     {
       id: "path",
-      header: "Поле",
+      header: category === 'Валюти' ? 'Валюта' : category === 'Характеристики товару' ? 'Характеристика' : 'Поле',
       cell: ({ row }) => null,
     },
     {
@@ -249,13 +343,13 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
     },
     {
       id: "actions",
-      header: "Дії",
+      header: () => null,
       cell: ({ row }) => null,
     },
   ];
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getRowId: (row) => row.id.toString(),
     getCoreRowModel: getCoreRowModel(),
@@ -264,34 +358,24 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id);
-        const newIndex = dataIds.indexOf(over.id);
-        const newData = arrayMove(data, oldIndex, newIndex);
-        // Оповестить родителя об изменении
-        onFieldsChange(newData.map(({ id, ...field }) => field));
-        return newData;
+      setData(prev => {
+        const oldIndex = prev.findIndex(item => item.id === active.id);
+        const newIndex = prev.findIndex(item => item.id === over.id);
+        return arrayMove(prev, oldIndex, newIndex);
       });
     }
   }
 
   const handleUpdate = (id: number, updates: Partial<EditableRow>) => {
-    setData((prev) => {
-      const newData = prev.map(row => 
-        row.id === id ? { ...row, ...updates } : row
-      );
-      onFieldsChange(newData.map(({ id, ...field }) => field));
-      return newData;
-    });
+    setData(prev => prev.map(row => 
+      row.id === id ? { ...row, ...updates } : row
+    ));
+    // НЕ вызываем onFieldsChange
   };
 
   const handleDelete = (id: number) => {
-    setData((prev) => {
-      const newData = prev.filter(row => row.id !== id);
-      onFieldsChange(newData.map(({ id, ...field }) => field));
-      toast.success('Поле видалено');
-      return newData;
-    });
+    setData(prev => prev.filter(row => row.id !== id));
+    toast.success('Поле видалено');
   };
 
   const handleAddField = () => {
@@ -305,26 +389,36 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
       order: data.length
     };
     
-    setData((prev) => {
-      const newData = [...prev, newField];
-      onFieldsChange(newData.map(({ id, ...field }) => field));
-      toast.success('Поле додано');
-      return newData;
-    });
+    setData(prev => [...prev, newField]);
+    toast.success('Поле додано');
+  };
+
+  const handleSaveAll = () => {
+    onFieldsChange(data.map(({ id, ...field }) => field));
+    toast.success('Всі зміни збережено!');
   };
 
   return (
     <Card>
       <CardHeader className="pb-3 flex flex-row items-center justify-between">
         <CardTitle className="text-lg">{category}</CardTitle>
-        <Button
-          onClick={handleAddField}
-          size="sm"
-          variant="outline"
-        >
-          <PlusIcon className="h-4 w-4 mr-1" />
-          Додати поле
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSaveAll}
+            size="sm"
+            variant="default"
+          >
+            Зберегти всі зміни
+          </Button>
+          <Button
+            onClick={handleAddField}
+            size="sm"
+            variant="outline"
+          >
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Додати поле
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-hidden rounded-lg border">
@@ -366,6 +460,8 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
                         row={row} 
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
+                        category={category}
+                        allData={data}
                       />
                     ))}
                   </SortableContext>

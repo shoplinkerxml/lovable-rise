@@ -677,6 +677,10 @@ const dictionary: Dictionary = {
   tab_mapping: { uk: "Маппінг полей", en: "Field Mapping" },
   tab_preview: { uk: "Предпросмотр", en: "Preview" },
   
+  // Template settings
+  template_settings: { uk: "Налаштування шаблону", en: "Template Settings" },
+  loading_admin_dashboard: { uk: "Завантаження панелі адміністратора...", en: "Loading admin dashboard..." },
+  
   // Stats
   parse_time: { uk: "Час парсингу", en: "Parse Time" },
   file_size: { uk: "Розмір файлу", en: "File Size" },

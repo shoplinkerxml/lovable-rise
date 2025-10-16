@@ -40,12 +40,9 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
   const handleFieldsChange = (category: string, newFields: typeof structure.fields) => {
     if (!onStructureChange) return;
     
-    // Обновляем поля для конкретной категории
-    const updatedFields = structure.fields.filter(f => (f.category || 'Інше') !== category);
-    const allFields = [...updatedFields, ...newFields];
-    
-    // Пересортировываем по order
-    allFields.sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Просто обновляем поля для конкретной категории
+    const otherFields = structure.fields.filter(f => (f.category || 'Інше') !== category);
+    const allFields = [...otherFields, ...newFields];
     
     onStructureChange({
       ...structure,

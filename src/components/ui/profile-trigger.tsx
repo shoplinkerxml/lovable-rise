@@ -9,12 +9,15 @@ import { ProfileTriggerProps } from './profile-types';
  * Unified profile trigger component that adapts to header and sidebar positions
  * Supports responsive states and consistent styling across both contexts
  */
-export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
-  userProfile,
-  position,
-  collapsed = false,
-  onClick,
-}) => {
+export const ProfileTrigger = React.forwardRef<HTMLElement, ProfileTriggerProps>((
+  {
+    userProfile,
+    position,
+    collapsed = false,
+    onClick,
+  },
+  ref
+) => {
   const userInfo = userProfile || {
     name: "Administrator",
     email: "admin@example.com", 
@@ -39,6 +42,7 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
   if (position === 'header') {
     return (
       <div 
+        ref={ref as React.RefObject<HTMLDivElement>}
         role="button" 
         className="pl-2 pr-3 py-1 h-auto rounded-lg border-l select-none cursor-pointer hover:bg-emerald-50 transition-colors"
         onClick={onClick}
@@ -91,6 +95,7 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
   // Sidebar expanded state
   return (
     <button
+      ref={ref as React.RefObject<HTMLButtonElement>}
       onClick={onClick}
       className="w-full flex items-center gap-2 pl-2 pr-3 py-1 h-auto rounded-lg border-l transition-colors group cursor-pointer select-none hover:bg-emerald-50"
     >
@@ -106,7 +111,9 @@ export const ProfileTrigger: React.FC<ProfileTriggerProps> = ({
       </div>
     </button>
   );
-};
+});
+
+ProfileTrigger.displayName = 'ProfileTrigger';
 
 /**
  * Separate logout button component for collapsed sidebar state

@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { 
   XMLUploader, 
   TemplatesList, 
@@ -178,7 +178,12 @@ export const StoreTemplates = () => {
           </TabsContent>
 
           <TabsContent value="structure" className="mt-6">
-            <ParametersTable structure={xmlStructure} />
+            {xmlStructure && (
+              <ParametersTable 
+                structure={xmlStructure} 
+                onStructureChange={setXmlStructure}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="mapping" className="mt-6">
