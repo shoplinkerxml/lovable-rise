@@ -30,8 +30,8 @@ export function StatusToggle({ userId, status, onToggle, disabled = false }: Sta
         variant={status === "active" ? "default" : "secondary"}
         className={
           status === "active"
-            ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-100"
-            : "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100"
+            ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/10"
+            : "bg-muted/50 text-muted-foreground border-muted hover:bg-muted/50"
         }
       >
         {status === "active" ? t("status_active") : t("status_inactive")}

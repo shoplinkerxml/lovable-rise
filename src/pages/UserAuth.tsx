@@ -271,11 +271,11 @@ const UserAuth = () => {
                     type="email"
                     {...loginForm("email")}
                     placeholder={t("email_placeholder")}
-                    className={loginErrors.email ? "border-red-500" : ""}
+                    className={loginErrors.email ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {loginErrors.email && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-destructive">
                       {t(loginErrors.email.message as any) || loginErrors.email.message}
                     </p>
                   )}
@@ -288,11 +288,11 @@ const UserAuth = () => {
                     type="password"
                     {...loginForm("password")}
                     placeholder={t("password_placeholder")}
-                    className={loginErrors.password ? "border-red-500" : ""}
+                    className={loginErrors.password ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {loginErrors.password && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-destructive">
                       {t(loginErrors.password.message as any) || loginErrors.password.message}
                     </p>
                   )}

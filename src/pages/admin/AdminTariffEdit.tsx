@@ -691,12 +691,12 @@ const AdminTariffEdit = () => {
   }
   return <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Read-only mode banner for non-admin users */}
-      {!isAdmin && <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      {!isAdmin && <div className="bg-muted/50 border rounded-lg p-4 mb-6">
           <div className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-blue-600" />
+            <Lock className="h-5 w-5" />
             <div>
-              <h3 className="font-medium text-blue-800">{t('read_only_mode')}</h3>
-              <p className="text-sm text-blue-600">{t('user_role_read_only')}</p>
+              <h3 className="font-medium">{t('read_only_mode')}</h3>
+              <p className="text-sm text-muted-foreground">{t('user_role_read_only')}</p>
             </div>
           </div>
         </div>}
@@ -753,15 +753,15 @@ const AdminTariffEdit = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">{t('tariff_name')} *</Label>
-                  <Input id="name" value={formData.name} onChange={e => handleInputChange('name', e.target.value)} placeholder={t('enter_tariff_name')} required disabled={!isAdmin} className={formErrors.name ? 'border-red-500' : ''} />
-                  {formErrors.name && <p className="text-sm text-red-600">{formErrors.name}</p>}
+                  <Input id="name" value={formData.name} onChange={e => handleInputChange('name', e.target.value)} placeholder={t('enter_tariff_name')} required disabled={!isAdmin} className={formErrors.name ? 'border-destructive' : ''} />
+                  {formErrors.name && <p className="text-sm text-destructive">{formErrors.name}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="currency">{t('currency')} *</Label>
                     <Select value={formData.currency_id.toString()} onValueChange={value => handleInputChange('currency_id', parseInt(value))} disabled={!isAdmin}>
-                      <SelectTrigger className={formErrors.currency_id ? 'border-red-500' : ''}>
+                      <SelectTrigger className={formErrors.currency_id ? 'border-destructive' : ''}>
                         <SelectValue placeholder={t('select_currency')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -780,7 +780,7 @@ const AdminTariffEdit = () => {
                       })}
                       </SelectContent>
                     </Select>
-                    {formErrors.currency_id && <p className="text-sm text-red-600">{formErrors.currency_id}</p>}
+                    {formErrors.currency_id && <p className="text-sm text-destructive">{formErrors.currency_id}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -858,7 +858,7 @@ const AdminTariffEdit = () => {
                 <div className="flex items-center space-x-2">
                   <Switch id="visible" checked={formData.visible || false} onCheckedChange={checked => handleInputChange('visible', checked)} disabled={!isAdmin} />
                   <Label htmlFor="visible" className="flex items-center gap-2 cursor-pointer">
-                    <Eye className="h-4 w-4 text-indigo-500" />
+                    <Eye className="h-4 w-4" />
                     
                   </Label>
                 </div>
@@ -1105,7 +1105,7 @@ const AdminTariffEdit = () => {
                                   {id && <TooltipProvider>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Button variant="outline" size="sm" onClick={() => saveLimit(index)} className="text-green-600 hover:text-green-800 p-1">
+                                          <Button variant="outline" size="sm" onClick={() => saveLimit(index)} className="p-1">
                                             <Save className="h-3 w-3" />
                                           </Button>
                                         </TooltipTrigger>
@@ -1117,7 +1117,7 @@ const AdminTariffEdit = () => {
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="sm" onClick={() => removeLimit(index)} className="text-red-600 hover:text-red-800 p-1">
+                                        <Button variant="ghost" size="sm" onClick={() => removeLimit(index)} className="p-1">
                                           <Trash2 className="h-3 w-3" />
                                         </Button>
                                       </TooltipTrigger>

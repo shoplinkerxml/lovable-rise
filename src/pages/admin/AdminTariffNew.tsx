@@ -616,7 +616,7 @@ const AdminTariffNew = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeFeature(index)}
-                                className="text-red-600 hover:text-red-800"
+                                className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -770,7 +770,7 @@ const AdminTariffNew = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeLimit(index)}
-                                className="text-red-600 hover:text-red-800"
+                                className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

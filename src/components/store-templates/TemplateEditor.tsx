@@ -50,11 +50,11 @@ export const TemplateEditor = ({ structure }: TemplateEditorProps) => {
 
   const getTypeBadgeColor = (type: string) => {
     switch (type) {
-      case 'string': return 'bg-blue-100 text-blue-800';
-      case 'number': return 'bg-green-100 text-green-800';
-      case 'array': return 'bg-purple-100 text-purple-800';
+      case 'string': return 'bg-primary/10 text-primary';
+      case 'number': return 'bg-primary/10 text-primary';
+      case 'array': return 'bg-secondary/50 text-secondary-foreground';
       case 'object': return 'bg-orange-100 text-orange-800';
-      case 'boolean': return 'bg-yellow-100 text-yellow-800';
+      case 'boolean': return 'bg-accent/50 text-accent-foreground';
       default: return 'bg-gray-100 text-gray-800';
     }
   };

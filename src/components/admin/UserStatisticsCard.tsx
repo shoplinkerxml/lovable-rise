@@ -34,14 +34,14 @@ const UserStatisticsCard = () => {
 
   if (error) {
     return (
-      <Card className="p-6 border-red-200 bg-red-50">
+      <Card className="p-6 border-destructive/20 bg-destructive/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-            <Activity className="w-5 h-5 text-red-500" />
+          <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
+            <Activity className="w-5 h-5 text-destructive" />
           </div>
           <div>
-            <p className="text-red-600 font-medium">{t("error_fetch_users")}</p>
-            <p className="text-red-400 text-sm">{error.message || String(error)}</p>
+            <p className="text-destructive font-medium">{t("error_fetch_users")}</p>
+            <p className="text-destructive/70 text-sm">{error.message || String(error)}</p>
           </div>
         </div>
       </Card>

@@ -120,7 +120,7 @@ const DefaultFormTemplate = ({ formConfig, title }: { formConfig: any; title: st
         <div key={field.id} className="space-y-2">
           <Label htmlFor={field.id}>
             {field.label}
-            {field.required && <span className="text-red-500 ml-1">*</span>}
+            {field.required && <span className="text-destructive ml-1">*</span>}
           </Label>
           {renderField(field)}
         </div>

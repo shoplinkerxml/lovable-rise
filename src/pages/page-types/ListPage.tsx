@@ -134,10 +134,10 @@ export const ListPage = ({ config, title }: ListPageProps) => {
   };
 
   const getTariffIcon = (row: TableData) => {
-    if (row.is_free) return <Package className="h-5 w-5 text-blue-500" />;
-    if (row.is_lifetime) return <Crown className="h-5 w-5 text-yellow-500" />;
-    if (row.new_price && row.new_price > 50) return <Star className="h-5 w-5 text-purple-500" />;
-    return <CreditCard className="h-5 w-5 text-green-500" />;
+    if (row.is_free) return <Package className="h-5 w-5" />;
+    if (row.is_lifetime) return <Crown className="h-5 w-5" />;
+    if (row.new_price && row.new_price > 50) return <Star className="h-5 w-5" />;
+    return <CreditCard className="h-5 w-5" />;
   };
 
   const getCurrencyIcon = (currencyCode: string) => {

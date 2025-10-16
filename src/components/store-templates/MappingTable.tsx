@@ -151,18 +151,18 @@ export const MappingTable: React.FC<MappingTableProps> = ({
   return (
     <div className="space-y-6">
       {/* Прогрес-бар */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-muted/50 border rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-blue-900">
+          <h3 className="font-semibold">
             Прогрес налаштування обов'язкових полів
           </h3>
-          <span className="text-sm font-medium text-blue-700">
+          <span className="text-sm font-medium">
             {mappedRequiredCount} з {requiredFieldsCount}
           </span>
         </div>
         <Progress value={progressPercentage} className="h-3" />
         {mappedRequiredCount === requiredFieldsCount && requiredFieldsCount > 0 && (
-          <p className="text-sm text-green-600 mt-2 flex items-center gap-2">
+          <p className="text-sm mt-2 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" />
             Всі обов'язкові поля налаштовано!
           </p>
@@ -231,7 +231,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
                         <div className="font-medium flex items-center gap-2">
                           {field.path.split('.').pop()}
                           {!isMapped && suggestedField && (
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
+                            <Badge variant="outline" className="bg-accent/50 text-accent-foreground text-xs">
                               автопідказка
                             </Badge>
                           )}
@@ -259,14 +259,14 @@ export const MappingTable: React.FC<MappingTableProps> = ({
                       >
                         <SelectTrigger className={`
                           ${!isMapped ? 'border-gray-300' : ''}
-                          ${isRequired ? 'border-green-500 bg-green-50' : ''}
+                          ${isRequired ? 'border-primary' : ''}
                         `}>
                           <SelectValue placeholder="Вибрати поле..." />
                         </SelectTrigger>
                         <SelectContent>
                           {suggestedField && !isMapped && (
                             <>
-                              <SelectItem value={suggestedField} className="bg-yellow-50">
+                              <SelectItem value={suggestedField} className="bg-accent/30">
                                 <div className="flex items-center gap-2">
                                   <span>⭐</span>
                                   <span>{systemFields.find(f => f.id === suggestedField)?.label}</span>
@@ -281,7 +281,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
                               <div className="flex items-center gap-2">
                                 {sField.label}
                                 {sField.required && (
-                                  <span className="text-red-500">*</span>
+                                  <span className="text-destructive">*</span>
                                 )}
                                 <Badge variant="outline" className="text-xs">
                                   {sField.category}
@@ -318,9 +318,9 @@ export const MappingTable: React.FC<MappingTableProps> = ({
                     
                     <TableCell>
                       {isMapped ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
                       ) : (
-                        <AlertCircle className="h-5 w-5 text-gray-300" />
+                        <AlertCircle className="h-5 w-5 text-muted-foreground/30" />
                       )}
                     </TableCell>
                   </TableRow>
@@ -344,7 +344,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
               <div 
                 key={field.id}
                 className={`flex items-center gap-2 text-sm p-2 rounded ${
-                  isMapped ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  isMapped ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
                 }`}
               >
                 {isMapped ? (

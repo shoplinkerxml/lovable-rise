@@ -473,7 +473,7 @@ const UserLayoutContent = ({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                    <DropdownMenuItem onClick={handleLogout} className="focus:text-destructive">
                       <LogOut className="mr-2 h-4 w-4" />
                       {t('logout')}
                     </DropdownMenuItem>
@@ -541,7 +541,7 @@ const UserLayoutContent = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                <DropdownMenuItem onClick={handleLogout} className="focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   {t('logout')}
                 </DropdownMenuItem>
@@ -566,7 +566,7 @@ const UserLayoutContent = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                  <DropdownMenuItem onClick={handleLogout} className="focus:text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     {t('logout')}
                   </DropdownMenuItem>

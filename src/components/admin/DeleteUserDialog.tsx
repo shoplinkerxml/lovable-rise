@@ -65,8 +65,8 @@ export function DeleteUserDialog({
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
             <div>
               <AlertDialogTitle className="text-left">
@@ -114,7 +114,7 @@ export function DeleteUserDialog({
           <AlertDialogAction
             onClick={handleDelete}
             disabled={deleteUserMutation.isPending}
-            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
           >
             {deleteUserMutation.isPending ? (
               <>

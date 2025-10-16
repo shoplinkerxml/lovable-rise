@@ -491,10 +491,10 @@ console.log("Права доступа обновлены:", responseData);`
   ];
 
   const methodColors = {
-    GET: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-    POST: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    PATCH: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-    DELETE: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+    GET: 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary',
+    POST: 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary',
+    PATCH: 'bg-accent/50 text-accent-foreground dark:bg-accent/20 dark:text-accent-foreground',
+    DELETE: 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive'
   };
 
   const generateCurlCommand = (endpoint: ApiEndpoint) => {
@@ -961,7 +961,7 @@ console.log("Права доступа обновлены:", responseData);`
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
-                      <Badge className="bg-blue-100 text-blue-800 shrink-0">1</Badge>
+                      <Badge className="bg-primary/10 text-primary shrink-0">1</Badge>
                       <div>
                         <h4 className="font-medium">Получить токен администратора</h4>
                         <p className="text-sm text-muted-foreground">POST /auth/v1/token?grant_type=password с данными админа</p>
@@ -969,7 +969,7 @@ console.log("Права доступа обновлены:", responseData);`
                     </div>
                     
                     <div className="flex items-start gap-3">
-                      <Badge className="bg-blue-100 text-blue-800 shrink-0">2</Badge>
+                      <Badge className="bg-primary/10 text-primary shrink-0">2</Badge>
                       <div>
                         <h4 className="font-medium">Зарегистрировать пользователя</h4>
                         <p className="text-sm text-muted-foreground">POST /auth/v1/signup с email и паролем нового пользователя</p>
@@ -977,7 +977,7 @@ console.log("Права доступа обновлены:", responseData);`
                     </div>
                     
                     <div className="flex items-start gap-3">
-                      <Badge className="bg-blue-100 text-blue-800 shrink-0">3</Badge>
+                      <Badge className="bg-primary/10 text-primary shrink-0">3</Badge>
                       <div>
                         <h4 className="font-medium">Обновить профиль</h4>
                         <p className="text-sm text-muted-foreground">PATCH /rest/v1/profiles?id=eq.{'{{manager_id}}'} с дополнительными данными</p>
@@ -985,9 +985,9 @@ console.log("Права доступа обновлены:", responseData);`
                     </div>
                   </div>
                   
-                  <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                    <h5 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Важно!</h5>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  <div className="mt-6 p-4 bg-accent/10 rounded-lg border">
+                    <h5 className="font-medium mb-2">Важно!</h5>
+                    <p className="text-sm text-muted-foreground">
                       Создание пользователей через endpoint /functions/v1/users требует прав администратора. 
                       Для публичной регистрации используйте /auth/v1/signup.
                     </p>
@@ -1007,7 +1007,7 @@ console.log("Права доступа обновлены:", responseData);`
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <h4 className="font-medium text-green-600">Успешные ответы</h4>
+                      <h4 className="font-medium text-primary">Успешные ответы</h4>
                       <div className="space-y-1 text-sm">
                         <div><code className="bg-muted px-1 py-0.5 rounded">200</code> OK - Запрос выполнен успешно</div>
                         <div><code className="bg-muted px-1 py-0.5 rounded">201</code> Created - Ресурс создан</div>
@@ -1015,7 +1015,7 @@ console.log("Права доступа обновлены:", responseData);`
                     </div>
                     
                     <div className="space-y-2">
-                      <h4 className="font-medium text-red-600">Ошибки клиента</h4>
+                      <h4 className="font-medium text-destructive">Ошибки клиента</h4>
                       <div className="space-y-1 text-sm">
                         <div><code className="bg-muted px-1 py-0.5 rounded">400</code> Bad Request - Неверный запрос</div>
                         <div><code className="bg-muted px-1 py-0.5 rounded">401</code> Unauthorized - Не авторизован</div>

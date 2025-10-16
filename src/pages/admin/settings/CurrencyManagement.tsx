@@ -273,7 +273,7 @@ const CurrencyManagement = () => {
                         <DropdownMenuItem 
                           onClick={() => handleDeleteCurrency(currency)}
                           disabled={!!currency.is_base}
-                          className={currency.is_base ? "text-muted-foreground cursor-not-allowed" : "text-red-600"}
+                          className={currency.is_base ? "text-muted-foreground cursor-not-allowed" : "text-destructive"}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           {t("delete")}

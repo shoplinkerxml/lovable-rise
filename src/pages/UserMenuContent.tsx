@@ -138,7 +138,7 @@ const UserMenuContent = () => {
             <Copy className="h-4 w-4 mr-2" />
             {t("duplicate")}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-600 border-red-200 hover:bg-red-50">
+          <Button variant="outline" size="sm" onClick={handleDelete} className="text-destructive border-destructive/20 hover:bg-destructive/10">
             <Trash2 className="h-4 w-4 mr-2" />
             {t("delete")}
           </Button>

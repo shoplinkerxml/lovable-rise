@@ -52,7 +52,7 @@ import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { useIsMobile } from "@/components/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -147,8 +147,11 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       <div className="flex items-center justify-center">
         <Checkbox
           checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+              ? "indeterminate"
+              : false
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"
@@ -195,7 +198,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         className="flex gap-1 px-1.5 text-muted-foreground [&_svg]:size-3"
       >
         {row.original.status === "Done" ? (
-          <CheckCircle2Icon className="text-green-500 dark:text-green-400" />
+          <CheckCircle2Icon className="text-primary" />
         ) : (
           <LoaderIcon />
         )}

@@ -148,7 +148,7 @@ const AdminAuth = () => {
                 />
               </div>
               {error && (
-                <div className="text-sm text-red-600">{error}</div>
+                <div className="text-sm text-destructive">{error}</div>
               )}
               <Button type="submit" disabled={loading} className="w-full" variant="default">
                 {loading ? "…" : t("sign_in")}

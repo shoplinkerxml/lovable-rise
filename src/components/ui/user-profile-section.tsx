@@ -64,7 +64,7 @@ export const UserProfileSection: React.FC<UserProfileSectionProps> = ({
                     {t('profile') || 'Profile'}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                  <DropdownMenuItem onClick={handleLogout} className="focus:text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     {t('logout') || 'Log out'}
                   </DropdownMenuItem>

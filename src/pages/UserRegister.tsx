@@ -262,11 +262,11 @@ const UserRegister = () => {
                     id="name"
                     {...registerForm("name")}
                     placeholder={t("name_placeholder")}
-                    className={registerErrors.name ? "border-red-500" : ""}
+                    className={registerErrors.name ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.name && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-destructive">
                       {t(registerErrors.name.message as any) || registerErrors.name.message}
                     </p>
                   )}
@@ -279,11 +279,11 @@ const UserRegister = () => {
                     type="email"
                     {...registerForm("email")}
                     placeholder={t("email_placeholder")}
-                    className={registerErrors.email ? "border-red-500" : ""}
+                    className={registerErrors.email ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.email && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-destructive">
                       {t(registerErrors.email.message as any) || registerErrors.email.message}
                     </p>
                   )}
@@ -296,11 +296,11 @@ const UserRegister = () => {
                     type="password"
                     {...registerForm("password")}
                     placeholder={t("password_placeholder")}
-                    className={registerErrors.password ? "border-red-500" : ""}
+                    className={registerErrors.password ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.password && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-destructive">
                       {t(registerErrors.password.message as any) || registerErrors.password.message}
                     </p>
                   )}
@@ -313,11 +313,11 @@ const UserRegister = () => {
                     type="password"
                     {...registerForm("confirmPassword")}
                     placeholder={t("password_placeholder")}
-                    className={registerErrors.confirmPassword ? "border-red-500" : ""}
+                    className={registerErrors.confirmPassword ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.confirmPassword && (
-                    <p className="text-sm text-red-600">
+                    <p className="text-sm text-destructive">
                       {t(registerErrors.confirmPassword.message as any) || registerErrors.confirmPassword.message}
                     </p>
                   )}
@@ -348,7 +348,7 @@ const UserRegister = () => {
                   </Label>
                 </div>
                 {registerErrors.acceptTerms && (
-                  <p className="text-sm text-red-600">
+                  <p className="text-sm text-destructive">
                     {lang === 'uk' ? 'Необхідно прийняти умови' : 'You must accept the terms'}
                   </p>
                 )}

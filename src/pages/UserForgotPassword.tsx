@@ -141,11 +141,11 @@ const UserForgotPassword = () => {
             <CardContent className="space-y-4">
               {resetSuccess ? (
                 <div className="text-center space-y-4">
-                  <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                     <CheckCircle2 className="h-6 w-6" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="font-medium text-green-900">{t("reset_success")}</h3>
+                    <h3 className="font-medium">{t("reset_success")}</h3>
                     <p className="text-sm text-muted-foreground">
                       {lang === 'uk' 
                         ? 'Перевірте пошту для отримання посилання на скидання паролю' 
@@ -170,11 +170,11 @@ const UserForgotPassword = () => {
                       type="email"
                       {...resetForm("email")}
                       placeholder={t("reset_email_placeholder")}
-                      className={resetErrors.email ? "border-red-500" : ""}
+                      className={resetErrors.email ? "border-destructive" : ""}
                       disabled={loading}
                     />
                     {resetErrors.email && (
-                      <p className="text-sm text-red-600">
+                      <p className="text-sm text-destructive">
                         {t(resetErrors.email.message as any) || resetErrors.email.message}
                       </p>
                     )}

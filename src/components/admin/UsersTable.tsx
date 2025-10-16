@@ -178,8 +178,8 @@ const StatusBadge = ({ status }: { status: "active" | "inactive" }) => {
       variant={status === "active" ? "default" : "secondary"}
       className={
         status === "active"
-          ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-100"
-          : "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100"
+          ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/10"
+          : "bg-muted/50 text-muted-foreground border-muted hover:bg-muted/50"
       }
     >
       {status === "active" ? t("status_active") : t("status_inactive")}
@@ -235,7 +235,7 @@ const UserActionsDropdown = ({
         <DropdownMenuSeparator />
         <DropdownMenuItem 
           onClick={onDelete}
-          className="cursor-pointer text-red-600 focus:text-red-600"
+          className="cursor-pointer focus:text-destructive"
         >
           <Trash2 className="mr-2 h-4 w-4" />
           {t("delete_action")}
@@ -372,11 +372,11 @@ export function UsersTable({
                   {user.subscription?.tariff_name ? (
                     user.subscription.is_active ? (
                       <div className="flex items-center" title="Активна">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
                       </div>
                     ) : (
                       <div className="flex items-center" title="Неактивна">
-                        <XCircle className="h-5 w-5 text-red-600" />
+                        <XCircle className="h-5 w-5 text-destructive" />
                       </div>
                     )
                   ) : (

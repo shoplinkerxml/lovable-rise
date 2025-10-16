@@ -198,11 +198,11 @@ const UserResetPassword = () => {
             <CardContent className="space-y-4">
               {resetSuccess ? (
                 <div className="text-center space-y-4">
-                  <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                     <CheckCircle2 className="h-6 w-6" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="font-medium text-green-900">
+                    <h3 className="font-medium">
                       {t("password_updated") || "Password Updated Successfully"}
                     </h3>
                     <p className="text-sm text-muted-foreground">
@@ -229,11 +229,11 @@ const UserResetPassword = () => {
                       type="password"
                       {...passwordForm("password")}
                       placeholder={t("password_placeholder")}
-                      className={passwordErrors.password ? "border-red-500" : ""}
+                      className={passwordErrors.password ? "border-destructive" : ""}
                       disabled={loading}
                     />
                     {passwordErrors.password && (
-                      <p className="text-sm text-red-600">
+                      <p className="text-sm text-destructive">
                         {t(passwordErrors.password.message as any) || passwordErrors.password.message}
                       </p>
                     )}
@@ -246,11 +246,11 @@ const UserResetPassword = () => {
                       type="password"
                       {...passwordForm("confirmPassword")}
                       placeholder={t("password_placeholder")}
-                      className={passwordErrors.confirmPassword ? "border-red-500" : ""}
+                      className={passwordErrors.confirmPassword ? "border-destructive" : ""}
                       disabled={loading}
                     />
                     {passwordErrors.confirmPassword && (
-                      <p className="text-sm text-red-600">
+                      <p className="text-sm text-destructive">
                         {t(passwordErrors.confirmPassword.message as any) || passwordErrors.confirmPassword.message}
                       </p>
                     )}

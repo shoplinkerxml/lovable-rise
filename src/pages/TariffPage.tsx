@@ -415,9 +415,9 @@ const TariffPage = () => {
                           return (
                             <div key={feature.id} className="flex items-start gap-2">
                               {feature.is_active ? (
-                                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                               ) : (
-                                <XCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                <XCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               )}
                               <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               <span className={`text-sm ${feature.is_active ? "" : "text-muted-foreground line-through"}`}>

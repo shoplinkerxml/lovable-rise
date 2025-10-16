@@ -60,7 +60,7 @@ export const VisualMapper = ({
         <div className="text-sm">
           <div className="font-medium">
             {field.name}
-            {field.required && <span className="text-red-500 ml-1">*</span>}
+            {field.required && <span className="text-destructive ml-1">*</span>}
           </div>
           <div className="text-xs text-muted-foreground">{field.type}</div>
         </div>

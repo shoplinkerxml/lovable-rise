@@ -163,7 +163,7 @@ export const UserHeader = ({ user, onMenuToggle }: UserHeaderProps) => {
             <DropdownMenuItem 
               onClick={handleLogout}
               disabled={loading}
-              className="text-red-600 focus:text-red-600"
+              className="focus:text-destructive"
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span>{loading ? "Logging out..." : "Log out"}</span>

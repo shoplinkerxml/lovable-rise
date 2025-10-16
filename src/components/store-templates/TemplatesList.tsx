@@ -147,7 +147,7 @@ export const TemplatesList = ({ onSelect }: TemplatesListProps) => {
             <AlertDialogCancel>Скасувати</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteDialog.template && handleDelete(deleteDialog.template.id, deleteDialog.template.name)}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               Видалити
             </AlertDialogAction>

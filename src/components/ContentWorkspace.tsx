@@ -122,7 +122,7 @@ const ContentWorkspace: React.FC = () => {
         </Alert>
         <button 
           onClick={clearContentError}
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           Try again
         </button>
@@ -162,11 +162,11 @@ const ContentWorkspace: React.FC = () => {
   if (activeMenuItem && isParentItem) {
     return (
       <div className="p-4 md:p-6">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <h2 className="text-xl font-semibold text-blue-800 mb-2">
+        <div className="bg-muted/50 border rounded-lg p-6 text-center">
+          <h2 className="text-xl font-semibold mb-2">
             Please Select a Submenu Item
           </h2>
-          <p className="text-blue-600">
+          <p className="text-muted-foreground">
             This menu item contains sub-items. Please select one of the sub-items from the sidebar to view its content.
           </p>
         </div>

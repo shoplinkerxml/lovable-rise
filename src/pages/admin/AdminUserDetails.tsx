@@ -433,7 +433,7 @@ const AdminUserDetails = () => {
             <CardTitle className="text-sm font-medium">
               {t('active_tariff') || 'Активний тариф'}
             </CardTitle>
-            {activeSubscription?.tariffs.is_lifetime ? <Crown className="h-4 w-4 text-yellow-600" /> : <CreditCard className="h-4 w-4 text-muted-foreground" />}
+            {activeSubscription?.tariffs.is_lifetime ? <Crown className="h-4 w-4" /> : <CreditCard className="h-4 w-4 text-muted-foreground" />}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -506,7 +506,7 @@ const AdminUserDetails = () => {
                   <CardTitle className="text-sm font-medium">
                     {tariff.name}
                   </CardTitle>
-                  {tariff.is_lifetime ? <Crown className="h-4 w-4 text-yellow-600" /> : <CreditCard className="h-4 w-4 text-muted-foreground" />}
+                  {tariff.is_lifetime ? <Crown className="h-4 w-4" /> : <CreditCard className="h-4 w-4 text-muted-foreground" />}
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
@@ -522,11 +522,11 @@ const AdminUserDetails = () => {
                   {/* Subscription Status */}
                   <div className="mt-4 flex items-center gap-2">
                     {isActive ? <>
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-600">Активна</span>
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Активна</span>
                       </> : userSubscription ? <>
-                        <XCircle className="h-4 w-4 text-red-600" />
-                        <span className="text-sm text-red-600">Неактивна</span>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-sm text-destructive">Неактивна</span>
                       </> : <span className="text-sm text-muted-foreground">Не придбано</span>}
                   </div>
                   
@@ -590,7 +590,7 @@ const AdminUserDetails = () => {
                   </TableCell>
                 </TableRow> : subscriptionHistory.map(sub => <TableRow key={sub.id}>
                     <TableCell>
-                      {sub.tariffs.is_lifetime ? <Crown className="h-4 w-4 text-yellow-600" /> : <CreditCard className="h-4 w-4 text-emerald-600" />}
+                      {sub.tariffs.is_lifetime ? <Crown className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
                     </TableCell>
                     <TableCell className="font-medium">{sub.tariffs.name}</TableCell>
                     <TableCell>
@@ -605,10 +605,10 @@ const AdminUserDetails = () => {
                     </TableCell>
                     <TableCell>
                       {sub.is_active ? <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
                           <span className="text-sm">Активна</span>
                         </div> : <div className="flex items-center gap-2">
-                          <XCircle className="h-4 w-4 text-red-600" />
+                          <XCircle className="h-4 w-4 text-destructive" />
                           <span className="text-sm">Неактивна</span>
                         </div>}
                     </TableCell>
