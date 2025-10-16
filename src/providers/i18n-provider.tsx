@@ -53,6 +53,7 @@ const dictionary: Dictionary = {
   menu_tariff_features: { uk: "Функції тарифів", en: "Tariff Features" },
   menu_stores: { uk: "Магазини", en: "Stores" },
   menu_suppliers: { uk: "Постачальники", en: "Suppliers" },
+  menu_store_templates: { uk: "Шаблони XML", en: "XML Templates" },
   
   // Page descriptions
   tariff_plans_description: { uk: "Управління тарифними планами користувачів", en: "Manage user tariff plans" },
@@ -618,6 +619,81 @@ const dictionary: Dictionary = {
   invalid_currency_selected: { uk: "Обрано недійсну валюту", en: "Invalid currency selected" },
   read_only_mode: { uk: "Режим лише для читання", en: "Read-only mode" },
   user_role_read_only: { uk: "Користувачі можуть лише переглядати дані", en: "Users can only view data" },
+  
+  // XML Templates translations
+  store_templates_title: { uk: "Шаблони маркетплейсів", en: "Marketplace Templates" },
+  create_template: { uk: "Створити шаблон", en: "Create Template" },
+  edit_template: { uk: "Редагувати шаблон", en: "Edit Template" },
+  back_to_templates: { uk: "Назад до шаблонів", en: "Back to Templates" },
+  
+  // Upload tab
+  upload_xml: { uk: "Загрузка XML", en: "Upload XML" },
+  xml_file: { uk: "XML файл", en: "XML file" },
+  xml_url: { uk: "URL адреса XML", en: "XML URL" },
+  load_xml: { uk: "Завантажити XML", en: "Load XML" },
+  upload_xml_file: { uk: "Завантажити XML файл", en: "Upload XML file" },
+  or_enter_url: { uk: "або введіть URL", en: "or enter URL" },
+  enter_xml_url: { uk: "Введіть URL адресу XML файлу", en: "Enter XML file URL" },
+  parse_xml: { uk: "Парсити XML", en: "Parse XML" },
+  drag_drop_xml: { uk: "Перетягніть XML файл сюди або натисніть для вибору", en: "Drag & drop XML file here or click to select" },
+  
+  // Structure tab
+  xml_structure: { uk: "Структура XML", en: "XML Structure" },
+  root_element: { uk: "Кореневий елемент", en: "Root Element" },
+  total_fields: { uk: "Всього полів", en: "Total Fields" },
+  fields_found: { uk: "полів знайдено", en: "fields found" },
+  
+  // Mapping tab
+  field_mapping: { uk: "Маппінг полей", en: "Field Mapping" },
+  configure_mapping: { uk: "Налаштування відповідності полей", en: "Configure Field Mapping" },
+  required_fields_configured: { uk: "обов'язкових полів налаштовано", en: "required fields configured" },
+  xml_fields: { uk: "Поля XML", en: "XML Fields" },
+  system_fields: { uk: "Системні поля", en: "System Fields" },
+  mapping_rules: { uk: "Правила маппінгу", en: "Mapping Rules" },
+  
+  // Preview tab
+  mapping_preview: { uk: "Предпросмотр маппінгу", en: "Mapping Preview" },
+  save_template: { uk: "Зберегти шаблон", en: "Save Template" },
+  template_saved: { uk: "Шаблон збережено", en: "Template saved" },
+  failed_save_template: { uk: "Не вдалося зберегти шаблон", en: "Failed to save template" },
+  
+  // Messages
+  xml_loaded: { uk: "XML успішно завантажено", en: "XML loaded successfully" },
+  xml_parse_error: { uk: "Помилка парсингу XML", en: "XML parsing error" },
+  items_found: { uk: "елементів знайдено", en: "items found" },
+  parsing_xml: { uk: "Парсинг XML...", en: "Parsing XML..." },
+  loading_xml: { uk: "Завантаження XML...", en: "Loading XML..." },
+  
+  // Template list
+  no_templates: { uk: "Шаблони не знайдено", en: "No templates found" },
+  template_name: { uk: "Назва шаблону", en: "Template Name" },
+  template_description: { uk: "Опис шаблону", en: "Template Description" },
+  enter_template_name: { uk: "Введіть назву шаблону", en: "Enter template name" },
+  enter_template_description: { uk: "Введіть опис шаблону", en: "Enter template description" },
+  
+  // Tabs
+  tab_upload: { uk: "Загрузка XML", en: "Upload XML" },
+  tab_structure: { uk: "Структура", en: "Structure" },
+  tab_mapping: { uk: "Маппінг полей", en: "Field Mapping" },
+  tab_preview: { uk: "Предпросмотр", en: "Preview" },
+  
+  // Stats
+  parse_time: { uk: "Час парсингу", en: "Parse Time" },
+  file_size: { uk: "Розмір файлу", en: "File Size" },
+  items_count: { uk: "Кількість елементів", en: "Items Count" },
+  
+  // Field types
+  field_type_string: { uk: "Рядок", en: "String" },
+  field_type_number: { uk: "Число", en: "Number" },
+  field_type_array: { uk: "Масив", en: "Array" },
+  field_type_object: { uk: "Об'єкт", en: "Object" },
+  field_type_boolean: { uk: "Логічний", en: "Boolean" },
+  
+  // Transformation types
+  transformation_direct: { uk: "Пряме", en: "Direct" },
+  transformation_concat: { uk: "Об'єднання", en: "Concatenate" },
+  transformation_split: { uk: "Розділення", en: "Split" },
+  transformation_custom: { uk: "Довільне", en: "Custom" },
 };
 
 // User Statistics

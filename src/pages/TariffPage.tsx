@@ -126,49 +126,40 @@ const TariffPage = () => {
 
   // Function to get relevant icon for a tariff based on price and sort order
   const getTariffIcon = (tariff: TariffWithDetails) => {
-    // Determine icon based on price tier and sort order
     if (tariff.is_free) {
-      return <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />;
+      return <Zap className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
     
     if (tariff.is_lifetime) {
-      return <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />;
+      return <Crown className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
     
-    // For paid tariffs, determine icon based on price relative to other tariffs
     const paidTariffs = tariffs.filter(t => !t.is_free && t.new_price !== null) as TariffWithDetails[];
     
     if (paidTariffs.length <= 1) {
-      // If only one paid tariff, use default icon
-      return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
+      return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
     
-    // Sort paid tariffs by price
     const sortedTariffs = [...paidTariffs].sort((a, b) => {
       const priceA = a.new_price || 0;
       const priceB = b.new_price || 0;
       return priceA - priceB;
     });
     
-    // Find position of current tariff
     const currentIndex = sortedTariffs.findIndex(t => t.id === tariff.id);
     
     if (currentIndex === -1) {
-      return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
+      return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
     
-    // Determine icon based on price tier
     const tier = currentIndex / sortedTariffs.length;
     
     if (tier < 0.33) {
-      // Entry level - Rocket icon
-      return <Rocket className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />;
+      return <Rocket className="h-5 w-5 sm:h-6 sm:w-6" />;
     } else if (tier < 0.66) {
-      // Mid tier - Money bag icon
-      return <Banknote className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />;
+      return <Banknote className="h-5 w-5 sm:h-6 sm:w-6" />;
     } else {
-      // Premium tier - Chart with upward trend
-      return <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />;
+      return <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
   };
 

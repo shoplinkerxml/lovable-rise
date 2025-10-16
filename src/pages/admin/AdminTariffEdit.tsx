@@ -826,7 +826,7 @@ const AdminTariffEdit = () => {
                 <div className="flex items-center space-x-2">
                   <Switch id="is_free" checked={formData.is_free || false} onCheckedChange={checked => handleInputChange('is_free', checked)} disabled={!isAdmin} />
                   <Label htmlFor="is_free" className="flex items-center gap-2 cursor-pointer">
-                    <Gift className="h-4 w-4 text-blue-500" />
+                    <Gift className="h-4 w-4" />
                     
                   </Label>
                 </div>
@@ -834,7 +834,7 @@ const AdminTariffEdit = () => {
                 <div className="flex items-center space-x-2">
                   <Switch id="is_lifetime" checked={formData.is_lifetime || false} onCheckedChange={checked => handleInputChange('is_lifetime', checked)} disabled={!isAdmin} />
                   <Label htmlFor="is_lifetime" className="flex items-center gap-2 cursor-pointer">
-                    <Infinity className="h-4 w-4 text-purple-500" />
+                    <Infinity className="h-4 w-4" />
                     
                   </Label>
                 </div>
@@ -842,7 +842,7 @@ const AdminTariffEdit = () => {
                 <div className="flex items-center space-x-2">
                   <Switch id="is_active" checked={formData.is_active || false} onCheckedChange={checked => handleInputChange('is_active', checked)} disabled={!isAdmin} />
                   <Label htmlFor="is_active" className="flex items-center gap-2 cursor-pointer">
-                    <Power className="h-4 w-4 text-green-500" />
+                    <Power className="h-4 w-4" />
                     
                   </Label>
                 </div>
@@ -850,7 +850,7 @@ const AdminTariffEdit = () => {
                 <div className="flex items-center space-x-2">
                   <Switch id="popular" checked={formData.popular || false} onCheckedChange={checked => handleInputChange('popular', checked)} disabled={!isAdmin} />
                   <Label htmlFor="popular" className="flex items-center gap-2 cursor-pointer">
-                    <Star className="h-4 w-4 text-yellow-500" />
+                    <Star className="h-4 w-4" />
                     
                   </Label>
                 </div>
@@ -960,7 +960,7 @@ const AdminTariffEdit = () => {
                                   {id && <TooltipProvider>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Button variant="outline" size="sm" onClick={() => saveFeature(index)} className="text-green-600 hover:text-green-800 p-1">
+                                          <Button variant="outline" size="sm" onClick={() => saveFeature(index)} className="p-1">
                                             <Save className="h-3 w-3" />
                                           </Button>
                                         </TooltipTrigger>
@@ -972,7 +972,7 @@ const AdminTariffEdit = () => {
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="sm" onClick={() => removeFeature(index)} className="text-red-600 hover:text-red-800 p-1">
+                                        <Button variant="ghost" size="sm" onClick={() => removeFeature(index)} className="p-1">
                                           <Trash2 className="h-3 w-3" />
                                         </Button>
                                       </TooltipTrigger>

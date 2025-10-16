@@ -39,16 +39,16 @@ const TariffStatisticsCard = () => {
 
   return (
     /* Active Tariffs Block */
-    <Card className="p-4 sm:p-6 text-center">
+    <Card className="p-4 sm:p-6 text-center border">
       <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-          <Package className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+          <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
         </div>
-        <h3 className="text-xs sm:text-sm font-medium text-gray-600">
+        <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">
           {t("active_tariffs") || "Active Tariffs"}
         </h3>
       </div>
-      <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-purple-600 mb-1">
+      <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-1">
         {statistics?.activeTariffs || 0}
       </div>
      

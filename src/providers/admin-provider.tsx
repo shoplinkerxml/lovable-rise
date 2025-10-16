@@ -135,6 +135,17 @@ const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
     created_at: new Date().toISOString(),
     icon_name: 'check-circle',
     section_type: 'main'
+  },
+  '/storetemplates': {
+    id: -13,
+    title: 'Шаблони XML',
+    path: '/storetemplates',
+    page_type: 'custom',
+    is_active: true,
+    order_index: 9,
+    created_at: new Date().toISOString(),
+    icon_name: 'file-code',
+    section_type: 'main'
   }
 };
 

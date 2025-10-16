@@ -23,8 +23,7 @@ import AdminTariffFeatures from '@/pages/admin/AdminTariffFeatures';
 import AdminTariffNew from '@/pages/admin/AdminTariffNew';
 import AdminTariffEdit from '@/pages/admin/AdminTariffEdit';
 import AdminUserDetails from '@/pages/admin/AdminUserDetails';
-
-
+import { StoreTemplates } from '@/pages/admin/StoreTemplates';
 
 // Error display component
 const ContentError = ({ error }: { error: string }) => (
@@ -50,6 +49,7 @@ const STATIC_COMPONENTS: Record<string, React.ComponentType> = {
   '/tariff': AdminTariffManagement,
   '/tariff/features': AdminTariffFeatures,
   '/tariff/new': AdminTariffNew,
+  '/storetemplates': StoreTemplates,
 };
 
 const ContentWorkspace: React.FC = () => {
