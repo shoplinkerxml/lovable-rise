@@ -179,6 +179,9 @@ export const StoreTemplates = () => {
               <ParametersTable 
                 structure={xmlStructure} 
                 onStructureChange={setXmlStructure}
+                onSave={handleSaveTemplate}
+                onCancel={() => setViewMode('list')}
+                saving={saving}
               />
             )}
           </TabsContent>
@@ -191,6 +194,9 @@ export const StoreTemplates = () => {
                   systemFields={systemFields}
                   mappings={mappings}
                   onMappingChange={setMappings}
+                  onSave={handleSaveTemplate}
+                  onCancel={() => setViewMode('list')}
+                  saving={saving}
                 />
                 
                 {/* Блок збереження шаблону */}
@@ -225,16 +231,6 @@ export const StoreTemplates = () => {
                         rows={3}
                       />
                     </div>
-                  </div>
-                  
-                  {/* Кнопки збереження */}
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setViewMode('list')} disabled={saving}>
-                      {t('cancel')}
-                    </Button>
-                    <Button onClick={handleSaveTemplate} disabled={saving}>
-                      {saving ? t('saving') : t('save_template')}
-                    </Button>
                   </div>
                 </div>
               </div>

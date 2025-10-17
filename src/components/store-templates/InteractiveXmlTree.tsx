@@ -49,7 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { XMLStructure, XMLField } from '@/lib/xml-template-service';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 interface TreeNode {
   id: string;
@@ -76,6 +76,7 @@ function SortableTreeNode({
   onEdit,
   onDelete,
   onAdd,
+  onDuplicate,
   parentCategory
 }: {
   node: TreeNode;
@@ -83,7 +84,8 @@ function SortableTreeNode({
   onToggle: (id: string) => void;
   onEdit: (id: string, name: string, value: string) => void;
   onDelete: (id: string) => void;
-  onAdd: (categoryName: string) => void;
+  onAdd: (parentId: string) => void;
+  onDuplicate: (id: string) => void;
   parentCategory?: string;
 }) {
   const [isEditing, setIsEditing] = React.useState(false);
@@ -204,9 +206,19 @@ function SortableTreeNode({
                   <Pencil className="h-3.5 w-3.5 mr-2" />
                   Редагувати
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDuplicate(node.id)}>
+                  <Copy className="h-3.5 w-3.5 mr-2" />
+                  Дублювати
+                </DropdownMenuItem>
+                {node.children && node.children.length > 0 && (
+                  <DropdownMenuItem onClick={() => onAdd(node.id)}>
+                    <Plus className="h-3.5 w-3.5 mr-2" />
+                    Додати
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleCopy}>
                   <Copy className="h-3.5 w-3.5 mr-2" />
-                  Копіювати
+                  Копіювати текст
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onDelete(node.id)} className="text-destructive">
                   <Trash2 className="h-3.5 w-3.5 mr-2" />
@@ -291,6 +303,7 @@ function SortableTreeNode({
               onEdit={onEdit}
               onDelete={onDelete}
               onAdd={onAdd}
+              onDuplicate={onDuplicate}
               parentCategory={node.type === 'category' ? node.name : parentCategory}
             />
           ))}
@@ -508,6 +521,59 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     buildTreeFromStructure(structure, xml)
   );
 
+  // Автосохранение изменений в структуру при работе с XML
+  React.useEffect(() => {
+    if (!xml || !onSave || treeData.length === 0) return;
+
+    const saveToStructure = async () => {
+      try {
+        const treeToObject = (nodes: TreeNode[]): any => {
+          const result: any = {};
+          nodes.forEach(node => {
+            const key = node.name;
+            if (node.children && node.children.length > 0) {
+              const isArray = node.children.every(child => child.name.match(/\[\d+\]$/));
+              if (isArray) {
+                const arrayKey = key.replace(/\[\d+\]$/, '');
+                if (!result[arrayKey]) result[arrayKey] = [];
+                const childObj = treeToObject(node.children);
+                result[arrayKey].push(childObj);
+              } else {
+                result[key] = treeToObject(node.children);
+              }
+            } else if (node.value !== undefined) {
+              result[key] = node.value;
+            }
+          });
+          return result;
+        };
+        
+        const xmlObject = treeToObject(treeData);
+        const builder = new XMLBuilder({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@',
+          textNodeName: '_text',
+          format: true,
+          indentBy: '  ',
+          suppressEmptyNode: false,
+        });
+        
+        const newXmlContent = builder.build(xmlObject);
+        const updatedStructure: XMLStructure = {
+          ...structure,
+          originalXml: newXmlContent
+        };
+        
+        onSave(updatedStructure);
+      } catch (error) {
+        console.error('Auto-save error:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(saveToStructure, 500); // debounce
+    return () => clearTimeout(timeoutId);
+  }, [treeData]);
+
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
     useSensor(TouchSensor, {}),
@@ -564,44 +630,83 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     toast.success('Поле видалено');
   };
 
-  const handleAdd = (categoryName: string) => {
+  const handleAdd = (parentId: string) => {
     setTreeData(prev => {
       const timestamp = Date.now();
       
-      const addToCategory = (nodes: TreeNode[]): TreeNode[] => {
+      const addToNode = (nodes: TreeNode[]): TreeNode[] => {
         return nodes.map(node => {
-          if (node.type === 'category' && node.name === categoryName) {
+          if (node.id === parentId) {
             const newField: TreeNode = {
-              id: `field-${categoryName}-${timestamp}`,
+              id: `field-${parentId}-${timestamp}`,
               name: 'нове_поле',
               value: '',
               type: 'field',
-              category: categoryName,
-              fieldData: {
-                path: `${categoryName.toLowerCase()}.new_field`,
-                type: 'string',
-                required: false,
-                sample: '',
-                category: categoryName,
-                order: node.children?.length || 0
-              }
+              category: node.category,
+              isExpanded: true
             };
             
             return {
               ...node,
-              children: [...(node.children || []), newField]
+              children: [...(node.children || []), newField],
+              isExpanded: true
             };
           }
           if (node.children) {
-            return { ...node, children: addToCategory(node.children) };
+            return { ...node, children: addToNode(node.children) };
           }
           return node;
         });
       };
       
-      return addToCategory(prev);
+      return addToNode(prev);
     });
     toast.success('Поле додано');
+  };
+
+  const handleDuplicate = (id: string) => {
+    setTreeData(prev => {
+      const timestamp = Date.now();
+      
+      const duplicateNode = (nodes: TreeNode[], parentNodes?: TreeNode[]): TreeNode[] => {
+        for (let i = 0; i < nodes.length; i++) {
+          const node = nodes[i];
+          
+          if (node.id === id) {
+            // Нашли узел - дублируем его
+            const duplicateNodeRecursive = (original: TreeNode, suffix: string): TreeNode => {
+              return {
+                ...original,
+                id: `${original.id}-copy-${suffix}`,
+                children: original.children?.map((child, idx) => 
+                  duplicateNodeRecursive(child, `${suffix}-${idx}`)
+                )
+              };
+            };
+            
+            const newNode = duplicateNodeRecursive(node, String(timestamp));
+            
+            // Вставляем сразу после оригинала
+            const newNodes = [...nodes];
+            newNodes.splice(i + 1, 0, newNode);
+            return newNodes;
+          }
+          
+          if (node.children) {
+            const updatedChildren = duplicateNode(node.children, nodes);
+            if (updatedChildren !== node.children) {
+              const newNodes = [...nodes];
+              newNodes[i] = { ...node, children: updatedChildren };
+              return newNodes;
+            }
+          }
+        }
+        return nodes;
+      };
+      
+      return duplicateNode(prev);
+    });
+    toast.success('Елемент продубльовано');
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -633,11 +738,73 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
   };
 
   const handleSaveAll = () => {
-    // Если дерево построено из XML, не пытаемся конвертировать обратно
-    // Просто показываем сообщение что изменения сохранены локально
+    // Если дерево построено из XML - конвертируем обратно в XML
     if (xml) {
-      toast.success('Зміни збережено локально. Функція експорту в XML буде додана пізніше.');
-      return;
+      try {
+        // Конвертируем дерево обратно в объект
+        const treeToObject = (nodes: TreeNode[]): any => {
+          const result: any = {};
+          
+          nodes.forEach(node => {
+            const key = node.name;
+            
+            if (node.children && node.children.length > 0) {
+              // Проверяем, это массив или объект
+              const isArray = node.children.every(child => 
+                child.name.match(/\[\d+\]$/)
+              );
+              
+              if (isArray) {
+                // Это массив
+                const arrayKey = key.replace(/\[\d+\]$/, '');
+                if (!result[arrayKey]) result[arrayKey] = [];
+                
+                const childObj = treeToObject(node.children);
+                result[arrayKey].push(childObj);
+              } else {
+                // Это объект
+                result[key] = treeToObject(node.children);
+              }
+            } else if (node.value !== undefined) {
+              // Простое значение
+              result[key] = node.value;
+            }
+          });
+          
+          return result;
+        };
+        
+        const xmlObject = treeToObject(treeData);
+        
+        // Конвертируем объект обратно в XML
+        const builder = new XMLBuilder({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@',
+          textNodeName: '_text',
+          format: true,
+          indentBy: '  ',
+          suppressEmptyNode: false,
+        });
+        
+        const newXmlContent = builder.build(xmlObject);
+        
+        // Обновляем originalXml в структуре
+        const updatedStructure: XMLStructure = {
+          ...structure,
+          originalXml: newXmlContent
+        };
+        
+        if (onSave) {
+          onSave(updatedStructure);
+        }
+        
+        toast.success('Зміни збережено!');
+        return;
+      } catch (error) {
+        console.error('Save error:', error);
+        toast.error('Помилка збереження: ' + (error as Error).message);
+        return;
+      }
     }
     
     // Преобразуем дерево обратно в XMLStructure (только для fallback режима)
@@ -720,14 +887,6 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with Save button */}
-      <div className="flex items-center justify-between p-4 border-b bg-card">
-        <h2 className="text-lg font-semibold">Структура XML</h2>
-        <Button onClick={handleSaveAll} className="gap-2" title="Зберегти всі зміни">
-          <Save className="h-4 w-4" />
-        </Button>
-      </div>
-
       {/* Tree */}
       <ScrollArea className="flex-1">
         <div className="p-4">
@@ -751,6 +910,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onAdd={handleAdd}
+                    onDuplicate={handleDuplicate}
                   />
                 ))}
               </SortableContext>

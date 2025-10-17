@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Check, Save, X } from 'lucide-react';
 import { XMLField, MappingRule } from '@/lib/xml-template-service';
 
 interface SimpleMappingViewProps {
@@ -10,6 +11,9 @@ interface SimpleMappingViewProps {
   systemFields: SystemField[];
   mappings: MappingRule[];
   onMappingChange: (mappings: MappingRule[]) => void;
+  onSave?: () => void;
+  onCancel?: () => void;
+  saving?: boolean;
 }
 
 export interface SystemField {
@@ -25,7 +29,10 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
   xmlFields,
   systemFields,
   mappings,
-  onMappingChange
+  onMappingChange,
+  onSave,
+  onCancel,
+  saving = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -71,11 +78,27 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
       {/* Заголовок */}
       <Card>
         <CardHeader className="pb-3">
-          <div>
-            <CardTitle className="text-lg">Перевірка парсингу</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Перевірте чи правильно розпізнались поля з XML файлу
-            </p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <CardTitle className="text-lg">Перевірка парсингу</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Перевірте чи правильно розпізнались поля з XML файлу
+              </p>
+            </div>
+            {(onSave || onCancel) && (
+              <div className="flex items-center gap-2">
+                {onCancel && (
+                  <Button variant="outline" size="icon" onClick={onCancel} disabled={saving} title="Скасувати">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                {onSave && (
+                  <Button variant="default" size="icon" onClick={onSave} disabled={saving} title="Зберегти">
+                    <Save className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </CardHeader>
       </Card>

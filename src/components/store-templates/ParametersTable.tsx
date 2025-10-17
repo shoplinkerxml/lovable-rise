@@ -8,7 +8,22 @@ import {
   Eye, 
   EyeOff,
   Trash2,
-  GripVertical
+  GripVertical,
+  Save,
+  X,
+  DollarSign,
+  Tag,
+  Package,
+  Image,
+  Coins,
+  FileText,
+  Link,
+  File,
+  Settings,
+  CreditCard,
+  Folder,
+  ListTree,
+  Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { XMLStructure } from '@/lib/xml-template-service';
@@ -16,11 +31,17 @@ import { XMLStructure } from '@/lib/xml-template-service';
 interface ParametersTableProps {
   structure: XMLStructure | null;
   onStructureChange?: (structure: XMLStructure) => void;
+  onSave?: () => void;
+  onCancel?: () => void;
+  saving?: boolean;
 }
 
 export const ParametersTable: React.FC<ParametersTableProps> = ({ 
   structure,
-  onStructureChange 
+  onStructureChange,
+  onSave,
+  onCancel,
+  saving = false
 }) => {
   const [hiddenFields, setHiddenFields] = useState<Set<number>>(new Set());
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -69,20 +90,88 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
     }
   };
 
-  const getCategoryIcon = (path: string) => {
-    const lowerPath = path.toLowerCase();
-    if (lowerPath.includes('price') || lowerPath.includes('ціна')) return '💰';
-    if (lowerPath.includes('category') || lowerPath.includes('категор')) return '🏷️';
-    if (lowerPath.includes('product') || lowerPath.includes('name') || lowerPath.includes('назва')) return '📦';
-    if (lowerPath.includes('image') || lowerPath.includes('зображ') || lowerPath.includes('picture')) return '🖼️';
-    if (lowerPath.includes('currency') || lowerPath.includes('валют')) return '💱';
-    if (lowerPath.includes('description') || lowerPath.includes('опис')) return '📝';
-    if (lowerPath.includes('url') || lowerPath.includes('link')) return '🔗';
-    return '📄';
+  const getCategoryIcon = (field: any) => {
+    const category = field.category || '';
+    const lowerCategory = category.toLowerCase();
+    
+    // Проверяем по названию категории
+    if (lowerCategory.includes('основна') || lowerCategory.includes('основная')) return Settings;
+    if (lowerCategory.includes('валют')) return CreditCard;
+    if (lowerCategory.includes('категор')) return Folder;
+    if (lowerCategory.includes('параметр')) return ListTree;
+    if (lowerCategory.includes('характеристик')) return Sparkles;
+    
+    // Проверяем по пути если категория не определена
+    const lowerPath = field.path.toLowerCase();
+    if (lowerPath.includes('price') || lowerPath.includes('ціна')) return DollarSign;
+    if (lowerPath.includes('currency') || lowerPath.includes('валют')) return CreditCard;
+    if (lowerPath.includes('category') || lowerPath.includes('категор')) return Folder;
+    if (lowerPath.includes('image') || lowerPath.includes('зображ') || lowerPath.includes('picture')) return Image;
+    if (lowerPath.includes('description') || lowerPath.includes('опис')) return FileText;
+    if (lowerPath.includes('url') || lowerPath.includes('link')) return Link;
+    if (lowerPath.includes('param')) return ListTree;
+    
+    return File;
+  };
+
+  const getDisplayName = (field: any) => {
+    const pathParts = field.path.split('.');
+    const lastName = pathParts[pathParts.length - 1];
+    
+    // Для характеристик с @name показываем значение @name
+    if (field.path.includes('param') && field.path.includes('@name')) {
+      return field.sample || lastName;
+    }
+    
+    // Для валют с @id показываем код валюты
+    if (field.path.includes('currency') && field.path.includes('@id')) {
+      return field.sample || lastName;
+    }
+    
+    // Для категорий с @id показываем название категории из соответствующего _text
+    if (field.path.includes('category') && field.path.includes('@id')) {
+      const basePath = field.path.replace('.@id', '');
+      const textField = structure?.fields.find(f => f.path === basePath + '._text');
+      return textField?.sample || lastName;
+    }
+    
+    return lastName;
+  };
+
+  const getDisplayValue = (field: any) => {
+    // Для характеристик с @name показываем значение из соответствующего _text
+    if (field.path.includes('param') && field.path.endsWith('@name')) {
+      const basePath = field.path.replace('.@name', '');
+      const textField = structure?.fields.find(f => 
+        f.path === basePath + '._text' || f.path === basePath
+      );
+      return textField?.sample || '-';
+    }
+    
+    // Для валют с @id показываем курс из соответствующего @rate
+    if (field.path.includes('currency') && field.path.endsWith('@id')) {
+      const basePath = field.path.replace('.@id', '');
+      const rateField = structure?.fields.find(f => f.path === basePath + '.@rate');
+      return rateField?.sample || '-';
+    }
+    
+    // Для категорий с @id показываем ID из самого поля
+    if (field.path.includes('category') && field.path.endsWith('@id')) {
+      return field.sample || '-';
+    }
+    
+    // Для обычных полей просто возвращаем sample
+    return field.sample || '-';
   };
 
   const getCategoryName = (field: any) => {
     return field.category || 'Інше';
+  };
+
+  const getShortPath = (path: string) => {
+    const parts = path.split('.');
+    if (parts.length <= 2) return path;
+    return '...' + parts.slice(-2).join('.');
   };
 
   const deleteField = (index: number) => {
@@ -122,7 +211,36 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="space-y-4">
+      {/* Заголовок с кнопками */}
+      {(onSave || onCancel) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <CardTitle className="text-lg">Структура XML</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Перегляньте та редагуйте структуру шаблону
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {onCancel && (
+                  <Button variant="outline" size="icon" onClick={onCancel} disabled={saving} title="Скасувати">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                {onSave && (
+                  <Button variant="default" size="icon" onClick={onSave} disabled={saving} title="Зберегти">
+                    <Save className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
+      <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
@@ -130,13 +248,37 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
             <TableHead className="font-semibold">Назва параметра</TableHead>
             <TableHead className="font-semibold">Значення (приклад)</TableHead>
             <TableHead className="font-semibold">XML шлях</TableHead>
-            <TableHead className="font-semibold">Тип</TableHead>
             <TableHead className="font-semibold">Категорія</TableHead>
             <TableHead className="w-40 font-semibold">Дії</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {structure.fields.map((field, index) => (
+          {structure.fields
+            .filter(field => {
+              // Полностью скрываем _text поля для param элементов, так как их значения показываются в @name строке
+              if (field.path.includes('param') && field.path.endsWith('_text')) {
+                const basePath = field.path.replace('._text', '');
+                const hasNameField = structure.fields.some(f => f.path === basePath + '.@name');
+                if (hasNameField) return false;
+              }
+              
+              // Скрываем @rate поля для валют, так как они показываются в @id строке
+              if (field.path.includes('currency') && field.path.endsWith('@rate')) {
+                const basePath = field.path.replace('.@rate', '');
+                const hasIdField = structure.fields.some(f => f.path === basePath + '.@id');
+                if (hasIdField) return false;
+              }
+              
+              // Скрываем _text поля для категорий, так как они показываются в @id строке
+              if (field.path.includes('category') && field.path.endsWith('_text')) {
+                const basePath = field.path.replace('._text', '');
+                const hasIdField = structure.fields.some(f => f.path === basePath + '.@id');
+                if (hasIdField) return false;
+              }
+              
+              return true;
+            })
+            .map((field, index) => (
             <TableRow 
               key={index}
               draggable
@@ -155,26 +297,26 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
               </TableCell>
               
               <TableCell>
-                <div className="font-medium">{field.path.split('.').pop()}</div>
+                <div className="font-medium">{getDisplayName(field)}</div>
               </TableCell>
               
               <TableCell>
-                <div className="text-gray-600 truncate max-w-xs" title={field.sample || ''}>
-                  {field.sample || '-'}
+                <div className="text-gray-600 truncate max-w-xs" title={getDisplayValue(field)}>
+                  {getDisplayValue(field)}
                 </div>
               </TableCell>
               
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
-                    {field.path}
+                  <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono" title={field.path}>
+                    {getShortPath(field.path)}
                   </code>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => copyPath(field.path)}
                     className="h-6 w-6 p-0"
-                    title="Копіювати шлях"
+                    title="Копіювати повний шлях"
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -182,17 +324,8 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
               </TableCell>
               
               <TableCell>
-                <Badge 
-                  variant="outline" 
-                  className={`${getTypeBadgeColor(field.type)} font-medium`}
-                >
-                  {field.type}
-                </Badge>
-              </TableCell>
-              
-              <TableCell>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{getCategoryIcon(field.path)}</span>
+                  {React.createElement(getCategoryIcon(field), { className: 'h-4 w-4 text-muted-foreground' })}
                   <span className="text-sm text-gray-600">{getCategoryName(field)}</span>
                 </div>
               </TableCell>
@@ -227,6 +360,7 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 };
