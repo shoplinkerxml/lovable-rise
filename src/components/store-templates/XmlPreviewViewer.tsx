@@ -80,18 +80,30 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
       textValue = truncateValue(String(obj._text));
     }
 
+    // Сначала атрибуты, потом остальные поля
+    const attributes: [string, any][] = [];
+    const others: [string, any][] = [];
+    
     for (const [key, value] of Object.entries(obj)) {
       if (key.startsWith('@')) {
-        // Атрибут
-        nodes.push({
-          name: key.substring(1),
-          value: truncateValue(String(value)),
-          type: 'attribute'
-        });
-      } else if (key === '_text') {
-        // Пропускаем _text, он будет добавлен в конце
-        continue;
-      } else if (Array.isArray(value)) {
+        attributes.push([key, value]);
+      } else if (key !== '_text') {
+        others.push([key, value]);
+      }
+    }
+    
+    // Обрабатываем атрибуты ПЕРВЫМИ
+    for (const [key, value] of attributes) {
+      nodes.push({
+        name: key.substring(1),
+        value: truncateValue(String(value)),
+        type: 'attribute'
+      });
+    }
+    
+    // Потом обрабатываем остальные поля
+    for (const [key, value] of others) {
+      if (Array.isArray(value)) {
         // Массив
         const children: TreeNode[] = [];
         value.forEach((item, idx) => {

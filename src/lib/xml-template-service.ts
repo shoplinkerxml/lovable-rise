@@ -4,6 +4,7 @@ export interface XMLStructure {
   root: string;
   fields: XMLField[];
   namespaces?: Record<string, string>;
+  originalXml?: string;
 }
 
 export interface XMLField {
@@ -178,6 +179,7 @@ export class XMLTemplateService {
     }
     
     const structure = this.extractStructure(parsed);
+    structure.originalXml = xmlContent; // Сохраняем оригинальный XML
     
     const stats = {
       parseTime: performance.now() - startTime,

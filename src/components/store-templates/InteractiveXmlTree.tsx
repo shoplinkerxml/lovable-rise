@@ -64,6 +64,7 @@ interface TreeNode {
 
 interface InteractiveXmlTreeProps {
   structure: XMLStructure;
+  xmlContent?: string;
   onSave?: (structure: XMLStructure) => void;
 }
 
@@ -126,7 +127,7 @@ function SortableTreeNode({
   };
 
   const getIcon = (node: TreeNode) => {
-    const iconClass = "h-3.5 w-3.5 text-primary";
+    const iconClass = "h-4 w-4 text-primary";
     
     const path = node.fieldData?.path?.toLowerCase() || node.name.toLowerCase();
     
@@ -234,11 +235,11 @@ function SortableTreeNode({
             </div>
           ) : (
             <>
-              <span className="font-mono text-sm font-medium text-foreground flex-shrink-0">{node.name}</span>
+              <span className="font-mono text-base font-medium text-foreground flex-shrink-0">{node.name}</span>
               {node.value && !node.children && (
                 <>
                   <span className="text-muted-foreground flex-shrink-0">:</span>
-                  <span className="font-mono text-sm text-muted-foreground truncate">{node.value}</span>
+                  <span className="font-mono text-base text-muted-foreground truncate">{node.value}</span>
                 </>
               )}
               
@@ -297,9 +298,25 @@ function SortableTreeNode({
   );
 }
 
-export function InteractiveXmlTree({ structure, onSave }: InteractiveXmlTreeProps) {
-  // Парсим поля напрямую (без XML, строим из структуры полей)
-  const buildTreeFromStructure = React.useCallback((structure: XMLStructure): TreeNode[] => {
+export function InteractiveXmlTree({ structure, xmlContent, onSave }: InteractiveXmlTreeProps) {
+  // Парсим XML напрямую если есть (приоритет: xmlContent prop, потом structure.originalXml)
+  const xml = xmlContent || structure.originalXml;
+  
+  const buildTreeFromStructure = React.useCallback((structure: XMLStructure, xml?: string): TreeNode[] => {
+    if (xml) {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@',
+        textNodeName: '_text',
+        parseAttributeValue: true,
+        parseTagValue: true,
+      });
+      
+      const parsed = parser.parse(xml);
+      return buildTree(parsed);
+    }
+    
+    // Fallback - строим из полей
     const obj: any = {};
     
     // Собираем объект из полей
@@ -347,7 +364,31 @@ export function InteractiveXmlTree({ structure, onSave }: InteractiveXmlTreeProp
       textValue = String(obj._text);
     }
 
+    // Сначала собираем атрибуты (@date, @version, @id и т.д.), потом остальные
+    const attributes: [string, any][] = [];
+    const others: [string, any][] = [];
+    
     for (const [key, value] of Object.entries(obj)) {
+      if (key.startsWith('@')) {
+        attributes.push([key, value]);
+      } else if (key !== '_text') {
+        others.push([key, value]);
+      }
+    }
+    
+    // Обрабатываем атрибуты ПЕРВЫМИ (включая @date из yml_catalog)
+    for (const [key, value] of attributes) {
+      const currentPath = parentPath ? `${parentPath}-${key}` : key;
+      nodes.push({
+        id: `${currentPath}-${nodeId++}`,
+        name: key, // Оставляем @ в имени (@date, @id, @available)
+        value: String(value),
+        type: 'field'
+      });
+    }
+    
+    // Потом обрабатываем остальные поля
+    for (const [key, value] of others) {
       const currentPath = parentPath ? `${parentPath}-${key}` : key;
       
       if (key.startsWith('@')) {
@@ -462,7 +503,7 @@ export function InteractiveXmlTree({ structure, onSave }: InteractiveXmlTreeProp
   };
 
   const [treeData, setTreeData] = React.useState<TreeNode[]>(() => 
-    buildTreeFromStructure(structure)
+    buildTreeFromStructure(structure, xml)
   );
 
   const sensors = useSensors(
@@ -590,7 +631,14 @@ export function InteractiveXmlTree({ structure, onSave }: InteractiveXmlTreeProp
   };
 
   const handleSaveAll = () => {
-    // Преобразуем дерево обратно в XMLStructure
+    // Если дерево построено из XML, не пытаемся конвертировать обратно
+    // Просто показываем сообщение что изменения сохранены локально
+    if (xml) {
+      toast.success('Зміни збережено локально. Функція експорту в XML буде додана пізніше.');
+      return;
+    }
+    
+    // Преобразуем дерево обратно в XMLStructure (только для fallback режима)
     const fields: XMLField[] = [];
     
     const extractFields = (nodes: TreeNode[]) => {
