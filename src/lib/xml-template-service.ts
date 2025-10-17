@@ -219,9 +219,15 @@ export class XMLTemplateService {
       const productPathParts = format.productPath.toLowerCase().split('.');
       const hasProductPath = productPathParts.some(part => lowerPath.includes(part + '.') || lowerPath.includes(part + '['));
       
-      // Основна інформація - поля корневого уровня, НЕ в товарах
-      if (lowerPath.match(/^[^.]+\.(name|company|url|shop_name|store_name|date)$/) && !hasProductPath) {
-        return 'Основна інформація';
+      // Основна інформація - поля корневого уровня и root атрибуты (@version, @encoding, @date), НЕ в товарах
+      if (!hasProductPath && !lowerPath.includes('currencies') && !lowerPath.includes('currency') && 
+          !lowerPath.match(/categor(y|ies)/)) {
+        // Проверяем что это root-level поля (name, company, url, date) или атрибуты (@version, @encoding)
+        const fieldName = lowerPath.split('.').pop() || '';
+        if (fieldName.match(/^(name|company|url|shop_name|store_name|date)$/) ||
+            fieldName.match(/^@(version|encoding|date)$/)) {
+          return 'Основна інформація';
+        }
       }
       
       // Валюти - проверяем по categoryPath или паттерну
@@ -241,11 +247,14 @@ export class XMLTemplateService {
         return 'Валюти';
       }
       
-      // Характеристики товару - ТОЛЬКО поля param с @name атрибутом
+      // Характеристики товару - поля param с атрибутом name (может быть @name или просто name)
       const paramPathLower = format.paramPath.toLowerCase();
       if (lowerPath.includes(paramPathLower + '[') && hasProductPath) {
-        // Проверяем что это поле @name или _text внутри param
+        // Проверяем что это поле с атрибутом name или его дочерние элементы (value, _text)
         if (lowerPath.includes('.@name') || 
+            lowerPath.includes('.name') ||
+            lowerPath.match(/param\[\d+\]\.value/) ||
+            lowerPath.match(/param\[\d+\]\._text/) ||
             (lowerPath.endsWith(']') && !lowerPath.includes('.@')) ||
             lowerPath.match(new RegExp(paramPathLower + '\\[\\d+\\]$')) ||
             lowerPath.includes('.@paramcode') ||
