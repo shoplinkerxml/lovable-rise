@@ -559,9 +559,59 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
         });
         
         const newXmlContent = builder.build(xmlObject);
+        
+        // Ре-парсим XML чтобы обновить fields
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@',
+          textNodeName: '_text',
+          parseAttributeValue: true,
+          parseTagValue: true,
+        });
+        
+        const parsedXml = parser.parse(newXmlContent);
+        const updatedFields: XMLField[] = [];
+        
+        // Извлекаем поля из распарсенного XML
+        const extractFieldsFromParsed = (obj: any, path = '', category = 'Інше') => {
+          Object.keys(obj).forEach(key => {
+            const value = obj[key];
+            const currentPath = path ? `${path}.${key}` : key;
+            
+            if (Array.isArray(value)) {
+              value.forEach((item, idx) => {
+                if (typeof item === 'object') {
+                  extractFieldsFromParsed(item, `${currentPath}[${idx}]`, category);
+                } else {
+                  updatedFields.push({
+                    path: `${currentPath}[${idx}]`,
+                    type: 'string',
+                    required: false,
+                    sample: String(item),
+                    category,
+                  });
+                }
+              });
+            } else if (typeof value === 'object' && value !== null) {
+              extractFieldsFromParsed(value, currentPath, category);
+            } else {
+              updatedFields.push({
+                path: currentPath,
+                type: 'string',
+                required: false,
+                sample: String(value),
+                category,
+              });
+            }
+          });
+        };
+        
+        extractFieldsFromParsed(parsedXml);
+        
         const updatedStructure: XMLStructure = {
           ...structure,
-          originalXml: newXmlContent
+          originalXml: newXmlContent,
+          fields: updatedFields,
         };
         
         onSave(updatedStructure);
