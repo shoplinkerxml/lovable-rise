@@ -34,13 +34,22 @@ import {
   Type,
   CheckCircle2,
   Image,
-  Package
+  Package,
+  MoreVertical,
+  Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { XMLStructure, XMLField } from '@/lib/xml-template-service';
+import { XMLParser } from 'fast-xml-parser';
 
 interface TreeNode {
   id: string;
@@ -109,6 +118,13 @@ function SortableTreeNode({
     setIsEditing(false);
   };
 
+  const handleCopy = () => {
+    // Копируем значение в буфер обмена
+    const textToCopy = node.value || node.name;
+    navigator.clipboard.writeText(textToCopy);
+    toast.success('Скопійовано');
+  };
+
   const getIcon = (node: TreeNode) => {
     const iconClass = "h-3.5 w-3.5 text-primary";
     
@@ -165,88 +181,102 @@ function SortableTreeNode({
   return (
     <div ref={setNodeRef} style={style}>
       <div
-        className="flex items-center gap-2 py-1 px-2 hover:bg-muted/50 rounded cursor-pointer group"
+        className="flex items-center gap-2 py-1 px-2 hover:bg-muted/50 rounded group"
         style={{ paddingLeft: `${level * 20}px` }}
-        onClick={() => node.children && node.children.length > 0 && onToggle(node.id)}
       >
-        {/* Expand/Collapse */}
-        {node.children && node.children.length > 0 && (
-          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-            {node.isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-        )}
-        {!(node.children && node.children.length > 0) && <div className="w-4 flex-shrink-0" />}
-
-        {/* Icon */}
-        <div className="flex-shrink-0">
-          {getIcon(node)}
+        {/* Drag Handle - СЛЕВА */}
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 flex-shrink-0">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
 
-        {/* Content */}
-        {isEditing ? (
-          <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
-            <Input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="h-6 text-xs flex-1 font-mono px-1"
-              placeholder="Назва"
-            />
-            <Input
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              className="h-6 text-xs flex-1 font-mono px-1"
-              placeholder="Значення"
-            />
-            <Button size="sm" variant="default" onClick={handleSave} className="h-6 w-6 p-0 flex-shrink-0" title="Зберегти">
-              <Save className="h-3 w-3" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={handleCancel} className="h-6 w-6 p-0 flex-shrink-0" title="Скасувати">
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <>
-            <span className="font-mono text-sm font-medium text-foreground flex-shrink-0">{node.name}</span>
-            {node.value && (
-              <>
-                <span className="text-muted-foreground flex-shrink-0">:</span>
-                <span className="font-mono text-sm text-muted-foreground truncate">{node.value}</span>
-              </>
-            )}
+        {/* Expand/Collapse */}
+        <div onClick={() => node.children && node.children.length > 0 && onToggle(node.id)} className="cursor-pointer flex items-center gap-2 flex-1 min-w-0">
+          {node.children && node.children.length > 0 && (
+            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+              {node.isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          )}
+          {!(node.children && node.children.length > 0) && <div className="w-4 flex-shrink-0" />}
 
-            {/* Actions - всегда видны */}
-            <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-              <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing flex-shrink-0">
-                <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                className="h-6 w-6 p-0 flex-shrink-0"
-                title="Редагувати"
-              >
-                <Pencil className="h-3 w-3" />
+          {/* Icon */}
+          <div className="flex-shrink-0">
+            {getIcon(node)}
+          </div>
+
+          {/* Content */}
+          {isEditing ? (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="h-6 text-xs font-mono px-1"
+                style={{ width: `${Math.max(editName.length * 8 + 16, 100)}px`, minWidth: '100px' }}
+                placeholder="Назва"
+              />
+              <span className="text-muted-foreground">:</span>
+              <Input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="h-6 text-xs font-mono px-1"
+                style={{ width: `${Math.max(editValue.length * 7 + 16, 150)}px`, minWidth: '150px' }}
+                placeholder="Значення"
+              />
+              <Button size="sm" variant="default" onClick={handleSave} className="h-6 w-6 p-0 flex-shrink-0" title="Зберегти">
+                <Save className="h-3 w-3" />
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onDelete(node.id)}
-                className="h-6 w-6 p-0 text-destructive flex-shrink-0"
-                title="Видалити"
-              >
-                <Trash2 className="h-3 w-3" />
+              <Button size="sm" variant="ghost" onClick={handleCancel} className="h-6 w-6 p-0 flex-shrink-0" title="Скасувати">
+                <X className="h-3 w-3" />
               </Button>
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              <span className="font-mono text-sm font-medium text-foreground flex-shrink-0">{node.name}</span>
+              {node.value && !node.children && (
+                <>
+                  <span className="text-muted-foreground flex-shrink-0">:</span>
+                  <span className="font-mono text-sm text-muted-foreground truncate">{node.value}</span>
+                </>
+              )}
+              
+              {/* Menu - 4 точки сразу после текста */}
+              <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      title="Меню"
+                    >
+                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                      <Pencil className="h-3.5 w-3.5 mr-2" />
+                      Редагувати
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCopy}>
+                      <Copy className="h-3.5 w-3.5 mr-2" />
+                      Копіювати
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onDelete(node.id)} className="text-destructive">
+                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                      Видалити
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Children */}
+      {/* Children - КАК В МОДАЛКЕ просто рендерим */}
       {node.isExpanded && node.children && node.children.length > 0 && (
         <div>
           {node.children.map((child) => (
@@ -268,145 +298,168 @@ function SortableTreeNode({
 }
 
 export function InteractiveXmlTree({ structure, onSave }: InteractiveXmlTreeProps) {
-  // Построение дерева ТОЧНО КАК В XmlPreviewViewer
+  // Парсим поля напрямую (без XML, строим из структуры полей)
   const buildTreeFromStructure = React.useCallback((structure: XMLStructure): TreeNode[] => {
-    // Создаем объект из полей для парсинга
-    const buildObject = (fields: XMLField[]) => {
-      const obj: any = {};
+    const obj: any = {};
+    
+    // Собираем объект из полей
+    structure.fields.forEach(field => {
+      const parts = field.path.split('.');
+      let current = obj;
       
-      fields.forEach(field => {
-        const parts = field.path.split('.');
-        let current = obj;
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLast = i === parts.length - 1;
         
-        for (let i = 0; i < parts.length; i++) {
-          const part = parts[i];
-          const isLast = i === parts.length - 1;
+        const arrayMatch = part.match(/(.+)\[(\d+)\]/);
+        if (arrayMatch) {
+          const [, name, index] = arrayMatch;
+          const idx = parseInt(index);
           
-          // Проверка на массив
-          const arrayMatch = part.match(/(.+)\[(\d+)\]/);
-          if (arrayMatch) {
-            const [, name, index] = arrayMatch;
-            const idx = parseInt(index);
-            
-            if (!current[name]) current[name] = [];
-            if (!current[name][idx]) current[name][idx] = {};
-            
-            if (isLast) {
-              // Атрибут или текст
-              if (parts[parts.length - 1].startsWith('@')) {
-                current[name][idx][parts[parts.length - 1]] = field.sample;
-              } else if (parts[parts.length - 1] === '_text') {
-                current[name][idx]._text = field.sample;
-              } else {
-                current[name][idx] = field.sample;
-              }
-            } else {
-              current = current[name][idx];
-            }
+          if (!current[name]) current[name] = [];
+          
+          if (isLast) {
+            current[name][idx] = field.sample;
           } else {
-            if (isLast) {
-              current[part] = field.sample;
-            } else {
-              if (!current[part]) current[part] = {};
-              current = current[part];
-            }
+            if (!current[name][idx]) current[name][idx] = {};
+            current = current[name][idx];
+          }
+        } else {
+          if (isLast) {
+            current[part] = field.sample;
+          } else {
+            if (!current[part]) current[part] = {};
+            current = current[part];
           }
         }
-      });
-      
-      return obj;
-    };
-    
-    const obj = buildObject(structure.fields);
-    
-    // Теперь строим дерево ТОЧНО как в XmlPreviewViewer
-    const buildTree = (obj: any, parentPath = ''): TreeNode[] => {
-      const nodes: TreeNode[] = [];
-      let textValue: string | null = null;
-      let nodeId = 0;
-
-      // Сначала собираем текстовое значение если есть
-      if (obj._text !== undefined) {
-        textValue = String(obj._text);
       }
-
-      for (const [key, value] of Object.entries(obj)) {
-        const currentPath = parentPath ? `${parentPath}-${key}` : key;
-        
-        if (key.startsWith('@')) {
-          // Атрибут
-          nodes.push({
-            id: `${currentPath}-${nodeId++}`,
-            name: key.substring(1),
-            value: String(value),
-            type: 'field'
-          });
-        } else if (key === '_text') {
-          // Пропускаем _text, он будет добавлен в конце
-          continue;
-        } else if (Array.isArray(value)) {
-          // Массив - каждый элемент отдельно!
-          const children: TreeNode[] = [];
-          value.forEach((item, idx) => {
-            if (typeof item === 'object') {
-              children.push({
-                id: `${currentPath}-${idx}-${nodeId++}`,
-                name: `${key}[${idx}]`,
-                children: buildTree(item, `${currentPath}-${idx}`),
-                type: 'field',
-                isExpanded: true
-              });
-            } else {
-              children.push({
-                id: `${currentPath}-${idx}-${nodeId++}`,
-                name: `${key}[${idx}]`,
-                value: String(item),
-                type: 'field'
-              });
-            }
-          });
-          nodes.push({
-            id: `${currentPath}-${nodeId++}`,
-            name: key,
-            children,
-            type: 'field',
-            isExpanded: true
-          });
-        } else if (typeof value === 'object' && value !== null) {
-          // Объект
-          nodes.push({
-            id: `${currentPath}-${nodeId++}`,
-            name: key,
-            children: buildTree(value, currentPath),
-            type: 'field',
-            isExpanded: true
-          });
-        } else {
-          // Простое значение
-          nodes.push({
-            id: `${currentPath}-${nodeId++}`,
-            name: key,
-            value: String(value),
-            type: 'field'
-          });
-        }
-      }
-
-      // Добавляем текстовое значение в конце как "value"
-      if (textValue !== null && nodes.length > 0) {
-        nodes.push({
-          id: `${parentPath}-value-${nodeId++}`,
-          name: 'value',
-          value: textValue,
-          type: 'field'
-        });
-      }
-
-      return nodes;
-    };
+    });
     
     return buildTree(obj);
   }, []);
+
+  const buildTree = (obj: any, parentPath = ''): TreeNode[] => {
+    const nodes: TreeNode[] = [];
+    let textValue: string | null = null;
+    let nodeId = 0;
+
+    if (obj._text !== undefined) {
+      textValue = String(obj._text);
+    }
+
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = parentPath ? `${parentPath}-${key}` : key;
+      
+      if (key.startsWith('@')) {
+        nodes.push({
+          id: `${currentPath}-${nodeId++}`,
+          name: key.substring(1),
+          value: String(value),
+          type: 'field'
+        });
+      } else if (key === '_text') {
+        continue;
+      } else if (Array.isArray(value)) {
+        // МАССИВ - каждый элемент отдельно под родителем
+        console.log(`[buildTree] Массив найден: ${key}, элементов: ${value.length}`, value);
+        const children: TreeNode[] = [];
+        value.forEach((item, idx) => {
+          if (typeof item === 'object') {
+            children.push({
+              id: `${currentPath}-${idx}-${nodeId++}`,
+              name: `${key}[${idx}]`,
+              children: buildTree(item, `${currentPath}-${idx}`),
+              type: 'field',
+              isExpanded: true
+            });
+          } else {
+            children.push({
+              id: `${currentPath}-${idx}-${nodeId++}`,
+              name: `${key}[${idx}]`,
+              value: String(item),
+              type: 'field'
+            });
+          }
+        });
+        console.log(`[buildTree] Создано детей для ${key}:`, children.length);
+        nodes.push({
+          id: `${currentPath}-${nodeId++}`,
+          name: key,
+          children,
+          type: 'field',
+          isExpanded: true
+        });
+      } else if (typeof value === 'object' && value !== null) {
+        nodes.push({
+          id: `${currentPath}-${nodeId++}`,
+          name: key,
+          children: buildTree(value, currentPath),
+          type: 'field',
+          isExpanded: true
+        });
+      } else {
+        // Простое значение - проверяем, может это массив в виде строки
+        const strValue = String(value);
+        const isArrayLike = strValue.startsWith('[') && strValue.endsWith(']');
+        
+        if (isArrayLike) {
+          // Парсим массив из строки
+          const items = strValue
+            .slice(1, -1)
+            .split(',')
+            .map(u => u.trim().replace(/^['"]|['"]$/g, ''))
+            .filter(u => u.length > 0);
+          
+          if (items.length > 0) {
+            const children: TreeNode[] = items.map((item, idx) => ({
+              id: `${currentPath}-${idx}-${nodeId++}`,
+              name: `${key}[${idx}]`,
+              value: item,
+              type: 'field'
+            }));
+            
+            nodes.push({
+              id: `${currentPath}-${nodeId++}`,
+              name: key,
+              children,
+              type: 'field',
+              isExpanded: true
+            });
+            continue;
+          }
+        }
+        
+        // Обычное значение
+        nodes.push({
+          id: `${currentPath}-${nodeId++}`,
+          name: key,
+          value: strValue,
+          type: 'field'
+        });
+      }
+    }
+
+    if (textValue !== null && nodes.length > 0) {
+      nodes.push({
+        id: `${parentPath}-value-${nodeId++}`,
+        name: 'value',
+        value: textValue,
+        type: 'field'
+      });
+    }
+
+    return nodes;
+  };
+
+  const buildTreeFromFields = (fields: XMLField[]): TreeNode[] => {
+    // Fallback если нет XML
+    return fields.map((f, i) => ({
+      id: `field-${i}`,
+      name: f.path.split('.').pop() || f.path,
+      value: f.sample,
+      type: 'field' as const
+    }));
+  };
 
   const [treeData, setTreeData] = React.useState<TreeNode[]>(() => 
     buildTreeFromStructure(structure)
