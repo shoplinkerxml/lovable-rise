@@ -301,6 +301,10 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
     }))
   );
 
+  // State для ограничения отображаемых строк
+  const [showAll, setShowAll] = React.useState(false);
+  const INITIAL_ROWS = 50;
+
   // НЕТ useEffect - НИКАКОЙ синхронизации с props
 
   // Фильтруем данные для отображения и объединяем пары
@@ -313,6 +317,13 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
     return data;
   }, [data, category]);
 
+  // Ограничиваем количество отображаемых строк для производительности
+  const displayData = React.useMemo(() => {
+    return showAll ? filteredData : filteredData.slice(0, INITIAL_ROWS);
+  }, [filteredData, showAll]);
+
+  const hasMore = filteredData.length > INITIAL_ROWS;
+
   const sortableId = React.useId();
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -321,8 +332,8 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
   );
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => filteredData?.map(({ id }) => id) || [],
-    [filteredData]
+    () => displayData?.map(({ id }) => id) || [],
+    [displayData]
   );
 
   const columns: ColumnDef<EditableRow>[] = [
@@ -349,7 +360,7 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
   ];
 
   const table = useReactTable({
-    data: filteredData,
+    data: displayData,
     columns,
     getRowId: (row) => row.id.toString(),
     getCoreRowModel: getCoreRowModel(),
@@ -474,6 +485,20 @@ export function EditableXMLTable({ category, fields, onFieldsChange }: EditableX
         </div>
       </CardHeader>
       <CardContent>
+        {hasMore && !showAll && (
+          <div className="mb-3 p-3 bg-muted rounded-lg flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Показано {INITIAL_ROWS} з {filteredData.length} записів
+            </span>
+            <Button
+              onClick={() => setShowAll(true)}
+              size="sm"
+              variant="outline"
+            >
+              Показати всі ({filteredData.length})
+            </Button>
+          </div>
+        )}
         <div className="overflow-hidden rounded-lg border">
           <DndContext
             collisionDetection={closestCenter}

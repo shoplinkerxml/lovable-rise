@@ -8,12 +8,17 @@ import { Upload, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { XMLTemplateService } from '@/lib/xml-template-service';
 import { toast } from 'sonner';
 import { useI18n } from '@/providers/i18n-provider';
+import { XMLStructureDialog, type XMLStructureMapping } from './XMLStructureDialog';
 
 export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [url, setUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [showStructureDialog, setShowStructureDialog] = useState(false);
+  const [pendingSource, setPendingSource] = useState<File | string | null>(null);
+  const [xmlPreview, setXmlPreview] = useState('');
+  const [detectedFormatType, setDetectedFormatType] = useState<'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom'>('custom');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -25,7 +30,34 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
     }
 
     setFile(selectedFile);
-    await parseXML(selectedFile);
+    setPendingSource(selectedFile);
+    
+    // Читаем первые 50 строк для превью и определяем формат
+    try {
+      const text = await selectedFile.text();
+      const lines = text.split('\n').slice(0, 50);
+      setXmlPreview(lines.join('\n') + (text.split('\n').length > 50 ? '\n\n... (файл обрізано для перегляду)' : ''));
+      
+      // Определяем формат
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes('yml_catalog') && lowerText.includes('categories') && lowerText.includes('currencies')) {
+        setDetectedFormatType('rozetka');
+      } else if (lowerText.includes('yml_catalog') || (lowerText.includes('offers') && lowerText.includes('offer'))) {
+        setDetectedFormatType('epicentr');
+      } else if (lowerText.includes('<price>') && lowerText.includes('<currency') && lowerText.includes('<catalog>')) {
+        setDetectedFormatType('mma');
+      } else if (lowerText.includes('<price>') && lowerText.includes('<items>')) {
+        setDetectedFormatType('price');
+      } else if (lowerText.includes('<shop>') && lowerText.includes('<items>')) {
+        setDetectedFormatType('prom');
+      } else {
+        setDetectedFormatType('custom');
+      }
+    } catch (error) {
+      console.error('Error reading XML preview:', error);
+    }
+    
+    setShowStructureDialog(true);
   };
 
   const handleUrlSubmit = async () => {
@@ -34,14 +66,57 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
       return;
     }
 
-    await parseXML(url);
+    setPendingSource(url);
+    
+    // Загружаем превью для URL и определяем формат
+    try {
+      const response = await fetch(url);
+      const text = await response.text();
+      const lines = text.split('\n').slice(0, 50);
+      setXmlPreview(lines.join('\n') + (text.split('\n').length > 50 ? '\n\n... (файл обрізано для перегляду)' : ''));
+      
+      // Определяем формат
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes('yml_catalog') && lowerText.includes('categories') && lowerText.includes('currencies')) {
+        setDetectedFormatType('rozetka');
+      } else if (lowerText.includes('yml_catalog') || (lowerText.includes('offers') && lowerText.includes('offer'))) {
+        setDetectedFormatType('epicentr');
+      } else if (lowerText.includes('<price>') && lowerText.includes('<currency') && lowerText.includes('<catalog>')) {
+        setDetectedFormatType('mma');
+      } else if (lowerText.includes('<price>') && lowerText.includes('<items>')) {
+        setDetectedFormatType('price');
+      } else if (lowerText.includes('<shop>') && lowerText.includes('<items>')) {
+        setDetectedFormatType('prom');
+      } else {
+        setDetectedFormatType('custom');
+      }
+    } catch (error) {
+      console.error('Error loading XML preview:', error);
+      setXmlPreview('Помилка завантаження превью');
+    }
+    
+    setShowStructureDialog(true);
   };
 
-  const parseXML = async (source: File | string) => {
+  const handleStructureConfirm = async (mapping: XMLStructureMapping) => {
+    setShowStructureDialog(false);
+    if (pendingSource) {
+      await parseXML(pendingSource, mapping);
+      setPendingSource(null);
+    }
+  };
+
+  const handleStructureCancel = () => {
+    setShowStructureDialog(false);
+    setPendingSource(null);
+    setXmlPreview('');
+  };
+
+  const parseXML = async (source: File | string, mapping: XMLStructureMapping) => {
     setLoading(true);
     try {
       const service = new XMLTemplateService();
-      const result = await service.parseXML(source);
+      const result = await service.parseXML(source, mapping);
       
       toast.success(`${t('xml_loaded')}! ${result.stats.itemsCount} ${t('items_found')}`);
       
@@ -57,7 +132,16 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
   };
 
   return (
-    <Card>
+    <>
+      <XMLStructureDialog
+        open={showStructureDialog}
+        onConfirm={handleStructureConfirm}
+        onCancel={handleStructureCancel}
+        xmlPreview={xmlPreview}
+        detectedFormat={detectedFormatType}
+      />
+      
+      <Card>
       <CardHeader>
         <CardTitle>{t('upload_xml')}</CardTitle>
         <CardDescription>
@@ -128,5 +212,6 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
         </Tabs>
       </CardContent>
     </Card>
+    </>
   );
 };

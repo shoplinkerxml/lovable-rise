@@ -32,9 +32,9 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
     'Основна інформація',
     'Валюти',
     'Категорії',
-    'Атрибути товару',
     'Параметри товару',
-    'Характеристики товару'
+    'Характеристики товару',
+    'Інше'
   ];
 
   const handleFieldsChange = (category: string, newFields: typeof structure.fields) => {

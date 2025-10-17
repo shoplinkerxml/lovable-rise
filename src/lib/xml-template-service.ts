@@ -31,10 +31,22 @@ interface ParseStats {
   itemsCount: number;
 }
 
+// Типы XML форматов
+export type XMLFormatType = 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom' | 'unknown';
+
+interface XMLFormat {
+  type: XMLFormatType;
+  productPath: string; // Путь к товарам: 'offers.offer' или 'items.item'
+  categoryPath: string; // Путь к категориям
+  paramPath: string; // Путь к характеристикам внутри товара
+}
+
 export class XMLTemplateService {
   private parser: XMLParser;
+  private detectedFormat?: XMLFormat;
 
   constructor() {
+    // Парсер с универсальной конфигурацией
     this.parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@',
@@ -45,14 +57,96 @@ export class XMLTemplateService {
       processEntities: true,
       allowBooleanAttributes: true,
       isArray: (name, jpath) => {
-        // Помечаем элементы которые всегда массивы
-        return ['currencies.currency', 'categories.category', 'offers.offer', 'offer.picture', 'offer.param'].includes(jpath);
+        // Универсальное определение массивов
+        // YML формат
+        if (['currencies.currency', 'categories.category', 'offers.offer', 'offer.picture', 'offer.param'].includes(jpath)) {
+          return true;
+        }
+        // Shop-items формат
+        if (jpath.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
+          return true;
+        }
+        // Общие паттерны
+        if (jpath.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
+          return true;
+        }
+        return false;
       }
     });
   }
 
+  // Определение типа XML формата
+  private detectXMLFormat(data: any): XMLFormat {
+    const dataStr = JSON.stringify(data).toLowerCase();
+    
+    // Rozetka формат (YML с categories и currencies)
+    if (dataStr.includes('yml_catalog') && dataStr.includes('categories') && dataStr.includes('currencies')) {
+      return {
+        type: 'rozetka',
+        productPath: 'offers.offer',
+        categoryPath: 'categories.category',
+        paramPath: 'param'
+      };
+    }
+    
+    // Epicentr формат (YML без categories и currencies, с lang атрибутами)
+    if (dataStr.includes('yml_catalog') || (dataStr.includes('offers') && dataStr.includes('offer'))) {
+      return {
+        type: 'epicentr',
+        productPath: 'offers.offer',
+        categoryPath: '',
+        paramPath: 'param'
+      };
+    }
+    
+    // MMA формат (price.items.item с currency в корне)
+    if (data.price && data.price.items && data.price.currency) {
+      return {
+        type: 'mma',
+        productPath: 'items.item',
+        categoryPath: 'catalog.category',
+        paramPath: 'param'
+      };
+    }
+    
+    // Price формат (price.items.item)
+    if (data.price && data.price.items) {
+      return {
+        type: 'price',
+        productPath: 'items.item',
+        categoryPath: 'categories.category',
+        paramPath: 'param'
+      };
+    }
+    
+    // Prom формат (shop.items.item)
+    if (dataStr.includes('shop') && (dataStr.includes('items') || dataStr.includes('item'))) {
+      return {
+        type: 'prom',
+        productPath: 'items.item',
+        categoryPath: 'catalog.category',
+        paramPath: 'param'
+      };
+    }
+    
+    // Неизвестный формат - попробуем универсально
+    return {
+      type: 'unknown',
+      productPath: '',
+      categoryPath: '',
+      paramPath: 'param'
+    };
+  }
+
   // Парсинг XML с оптимизацией для больших файлов
-  async parseXML(source: string | File): Promise<{
+  async parseXML(source: string | File, userMapping?: {
+    formatType: 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom';
+    rootTag: string;
+    productTag: string;
+    categoryTag: string;
+    currencyTag: string;
+    paramTag: string;
+  }): Promise<{
     structure: XMLStructure;
     data: any;
     stats: ParseStats;
@@ -67,6 +161,22 @@ export class XMLTemplateService {
     }
 
     const parsed = this.parser.parse(xmlContent);
+    
+    // Используем маппинг пользователя или автоопределение
+    if (userMapping) {
+      this.detectedFormat = {
+        type: userMapping.formatType,
+        productPath: userMapping.productTag,
+        categoryPath: userMapping.categoryTag,
+        paramPath: userMapping.paramTag
+      };
+      console.log('User-defined XML format:', this.detectedFormat);
+    } else {
+      // Автоопределение формата
+      this.detectedFormat = this.detectXMLFormat(parsed);
+      console.log('Auto-detected XML format:', this.detectedFormat);
+    }
+    
     const structure = this.extractStructure(parsed);
     
     const stats = {
@@ -101,34 +211,52 @@ export class XMLTemplateService {
     
     const getCategory = (fieldPath: string): string => {
       const lowerPath = fieldPath.toLowerCase();
+      const format = this.detectedFormat;
       
-      // Основна інформація (магазин)
-      if (lowerPath.match(/^yml_catalog\.shop\.(name|company|url)$/)) {
+      if (!format) return 'Інше';
+      
+      // Проверяем есть ли в пути секция товаров (пользовательский productPath)
+      const productPathParts = format.productPath.toLowerCase().split('.');
+      const hasProductPath = productPathParts.some(part => lowerPath.includes(part + '.') || lowerPath.includes(part + '['));
+      
+      // Основна інформація - поля корневого уровня, НЕ в товарах
+      if (lowerPath.match(/^[^.]+\.(name|company|url|shop_name|store_name|date)$/) && !hasProductPath) {
         return 'Основна інформація';
       }
       
-      // Валюти (только currencies.currency, НЕ offer.currencyId)
-      if ((lowerPath.includes('currencies.currency') || lowerPath.includes('yml_catalog.shop.currencies')) && !lowerPath.includes('offer')) {
-        return 'Валюти';
+      // Валюти - проверяем по categoryPath или паттерну
+      if (format.categoryPath) {
+        const categoryPathLower = format.categoryPath.toLowerCase();
+        if (lowerPath.includes(categoryPathLower) && !hasProductPath) {
+          return 'Категорії';
+        }
       }
-      
-      // Категорії (только categories.category, НЕ offer.categoryId)
-      if ((lowerPath.includes('categories.category') || lowerPath.includes('yml_catalog.shop.categories')) && !lowerPath.includes('offer')) {
+      // Фолбек для категорий
+      if (lowerPath.match(/categor(y|ies)/) && !hasProductPath) {
         return 'Категорії';
       }
       
-      // Атрибути товару (id, available у offer)
-      if (lowerPath.match(/offers\.offer\[\d+\]\.@/)) {
-        return 'Атрибути товару';
+      // Валюти - только секция валют, НЕ поля товара
+      if (lowerPath.match(/currenc(y|ies)/) && !hasProductPath) {
+        return 'Валюти';
       }
       
-      // Характеристики товару (param)
-      if (lowerPath.includes('.param')) {
-        return 'Характеристики товару';
+      // Характеристики товару - ТОЛЬКО поля param с @name атрибутом
+      const paramPathLower = format.paramPath.toLowerCase();
+      if (lowerPath.includes(paramPathLower + '[') && hasProductPath) {
+        // Проверяем что это поле @name или _text внутри param
+        if (lowerPath.includes('.@name') || 
+            (lowerPath.endsWith(']') && !lowerPath.includes('.@')) ||
+            lowerPath.match(new RegExp(paramPathLower + '\\[\\d+\\]$')) ||
+            lowerPath.includes('.@paramcode') ||
+            lowerPath.includes('.@valuecode') ||
+            lowerPath.includes('.@lang')) {
+          return 'Характеристики товару';
+        }
       }
       
-      // Параметри товару (все остальное в offer, включая categoryId и currencyId)
-      if (lowerPath.includes('offers.offer')) {
+      // Параметри товару - ВСЕ остальное что касается товара (price, category, name, description, picture и т.д.)
+      if (hasProductPath) {
         return 'Параметри товару';
       }
       
@@ -151,10 +279,57 @@ export class XMLTemplateService {
           const firstItem = value[0];
           
           if (typeof firstItem === 'object' && firstItem !== null) {
-            // Массив объектов - обрабатываем каждый элемент
-            value.forEach((item: any, index: number) => {
-              traverse(item, `${fieldPath}[${index}]`, depth + 1);
-            });
+            // Проверяем есть ли @lang атрибут - это может быть <name lang="ru"> и <name lang="ua">
+            const hasLangAttr = value.some((item: any) => item['@lang'] !== undefined);
+            
+            if (hasLangAttr) {
+              // Обрабатываем каждый элемент с lang как отдельное поле
+              value.forEach((item: any) => {
+                const lang = item['@lang'];
+                const langSuffix = lang ? `_${lang}` : '';
+                const pathWithLang = `${fieldPath}${langSuffix}`;
+                
+                // Добавляем атрибуты кроме @lang
+                Object.entries(item).forEach(([attrKey, attrValue]) => {
+                  if (attrKey.startsWith('@') && attrKey !== '@lang') {
+                    fields.push({
+                      path: `${pathWithLang}.${attrKey}`,
+                      type: this.detectType(attrValue),
+                      required: false,
+                      sample: this.getSample(attrValue),
+                      category: getCategory(`${pathWithLang}.${attrKey}`),
+                      order: orderCounter++
+                    });
+                  }
+                });
+                
+                // Добавляем текстовое значение
+                if (item._text !== undefined) {
+                  fields.push({
+                    path: pathWithLang,
+                    type: this.detectType(item._text),
+                    required: false,
+                    sample: this.getSample(item._text),
+                    category: getCategory(pathWithLang),
+                    order: orderCounter++
+                  });
+                } else if (typeof item === 'string') {
+                  fields.push({
+                    path: pathWithLang,
+                    type: 'string',
+                    required: false,
+                    sample: this.getSample(item),
+                    category: getCategory(pathWithLang),
+                    order: orderCounter++
+                  });
+                }
+              });
+            } else {
+              // Массив объектов без lang - обрабатываем каждый элемент
+              value.forEach((item: any, index: number) => {
+                traverse(item, `${fieldPath}[${index}]`, depth + 1);
+              });
+            }
           } else {
             // Массив простых значений
             fields.push({
@@ -173,10 +348,24 @@ export class XMLTemplateService {
             // Сначала добавляем атрибуты (например, @name для param, @id для category)
             const attributes = Object.entries(valueObj).filter(([k]) => k.startsWith('@'));
             const sortedAttrs = attributes.sort((a, b) => {
-              // @name всегда первый
-              if (a[0] === '@name') return -1;
-              if (b[0] === '@name') return 1;
-              return 0;
+              // Приоритет для характеристик: @name, @paramcode, @valuecode, @lang, остальные
+              const priority: Record<string, number> = {
+                '@name': 1,
+                '@paramcode': 2,
+                '@valuecode': 3,
+                '@lang': 4,
+                '@id': 1,
+                '@code': 2
+              };
+              
+              const aPriority = priority[a[0]] || 99;
+              const bPriority = priority[b[0]] || 99;
+              
+              if (aPriority !== bPriority) {
+                return aPriority - bPriority;
+              }
+              
+              return a[0].localeCompare(b[0]);
             });
             
             for (const [attrKey, attrValue] of sortedAttrs) {
