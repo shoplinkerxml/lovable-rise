@@ -212,61 +212,88 @@ export class XMLTemplateService {
     let orderCounter = 0;
     
     const getCategory = (fieldPath: string): string => {
-      const lowerPath = fieldPath.toLowerCase();
+      // Убираем индексы массивов для правильного определения категории
+      const lowerPath = fieldPath.toLowerCase().replace(/\[\d+\]/g, '');
       const format = this.detectedFormat;
       
       if (!format) return 'Інше';
       
-      // Проверяем есть ли в пути секция товаров (пользовательский productPath)
-      const productPathParts = format.productPath.toLowerCase().split('.');
-      const hasProductPath = productPathParts.some(part => lowerPath.includes(part + '.') || lowerPath.includes(part + '['));
+      const pathParts = lowerPath.split('.');
       
-      // Основна інформація - поля корневого уровня и root атрибуты (@version, @encoding, @date), НЕ в товарах
-      if (!hasProductPath && !lowerPath.includes('currencies') && !lowerPath.includes('currency') && 
-          !lowerPath.match(/categor(y|ies)/)) {
-        // Проверяем что это root-level поля (name, company, url, date) или атрибуты (@version, @encoding)
-        const fieldName = lowerPath.split('.').pop() || '';
+      // Проверяем есть ли в пути секция товаров
+      let hasProductPath = false;
+      if (format.productPath) {
+        const productPathParts = format.productPath.toLowerCase().split('.');
+        // Проверяем что ВСЕ части productPath присутствуют в пути в правильном порядке
+        let foundIndex = -1;
+        let allFound = true;
+        for (const part of productPathParts) {
+          const index = pathParts.indexOf(part, foundIndex + 1);
+          if (index === -1) {
+            allFound = false;
+            break;
+          }
+          foundIndex = index;
+        }
+        hasProductPath = allFound && foundIndex !== -1;
+      }
+      
+      // Проверяем есть ли в пути секция категорий
+      let hasCategoryPath = false;
+      if (format.categoryPath) {
+        const categoryPathParts = format.categoryPath.toLowerCase().split('.');
+        let foundIndex = -1;
+        let allFound = true;
+        for (const part of categoryPathParts) {
+          const index = pathParts.indexOf(part, foundIndex + 1);
+          if (index === -1) {
+            allFound = false;
+            break;
+          }
+          foundIndex = index;
+        }
+        hasCategoryPath = allFound && foundIndex !== -1;
+      }
+      
+      // Основна інформація - поля корневого уровня и root атрибуты
+      if (!hasProductPath && !hasCategoryPath && !lowerPath.includes('currenc')) {
+        const fieldName = pathParts[pathParts.length - 1];
         if (fieldName.match(/^(name|company|url|shop_name|store_name|date)$/) ||
             fieldName.match(/^@(version|encoding|date)$/)) {
           return 'Основна інформація';
         }
       }
       
-      // Валюти - проверяем по categoryPath или паттерну
-      if (format.categoryPath) {
-        const categoryPathLower = format.categoryPath.toLowerCase();
-        if (lowerPath.includes(categoryPathLower) && !hasProductPath) {
-          return 'Категорії';
-        }
+      // Категорії
+      if (hasCategoryPath && !hasProductPath) {
+        return 'Категорії';
       }
-      // Фолбек для категорий
-      if (lowerPath.match(/categor(y|ies)/) && !hasProductPath) {
+      if (!hasProductPath && lowerPath.match(/categor(y|ies)/)) {
         return 'Категорії';
       }
       
-      // Валюти - только секция валют, НЕ поля товара
-      if (lowerPath.match(/currenc(y|ies)/) && !hasProductPath) {
+      // Валюти
+      if (!hasProductPath && lowerPath.match(/currenc(y|ies)/)) {
         return 'Валюти';
       }
       
-      // Характеристики товару - поля param с атрибутом name (может быть @name или просто name)
-      const paramPathLower = format.paramPath.toLowerCase();
-      if (lowerPath.includes(paramPathLower + '[') && hasProductPath) {
-        // Проверяем что это поле с атрибутом name или его дочерние элементы (value, _text)
-        if (lowerPath.includes('.@name') || 
-            lowerPath.includes('.name') ||
-            lowerPath.match(/param\[\d+\]\.value/) ||
-            lowerPath.match(/param\[\d+\]\._text/) ||
-            (lowerPath.endsWith(']') && !lowerPath.includes('.@')) ||
-            lowerPath.match(new RegExp(paramPathLower + '\\[\\d+\\]$')) ||
-            lowerPath.includes('.@paramcode') ||
-            lowerPath.includes('.@valuecode') ||
-            lowerPath.includes('.@lang')) {
-          return 'Характеристики товару';
+      // Характеристики товару - param с @name
+      if (hasProductPath && format.paramPath) {
+        const paramPathLower = format.paramPath.toLowerCase();
+        if (pathParts.includes(paramPathLower)) {
+          if (lowerPath.includes('.@name') || 
+              lowerPath.includes('.name') ||
+              lowerPath.includes('.value') ||
+              lowerPath.includes('._text') ||
+              lowerPath.includes('.@paramcode') ||
+              lowerPath.includes('.@valuecode') ||
+              lowerPath.includes('.@lang')) {
+            return 'Характеристики товару';
+          }
         }
       }
       
-      // Параметри товару - ВСЕ остальное что касается товара (price, category, name, description, picture и т.д.)
+      // Параметри товару
       if (hasProductPath) {
         return 'Параметри товару';
       }
@@ -336,10 +363,10 @@ export class XMLTemplateService {
                 }
               });
             } else {
-              // Массив объектов без lang - обрабатываем каждый элемент
-              value.forEach((item: any, index: number) => {
-                traverse(item, `${fieldPath}[${index}]`, depth + 1);
-              });
+              // Массив объектов без lang - обрабатываем только ПЕРВЫЙ элемент (остальные идентичны)
+              if (value.length > 0) {
+                traverse(value[0], fieldPath, depth + 1);
+              }
             }
           } else {
             // Массив простых значений

@@ -278,6 +278,7 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
               
               return true;
             })
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
             .map((field, index) => (
             <TableRow 
               key={index}

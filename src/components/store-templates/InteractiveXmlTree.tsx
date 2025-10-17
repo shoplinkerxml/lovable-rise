@@ -416,14 +416,14 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
       } else if (key === '_text') {
         continue;
       } else if (Array.isArray(value)) {
-        // МАССИВ - каждый элемент отдельно под родителем
+        // МАССИВ - каждый элемент отдельно под родителем (БЕЗ индексов в имени)
         console.log(`[buildTree] Массив найден: ${key}, элементов: ${value.length}`, value);
         const children: TreeNode[] = [];
         value.forEach((item, idx) => {
           if (typeof item === 'object') {
             children.push({
               id: `${currentPath}-${idx}-${nodeId++}`,
-              name: `${key}[${idx}]`,
+              name: key, // Убрали [${idx}]
               children: buildTree(item, `${currentPath}-${idx}`),
               type: 'field',
               isExpanded: true
@@ -431,7 +431,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
           } else {
             children.push({
               id: `${currentPath}-${idx}-${nodeId++}`,
-              name: `${key}[${idx}]`,
+              name: key, // Убрали [${idx}]
               value: String(item),
               type: 'field'
             });
@@ -469,7 +469,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
           if (items.length > 0) {
             const children: TreeNode[] = items.map((item, idx) => ({
               id: `${currentPath}-${idx}-${nodeId++}`,
-              name: `${key}[${idx}]`,
+              name: key, // Убрали [${idx}]
               value: item,
               type: 'field'
             }));
