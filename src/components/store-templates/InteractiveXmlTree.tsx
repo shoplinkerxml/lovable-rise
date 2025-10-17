@@ -182,16 +182,48 @@ function SortableTreeNode({
   return (
     <div ref={setNodeRef} style={style}>
       <div
-        className="flex items-center gap-2 py-1 px-2 hover:bg-muted/50 rounded group"
+        className="flex items-center gap-2 py-1 px-2 hover:bg-muted/50 rounded group overflow-hidden"
         style={{ paddingLeft: `${level * 20}px` }}
       >
-        {/* Drag Handle - СЛЕВА */}
+        {/* Menu - 3 точки СЛЕВА, видны при hover */}
+        {!isEditing && (
+          <div className="opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 hover:bg-accent"
+                  title="Меню"
+                >
+                  <MoreVertical className="h-4 w-4 text-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                  Редагувати
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopy}>
+                  <Copy className="h-3.5 w-3.5 mr-2" />
+                  Копіювати
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(node.id)} className="text-destructive">
+                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                  Видалити
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
+        {/* Drag Handle - СПРАВА от меню */}
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 flex-shrink-0">
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
 
         {/* Expand/Collapse */}
-        <div onClick={() => node.children && node.children.length > 0 && onToggle(node.id)} className="cursor-pointer flex items-center gap-2 flex-1 min-w-0">
+        <div onClick={() => node.children && node.children.length > 0 && onToggle(node.id)} className="cursor-pointer flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
           {node.children && node.children.length > 0 && (
             <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
               {node.isExpanded ? (
@@ -234,45 +266,15 @@ function SortableTreeNode({
               </Button>
             </div>
           ) : (
-            <>
+            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
               <span className="font-mono text-base font-medium text-foreground flex-shrink-0">{node.name}</span>
               {node.value && !node.children && (
                 <>
                   <span className="text-muted-foreground flex-shrink-0">:</span>
-                  <span className="font-mono text-base text-muted-foreground truncate">{node.value}</span>
+                  <span className="font-mono text-base text-muted-foreground truncate max-w-[400px]">{node.value}</span>
                 </>
               )}
-              
-              {/* Menu - 4 точки сразу после текста */}
-              <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-6 p-0"
-                      title="Меню"
-                    >
-                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                      <Pencil className="h-3.5 w-3.5 mr-2" />
-                      Редагувати
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleCopy}>
-                      <Copy className="h-3.5 w-3.5 mr-2" />
-                      Копіювати
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onDelete(node.id)} className="text-destructive">
-                      <Trash2 className="h-3.5 w-3.5 mr-2" />
-                      Видалити
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </>
+            </div>
           )}
         </div>
       </div>
