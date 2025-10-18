@@ -546,13 +546,41 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
         // Конвертируем дерево в объект
         const treeToObject = (nodes: TreeNode[]): any => {
           const result: any = {};
+          
+          // Группируем узлы по имени для обработки массивов
+          const grouped = new Map<string, TreeNode[]>();
           nodes.forEach(node => {
-            if (node.children && node.children.length > 0) {
-              result[node.name] = treeToObject(node.children);
-            } else if (node.value !== undefined) {
-              result[node.name] = node.value;
+            const existing = grouped.get(node.name) || [];
+            existing.push(node);
+            grouped.set(node.name, existing);
+          });
+          
+          // Обрабатываем каждую группу
+          grouped.forEach((nodeGroup, name) => {
+            if (nodeGroup.length === 1) {
+              // Одиночный элемент
+              const node = nodeGroup[0];
+              if (node.children && node.children.length > 0) {
+                result[name] = treeToObject(node.children);
+              } else if (node.value !== undefined) {
+                result[name] = node.value;
+              } else {
+                result[name] = '';
+              }
+            } else {
+              // Массив элементов (дублированные или множественные)
+              result[name] = nodeGroup.map(node => {
+                if (node.children && node.children.length > 0) {
+                  return treeToObject(node.children);
+                } else if (node.value !== undefined) {
+                  return node.value;
+                } else {
+                  return '';
+                }
+              });
             }
           });
+          
           return result;
         };
 
