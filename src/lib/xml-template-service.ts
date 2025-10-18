@@ -33,7 +33,7 @@ interface ParseStats {
 }
 
 // Типы XML форматов
-export type XMLFormatType = 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom' | 'unknown';
+export type XMLFormatType = 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'google_shopping' | 'custom' | 'unknown';
 
 interface XMLFormat {
   type: XMLFormatType;
@@ -57,10 +57,15 @@ export class XMLTemplateService {
       trimValues: true,
       processEntities: true,
       allowBooleanAttributes: true,
+      removeNSPrefix: true, // Убираем namespace префиксы (g: для Google Shopping)
       isArray: (name, jpath) => {
         // Универсальное определение массивов
         // YML формат
         if (['currencies.currency', 'categories.category', 'offers.offer', 'offer.picture', 'offer.param'].includes(jpath)) {
+          return true;
+        }
+        // Google Shopping RSS
+        if (jpath === 'rss.channel.item' || jpath === 'channel.item') {
           return true;
         }
         // Shop-items формат
@@ -79,6 +84,20 @@ export class XMLTemplateService {
   // Определение типа XML формата
   private detectXMLFormat(data: any): XMLFormat {
     const dataStr = JSON.stringify(data).toLowerCase();
+    
+    // Google Shopping формат (RSS с namespace g: и элементами типа g:id, g:price)
+    if (data.rss && data.rss.channel && data.rss.channel.item) {
+      const firstItem = Array.isArray(data.rss.channel.item) ? data.rss.channel.item[0] : data.rss.channel.item;
+      // Проверяем наличие Google Shopping специфичных полей
+      if (firstItem && (firstItem['g:id'] || firstItem['g:link'] || firstItem['g:price'])) {
+        return {
+          type: 'google_shopping',
+          productPath: 'channel.item',
+          categoryPath: '',
+          paramPath: ''
+        };
+      }
+    }
     
     // Rozetka формат (YML с categories и currencies)
     if (dataStr.includes('yml_catalog') && dataStr.includes('categories') && dataStr.includes('currencies')) {
@@ -141,7 +160,7 @@ export class XMLTemplateService {
 
   // Парсинг XML с оптимизацией для больших файлов
   async parseXML(source: string | File, userMapping?: {
-    formatType: 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom';
+    formatType: 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'google_shopping' | 'custom';
     rootTag: string;
     productTag: string;
     categoryTag: string;
@@ -219,6 +238,21 @@ export class XMLTemplateService {
       if (!format) return 'Інше';
       
       const pathParts = lowerPath.split('.');
+      
+      // Google Shopping формат
+      if (format.type === 'google_shopping') {
+        // Основна інформація channel (не item)
+        if (lowerPath.match(/^(rss\.)?channel\.(title|link|description)$/)) {
+          return 'Основна інформація';
+        }
+        
+        // Параметри товару - все поля внутри item
+        if (lowerPath.includes('channel.item')) {
+          return 'Параметри товару';
+        }
+        
+        return 'Інше';
+      }
       
       // Проверяем есть ли в пути секция товаров
       let hasProductPath = false;
@@ -528,5 +562,25 @@ export class XMLTemplateService {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch XML: ${response.statusText}`);
     return response.text();
+  }
+  
+  // Получить отображаемое название формата
+  getFormatDisplayName(formatType: XMLFormatType): string {
+    const formatNames: Record<XMLFormatType, string> = {
+      'rozetka': 'Rozetka',
+      'epicentr': 'Epicentr',
+      'prom': 'Prom',
+      'price': 'Price',
+      'mma': 'MMA',
+      'google_shopping': 'Google Shopping',
+      'custom': 'Кастомний',
+      'unknown': 'Невідомий'
+    };
+    return formatNames[formatType] || formatType;
+  }
+  
+  // Получить текущий формат
+  getDetectedFormat(): XMLFormat | undefined {
+    return this.detectedFormat;
   }
 }

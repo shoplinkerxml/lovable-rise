@@ -18,7 +18,7 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
   const [showStructureDialog, setShowStructureDialog] = useState(false);
   const [pendingSource, setPendingSource] = useState<File | string | null>(null);
   const [xmlPreview, setXmlPreview] = useState('');
-  const [detectedFormatType, setDetectedFormatType] = useState<'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom'>('custom');
+  const [detectedFormatType, setDetectedFormatType] = useState<'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'google_shopping' | 'custom'>('custom');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -40,7 +40,9 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
       
       // Определяем формат
       const lowerText = text.toLowerCase();
-      if (lowerText.includes('yml_catalog') && lowerText.includes('categories') && lowerText.includes('currencies')) {
+      if (lowerText.includes('<rss') && (lowerText.includes('g:id') || lowerText.includes('g:price') || lowerText.includes('g:link'))) {
+        setDetectedFormatType('google_shopping');
+      } else if (lowerText.includes('yml_catalog') && lowerText.includes('categories') && lowerText.includes('currencies')) {
         setDetectedFormatType('rozetka');
       } else if (lowerText.includes('yml_catalog') || (lowerText.includes('offers') && lowerText.includes('offer'))) {
         setDetectedFormatType('epicentr');
@@ -77,7 +79,9 @@ export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) 
       
       // Определяем формат
       const lowerText = text.toLowerCase();
-      if (lowerText.includes('yml_catalog') && lowerText.includes('categories') && lowerText.includes('currencies')) {
+      if (lowerText.includes('<rss') && (lowerText.includes('g:id') || lowerText.includes('g:price') || lowerText.includes('g:link'))) {
+        setDetectedFormatType('google_shopping');
+      } else if (lowerText.includes('yml_catalog') && lowerText.includes('categories') && lowerText.includes('currencies')) {
         setDetectedFormatType('rozetka');
       } else if (lowerText.includes('yml_catalog') || (lowerText.includes('offers') && lowerText.includes('offer'))) {
         setDetectedFormatType('epicentr');

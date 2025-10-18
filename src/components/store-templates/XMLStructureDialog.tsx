@@ -20,7 +20,7 @@ import {
 import { XmlPreviewViewer } from './XmlPreviewViewer';
 
 export interface XMLStructureMapping {
-  formatType: 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'custom';
+  formatType: 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'google_shopping' | 'custom';
   rootTag: string;
   productTag: string;
   categoryTag: string;
@@ -74,6 +74,11 @@ export const XMLStructureDialog = ({
       setCategoryTag('');
       setCurrencyTag('');
       setParamTag('param');
+    } else if (value === 'google_shopping') {
+      setProductTag('channel.item');
+      setCategoryTag('');
+      setCurrencyTag('');
+      setParamTag('');
     } else if (value === 'prom') {
       setProductTag('items.item');
       setCategoryTag('catalog.category');
@@ -130,6 +135,7 @@ export const XMLStructureDialog = ({
                 <SelectContent>
                   <SelectItem value="rozetka">Rozetka</SelectItem>
                   <SelectItem value="epicentr">Epicentr</SelectItem>
+                  <SelectItem value="google_shopping">Google Shopping</SelectItem>
                   <SelectItem value="prom">Prom</SelectItem>
                   <SelectItem value="mma">MMA</SelectItem>
                   <SelectItem value="price">Price</SelectItem>
