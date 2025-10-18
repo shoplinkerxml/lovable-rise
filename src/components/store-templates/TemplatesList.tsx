@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { FileText, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,9 +31,11 @@ interface Template {
 
 interface TemplatesListProps {
   onSelect?: (template: Template) => void;
+  onTemplatesLoaded?: (count: number) => void;
+  onCreateNew?: () => void;
 }
 
-export const TemplatesList = ({ onSelect }: TemplatesListProps) => {
+export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: TemplatesListProps) => {
   const { t } = useI18n();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,7 @@ export const TemplatesList = ({ onSelect }: TemplatesListProps) => {
 
       if (error) throw error;
       setTemplates(data || []);
+      onTemplatesLoaded?.(data?.length || 0);
     } catch (error) {
       console.error('Load templates error:', error);
       toast.error(t('failed_save_template'));
@@ -87,12 +91,23 @@ export const TemplatesList = ({ onSelect }: TemplatesListProps) => {
 
   if (templates.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600">{t('no_templates')}</p>
-        </CardContent>
-      </Card>
+      <div className="flex justify-center">
+        <Empty className="border max-w-md">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FileText />
+            </EmptyMedia>
+            <EmptyTitle>{t('no_templates')}</EmptyTitle>
+            <EmptyDescription>
+              Створіть перший XML шаблон для маркетплейсу
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button onClick={onCreateNew} className="mt-4">
+            <FileText className="h-4 w-4 mr-2" />
+            {t('create_template')}
+          </Button>
+        </Empty>
+      </div>
     );
   }
 

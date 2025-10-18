@@ -33,6 +33,7 @@ export const StoreTemplates = () => {
   const [marketplace, setMarketplace] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [templatesCount, setTemplatesCount] = useState(0);
 
   // Системные поля для маппинга
   const systemFields = [
@@ -149,7 +150,7 @@ export const StoreTemplates = () => {
                 {t('back_to_templates')}
               </Button>
             )}
-            {viewMode === 'list' && (
+            {viewMode === 'list' && templatesCount > 0 && (
               <Button onClick={() => setViewMode('create')}>
                 <Plus className="h-4 w-4 mr-2" />
                 {t('create_template')}
@@ -160,7 +161,11 @@ export const StoreTemplates = () => {
       />
 
       {viewMode === 'list' && (
-        <TemplatesList onSelect={handleSelectTemplate} />
+        <TemplatesList 
+          onSelect={handleSelectTemplate} 
+          onTemplatesLoaded={setTemplatesCount}
+          onCreateNew={() => setViewMode('create')}
+        />
       )}
 
       {(viewMode === 'create' || viewMode === 'edit') && (
