@@ -1,7 +1,7 @@
 import React from 'react';
 import { XMLStructure } from '@/lib/xml-template-service';
 import { InteractiveXmlTree } from './InteractiveXmlTree';
-import { ParametersTable as TableView } from './ParametersTable';
+import { StructureTable } from './StructureTable';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Save, X, Table, FileCode } from 'lucide-react';
@@ -80,9 +80,8 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
           onSave={onStructureChange}
         />
       ) : (
-        <TableView 
+        <StructureTable 
           structure={structure}
-          onStructureChange={onStructureChange}
         />
       )}
     </div>

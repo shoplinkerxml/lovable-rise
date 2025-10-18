@@ -10,8 +10,8 @@ import {
   TemplatesList, 
   TemplatePreview 
 } from '@/components/store-templates';
+import { StructureTable } from '@/components/store-templates/StructureTable';
 import { SimpleMappingView } from '@/components/store-templates/SimpleMappingView';
-import { ParametersTable } from '@/components/store-templates/ParametersTableSimple';
 import { useI18n } from '@/providers/i18n-provider';
 import { XMLStructure, MappingRule } from '@/lib/xml-template-service';
 import { XMLTemplateService } from '@/lib/xml-template-service';
@@ -186,8 +186,8 @@ export const StoreTemplates = () => {
 
           <TabsContent value="structure" className="mt-6">
             {xmlStructure && (
-              <ParametersTable 
-                structure={xmlStructure} 
+              <StructureTable 
+                structure={xmlStructure}
                 onStructureChange={setXmlStructure}
                 onSave={handleSaveTemplate}
                 onCancel={() => setViewMode('list')}

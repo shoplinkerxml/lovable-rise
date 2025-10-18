@@ -363,20 +363,23 @@ export class XMLTemplateService {
                 }
               });
             } else {
-              // Массив объектов без lang - обрабатываем только ПЕРВЫЙ элемент (остальные идентичны)
-              if (value.length > 0) {
-                traverse(value[0], fieldPath, depth + 1);
-              }
+              // Массив объектов без lang - обрабатываем ВСЕ элементы с индексами
+              value.forEach((item: any, index: number) => {
+                const indexedPath = `${fieldPath}[${index}]`;
+                traverse(item, indexedPath, depth + 1);
+              });
             }
           } else {
-            // Массив простых значений
-            fields.push({
-              path: fieldPath,
-              type: 'array',
-              required: false,
-              sample: `[${value.slice(0, 3).join(', ')}${value.length > 3 ? '...' : ''}]`,
-              category: getCategory(fieldPath),
-              order: orderCounter++
+            // Массив простых значений - добавляем каждый элемент отдельно
+            value.forEach((item: any, index: number) => {
+              fields.push({
+                path: `${fieldPath}[${index}]`,
+                type: this.detectType(item),
+                required: false,
+                sample: this.getSample(item),
+                category: getCategory(`${fieldPath}[${index}]`),
+                order: orderCounter++
+              });
             });
           }
         } else if (typeof value === 'object' && value !== null) {
