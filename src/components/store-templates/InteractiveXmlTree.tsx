@@ -533,56 +533,88 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     }
   }, [structure.originalXml, xmlContent]);
 
-  // ОТКЛЮЧАЕМ автосохранение - только ручное через кнопку
-  // React.useEffect(() => {
-  //   if (!onSave || !xml) return;
-  //   const saveToStructure = async () => {
-  //     try {
-  //       // Конвертируем дерево в XML
-  //       const treeToXml = (nodes: TreeNode[]): any => {
-  //         const result: any = {};
-  //         nodes.forEach(node => {
-  //           if (node.type === 'category' && node.children) {
-  //             result[node.name] = treeToXml(node.children);
-  //           } else if (node.value !== undefined) {
-  //             result[node.name] = node.value;
-  //           } else {
-  //             result[node.name] = '';
-  //           }
-  //         });
-  //         return result;
-  //       };
+  // Автосохранение при изменении дерева (с защитой от зацикливания)
+  const isSavingRef = React.useRef(false);
+  
+  React.useEffect(() => {
+    if (!onSave || !xml || isSavingRef.current) return;
 
-  //       const xmlObject = treeToXml(treeData);
+    const saveToStructure = async () => {
+      try {
+        isSavingRef.current = true;
         
-  //       const builder = new XMLBuilder({
-  //         ignoreAttributes: false,
-  //         attributeNamePrefix: '@',
-  //         textNodeName: '_text',
-  //         format: true,
-  //         indentBy: '  ',
-  //         suppressEmptyNode: true,
-  //       });
+        // Конвертируем дерево в объект
+        const treeToObject = (nodes: TreeNode[]): any => {
+          const result: any = {};
+          nodes.forEach(node => {
+            if (node.children && node.children.length > 0) {
+              result[node.name] = treeToObject(node.children);
+            } else if (node.value !== undefined) {
+              result[node.name] = node.value;
+            }
+          });
+          return result;
+        };
 
-  //       const newXmlContent = builder.build(xmlObject);
+        const xmlObject = treeToObject(treeData);
         
-  //       // НЕ пересоздаем fields - только обновляем XML
-  //       // fields остаются из оригинального парсинга с правильными категориями и индексами
-  //       const updatedStructure: XMLStructure = {
-  //         ...structure,
-  //         originalXml: newXmlContent,
-  //         // fields НЕ трогаем!
-  //       };
-        
-  //       onSave(updatedStructure);
-  //     } catch (error) {
-  //       console.error('Auto-save error:', error);
-  //     }
-  //   };
+        const builder = new XMLBuilder({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@',
+          textNodeName: '_text',
+          format: true,
+          indentBy: '  ',
+          suppressEmptyNode: false,
+        });
 
-  //   const timeoutId = setTimeout(saveToStructure, 500); // debounce
-  //   return () => clearTimeout(timeoutId);
-  // }, [treeData]);
+        const newXmlContent = builder.build(xmlObject);
+        
+        // Обновляем только если XML действительно изменился
+        if (newXmlContent !== prevXmlRef.current) {
+          // Обновляем значения в fields из дерева
+          const updatedFields = structure.fields.map(field => {
+            // Находим соответствующий узел в дереве
+            const findNodeValue = (nodes: TreeNode[], path: string): string | undefined => {
+              for (const node of nodes) {
+                const nodePath = field.path.split('.').pop()?.replace(/\[\d+\]/g, '');
+                if (nodePath === node.name && node.value !== undefined) {
+                  return node.value;
+                }
+                if (node.children) {
+                  const value = findNodeValue(node.children, path);
+                  if (value !== undefined) return value;
+                }
+              }
+              return undefined;
+            };
+            
+            const newValue = findNodeValue(treeData, field.path);
+            if (newValue !== undefined) {
+              return { ...field, sample: newValue };
+            }
+            return field;
+          });
+          
+          const updatedStructure: XMLStructure = {
+            ...structure,
+            originalXml: newXmlContent,
+            fields: updatedFields, // Обновляем fields!
+          };
+          
+          prevXmlRef.current = newXmlContent;
+          onSave(updatedStructure);
+        }
+        
+        isSavingRef.current = false;
+      } catch (error) {
+        console.error('Auto-save error:', error);
+        isSavingRef.current = false;
+      }
+    };
+
+    const timeoutId = setTimeout(saveToStructure, 500);
+    return () => clearTimeout(timeoutId);
+  }, [treeData, xml, structure, onSave]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
