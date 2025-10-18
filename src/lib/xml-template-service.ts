@@ -255,11 +255,11 @@ export class XMLTemplateService {
         hasCategoryPath = allFound && foundIndex !== -1;
       }
       
-      // Основна інформація - поля корневого уровня и root атрибуты
+      // Основна інформація - поля корневого уровня (name, company, url) - БЕЗ атрибутов
       if (!hasProductPath && !hasCategoryPath && !lowerPath.includes('currenc')) {
         const fieldName = pathParts[pathParts.length - 1];
-        if (fieldName.match(/^(name|company|url|shop_name|store_name|date)$/) ||
-            fieldName.match(/^@(version|encoding|date)$/)) {
+        // Только текстовые поля без @, не атрибуты
+        if (fieldName.match(/^(name|company|url|shop_name|store_name)$/)) {
           return 'Основна інформація';
         }
       }
@@ -305,6 +305,16 @@ export class XMLTemplateService {
       if (depth > 10) return;
       
       for (const [key, value] of Object.entries(obj)) {
+        // Пропускаем XML declaration атрибуты на корневом уровне
+        if (depth === 0 && key.startsWith('@')) {
+          continue; // Пропускаем @version, @encoding и другие корневые атрибуты
+        }
+        
+        // Пропускаем атрибут @date на первом уровне вложенности (yml_catalog.@date)
+        if (depth === 1 && key === '@date') {
+          continue;
+        }
+        
         // Обрабатываем атрибуты (они начинаются с @)
         const isAttribute = key.startsWith('@');
         const cleanKey = isAttribute ? key : key.replace(/^@_/, '');
