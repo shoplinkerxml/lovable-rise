@@ -316,6 +316,7 @@ function SortableTreeNode({
 export function InteractiveXmlTree({ structure, xmlContent, onSave }: InteractiveXmlTreeProps) {
   // Парсим XML напрямую если есть (приоритет: xmlContent prop, потом structure.originalXml)
   const xml = xmlContent || structure.originalXml;
+  const prevXmlRef = React.useRef(xml);
   
   const buildTreeFromStructure = React.useCallback((structure: XMLStructure, xml?: string): TreeNode[] => {
     if (xml) {
@@ -521,108 +522,67 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     buildTreeFromStructure(structure, xml)
   );
 
-  // Автосохранение изменений в структуру при работе с XML
+  // Пересоздаем дерево ТОЛЬКО при изменении XML контента
   React.useEffect(() => {
-    if (!xml || !onSave || treeData.length === 0) return;
+    const currentXml = xmlContent || structure.originalXml;
+    // Проверяем что XML действительно изменился
+    if (currentXml && currentXml !== prevXmlRef.current) {
+      console.log('XML изменился, пересоздаем дерево');
+      prevXmlRef.current = currentXml;
+      setTreeData(buildTreeFromStructure(structure, currentXml));
+    }
+  }, [structure.originalXml, xmlContent]);
 
-    const saveToStructure = async () => {
-      try {
-        const treeToObject = (nodes: TreeNode[]): any => {
-          const result: any = {};
-          nodes.forEach(node => {
-            const key = node.name;
-            if (node.children && node.children.length > 0) {
-              const isArray = node.children.every(child => child.name.match(/\[\d+\]$/));
-              if (isArray) {
-                const arrayKey = key.replace(/\[\d+\]$/, '');
-                if (!result[arrayKey]) result[arrayKey] = [];
-                const childObj = treeToObject(node.children);
-                result[arrayKey].push(childObj);
-              } else {
-                result[key] = treeToObject(node.children);
-              }
-            } else if (node.value !== undefined) {
-              result[key] = node.value;
-            }
-          });
-          return result;
-        };
-        
-        const xmlObject = treeToObject(treeData);
-        const builder = new XMLBuilder({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@',
-          textNodeName: '_text',
-          format: true,
-          indentBy: '  ',
-          suppressEmptyNode: false,
-        });
-        
-        const newXmlContent = builder.build(xmlObject);
-        
-        // Ре-парсим XML чтобы обновить fields
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@',
-          textNodeName: '_text',
-          parseAttributeValue: true,
-          parseTagValue: true,
-        });
-        
-        const parsedXml = parser.parse(newXmlContent);
-        const updatedFields: XMLField[] = [];
-        
-        // Извлекаем поля из распарсенного XML
-        const extractFieldsFromParsed = (obj: any, path = '', category = 'Інше') => {
-          Object.keys(obj).forEach(key => {
-            const value = obj[key];
-            const currentPath = path ? `${path}.${key}` : key;
-            
-            if (Array.isArray(value)) {
-              value.forEach((item, idx) => {
-                if (typeof item === 'object') {
-                  extractFieldsFromParsed(item, `${currentPath}[${idx}]`, category);
-                } else {
-                  updatedFields.push({
-                    path: `${currentPath}[${idx}]`,
-                    type: 'string',
-                    required: false,
-                    sample: String(item),
-                    category,
-                  });
-                }
-              });
-            } else if (typeof value === 'object' && value !== null) {
-              extractFieldsFromParsed(value, currentPath, category);
-            } else {
-              updatedFields.push({
-                path: currentPath,
-                type: 'string',
-                required: false,
-                sample: String(value),
-                category,
-              });
-            }
-          });
-        };
-        
-        extractFieldsFromParsed(parsedXml);
-        
-        const updatedStructure: XMLStructure = {
-          ...structure,
-          originalXml: newXmlContent,
-          fields: updatedFields,
-        };
-        
-        onSave(updatedStructure);
-      } catch (error) {
-        console.error('Auto-save error:', error);
-      }
-    };
+  // ОТКЛЮЧАЕМ автосохранение - только ручное через кнопку
+  // React.useEffect(() => {
+  //   if (!onSave || !xml) return;
+  //   const saveToStructure = async () => {
+  //     try {
+  //       // Конвертируем дерево в XML
+  //       const treeToXml = (nodes: TreeNode[]): any => {
+  //         const result: any = {};
+  //         nodes.forEach(node => {
+  //           if (node.type === 'category' && node.children) {
+  //             result[node.name] = treeToXml(node.children);
+  //           } else if (node.value !== undefined) {
+  //             result[node.name] = node.value;
+  //           } else {
+  //             result[node.name] = '';
+  //           }
+  //         });
+  //         return result;
+  //       };
 
-    const timeoutId = setTimeout(saveToStructure, 500); // debounce
-    return () => clearTimeout(timeoutId);
-  }, [treeData]);
+  //       const xmlObject = treeToXml(treeData);
+        
+  //       const builder = new XMLBuilder({
+  //         ignoreAttributes: false,
+  //         attributeNamePrefix: '@',
+  //         textNodeName: '_text',
+  //         format: true,
+  //         indentBy: '  ',
+  //         suppressEmptyNode: true,
+  //       });
+
+  //       const newXmlContent = builder.build(xmlObject);
+        
+  //       // НЕ пересоздаем fields - только обновляем XML
+  //       // fields остаются из оригинального парсинга с правильными категориями и индексами
+  //       const updatedStructure: XMLStructure = {
+  //         ...structure,
+  //         originalXml: newXmlContent,
+  //         // fields НЕ трогаем!
+  //       };
+        
+  //       onSave(updatedStructure);
+  //     } catch (error) {
+  //       console.error('Auto-save error:', error);
+  //     }
+  //   };
+
+  //   const timeoutId = setTimeout(saveToStructure, 500); // debounce
+  //   return () => clearTimeout(timeoutId);
+  // }, [treeData]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
