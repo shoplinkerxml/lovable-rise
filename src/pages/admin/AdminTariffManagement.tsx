@@ -402,32 +402,19 @@ const AdminTariffManagement = () => {
                       {tariff.is_free ? (
                         <Badge variant="secondary" className="text-xs sm:text-sm">{t('free_tariff')}</Badge>
                       ) : (
-                        <div className="flex flex-col xs:flex-row xs:flex-wrap items-start xs:items-center gap-1 min-w-0">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <div className="text-xs sm:text-sm md:text-base flex-shrink-0">
-                              {getCurrencySymbol(currencies.find(c => c.id === tariff.currency_id)?.code)}
-                            </div>
-                            <span className="text-xs sm:text-sm md:text-base min-w-0">
-                              {tariff.new_price !== null ? (
-                                <span className="truncate">
-                                  {formatPrice(tariff.new_price, currencies.find(c => c.id === tariff.currency_id)?.code)}
-                                </span>
-                              ) : (
-                                'N/A'
-                              )}
-                            </span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div className="text-xs sm:text-sm md:text-base flex-shrink-0">
+                            {getCurrencySymbol(currencies.find(c => c.id === tariff.currency_id)?.code)}
                           </div>
-                          {tariff.old_price && tariff.old_price > tariff.new_price && (
-                            <>
-                              <span className="text-muted-foreground line-through text-xs sm:text-sm md:text-base self-start xs:self-center
-                                             [@media(max-width:1180px)]:text-[0.625rem] [@media(max-width:1180px)]:sm:text-[0.75rem] [@media(max-width:1180px)]:md:text-xs">
-                                {formatPrice(tariff.old_price, currencies.find(c => c.id === tariff.currency_id)?.code)}
+                          <span className="text-xs sm:text-sm md:text-base min-w-0">
+                            {tariff.new_price !== null ? (
+                              <span className="truncate">
+                                {formatPrice(tariff.new_price, currencies.find(c => c.id === tariff.currency_id)?.code)}
                               </span>
-                              <Badge variant="destructive" className="text-xs self-start xs:self-center">
-                                {Math.round(((tariff.old_price - tariff.new_price) / tariff.old_price) * 100)}%
-                              </Badge>
-                            </>
-                          )}
+                            ) : (
+                              'N/A'
+                            )}
+                          </span>
                         </div>
                       )}
                     </TableCell>

@@ -12,6 +12,7 @@ const ADMIN_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: strin
   "/admin/tariff": { labelKey: "menu_pricing", parentPath: "/admin" },
   "/admin/tariff/new": { labelKey: "create_new_tariff", parentPath: "/admin/tariff" },
   "/admin/tariff/features": { labelKey: "tariff_features_and_limits", parentPath: "/admin/tariff" },
+  "/admin/storetemplates": { labelKey: "menu_store_templates", parentPath: "/admin" },
   "/admin/settings/currencies": { labelKey: "currency_management", parentPath: "/admin" },
   "/admin/settings/currency": { labelKey: "currency_management", parentPath: "/admin" },
   "/admin/forms": { labelKey: "breadcrumb_forms", parentPath: "/admin" },

@@ -347,6 +347,7 @@ const dictionary: Dictionary = {
   breadcrumb_vertical: { uk: "Вертикальні", en: "Vertical" },
   breadcrumb_custom: { uk: "Користувацькі", en: "Custom" },
   breadcrumb_validation: { uk: "Валідація", en: "Validation" },
+  breadcrumb_storetemplates: { uk: "Шаблони XML", en: "XML Templates" },
   
   // Form Page descriptions
   form_elements_description: { uk: "Додавайте сюди поля вводу, випадаючі списки, перемикачі тощо.", en: "Add inputs, selects, switches, etc. here." },
@@ -698,6 +699,10 @@ const dictionary: Dictionary = {
   transformation_concat: { uk: "Об'єднання", en: "Concatenate" },
   transformation_split: { uk: "Розділення", en: "Split" },
   transformation_custom: { uk: "Довільне", en: "Custom" },
+  
+  // Store Templates specific
+  marketplace: { uk: "Маркетплейс", en: "Marketplace" },
+  enter_marketplace_name: { uk: "Введіть назву маркетплейсу", en: "Enter marketplace name" },
 };
 
 // User Statistics

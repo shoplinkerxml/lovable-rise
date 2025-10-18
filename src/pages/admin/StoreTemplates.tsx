@@ -1,8 +1,8 @@
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { 
@@ -17,11 +17,14 @@ import { XMLStructure, MappingRule } from '@/lib/xml-template-service';
 import { XMLTemplateService } from '@/lib/xml-template-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/PageHeader';
+import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 
 type ViewMode = 'list' | 'create' | 'edit';
 
 export const StoreTemplates = () => {
   const { t } = useI18n();
+  const breadcrumbs = useBreadcrumbs();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [xmlStructure, setXmlStructure] = useState<XMLStructure | undefined>();
   const [mappings, setMappings] = useState<MappingRule[]>([]);
@@ -131,28 +134,30 @@ export const StoreTemplates = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        {viewMode !== 'list' && (
-          <Button 
-            variant="ghost" 
-            onClick={() => setViewMode('list')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('back_to_templates')}
-          </Button>
-        )}
-        <h1 className="text-2xl font-bold">
-          {viewMode === 'list' && t('store_templates_title')}
-          {viewMode === 'create' && t('create_template')}
-          {viewMode === 'edit' && t('edit_template')}
-        </h1>
-        {viewMode === 'list' && (
-          <Button onClick={() => setViewMode('create')}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t('create_template')}
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title={viewMode === 'list' ? t('store_templates_title') : viewMode === 'create' ? t('create_template') : t('edit_template')}
+        description={viewMode === 'list' ? 'Керування шаблонами XML для маркетплейсів' : 'Створення та редагування XML шаблону'}
+        breadcrumbItems={breadcrumbs}
+        actions={
+          <div className="flex gap-2">
+            {viewMode !== 'list' && (
+              <Button 
+                variant="ghost" 
+                onClick={() => setViewMode('list')}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {t('back_to_templates')}
+              </Button>
+            )}
+            {viewMode === 'list' && (
+              <Button onClick={() => setViewMode('create')}>
+                <Plus className="h-4 w-4 mr-2" />
+                {t('create_template')}
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {viewMode === 'list' && (
         <TemplatesList onSelect={handleSelectTemplate} />
