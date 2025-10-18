@@ -571,34 +571,45 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
         
         // Обновляем только если XML действительно изменился
         if (newXmlContent !== prevXmlRef.current) {
-          // Обновляем значения в fields из дерева
-          const updatedFields = structure.fields.map(field => {
-            // Находим соответствующий узел в дереве
-            const findNodeValue = (nodes: TreeNode[], path: string): string | undefined => {
-              for (const node of nodes) {
-                const nodePath = field.path.split('.').pop()?.replace(/\[\d+\]/g, '');
-                if (nodePath === node.name && node.value !== undefined) {
-                  return node.value;
-                }
-                if (node.children) {
-                  const value = findNodeValue(node.children, path);
-                  if (value !== undefined) return value;
-                }
+          // Парсим новый XML напрямую
+          const { XMLParser } = await import('fast-xml-parser');
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@',
+            textNodeName: '_text',
+            parseAttributeValue: true,
+            parseTagValue: true,
+            trimValues: true,
+            processEntities: true,
+            allowBooleanAttributes: true,
+            isArray: (name, jpath) => {
+              if (['currencies.currency', 'categories.category', 'offers.offer', 'offer.picture', 'offer.param'].includes(jpath)) {
+                return true;
               }
-              return undefined;
-            };
-            
-            const newValue = findNodeValue(treeData, field.path);
-            if (newValue !== undefined) {
-              return { ...field, sample: newValue };
+              if (jpath.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
+                return true;
+              }
+              return false;
             }
-            return field;
           });
+          
+          const parsed = parser.parse(newXmlContent);
+          
+          // Используем метод extractStructure из XMLTemplateService
+          const { XMLTemplateService } = await import('@/lib/xml-template-service');
+          const service = new XMLTemplateService();
+          
+          // Устанавливаем формат из текущей структуры
+          (service as any).detectedFormat = (service as any).detectXMLFormat(parsed);
+          
+          // Извлекаем структуру
+          const newStructure = (service as any).extractStructure(parsed);
+          newStructure.originalXml = newXmlContent;
           
           const updatedStructure: XMLStructure = {
             ...structure,
             originalXml: newXmlContent,
-            fields: updatedFields, // Обновляем fields!
+            fields: newStructure.fields,
           };
           
           prevXmlRef.current = newXmlContent;
