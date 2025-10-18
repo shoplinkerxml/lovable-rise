@@ -198,52 +198,21 @@ export const StoreTemplates = () => {
 
           <TabsContent value="mapping" className="mt-6">
             {xmlStructure && (
-              <div className="space-y-6">
-                <SimpleMappingView
-                  xmlFields={xmlStructure.fields}
-                  systemFields={systemFields}
-                  mappings={mappings}
-                  onMappingChange={setMappings}
-                  onSave={handleSaveTemplate}
-                  onCancel={() => setViewMode('list')}
-                  saving={saving}
-                />
-                
-                {/* Блок збереження шаблону */}
-                <div className="space-y-4 border rounded-lg p-4">
-                  <h3 className="text-lg font-medium">{t('template_settings')}</h3>
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="template-name">{t('template_name')} *</Label>
-                      <Input
-                        id="template-name"
-                        placeholder={t('enter_template_name')}
-                        value={templateName}
-                        onChange={(e) => setTemplateName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="marketplace">Маркетплейс</Label>
-                      <Input
-                        id="marketplace"
-                        placeholder="Rozetka, Prom, Amazon..."
-                        value={marketplace}
-                        onChange={(e) => setMarketplace(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="template-desc">{t('template_description')}</Label>
-                      <Textarea
-                        id="template-desc"
-                        placeholder={t('enter_template_description')}
-                        value={templateDescription}
-                        onChange={(e) => setTemplateDescription(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <SimpleMappingView
+                xmlFields={xmlStructure.fields}
+                systemFields={systemFields}
+                mappings={mappings}
+                onMappingChange={setMappings}
+                onSave={handleSaveTemplate}
+                onCancel={() => setViewMode('list')}
+                saving={saving}
+                templateName={templateName}
+                onTemplateNameChange={setTemplateName}
+                marketplace={marketplace}
+                onMarketplaceChange={setMarketplace}
+                templateDescription={templateDescription}
+                onTemplateDescriptionChange={setTemplateDescription}
+              />
             )}
           </TabsContent>
         </Tabs>

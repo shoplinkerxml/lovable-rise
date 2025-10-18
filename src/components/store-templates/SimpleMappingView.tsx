@@ -3,6 +3,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Search, Check, Save, X } from 'lucide-react';
 import { XMLField, MappingRule } from '@/lib/xml-template-service';
 
@@ -14,6 +16,12 @@ interface SimpleMappingViewProps {
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
+  templateName?: string;
+  onTemplateNameChange?: (name: string) => void;
+  marketplace?: string;
+  onMarketplaceChange?: (marketplace: string) => void;
+  templateDescription?: string;
+  onTemplateDescriptionChange?: (desc: string) => void;
 }
 
 export interface SystemField {
@@ -32,7 +40,13 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
   onMappingChange,
   onSave,
   onCancel,
-  saving = false
+  saving = false,
+  templateName = '',
+  onTemplateNameChange,
+  marketplace = '',
+  onMarketplaceChange,
+  templateDescription = '',
+  onTemplateDescriptionChange
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -102,6 +116,41 @@ export const SimpleMappingView: React.FC<SimpleMappingViewProps> = ({
           </div>
         </CardHeader>
       </Card>
+
+      {/* Блок налаштування шаблону */}
+      <div className="space-y-4 border rounded-lg p-4">
+        <h3 className="text-lg font-medium">Налаштування шаблону</h3>
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="template-name">Назва шаблону *</Label>
+            <Input
+              id="template-name"
+              placeholder="Введіть назву шаблону"
+              value={templateName}
+              onChange={(e) => onTemplateNameChange?.(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="marketplace">Маркетплейс</Label>
+            <Input
+              id="marketplace"
+              placeholder="Rozetka, Prom, Amazon..."
+              value={marketplace}
+              onChange={(e) => onMarketplaceChange?.(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="template-desc">Опис шаблону</Label>
+            <Textarea
+              id="template-desc"
+              placeholder="Введіть опис шаблону"
+              value={templateDescription}
+              onChange={(e) => onTemplateDescriptionChange?.(e.target.value)}
+              rows={3}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Пошук */}
       <div className="relative">

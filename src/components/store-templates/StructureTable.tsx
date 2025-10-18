@@ -90,17 +90,17 @@ export function StructureTable({ structure, onStructureChange, onSave, onCancel,
   const getCategoryColor = (category: string): string => {
     switch (category) {
       case 'Основна інформація':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'text-primary/60 border-primary/30';
       case 'Валюти':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'text-primary/70 border-primary/40';
       case 'Категорії':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
+        return 'text-primary/80 border-primary/50';
       case 'Параметри товару':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
+        return 'text-primary/90 border-primary/60';
       case 'Характеристики товару':
-        return 'bg-pink-50 text-pink-700 border-pink-200';
+        return 'text-primary border-primary/70';
       default:
-        return 'bg-gray-50 text-gray-700 border-gray-200';
+        return 'text-muted-foreground border-muted';
     }
   };
 
@@ -110,6 +110,12 @@ export function StructureTable({ structure, onStructureChange, onSave, onCancel,
     
     // Убираем индексы массивов для отображения
     return lastPart.replace(/\[\d+\]$/g, '');
+  };
+
+  const getShortenedPath = (path: string): string => {
+    const parts = path.split('.');
+    if (parts.length <= 2) return path;
+    return '...' + parts.slice(-2).join('.');
   };
 
   return (
@@ -162,11 +168,10 @@ export function StructureTable({ structure, onStructureChange, onSave, onCancel,
               <TableRow className="bg-gray-50">
                 <TableHead className="w-[40px]"></TableHead>
                 <TableHead className="w-[250px]">Назва параметру</TableHead>
-                <TableHead className="min-w-[200px]">Значення</TableHead>
+                <TableHead className="w-[150px]">Значення</TableHead>
                 <TableHead className="w-[280px]">XML шлях</TableHead>
                 <TableHead className="w-[100px]">Тип</TableHead>
                 <TableHead className="w-[150px]">Категорія</TableHead>
-                <TableHead className="w-[80px] text-center">Дії</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -179,14 +184,14 @@ export function StructureTable({ structure, onStructureChange, onSave, onCancel,
                     {getFieldDisplayName(field.path)}
                   </TableCell>
                   <TableCell className="py-3">
-                    <div className="truncate text-sm max-w-[300px]" title={field.sample}>
+                    <div className="truncate text-sm max-w-[150px]" title={field.sample}>
                       {field.sample || '-'}
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
                     <div className="flex items-center gap-2">
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded flex-1 truncate">
-                        {field.path}
+                      <code className="text-xs bg-gray-100 px-2 py-1 rounded flex-1 truncate" title={field.path}>
+                        {getShortenedPath(field.path)}
                       </code>
                       <Button
                         size="sm"
@@ -215,36 +220,6 @@ export function StructureTable({ structure, onStructureChange, onSave, onCancel,
                     >
                       {field.category || 'Інше'}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(field)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Редагувати
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(field)}>
-                          <CopyIcon className="h-4 w-4 mr-2" />
-                          Дублювати
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(field)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Видалити
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
