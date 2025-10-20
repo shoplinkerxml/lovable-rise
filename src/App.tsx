@@ -33,6 +33,7 @@ import AdminTariffEdit from "./pages/admin/AdminTariffEdit";
 import { StoreTemplates } from "./pages/admin/StoreTemplates";
 import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import TariffPage from "./pages/TariffPage";
+import { Suppliers } from "./pages/user/Suppliers";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +96,8 @@ const App = () => (
                 <Route path=":path/*" element={<UserMenuContentByPath />} />
                 {/* Add the tariff page route */}
                 <Route path="tariff" element={<TariffPage />} />
+                {/* Suppliers route */}
+                <Route path="suppliers" element={<Suppliers />} />
                 {/* Removed /user/menu-management route as requested */}
               </Route>
             </Route>
