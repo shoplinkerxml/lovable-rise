@@ -1,4 +1,5 @@
 import React from 'react';
+
 import {
   LayoutDashboard,
   FileText,
@@ -33,6 +34,9 @@ import {
   FileSpreadsheet,
   Layout,
   Code,
+  CodeXml,
+  FileCode,
+  FileCode2,
   Image,
   Bell,
   CreditCard,
@@ -130,7 +134,17 @@ const MENU_ICONS: Record<string, LucideIcon> = {
   // API & Development
   code: Code,
   api: Code,
+  'code-xml': CodeXml,
+  'file-code': FileCode,
+  'file-code-2': FileCode2,
+  xml: CodeXml,
+  template: FileCode,
+  templates: FileCode,
+  'xml-template': CodeXml,
+  'xml-templates': CodeXml,
   Code: Code,
+  CodeXml: CodeXml,
+  FileCode: FileCode,
   
   // Media & Notifications
   image: Image,
@@ -241,6 +255,7 @@ export const getAutoIcon = (item: { title: string; path: string; page_type?: str
   if (title.includes('dashboard') || title.includes('панель')) return 'layout-dashboard';
   if (title.includes('user') || title.includes('користувач')) return 'users';
   if (title.includes('setting') || title.includes('налаштування')) return 'settings';
+  if (title.includes('xml') || title.includes('template') || title.includes('шаблон')) return 'file-code';
   if (title.includes('form') || title.includes('форм')) return 'file-text';
   if (title.includes('report') || title.includes('звіт')) return 'bar-chart-3';
   if (title.includes('analytic') || title.includes('аналітика')) return 'trending-up';

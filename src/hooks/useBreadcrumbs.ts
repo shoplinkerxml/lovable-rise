@@ -31,6 +31,7 @@ const USER_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string
   "/user/profile": { labelKey: "breadcrumb_personal", parentPath: "/user" },
   "/user/settings": { labelKey: "breadcrumb_settings", parentPath: "/user" },
   "/user/tariff": { labelKey: "menu_pricing", parentPath: "/user" },
+  "/user/suppliers": { labelKey: "menu_suppliers", parentPath: "/user" },
 };
 
 export function useBreadcrumbs(): BreadcrumbItem[] {
@@ -232,6 +233,11 @@ export function usePageInfo() {
         return {
           title: t("create_new_tariff"),
           description: t("create_tariff_description"),
+        };
+      case "/user/suppliers":
+        return {
+          title: t("suppliers_title"),
+          description: t("suppliers_description"),
         };
       default:
         return {

@@ -119,31 +119,39 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
             <CardHeader>
               <div className="flex items-start justify-between">
                 <FileText className="h-8 w-8 text-emerald-600" />
-                <Badge variant="secondary">{template.marketplace}</Badge>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0"
+                    onClick={() => onSelect?.(template)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    onClick={() => setDeleteDialog({ open: true, template })}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <CardTitle className="mt-2">{template.name}</CardTitle>
               <CardDescription>
-                {(template.mapping_rules?.length || 0)} {t('fields_found')} • {new Date(template.created_at).toLocaleDateString()}
+                {new Date(template.created_at).toLocaleDateString('uk-UA')}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={() => onSelect?.(template)}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  {t('edit')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="destructive"
-                  onClick={() => setDeleteDialog({ open: true, template })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+            <CardContent className="space-y-2">
+              {template.marketplace && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Badge variant="secondary">{template.marketplace}</Badge>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <FileText className="h-4 w-4" />
+                <span>{(template.mapping_rules?.length || 0)} {t('fields_found')}</span>
               </div>
             </CardContent>
           </Card>
