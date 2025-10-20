@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
-import { Settings, Edit, Trash2, Loader2, MoreVertical } from 'lucide-react';
+import { Settings, Edit, Trash2, Loader2, MoreVertical, Shield, GripVertical } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';
@@ -120,6 +120,8 @@ export const LimitsList = ({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[50px]"></TableHead>
               <TableHead>{t('limit_name_field')}</TableHead>
               <TableHead>{t('limit_code_field')}</TableHead>
               <TableHead>{t('limit_description_field')}</TableHead>
@@ -130,6 +132,16 @@ export const LimitsList = ({
           <TableBody>
             {limits.map((limit) => (
               <TableRow key={limit.id}>
+                <TableCell>
+                  <div className="flex items-center justify-center cursor-move">
+                    <GripVertical className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-center">
+                    <Shield className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </TableCell>
                 <TableCell className="font-medium">{limit.name}</TableCell>
                 <TableCell>
                   <code className="rounded bg-muted px-2 py-1 text-sm">{limit.code}</code>
