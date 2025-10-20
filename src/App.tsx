@@ -31,6 +31,7 @@ import AdminTariffFeatures from "./pages/admin/AdminTariffFeatures";
 import AdminTariffNew from "./pages/admin/AdminTariffNew";
 import AdminTariffEdit from "./pages/admin/AdminTariffEdit";
 import { StoreTemplates } from "./pages/admin/StoreTemplates";
+import { LimitTemplates } from "./pages/admin/LimitTemplates";
 import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import TariffPage from "./pages/TariffPage";
 import { Suppliers } from "./pages/user/Suppliers";
@@ -69,6 +70,7 @@ const App = () => (
             {/* Admin Settings Routes */}
             <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>
               <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
+              <Route path="settings/limits" element={<AdminLayout><LimitTemplates /></AdminLayout>} />
               <Route path="storetemplates" element={<AdminLayout><StoreTemplates /></AdminLayout>} />
               <Route path="tariff" element={<AdminLayout><AdminTariffManagement /></AdminLayout>} />
               <Route path="tariff/new" element={<AdminLayout><AdminTariffNew /></AdminLayout>} />

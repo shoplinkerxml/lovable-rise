@@ -11,10 +11,12 @@ const ADMIN_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: strin
   "/admin/users": { labelKey: "breadcrumb_users", parentPath: "/admin" },
   "/admin/tariff": { labelKey: "menu_pricing", parentPath: "/admin" },
   "/admin/tariff/new": { labelKey: "create_new_tariff", parentPath: "/admin/tariff" },
+  "/admin/tariff/edit/:id": { labelKey: "edit_tariff", parentPath: "/admin/tariff" },
   "/admin/tariff/features": { labelKey: "tariff_features_and_limits", parentPath: "/admin/tariff" },
   "/admin/storetemplates": { labelKey: "menu_store_templates", parentPath: "/admin" },
   "/admin/settings/currencies": { labelKey: "currency_management", parentPath: "/admin" },
   "/admin/settings/currency": { labelKey: "currency_management", parentPath: "/admin" },
+  "/admin/settings/limits": { labelKey: "limits_title", parentPath: "/admin" },
   "/admin/forms": { labelKey: "breadcrumb_forms", parentPath: "/admin" },
   "/admin/forms/elements": { labelKey: "breadcrumb_elements", parentPath: "/admin/forms" },
   "/admin/forms/layouts": { labelKey: "breadcrumb_layouts", parentPath: "/admin/forms" },
@@ -238,6 +240,11 @@ export function usePageInfo() {
         return {
           title: t("suppliers_title"),
           description: t("suppliers_description"),
+        };
+      case "/admin/settings/limits":
+        return {
+          title: t("limits_title"),
+          description: t("limits_description"),
         };
       default:
         return {

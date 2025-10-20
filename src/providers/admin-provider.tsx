@@ -146,6 +146,17 @@ const STATIC_ROUTES: Record<string, Partial<MenuItemData>> = {
     created_at: new Date().toISOString(),
     icon_name: 'file-code',
     section_type: 'main'
+  },
+  '/settings/limits': {
+    id: -14,
+    title: 'Ліміти',
+    path: '/settings/limits',
+    page_type: 'custom',
+    is_active: true,
+    order_index: 101,
+    created_at: new Date().toISOString(),
+    icon_name: 'settings',
+    section_type: 'settings'
   }
 };
 

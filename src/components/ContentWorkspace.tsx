@@ -24,6 +24,7 @@ import AdminTariffNew from '@/pages/admin/AdminTariffNew';
 import AdminTariffEdit from '@/pages/admin/AdminTariffEdit';
 import AdminUserDetails from '@/pages/admin/AdminUserDetails';
 import { StoreTemplates } from '@/pages/admin/StoreTemplates';
+import { LimitTemplates } from '@/pages/admin/LimitTemplates';
 
 // Error display component
 const ContentError = ({ error }: { error: string }) => (
@@ -46,6 +47,7 @@ const STATIC_COMPONENTS: Record<string, React.ComponentType> = {
   '/forms/validation': FormValidation,
   '/users': AdminUsersPage,
   '/settings/currency': CurrencyManagement,
+  '/settings/limits': LimitTemplates,
   '/tariff': AdminTariffManagement,
   '/tariff/features': AdminTariffFeatures,
   '/tariff/new': AdminTariffNew,
@@ -82,6 +84,7 @@ const ContentWorkspace: React.FC = () => {
     if (adminPath === '/personal') return 'default';
     if (adminPath === '/users') return 'list';
     if (adminPath === '/settings/currency') return 'list';
+    if (adminPath === '/settings/limits') return 'list';
     if (adminPath === '/tariff' || adminPath === '/tariff/features') return 'list';
     if (adminPath.startsWith('/tariff/edit/') || adminPath === '/tariff/new') return 'form';
     
