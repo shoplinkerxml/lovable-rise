@@ -164,6 +164,7 @@ export type Database = {
           is_active: boolean | null
           limit_name: string
           tariff_id: number
+          template_id: number | null
           value: number
         }
         Insert: {
@@ -171,6 +172,7 @@ export type Database = {
           is_active?: boolean | null
           limit_name: string
           tariff_id: number
+          template_id?: number | null
           value: number
         }
         Update: {
@@ -178,6 +180,7 @@ export type Database = {
           is_active?: boolean | null
           limit_name?: string
           tariff_id?: number
+          template_id?: number | null
           value?: number
         }
         Relationships: [

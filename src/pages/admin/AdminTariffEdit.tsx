@@ -15,6 +15,7 @@ import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { TariffService, type Currency, type TariffFeature, type TariffLimit } from '@/lib/tariff-service';
+import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { ProfileService } from '@/lib/profile-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -66,12 +67,14 @@ const AdminTariffEdit = () => {
   const [savedTariffId, setSavedTariffId] = useState<number | null>(null);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
+  const [availableLimits, setAvailableLimits] = useState<LimitTemplate[]>([]);
   const [newFeature, setNewFeature] = useState({
     feature_name: '',
     is_active: true
   });
   const [newLimit, setNewLimit] = useState({
     limit_name: '',
+    template_id: null as number | null,
     value: 0,
     is_active: true
   });
@@ -98,6 +101,7 @@ const AdminTariffEdit = () => {
   useEffect(() => {
     // Fetch currencies and check permissions on component mount
     fetchCurrencies();
+    fetchAvailableLimits();
     checkUserPermissions();
     // Fetch tariff name for breadcrumb if we have an ID
     if (id) {
@@ -137,6 +141,16 @@ const AdminTariffEdit = () => {
       // Set admin permissions to prevent empty page
       setIsAdmin(true);
       setUserRole('admin');
+    }
+  };
+
+  const fetchAvailableLimits = async () => {
+    try {
+      const limitsData = await LimitService.getLimits();
+      setAvailableLimits(limitsData);
+    } catch (error) {
+      console.error('Error loading available limits:', error);
+      toast.error(t('failed_load_limits') || 'Failed to load available limits');
     }
   };
   const validateForm = (): boolean => {
@@ -327,6 +341,7 @@ const AdminTariffEdit = () => {
         await TariffService.addTariffLimit({
           tariff_id: tariffId,
           limit_name: limit.limit_name,
+          template_id: limit.template_id,
           value: limit.value,
           is_active: limit.is_active
         });
@@ -360,6 +375,7 @@ const AdminTariffEdit = () => {
         await TariffService.addTariffLimit({
           tariff_id: tariffId,
           limit_name: limit.limit_name,
+          template_id: limit.template_id,
           value: limit.value,
           is_active: limit.is_active
         });
@@ -367,6 +383,7 @@ const AdminTariffEdit = () => {
         // Existing limit - update it with separate request
         await TariffService.updateTariffLimit(limit.id, {
           limit_name: limit.limit_name,
+          template_id: limit.template_id,
           value: limit.value,
           is_active: limit.is_active
         });
@@ -548,12 +565,14 @@ const AdminTariffEdit = () => {
       // Temporary ID for new limits
       tariff_id: savedTariffId || 0,
       limit_name: newLimit.limit_name,
+      template_id: newLimit.template_id,
       value: newLimit.value,
       is_active: newLimit.is_active
     };
     setLimits([...limits, limit]);
     setNewLimit({
       limit_name: '',
+      template_id: null,
       value: 0,
       is_active: true
     });
@@ -594,6 +613,7 @@ const AdminTariffEdit = () => {
         const createdLimit = await TariffService.addTariffLimit({
           tariff_id: parseInt(id),
           limit_name: limit.limit_name,
+          template_id: limit.template_id,
           value: limit.value,
           is_active: limit.is_active
         });
@@ -606,6 +626,7 @@ const AdminTariffEdit = () => {
         // Existing limit, update it
         await TariffService.updateTariffLimit(limit.id, {
           limit_name: limit.limit_name,
+          template_id: limit.template_id,
           value: limit.value,
           is_active: limit.is_active
         });
@@ -642,18 +663,21 @@ const AdminTariffEdit = () => {
       id: Date.now() + 1,
       tariff_id: 0,
       limit_name: t('store_count_limit'),
+      template_id: null,
       value: 3,
       is_active: true
     }, {
       id: Date.now() + 2,
       tariff_id: 0,
       limit_name: t('supplier_count_limit'),
+      template_id: null,
       value: 5,
       is_active: true
     }, {
       id: Date.now() + 3,
       tariff_id: 0,
       limit_name: t('product_count_limit'),
+      template_id: null,
       value: 100,
       is_active: true
     }];
@@ -1036,10 +1060,31 @@ const AdminTariffEdit = () => {
                   <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
                     <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="new-limit-name">{t('limit_name')}</Label>
-                      <Input id="new-limit-name" value={newLimit.limit_name} onChange={e => setNewLimit({
-                      ...newLimit,
-                      limit_name: e.target.value
-                    })} placeholder={t('enter_limit_name')} disabled={!isAdmin} />
+                      <Select 
+                        value={newLimit.template_id?.toString() || ''} 
+                        onValueChange={(value) => {
+                          const selectedLimit = availableLimits.find(l => l.id === parseInt(value));
+                          if (selectedLimit) {
+                            setNewLimit({ 
+                              ...newLimit, 
+                              limit_name: selectedLimit.name,
+                              template_id: selectedLimit.id
+                            });
+                          }
+                        }}
+                        disabled={!isAdmin}
+                      >
+                        <SelectTrigger id="new-limit-name">
+                          <SelectValue placeholder={t('select_limit') || 'Виберіть обмеження'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLimits.map((limit) => (
+                            <SelectItem key={limit.id} value={limit.id.toString()}>
+                              {limit.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-limit-value" className="block text-center">{t('limit_value')}</Label>
@@ -1090,7 +1135,44 @@ const AdminTariffEdit = () => {
                       <TableBody>
                         {limits.map((limit, index) => <TableRow key={limit.id}>
                             <TableCell className="w-[40%]">
-                              <Input value={limit.limit_name} onChange={e => updateLimit(index, 'limit_name', e.target.value)} className="border-none p-0 focus-visible:ring-0 w-full" disabled={!isAdmin} />
+                              <Select 
+                                value={limit.template_id?.toString() || ''} 
+                                onValueChange={async (value) => {
+                                  const selectedLimit = availableLimits.find(l => l.id === parseInt(value));
+                                  if (selectedLimit) {
+                                    updateLimit(index, 'limit_name', selectedLimit.name);
+                                    updateLimit(index, 'template_id', selectedLimit.id);
+                                    
+                                    // Auto-save the changes to database for existing limits
+                                    if (id && limit.id <= 1000000) {
+                                      try {
+                                        await TariffService.updateTariffLimit(limit.id, {
+                                          limit_name: selectedLimit.name,
+                                          template_id: selectedLimit.id,
+                                          value: limit.value,
+                                          is_active: limit.is_active
+                                        });
+                                        toast.success(t('limit_updated_successfully'));
+                                      } catch (error) {
+                                        console.error('Error auto-saving limit:', error);
+                                        toast.error(t('failed_save_limit'));
+                                      }
+                                    }
+                                  }
+                                }}
+                                disabled={!isAdmin}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableLimits.map((availableLimit) => (
+                                    <SelectItem key={availableLimit.id} value={availableLimit.id.toString()}>
+                                      {availableLimit.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
                               <Input type="number" min="0" value={limit.value} onChange={e => updateLimit(index, 'value', parseInt(e.target.value) || 0)} className="border-none p-0 focus-visible:ring-0 text-center w-full" disabled={!isAdmin} />

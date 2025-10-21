@@ -6,6 +6,7 @@ export interface LimitTemplate {
   name: string;
   path?: string;
   description?: string;
+  order_index?: number;
 }
 
 export interface CreateLimitData {
@@ -29,6 +30,7 @@ export class LimitService {
     const { data, error } = await (supabase as any)
       .from('limit_templates')
       .select('*')
+      .order('order_index', { ascending: true })
       .order('id', { ascending: true });
 
     if (error) {
@@ -172,6 +174,27 @@ export class LimitService {
     if (error) {
       console.error('Delete limit error:', error);
       throw new Error(error.message);
+    }
+  }
+
+  /** Оновлення порядку лімітів */
+  static async updateLimitsOrder(limits: { id: number; order_index: number }[]): Promise<void> {
+    try {
+      // Оновлюємо кожен ліміт окремо
+      const updates = limits.map(async (limit) => {
+        // @ts-ignore - table not in generated types yet
+        const { error } = await (supabase as any)
+          .from('limit_templates')
+          .update({ order_index: limit.order_index })
+          .eq('id', limit.id);
+
+        if (error) throw error;
+      });
+
+      await Promise.all(updates);
+    } catch (error) {
+      console.error('Update limits order error:', error);
+      throw new Error('Failed to update limits order');
     }
   }
 }

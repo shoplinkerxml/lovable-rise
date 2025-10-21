@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { TariffService, type TariffInsert, type Currency, type TariffFeature, type TariffLimit } from '@/lib/tariff-service';
+import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, FileText, Sparkles, Shield, Gift, Infinity, Power } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
@@ -44,8 +45,14 @@ const AdminTariffNew = () => {
   const [savedTariffId, setSavedTariffId] = useState<number | null>(null);
   const [features, setFeatures] = useState<TariffFeature[]>([]);
   const [limits, setLimits] = useState<TariffLimit[]>([]);
+  const [availableLimits, setAvailableLimits] = useState<LimitTemplate[]>([]);
   const [newFeature, setNewFeature] = useState({ feature_name: '', is_active: true });
-  const [newLimit, setNewLimit] = useState({ limit_name: '', value: 0, is_active: true });
+  const [newLimit, setNewLimit] = useState({ 
+    limit_name: '', 
+    template_id: null as number | null,
+    value: 0, 
+    is_active: true 
+  });
   const [formData, setFormData] = useState<TariffFormData>({
     name: '',
     description: '',
@@ -62,6 +69,7 @@ const AdminTariffNew = () => {
 
   useEffect(() => {
     fetchCurrencies();
+    fetchAvailableLimits();
   }, []);
 
   const fetchCurrencies = async () => {
@@ -74,6 +82,16 @@ const AdminTariffNew = () => {
       toast.error(t('failed_load_currencies'));
     } finally {
       setIsInitialLoading(false);
+    }
+  };
+
+  const fetchAvailableLimits = async () => {
+    try {
+      const limitsData = await LimitService.getLimits();
+      setAvailableLimits(limitsData);
+    } catch (error) {
+      console.error('Error loading available limits:', error);
+      toast.error(t('failed_load_limits') || 'Failed to load available limits');
     }
   };
 
@@ -190,11 +208,12 @@ const AdminTariffNew = () => {
       id: Date.now(), // Temporary ID for new limits
       tariff_id: savedTariffId || 0,
       limit_name: newLimit.limit_name,
+      template_id: newLimit.template_id,
       value: newLimit.value,
       is_active: newLimit.is_active
     };
     setLimits([...limits, limit]);
-    setNewLimit({ limit_name: '', value: 0, is_active: true });
+    setNewLimit({ limit_name: '', template_id: null, value: 0, is_active: true });
   };
 
   const removeLimit = (index: number) => {
@@ -226,6 +245,7 @@ const AdminTariffNew = () => {
         await TariffService.addTariffLimit({
           tariff_id: tariffId,
           limit_name: limit.limit_name,
+          template_id: limit.template_id,
           value: limit.value,
           is_active: limit.is_active
         });
@@ -264,6 +284,7 @@ const AdminTariffNew = () => {
         id: Date.now() + 1,
         tariff_id: 0,
         limit_name: t('store_count_limit'),
+        template_id: null,
         value: 3,
         is_active: true
       },
@@ -271,6 +292,7 @@ const AdminTariffNew = () => {
         id: Date.now() + 2,
         tariff_id: 0,
         limit_name: t('supplier_count_limit'),
+        template_id: null,
         value: 5,
         is_active: true
       },
@@ -278,6 +300,7 @@ const AdminTariffNew = () => {
         id: Date.now() + 3,
         tariff_id: 0,
         limit_name: t('product_count_limit'),
+        template_id: null,
         value: 100,
         is_active: true
       }
@@ -678,12 +701,30 @@ const AdminTariffNew = () => {
                   <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
                     <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="new-limit-name">{t('limit_name')}</Label>
-                      <Input
-                        id="new-limit-name"
-                        value={newLimit.limit_name}
-                        onChange={(e) => setNewLimit({ ...newLimit, limit_name: e.target.value })}
-                        placeholder={t('enter_limit_name')}
-                      />
+                      <Select 
+                        value={newLimit.template_id?.toString() || ''} 
+                        onValueChange={(value) => {
+                          const selectedLimit = availableLimits.find(l => l.id === parseInt(value));
+                          if (selectedLimit) {
+                            setNewLimit({ 
+                              ...newLimit, 
+                              limit_name: selectedLimit.name,
+                              template_id: selectedLimit.id
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="new-limit-name">
+                          <SelectValue placeholder={t('select_limit') || 'Виберіть обмеження'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLimits.map((limit) => (
+                            <SelectItem key={limit.id} value={limit.id.toString()}>
+                              {limit.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="new-limit-value" className="block text-center">{t('limit_value')}</Label>
@@ -742,11 +783,27 @@ const AdminTariffNew = () => {
                         {limits.map((limit, index) => (
                           <TableRow key={limit.id}>
                             <TableCell className="w-[40%]">
-                              <Input
-                                value={limit.limit_name}
-                                onChange={(e) => updateLimit(index, 'limit_name', e.target.value)}
-                                className="border-none p-0 focus-visible:ring-0 w-full"
-                              />
+                              <Select 
+                                value={limit.template_id?.toString() || ''} 
+                                onValueChange={(value) => {
+                                  const selectedLimit = availableLimits.find(l => l.id === parseInt(value));
+                                  if (selectedLimit) {
+                                    updateLimit(index, 'limit_name', selectedLimit.name);
+                                    updateLimit(index, 'template_id', selectedLimit.id);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableLimits.map((availableLimit) => (
+                                    <SelectItem key={availableLimit.id} value={availableLimit.id.toString()}>
+                                      {availableLimit.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
                               <Input

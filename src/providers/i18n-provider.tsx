@@ -108,6 +108,7 @@ const dictionary: Dictionary = {
   limit_path_hint: { uk: "Вкажіть шлях до сторінки, якщо обмеження пов'язане з певним розділом", en: "Specify page path if limit is related to a specific section" },
   limit_description_field: { uk: "Опис обмеження", en: "Limit Description" },
   limit_description_placeholder: { uk: "Опишіть призначення обмеження", en: "Describe the purpose of the limit" },
+  select_limit: { uk: "Виберіть обмеження", en: "Select limit" },
   limit_created: { uk: "Обмеження створено", en: "Limit created" },
   limit_updated: { uk: "Обмеження оновлено", en: "Limit updated" },
   limit_deleted: { uk: "Обмеження видалено", en: "Limit deleted" },
@@ -115,6 +116,8 @@ const dictionary: Dictionary = {
   failed_load_limits: { uk: "Помилка завантаження обмежень", en: "Failed to load limits" },
   failed_delete_limit: { uk: "Помилка видалення обмеження", en: "Failed to delete limit" },
   delete_limit_confirm: { uk: "Видалити обмеження?", en: "Delete Limit?" },
+  limits_order_updated: { uk: "Порядок обмежень оновлено", en: "Limits order updated" },
+  failed_update_limits_order: { uk: "Помилка оновлення порядку обмежень", en: "Failed to update limits order" },
   
   // Page descriptions
   tariff_plans_description: { uk: "Управління тарифними планами користувачів", en: "Manage user tariff plans" },

@@ -29,6 +29,95 @@ import { Settings, Edit, Trash2, Loader2, MoreVertical, Shield, GripVertical } f
 import { useI18n } from '@/providers/i18n-provider';
 import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+interface SortableRowProps {
+  limit: LimitTemplate;
+  onEdit?: (limit: LimitTemplate) => void;
+  onDelete: (limit: LimitTemplate) => void;
+}
+
+const SortableRow = ({ limit, onEdit, onDelete }: SortableRowProps) => {
+  const { t } = useI18n();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: limit.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style}>
+      <TableCell>
+        <div 
+          className="flex items-center justify-center cursor-move touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center justify-center">
+          <Shield className="h-5 w-5 text-emerald-600" />
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">{limit.name}</TableCell>
+      <TableCell>
+        <code className="rounded bg-muted px-2 py-1 text-sm">{limit.code}</code>
+      </TableCell>
+      <TableCell>{limit.description || '—'}</TableCell>
+      <TableCell className="text-sm text-muted-foreground">{limit.path || '—'}</TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Відкрити меню</span>
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit?.(limit)}>
+              <Edit className="h-4 w-4 mr-2" />
+              {t('edit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => onDelete(limit)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {t('delete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+};
 
 interface LimitsListProps {
   onEdit?: (limit: LimitTemplate) => void;
@@ -52,6 +141,43 @@ export const LimitsList = ({
     open: false,
     limit: null
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = limits.findIndex((item) => item.id === active.id);
+      const newIndex = limits.findIndex((item) => item.id === over.id);
+
+      const newLimits = arrayMove(limits, oldIndex, newIndex);
+      
+      // Оновлюємо локальний стан негайно
+      setLimits(newLimits);
+
+      // Зберігаємо новий порядок в базі даних
+      try {
+        const updates = newLimits.map((limit, index) => ({
+          id: limit.id,
+          order_index: index,
+        }));
+        
+        await LimitService.updateLimitsOrder(updates);
+        toast.success(t('limits_order_updated') || 'Порядок оновлено');
+      } catch (error: any) {
+        console.error('Update order error:', error);
+        toast.error(error?.message || t('failed_update_limits_order') || 'Помилка оновлення порядку');
+        // Повертаємо попередній стан при помилці
+        loadLimits();
+      }
+    }
+  };
 
   useEffect(() => {
     loadLimits();
@@ -116,66 +242,42 @@ export const LimitsList = ({
 
   return (
     <>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]"></TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-              <TableHead>{t('limit_name_field')}</TableHead>
-              <TableHead>{t('limit_code_field')}</TableHead>
-              <TableHead>{t('limit_description_field')}</TableHead>
-              <TableHead>{t('limit_path_field')}</TableHead>
-              <TableHead className="w-[70px]">{t('table_actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {limits.map((limit) => (
-              <TableRow key={limit.id}>
-                <TableCell>
-                  <div className="flex items-center justify-center cursor-move">
-                    <GripVertical className="h-5 w-5 text-muted-foreground hover:text-foreground" />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-center">
-                    <Shield className="h-5 w-5 text-emerald-600" />
-                  </div>
-                </TableCell>
-                <TableCell className="font-medium">{limit.name}</TableCell>
-                <TableCell>
-                  <code className="rounded bg-muted px-2 py-1 text-sm">{limit.code}</code>
-                </TableCell>
-                <TableCell>{limit.description || '—'}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{limit.path || '—'}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Відкрити меню</span>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit?.(limit)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        {t('edit')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setDeleteDialog({ open: true, limit })}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {t('delete')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+      <DndContext 
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+                <TableHead>{t('limit_name_field')}</TableHead>
+                <TableHead>{t('limit_code_field')}</TableHead>
+                <TableHead>{t('limit_description_field')}</TableHead>
+                <TableHead>{t('limit_path_field')}</TableHead>
+                <TableHead className="w-[70px]">{t('table_actions')}</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              <SortableContext 
+                items={limits.map(l => l.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {limits.map((limit) => (
+                  <SortableRow
+                    key={limit.id}
+                    limit={limit}
+                    onEdit={onEdit}
+                    onDelete={(limit) => setDeleteDialog({ open: true, limit })}
+                  />
+                ))}
+              </SortableContext>
+            </TableBody>
+          </Table>
+        </div>
+      </DndContext>
 
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, limit: null })}>
         <AlertDialogContent>
