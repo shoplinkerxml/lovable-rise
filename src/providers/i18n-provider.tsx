@@ -158,7 +158,15 @@ const dictionary: Dictionary = {
   pricing_refund: { uk: "Повернення коштів протягом 30 днів", en: "Refund within 30 days" },
   pricing_no_hidden: { uk: "Ніяких прихованих платежів", en: "No hidden payments" },
   
-  auth_logout: { uk: "Вийти", en: "Logout" },
+  // Common actions
+  save: { uk: "Зберегти", en: "Save" },
+  update: { uk: "Оновити", en: "Update" },
+  delete: { uk: "Видалити", en: "Delete" },
+  edit: { uk: "Редагувати", en: "Edit" },
+  back: { uk: "Назад", en: "Back" },
+  cancel: { uk: "Скасувати", en: "Cancel" },
+  saving: { uk: "Збереження...", en: "Saving..." },
+  duplicate: { uk: "Дублювати", en: "Duplicate" },
   
   // User Registration & Authentication
   register_title: { uk: "Реєстрація в MarketGrow", en: "Sign up to MarketGrow" },
@@ -437,13 +445,9 @@ const dictionary: Dictionary = {
   list_page_placeholder: { uk: "Це заповнювач для сторінки списку", en: "This is a placeholder for list page" },
   dashboard_page_placeholder: { uk: "Це заповнювач для сторінки панелі", en: "This is a placeholder for dashboard page" },
   custom_page_placeholder: { uk: "Це заповнювач для користувацької сторінки", en: "This is a placeholder for custom page" },
-  edit: { uk: "Редагувати", en: "Edit" },
-  duplicate: { uk: "Дублювати", en: "Duplicate" },
-  delete: { uk: "Видалити", en: "Delete" },
   // Menu Management
   menu_management: { uk: "Управління меню", en: "Menu Management" },
   add_menu_item: { uk: "Додати пункт меню", en: "Add Menu Item" },
-  cancel: { uk: "Скасувати", en: "Cancel" },
   add_new_menu_item: { uk: "Додати новий пункт меню", en: "Add New Menu Item" },
   title: { uk: "Назва", en: "Title" },
   enter_menu_item_title: { uk: "Введіть назву пункту меню", en: "Enter menu item title" },
@@ -464,7 +468,6 @@ const dictionary: Dictionary = {
   description: { uk: "Опис", en: "Description" },
   enter_menu_item_description: { uk: "Введіть опис пункту меню", en: "Enter menu item description" },
   enter_page_content: { uk: "Введіть вміст сторінки", en: "Enter page content" },
-  save: { uk: "Зберегти", en: "Save" },
   current_menu_items: { uk: "Поточні пункти меню", en: "Current Menu Items" },
   no_menu_items_created: { uk: "Ще не створено жодного пункту меню", en: "No menu items created yet" },
   submenu: { uk: "Підменю", en: "Submenu" },
@@ -551,8 +554,6 @@ const dictionary: Dictionary = {
   enter_tariff_description: { uk: "Введіть опис тарифу", en: "Enter tariff description" },
   enter_duration_days: { uk: "Введіть тривалість у днях", en: "Enter duration in days" },
   lifetime_access: { uk: "Пожиттєвий доступ", en: "Lifetime Access" },
-  back: { uk: "Назад", en: "Back" },
-  saving: { uk: "Збереження...", en: "Saving..." },
   tariff_created: { uk: "Тариф створено успішно", en: "Tariff created successfully" },
   failed_create_tariff: { uk: "Не вдалося створити тариф", en: "Failed to create tariff" },
   features_will_be_configured_after_creating_tariff: { uk: "Функції будуть налаштовані після створення тарифу", en: "Features will be configured after creating the tariff" },

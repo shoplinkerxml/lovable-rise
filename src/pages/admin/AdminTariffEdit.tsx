@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -19,7 +20,7 @@ import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { ProfileService } from '@/lib/profile-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power, Star, Eye } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power, Star, Eye, MoreVertical, Edit } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 interface TariffFormData {
   name: string;
@@ -729,8 +730,8 @@ const AdminTariffEdit = () => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/admin/tariff')} className="p-2 sm:p-3">
-                    <ArrowLeft className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => navigate('/admin/tariff')} className="hover:bg-transparent">
+                    <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -741,8 +742,8 @@ const AdminTariffEdit = () => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button onClick={handleSave} disabled={loading} size="sm" className="p-2 sm:p-3">
-                    <Save className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={handleSave} disabled={loading} className="hover:bg-transparent">
+                    <Save className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -896,8 +897,8 @@ const AdminTariffEdit = () => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={loadSampleFeatures} className="p-2">
-                          <span className="text-xs font-medium">📋</span>
+                        <Button variant="ghost" size="icon" onClick={loadSampleFeatures} className="hover:bg-transparent">
+                          <span className="text-lg text-muted-foreground hover:text-foreground transition-colors">📋</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -908,8 +909,8 @@ const AdminTariffEdit = () => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button onClick={addFeature} size="sm" className="p-2">
-                          <Plus className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={addFeature} className="hover:bg-transparent">
+                          <Plus className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -944,8 +945,8 @@ const AdminTariffEdit = () => {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button onClick={addFeature} size="sm" disabled={!isAdmin} className="p-2">
-                              <Plus className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" onClick={addFeature} disabled={!isAdmin} className="hover:bg-transparent">
+                              <Plus className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -980,31 +981,24 @@ const AdminTariffEdit = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
-                              {isAdmin && <div className="flex justify-center space-x-1">
-                                  {id && <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="outline" size="sm" onClick={() => saveFeature(index)} className="p-1">
-                                            <Save className="h-3 w-3" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>{t('save')}</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>}
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="sm" onClick={() => removeFeature(index)} className="p-1">
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{t('delete')}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                              {isAdmin && <div className="flex justify-center">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="hover:bg-transparent">
+                                        <MoreVertical className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {id && <DropdownMenuItem onClick={() => saveFeature(index)}>
+                                          <Save className="h-4 w-4 mr-2" />
+                                          {t('save')}
+                                        </DropdownMenuItem>}
+                                      <DropdownMenuItem onClick={() => removeFeature(index)} className="text-destructive focus:text-destructive">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        {t('delete')}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>}
                             </TableCell>
                           </TableRow>)}
@@ -1030,8 +1024,8 @@ const AdminTariffEdit = () => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={loadSampleLimits} className="p-2">
-                          <span className="text-xs font-medium">📋</span>
+                        <Button variant="ghost" size="icon" onClick={loadSampleLimits} className="hover:bg-transparent">
+                          <span className="text-lg text-muted-foreground hover:text-foreground transition-colors">📋</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -1042,8 +1036,8 @@ const AdminTariffEdit = () => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button onClick={addLimit} size="sm" className="p-2">
-                          <Plus className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={addLimit} className="hover:bg-transparent">
+                          <Plus className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -1106,8 +1100,8 @@ const AdminTariffEdit = () => {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button onClick={addLimit} size="sm" disabled={!isAdmin} className="p-2">
-                              <Plus className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" onClick={addLimit} disabled={!isAdmin} className="hover:bg-transparent">
+                              <Plus className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -1183,31 +1177,24 @@ const AdminTariffEdit = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-center w-[20%]">
-                              {isAdmin && <div className="flex justify-center space-x-1">
-                                  {id && <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="outline" size="sm" onClick={() => saveLimit(index)} className="p-1">
-                                            <Save className="h-3 w-3" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>{t('save')}</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>}
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="sm" onClick={() => removeLimit(index)} className="p-1">
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>{t('delete')}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                              {isAdmin && <div className="flex justify-center">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="hover:bg-transparent">
+                                        <MoreVertical className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {id && <DropdownMenuItem onClick={() => saveLimit(index)}>
+                                          <Save className="h-4 w-4 mr-2" />
+                                          {t('save')}
+                                        </DropdownMenuItem>}
+                                      <DropdownMenuItem onClick={() => removeLimit(index)} className="text-destructive focus:text-destructive">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        {t('delete')}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>}
                             </TableCell>
                           </TableRow>)}
