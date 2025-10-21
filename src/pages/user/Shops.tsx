@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -99,16 +99,18 @@ export const Shops = () => {
           <div className="flex gap-2 items-center">
             {viewMode === 'list' && (
               <>
-                <Badge variant="outline" className="text-sm">
-                  {t('shops_limit')}: {limitInfo.current} / {limitInfo.max}
+                <Badge variant="outline" className="text-sm flex items-center gap-1.5">
+                  <Store className="h-4 w-4" />
+                  <span>{limitInfo.current} / {limitInfo.max}</span>
                 </Badge>
                 {shopsCount > 0 && (
                   <Button 
                     onClick={handleCreateNew}
                     disabled={!limitInfo.canCreate}
+                    size="icon"
+                    title={t('add_shop')}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('add_shop')}
+                    <Plus className="h-4 w-4" />
                   </Button>
                 )}
               </>

@@ -81,6 +81,8 @@ const dictionary: Dictionary = {
   failed_load_suppliers: { uk: "Помилка завантаження постачальників", en: "Failed to load suppliers" },
   failed_delete_supplier: { uk: "Помилка видалення постачальника", en: "Failed to delete supplier" },
   delete_supplier_confirm: { uk: "Видалити постачальника?", en: "Delete Supplier?" },
+  suppliers_limit: { uk: "Постачальники", en: "Suppliers" },
+  suppliers_limit_reached: { uk: "Досягнуто ліміту постачальників", en: "Supplier limit reached" },
   save_changes: { uk: "Зберегти зміни", en: "Save Changes" },
   
   // Shops

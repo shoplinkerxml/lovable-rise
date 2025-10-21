@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft, Truck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { SuppliersList } from '@/components/user/suppliers';
 import { SupplierForm } from '@/components/user/suppliers';
-import { SupplierService, type Supplier } from '@/lib/supplier-service';
+import { SupplierService, type Supplier, type SupplierLimitInfo } from '@/lib/supplier-service';
 import { toast } from 'sonner';
 
 type ViewMode = 'list' | 'create' | 'edit';
@@ -18,6 +19,33 @@ export const Suppliers = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [suppliersCount, setSuppliersCount] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [limitInfo, setLimitInfo] = useState<SupplierLimitInfo>({ current: 0, max: 0, canCreate: false });
+
+  useEffect(() => {
+    loadMaxLimit();
+  }, []);
+
+  const loadMaxLimit = async () => {
+    try {
+      const maxLimit = await SupplierService.getSupplierLimitOnly();
+      setLimitInfo(prev => ({
+        ...prev,
+        max: maxLimit,
+        canCreate: prev.current < maxLimit
+      }));
+    } catch (error: any) {
+      console.error('Load max limit error:', error);
+    }
+  };
+
+  const handleSuppliersLoaded = (count: number) => {
+    setSuppliersCount(count);
+    setLimitInfo(prev => ({
+      ...prev,
+      current: count,
+      canCreate: count < prev.max
+    }));
+  };
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -25,6 +53,10 @@ export const Suppliers = () => {
   };
 
   const handleCreateNew = () => {
+    if (!limitInfo.canCreate) {
+      toast.error(t('suppliers_limit_reached') + '. ' + t('upgrade_plan'));
+      return;
+    }
     setSelectedSupplier(null);
     setViewMode('create');
   };
@@ -65,17 +97,29 @@ export const Suppliers = () => {
         }
         breadcrumbItems={breadcrumbs}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {viewMode === 'list' && (
+              <>
+                <Badge variant="outline" className="text-sm flex items-center gap-1.5">
+                  <Truck className="h-4 w-4" />
+                  <span>{limitInfo.current} / {limitInfo.max}</span>
+                </Badge>
+                {suppliersCount > 0 && (
+                  <Button 
+                    onClick={handleCreateNew}
+                    disabled={!limitInfo.canCreate}
+                    size="icon"
+                    title={t('add_supplier')}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
+              </>
+            )}
             {viewMode !== 'list' && (
               <Button variant="ghost" onClick={handleBackToList}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 {t('back_to_suppliers')}
-              </Button>
-            )}
-            {viewMode === 'list' && suppliersCount > 0 && (
-              <Button onClick={handleCreateNew}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t('add_supplier')}
               </Button>
             )}
           </div>
@@ -87,7 +131,7 @@ export const Suppliers = () => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCreateNew={handleCreateNew}
-          onSuppliersLoaded={setSuppliersCount}
+          onSuppliersLoaded={handleSuppliersLoaded}
           refreshTrigger={refreshTrigger}
         />
       )}

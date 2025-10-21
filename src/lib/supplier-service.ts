@@ -26,7 +26,95 @@ export interface UpdateSupplierData {
   phone?: string;
 }
 
+export interface SupplierLimitInfo {
+  current: number;
+  max: number;
+  canCreate: boolean;
+}
+
 export class SupplierService {
+  /** Получение только максимального лимита поставщиков (без подсчета текущих) */
+  static async getSupplierLimitOnly(): Promise<number> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user's current active subscription
+    const { data: subscriptions, error: subscriptionError } = await supabase
+      .from('user_subscriptions')
+      .select('tariff_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('start_date', { ascending: false })
+      .limit(1);
+
+    if (subscriptionError || !subscriptions?.[0]) {
+      return 0;
+    }
+
+    const subscription = subscriptions[0];
+
+    // Get the supplier limit directly from tariff_limits by limit_name
+    const { data: limitData, error: limitError } = await supabase
+      .from('tariff_limits')
+      .select('value')
+      .eq('tariff_id', subscription.tariff_id)
+      .ilike('limit_name', '%постачальник%')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (limitError) {
+      console.error('Error fetching tariff limit:', limitError);
+      return 0;
+    }
+
+    return limitData?.value || 0;
+  }
+
+  /** Получение лимита поставщиков для текущего пользователя */
+  static async getSupplierLimit(): Promise<SupplierLimitInfo> {
+    const maxSuppliers = await this.getSupplierLimitOnly();
+    const currentCount = await this.getSuppliersCount();
+
+    return {
+      current: currentCount,
+      max: maxSuppliers,
+      canCreate: currentCount < maxSuppliers
+    };
+  }
+
+  /** Получение количества поставщиков текущего пользователя */
+  static async getSuppliersCount(): Promise<number> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    // @ts-ignore - table not in generated types yet
+    const { count, error } = await (supabase as any)
+      .from('user_suppliers')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Get suppliers count error:', error);
+      return 0;
+    }
+
+    return count || 0;
+  }
+
   /** Отримання списку постачальників поточного користувача */
   static async getSuppliers(): Promise<Supplier[]> {
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -94,6 +182,12 @@ export class SupplierService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error("User not authenticated");
+    }
+
+    // Check if user can create more suppliers
+    const limitInfo = await this.getSupplierLimit();
+    if (!limitInfo.canCreate) {
+      throw new Error(`Досягнуто ліміту постачальників (${limitInfo.max}). Оновіть тарифний план.`);
     }
 
     // @ts-ignore - table not in generated types yet
