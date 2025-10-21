@@ -1,0 +1,302 @@
+import { supabase } from "@/integrations/supabase/client";
+import { SessionValidator } from "./session-validation";
+
+export interface Shop {
+  id: string;
+  user_id: string;
+  store_name: string;
+  template_id?: string | null;
+  custom_mapping?: any;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateShopData {
+  store_name: string;
+  template_id?: string | null;
+  custom_mapping?: any;
+}
+
+export interface UpdateShopData {
+  store_name?: string;
+  template_id?: string | null;
+  custom_mapping?: any;
+  is_active?: boolean;
+}
+
+export interface ShopLimitInfo {
+  current: number;
+  max: number;
+  canCreate: boolean;
+}
+
+export class ShopService {
+  /** Получение лимита магазинов для текущего пользователя */
+  static async getShopLimit(): Promise<ShopLimitInfo> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    console.log('Fetching subscription for user:', user.id);
+
+    // Get user's current active subscription
+    const { data: subscriptions, error: subscriptionError } = await supabase
+      .from('user_subscriptions')
+      .select('tariff_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('start_date', { ascending: false })
+      .limit(1);
+
+    if (subscriptionError) {
+      console.error('Error fetching subscription:', subscriptionError);
+      console.error('Subscription error details:', {
+        message: subscriptionError.message,
+        details: subscriptionError.details,
+        hint: subscriptionError.hint,
+        code: subscriptionError.code
+      });
+      // Return zero limit if can't fetch subscription
+      const currentCount = await this.getShopsCount();
+      return {
+        current: currentCount,
+        max: 0,
+        canCreate: false
+      };
+    }
+
+    const subscription = subscriptions?.[0];
+
+    console.log('User subscription:', { userId: user.id, subscription, subscriptions });
+
+    if (!subscription) {
+      // No active subscription - default limit is 0
+      const currentCount = await this.getShopsCount();
+      return {
+        current: currentCount,
+        max: 0,
+        canCreate: false
+      };
+    }
+
+    // Get the shop limit directly from tariff_limits by limit_name
+    console.log('Fetching shop limit for tariff:', subscription.tariff_id);
+    
+    const { data: limitData, error: limitError } = await supabase
+      .from('tariff_limits')
+      .select('value')
+      .eq('tariff_id', subscription.tariff_id)
+      .ilike('limit_name', '%магазин%')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (limitError) {
+      console.error('Error fetching tariff limit:', limitError);
+    }
+
+    console.log('Found tariff limit:', limitData);
+
+    const maxShops = limitData?.value || 0;
+    const currentCount = await this.getShopsCount();
+
+    return {
+      current: currentCount,
+      max: maxShops,
+      canCreate: currentCount < maxShops
+    };
+  }
+
+  /** Получение количества магазинов текущего пользователя */
+  static async getShopsCount(): Promise<number> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    // @ts-ignore - table not in generated types yet
+    const { count, error } = await (supabase as any)
+      .from('user_stores')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Get shops count error:', error);
+      return 0;
+    }
+
+    return count || 0;
+  }
+
+  /** Получение списка магазинов текущего пользователя */
+  static async getShops(): Promise<Shop[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    // @ts-ignore - table not in generated types yet
+    const { data, error } = await (supabase as any)
+      .from('user_stores')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get shops error:', error);
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  }
+
+  /** Получение одного магазина по ID */
+  static async getShop(id: string): Promise<Shop> {
+    if (!id) throw new Error("Shop ID is required");
+
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    // @ts-ignore - table not in generated types yet
+    const { data, error } = await (supabase as any)
+      .from('user_stores')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Get shop error:', error);
+      throw new Error(error.message);
+    }
+
+    if (!data) {
+      throw new Error("Shop not found");
+    }
+
+    return data;
+  }
+
+  /** Создание нового магазина */
+  static async createShop(shopData: CreateShopData): Promise<Shop> {
+    if (!shopData.store_name?.trim()) {
+      throw new Error("Назва магазину обов'язкова");
+    }
+
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    // Check if user can create more shops
+    const limitInfo = await this.getShopLimit();
+    if (!limitInfo.canCreate) {
+      throw new Error(`Досягнуто ліміту магазинів (${limitInfo.max}). Оновіть тарифний план.`);
+    }
+
+    // @ts-ignore - table not in generated types yet
+    const { data, error } = await (supabase as any)
+      .from('user_stores')
+      .insert({
+        user_id: user.id,
+        store_name: shopData.store_name.trim(),
+        template_id: shopData.template_id || null,
+        custom_mapping: shopData.custom_mapping || null,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Create shop error:', error);
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  /** Обновление магазина */
+  static async updateShop(id: string, shopData: UpdateShopData): Promise<Shop> {
+    if (!id) throw new Error("Shop ID is required");
+
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const cleanData: any = {};
+    if (shopData.store_name !== undefined) {
+      if (!shopData.store_name.trim()) {
+        throw new Error("Назва магазину обов'язкова");
+      }
+      cleanData.store_name = shopData.store_name.trim();
+    }
+    if (shopData.template_id !== undefined) {
+      cleanData.template_id = shopData.template_id || null;
+    }
+    if (shopData.custom_mapping !== undefined) {
+      cleanData.custom_mapping = shopData.custom_mapping || null;
+    }
+    if (shopData.is_active !== undefined) {
+      cleanData.is_active = shopData.is_active;
+    }
+
+    if (Object.keys(cleanData).length === 0) {
+      throw new Error("No fields to update");
+    }
+
+    cleanData.updated_at = new Date().toISOString();
+
+    // @ts-ignore - table not in generated types yet
+    const { data, error } = await (supabase as any)
+      .from('user_stores')
+      .update(cleanData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update shop error:', error);
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  /** Удаление магазина */
+  static async deleteShop(id: string): Promise<void> {
+    if (!id) throw new Error("Shop ID is required");
+
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    // @ts-ignore - table not in generated types yet
+    const { error } = await (supabase as any)
+      .from('user_stores')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Delete shop error:', error);
+      throw new Error(error.message);
+    }
+  }
+}

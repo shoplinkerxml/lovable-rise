@@ -35,6 +35,7 @@ import { LimitTemplates } from "./pages/admin/LimitTemplates";
 import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import TariffPage from "./pages/TariffPage";
 import { Suppliers } from "./pages/user/Suppliers";
+import { Shops } from "./pages/user/Shops";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,6 +101,8 @@ const App = () => (
                 <Route path="tariff" element={<TariffPage />} />
                 {/* Suppliers route */}
                 <Route path="suppliers" element={<Suppliers />} />
+                {/* Shops route */}
+                <Route path="shops" element={<Shops />} />
                 {/* Removed /user/menu-management route as requested */}
               </Route>
             </Route>
