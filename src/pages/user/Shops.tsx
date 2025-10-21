@@ -21,16 +21,29 @@ export const Shops = () => {
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
 
   useEffect(() => {
-    loadLimitInfo();
-  }, [refreshTrigger]);
+    loadMaxLimit();
+  }, []);
 
-  const loadLimitInfo = async () => {
+  const loadMaxLimit = async () => {
     try {
-      const info = await ShopService.getShopLimit();
-      setLimitInfo(info);
+      const maxLimit = await ShopService.getShopLimitOnly();
+      setLimitInfo(prev => ({
+        ...prev,
+        max: maxLimit,
+        canCreate: prev.current < maxLimit
+      }));
     } catch (error: any) {
-      console.error('Load limit info error:', error);
+      console.error('Load max limit error:', error);
     }
+  };
+
+  const handleShopsLoaded = (count: number) => {
+    setShopsCount(count);
+    setLimitInfo(prev => ({
+      ...prev,
+      current: count,
+      canCreate: count < prev.max
+    }));
   };
 
   const handleEdit = (shop: Shop) => {
@@ -115,7 +128,7 @@ export const Shops = () => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCreateNew={handleCreateNew}
-          onShopsLoaded={setShopsCount}
+          onShopsLoaded={handleShopsLoaded}
           refreshTrigger={refreshTrigger}
         />
       )}

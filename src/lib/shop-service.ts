@@ -32,8 +32,8 @@ export interface ShopLimitInfo {
 }
 
 export class ShopService {
-  /** Получение лимита магазинов для текущего пользователя */
-  static async getShopLimit(): Promise<ShopLimitInfo> {
+  /** Получение только максимального лимита магазинов (без подсчета текущих) */
+  static async getShopLimitOnly(): Promise<number> {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
@@ -44,8 +44,6 @@ export class ShopService {
       throw new Error("User not authenticated");
     }
 
-    console.log('Fetching subscription for user:', user.id);
-
     // Get user's current active subscription
     const { data: subscriptions, error: subscriptionError } = await supabase
       .from('user_subscriptions')
@@ -55,40 +53,13 @@ export class ShopService {
       .order('start_date', { ascending: false })
       .limit(1);
 
-    if (subscriptionError) {
-      console.error('Error fetching subscription:', subscriptionError);
-      console.error('Subscription error details:', {
-        message: subscriptionError.message,
-        details: subscriptionError.details,
-        hint: subscriptionError.hint,
-        code: subscriptionError.code
-      });
-      // Return zero limit if can't fetch subscription
-      const currentCount = await this.getShopsCount();
-      return {
-        current: currentCount,
-        max: 0,
-        canCreate: false
-      };
+    if (subscriptionError || !subscriptions?.[0]) {
+      return 0;
     }
 
-    const subscription = subscriptions?.[0];
-
-    console.log('User subscription:', { userId: user.id, subscription, subscriptions });
-
-    if (!subscription) {
-      // No active subscription - default limit is 0
-      const currentCount = await this.getShopsCount();
-      return {
-        current: currentCount,
-        max: 0,
-        canCreate: false
-      };
-    }
+    const subscription = subscriptions[0];
 
     // Get the shop limit directly from tariff_limits by limit_name
-    console.log('Fetching shop limit for tariff:', subscription.tariff_id);
-    
     const { data: limitData, error: limitError } = await supabase
       .from('tariff_limits')
       .select('value')
@@ -99,11 +70,15 @@ export class ShopService {
 
     if (limitError) {
       console.error('Error fetching tariff limit:', limitError);
+      return 0;
     }
 
-    console.log('Found tariff limit:', limitData);
+    return limitData?.value || 0;
+  }
 
-    const maxShops = limitData?.value || 0;
+  /** Получение лимита магазинов для текущего пользователя */
+  static async getShopLimit(): Promise<ShopLimitInfo> {
+    const maxShops = await this.getShopLimitOnly();
     const currentCount = await this.getShopsCount();
 
     return {

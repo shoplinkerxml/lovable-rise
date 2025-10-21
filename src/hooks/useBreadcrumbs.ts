@@ -34,6 +34,8 @@ const USER_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string
   "/user/settings": { labelKey: "breadcrumb_settings", parentPath: "/user" },
   "/user/tariff": { labelKey: "menu_pricing", parentPath: "/user" },
   "/user/suppliers": { labelKey: "menu_suppliers", parentPath: "/user" },
+  "/user/shops": { labelKey: "shops_title", parentPath: "/user" },
+  "/user/Shops": { labelKey: "shops_title", parentPath: "/user" },
 };
 
 export function useBreadcrumbs(): BreadcrumbItem[] {
@@ -240,6 +242,12 @@ export function usePageInfo() {
         return {
           title: t("suppliers_title"),
           description: t("suppliers_description"),
+        };
+      case "/user/shops":
+      case "/user/Shops":
+        return {
+          title: t("shops_title"),
+          description: t("shops_description"),
         };
       case "/admin/settings/limits":
         return {
