@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,7 +19,6 @@ import { ShopService, type Shop } from '@/lib/shop-service';
 import { toast } from 'sonner';
 
 interface ShopsListProps {
-  onEdit?: (shop: Shop) => void;
   onDelete?: (id: string) => void;
   onCreateNew?: () => void;
   onShopsLoaded?: (count: number) => void;
@@ -26,13 +26,13 @@ interface ShopsListProps {
 }
 
 export const ShopsList = ({ 
-  onEdit, 
   onDelete, 
   onCreateNew, 
   onShopsLoaded,
   refreshTrigger 
 }: ShopsListProps) => {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; shop: Shop | null }>({
@@ -105,19 +105,15 @@ export const ShopsList = ({
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {shops.map((shop) => (
-          <Card key={shop.id} className="hover:shadow-lg transition-shadow">
+          <Card 
+            key={shop.id} 
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => navigate(`/user/shops/${shop.id}`)}
+          >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <Store className="h-8 w-8 text-emerald-600" />
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0"
-                    onClick={() => onEdit?.(shop)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     variant="ghost"

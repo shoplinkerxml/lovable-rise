@@ -2,10 +2,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
 
 export interface Shop {
-  id: string;
+  id: string; // UUID
   user_id: string;
   store_name: string;
   template_id?: string | null;
+  xml_config?: any;
   custom_mapping?: any;
   is_active: boolean;
   created_at: string;
@@ -15,12 +16,14 @@ export interface Shop {
 export interface CreateShopData {
   store_name: string;
   template_id?: string | null;
+  xml_config?: any;
   custom_mapping?: any;
 }
 
 export interface UpdateShopData {
   store_name?: string;
   template_id?: string | null;
+  xml_config?: any;
   custom_mapping?: any;
   is_active?: boolean;
 }
@@ -192,6 +195,7 @@ export class ShopService {
         user_id: user.id,
         store_name: shopData.store_name.trim(),
         template_id: shopData.template_id || null,
+        xml_config: shopData.xml_config || null,
         custom_mapping: shopData.custom_mapping || null,
         is_active: true
       })
@@ -224,6 +228,9 @@ export class ShopService {
     }
     if (shopData.template_id !== undefined) {
       cleanData.template_id = shopData.template_id || null;
+    }
+    if (shopData.xml_config !== undefined) {
+      cleanData.xml_config = shopData.xml_config || null;
     }
     if (shopData.custom_mapping !== undefined) {
       cleanData.custom_mapping = shopData.custom_mapping || null;

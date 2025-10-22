@@ -36,6 +36,7 @@ import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import TariffPage from "./pages/TariffPage";
 import { Suppliers } from "./pages/user/Suppliers";
 import { Shops } from "./pages/user/Shops";
+import { ShopDetail } from "./pages/user/ShopDetail";
 import { Products } from "./pages/user/Products";
 
 const queryClient = new QueryClient({
@@ -102,8 +103,9 @@ const App = () => (
                 <Route path="tariff" element={<TariffPage />} />
                 {/* Suppliers route */}
                 <Route path="suppliers" element={<Suppliers />} />
-                {/* Shops route */}
+                {/* Shops routes */}
                 <Route path="shops" element={<Shops />} />
+                <Route path="shops/:id" element={<ShopDetail />} />
                 {/* Products route */}
                 <Route path="products" element={<Products />} />
                 {/* Removed /user/menu-management route as requested */}

@@ -76,6 +76,16 @@ export function useBreadcrumbs(): BreadcrumbItem[] {
         });
         return breadcrumbs;
       }
+      // Handle dynamic user shop detail paths like /user/shops/uuid
+      if (isUserPath && path.startsWith("/user/shops/") && path.split("/").length === 4) {
+        // Add Home -> Shops
+        breadcrumbs.push({
+          label: t("shops_title"),
+          href: "/user/shops",
+        });
+        // Shop name will be added by the ShopDetail component itself
+        return breadcrumbs;
+      }
       // Handle dynamic user menu paths
       if (isUserPath && path.startsWith("/user/")) {
         // Extract the dynamic part

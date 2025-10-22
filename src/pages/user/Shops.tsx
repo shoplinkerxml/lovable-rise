@@ -9,13 +9,12 @@ import { ShopsList, ShopForm } from '@/components/user/shops';
 import { ShopService, type Shop, type ShopLimitInfo } from '@/lib/shop-service';
 import { toast } from 'sonner';
 
-type ViewMode = 'list' | 'create' | 'edit';
+type ViewMode = 'list' | 'create';
 
 export const Shops = () => {
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [shopsCount, setShopsCount] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
@@ -46,22 +45,17 @@ export const Shops = () => {
     }));
   };
 
-  const handleEdit = (shop: Shop) => {
-    setSelectedShop(shop);
-    setViewMode('edit');
-  };
+
 
   const handleCreateNew = () => {
     if (!limitInfo.canCreate) {
       toast.error(t('shops_limit_reached') + '. ' + t('upgrade_plan'));
       return;
     }
-    setSelectedShop(null);
     setViewMode('create');
   };
 
   const handleBackToList = () => {
-    setSelectedShop(null);
     setViewMode('list');
     setRefreshTrigger(prev => prev + 1);
   };
@@ -83,16 +77,12 @@ export const Shops = () => {
         title={
           viewMode === 'list' 
             ? t('shops_title') 
-            : viewMode === 'create' 
-            ? t('create_shop') 
-            : t('edit_shop')
+            : t('create_shop')
         }
         description={
           viewMode === 'list' 
             ? t('shops_description') 
-            : viewMode === 'create'
-            ? t('create_shop_description')
-            : t('edit_shop_description')
+            : t('create_shop_description')
         }
         breadcrumbItems={breadcrumbs}
         actions={
@@ -127,7 +117,6 @@ export const Shops = () => {
 
       {viewMode === 'list' && (
         <ShopsList
-          onEdit={handleEdit}
           onDelete={handleDelete}
           onCreateNew={handleCreateNew}
           onShopsLoaded={handleShopsLoaded}
@@ -135,9 +124,8 @@ export const Shops = () => {
         />
       )}
 
-      {(viewMode === 'create' || viewMode === 'edit') && (
+      {viewMode === 'create' && (
         <ShopForm
-          shop={selectedShop}
           onSuccess={handleBackToList}
           onCancel={handleBackToList}
         />
