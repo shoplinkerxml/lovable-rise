@@ -47,10 +47,25 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         textNodeName: '_text',
         parseAttributeValue: true,
         parseTagValue: true,
+        isArray: (name, jpath) => {
+          // Завжди обробляємо param, picture, category, currency як масиви
+          if (['param', 'picture', 'category', 'currency', 'offer', 'item'].includes(name)) {
+            return true;
+          }
+          return false;
+        }
       });
 
       const parsed = parser.parse(xml);
+      console.log('[XmlPreviewViewer] Parsed XML:', parsed);
+      console.log('[XmlPreviewViewer] Keys:', Object.keys(parsed));
       const tree = buildTree(parsed);
+      console.log('[XmlPreviewViewer] Built tree:', tree);
+      console.log('[XmlPreviewViewer] Tree length:', tree.length);
+      if (tree.length > 0 && tree[0].children) {
+        console.log('[XmlPreviewViewer] First node children:', tree[0].children.length);
+        console.log('[XmlPreviewViewer] First child:', tree[0].children[0]);
+      }
       setTreeData(tree);
       
       // Разворачиваем все узлы по умолчанию
@@ -58,29 +73,30 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
       const expandAll = (nodes: TreeNode[], prefix = '') => {
         nodes.forEach((node, idx) => {
           const path = prefix ? `${prefix}-${idx}` : String(idx);
+          allExpanded.add(path);
+          console.log('[expandAll] Added path:', path, 'children:', node.children?.length || 0);
           if (node.children && node.children.length > 0) {
-            allExpanded.add(path);
             expandAll(node.children, path);
           }
         });
       };
       expandAll(tree);
+      console.log('[XmlPreviewViewer] Total expanded paths:', allExpanded.size);
       setExpanded(allExpanded);
     } catch (error) {
       console.error('Error parsing XML:', error);
     }
   };
 
-  const buildTree = (obj: any, parentPath = ''): TreeNode[] => {
+  const buildTree = (obj: any, parentPath = '', parentName = ''): TreeNode[] => {
     const nodes: TreeNode[] = [];
     let textValue: string | null = null;
 
-    // Сначала собираем текстовое значение если есть
     if (obj._text !== undefined) {
       textValue = truncateValue(String(obj._text));
     }
 
-    // Сначала атрибуты, потом остальные поля
+    // Спочатку збираємо атрибути (@date, @version, @id і т.д.), потім інші
     const attributes: [string, any][] = [];
     const others: [string, any][] = [];
     
@@ -92,65 +108,201 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
       }
     }
     
-    // Обрабатываем атрибуты ПЕРВЫМИ
-    for (const [key, value] of attributes) {
-      nodes.push({
-        name: key.substring(1),
-        value: truncateValue(String(value)),
-        type: 'attribute'
-      });
-    }
+    // Для param - показываем в формате: @name → _text → @paramid → @valueid
+    const isParam = parentName === 'param';
     
-    // Потом обрабатываем остальные поля
-    for (const [key, value] of others) {
-      if (Array.isArray(value)) {
-        // Массив
-        const children: TreeNode[] = [];
-        value.forEach((item, idx) => {
-          if (typeof item === 'object') {
-            children.push({
-              name: `${key}[${idx}]`,
-              children: buildTree(item),
+    if (isParam) {
+      // Специальная обработка для param
+      const nameAttr = attributes.find(([k]) => k === '@name');
+      const paramidAttr = attributes.find(([k]) => k === '@paramid');
+      const valueidAttr = attributes.find(([k]) => k === '@valueid');
+      const valueField = others.find(([k]) => k === 'value');
+      
+      // 1. Название характеристики (@name)
+      if (nameAttr) {
+        nodes.push({
+          name: '@name',
+          value: truncateValue(String(nameAttr[1])),
+          type: 'attribute'
+        });
+      }
+      
+      // 2. Значение (_text или value)
+      if (textValue !== null) {
+        nodes.push({
+          name: 'value',
+          value: textValue,
+          type: 'text'
+        });
+      } else if (valueField) {
+        const [, val] = valueField;
+        if (typeof val === 'object' && val !== null) {
+          nodes.push({
+            name: 'value',
+            children: buildTree(val, `${parentPath}.value`, 'value'),
+            type: 'element'
+          });
+        } else {
+          nodes.push({
+            name: 'value',
+            value: truncateValue(String(val)),
+            type: 'text'
+          });
+        }
+      }
+      
+      // 3. ID параметра (@paramid)
+      if (paramidAttr) {
+        nodes.push({
+          name: '@paramid',
+          value: truncateValue(String(paramidAttr[1])),
+          type: 'attribute'
+        });
+      }
+      
+      // 4. ID значения (@valueid)
+      if (valueidAttr) {
+        nodes.push({
+          name: '@valueid',
+          value: truncateValue(String(valueidAttr[1])),
+          type: 'attribute'
+        });
+      }
+      
+      // Обработка остальных атрибутов и полей
+      for (const [key, value] of attributes) {
+        if (!['@name', '@paramid', '@valueid'].includes(key)) {
+          nodes.push({
+            name: key,
+            value: truncateValue(String(value)),
+            type: 'attribute'
+          });
+        }
+      }
+      
+      for (const [key, value] of others) {
+        if (key !== 'value') {
+          const currentPath = `${parentPath}.${key}`;
+          
+          if (Array.isArray(value)) {
+            const children: TreeNode[] = [];
+            value.forEach((item, idx) => {
+              if (typeof item === 'object') {
+                children.push({
+                  name: key,
+                  children: buildTree(item, `${currentPath}[${idx}]`, key),
+                  type: 'element'
+                });
+              } else {
+                children.push({
+                  name: key,
+                  value: truncateValue(String(item)),
+                  type: 'text'
+                });
+              }
+            });
+            nodes.push({
+              name: key,
+              children,
+              type: 'array'
+            });
+          } else if (typeof value === 'object' && value !== null) {
+            nodes.push({
+              name: key,
+              children: buildTree(value, currentPath, key),
               type: 'element'
             });
           } else {
-            children.push({
-              name: `${key}[${idx}]`,
-              value: truncateValue(String(item)),
+            nodes.push({
+              name: key,
+              value: truncateValue(String(value)),
               type: 'text'
             });
           }
-        });
-        nodes.push({
-          name: key,
-          children,
-          type: 'array'
-        });
-      } else if (typeof value === 'object' && value !== null) {
-        // Объект
-        nodes.push({
-          name: key,
-          children: buildTree(value),
-          type: 'element'
-        });
-      } else {
-        // Простое значение
+        }
+      }
+    } else {
+      // Обычная обработка для не-param элементов
+      // Обрабатываем атрибуты ПЕРВЫМИ
+      for (const [key, value] of attributes) {
         nodes.push({
           name: key,
           value: truncateValue(String(value)),
+          type: 'attribute'
+        });
+      }
+      
+      // Потом обрабатываем остальные поля
+      for (const [key, value] of others) {
+        const currentPath = parentPath ? `${parentPath}.${key}` : key;
+        
+        if (key.startsWith('@')) {
+          nodes.push({
+            name: key.substring(1),
+            value: truncateValue(String(value)),
+            type: 'attribute'
+          });
+        } else if (key === '_text') {
+          continue;
+        } else if (Array.isArray(value)) {
+          // МАСИВ - РОЗГОРТАЄМО ВСІ ЕЛЕМЕНТИ НАПРЯМУ
+          if (key === 'param') {
+            // Кожен param окремо
+            value.forEach((item, idx) => {
+              if (typeof item === 'object') {
+                nodes.push({
+                  name: 'param',
+                  children: buildTree(item, `${currentPath}[${idx}]`, 'param'),
+                  type: 'element'
+                });
+              } else {
+                nodes.push({
+                  name: 'param',
+                  value: truncateValue(String(item)),
+                  type: 'text'
+                });
+              }
+            });
+          } else {
+            // Всі інші масиви - кожен елемент як окремий вузол
+            value.forEach((item, idx) => {
+              if (typeof item === 'object') {
+                nodes.push({
+                  name: key,
+                  children: buildTree(item, `${currentPath}[${idx}]`, key),
+                  type: 'element'
+                });
+              } else {
+                nodes.push({
+                  name: key,
+                  value: truncateValue(String(item)),
+                  type: 'text'
+                });
+              }
+            });
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          nodes.push({
+            name: key,
+            children: buildTree(value, currentPath, key),
+            type: 'element'
+          });
+        } else {
+          nodes.push({
+            name: key,
+            value: truncateValue(String(value)),
+            type: 'text'
+          });
+        }
+      }
+
+      if (textValue !== null && nodes.length > 0) {
+        nodes.push({
+          name: 'value',
+          value: textValue,
           type: 'text'
         });
       }
-    }
-
-    // Добавляем текстовое значение в конце, но без отображения "#text:"
-    if (textValue !== null && nodes.length > 0) {
-      // Если есть атрибуты, добавляем текст как последний элемент с именем "value"
-      nodes.push({
-        name: 'value',
-        value: textValue,
-        type: 'text'
-      });
     }
 
     return nodes;
@@ -219,7 +371,7 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
           onClick={() => hasChildren && toggleExpand(path)}
         >
           {hasChildren && (
-            <div className="w-4 h-4 flex items-center justify-center">
+            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
               {isExpanded ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               ) : (
@@ -227,24 +379,21 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
               )}
             </div>
           )}
-          {!hasChildren && <div className="w-4" />}
+          {!hasChildren && <div className="w-4 flex-shrink-0" />}
           
           <div className="flex-shrink-0">
             {getIcon(node)}
           </div>
           
-          <span className="font-mono text-sm font-medium text-foreground">
-            {node.name}
-          </span>
-          
-          {node.value && (
-            <>
-              <span className="text-muted-foreground">:</span>
-              <span className="font-mono text-sm text-muted-foreground truncate">
-                {node.value}
-              </span>
-            </>
-          )}
+          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+            <span className="font-mono text-sm font-medium text-foreground flex-shrink-0">{node.name}</span>
+            {node.value && !node.children && (
+              <>
+                <span className="text-muted-foreground flex-shrink-0">:</span>
+                <span className="font-mono text-sm text-muted-foreground inline-block truncate max-w-[400px]" title={node.value}>{node.value}</span>
+              </>
+            )}
+          </div>
         </div>
         
         {hasChildren && isExpanded && (

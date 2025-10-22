@@ -123,7 +123,7 @@ export const XMLStructureDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-6 flex-1 overflow-hidden">
+        <div className="grid grid-cols-[1fr_2fr] gap-6 flex-1 overflow-hidden">
           {/* Ліва колонка - форма */}
           <div className="space-y-4 overflow-y-auto pr-2">
             <div className="space-y-2">

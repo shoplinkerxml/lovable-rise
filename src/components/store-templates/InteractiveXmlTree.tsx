@@ -283,7 +283,7 @@ function SortableTreeNode({
               {node.value && !node.children && (
                 <>
                   <span className="text-muted-foreground flex-shrink-0">:</span>
-                  <span className="font-mono text-base text-muted-foreground truncate max-w-[400px]">{node.value}</span>
+                  <span className="font-mono text-base text-muted-foreground inline-block truncate max-w-[400px]" title={node.value}>{node.value}</span>
                 </>
               )}
             </div>
@@ -371,7 +371,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     return buildTree(obj);
   }, []);
 
-  const buildTree = (obj: any, parentPath = ''): TreeNode[] => {
+  const buildTree = (obj: any, parentPath = '', parentName = ''): TreeNode[] => {
     const nodes: TreeNode[] = [];
     let textValue: string | null = null;
     let nodeId = 0;
@@ -392,89 +392,117 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
       }
     }
     
-    // Обрабатываем атрибуты ПЕРВЫМИ (включая @date из yml_catalog)
-    for (const [key, value] of attributes) {
-      const currentPath = parentPath ? `${parentPath}-${key}` : key;
-      nodes.push({
-        id: `${currentPath}-${nodeId++}`,
-        name: key, // Оставляем @ в имени (@date, @id, @available)
-        value: String(value),
-        type: 'field'
-      });
-    }
+    // Для param - показываем в формате: @name → _text → @paramid → @valueid
+    const isParam = parentName === 'param';
     
-    // Потом обрабатываем остальные поля
-    for (const [key, value] of others) {
-      const currentPath = parentPath ? `${parentPath}-${key}` : key;
+    if (isParam) {
+      // Специальная обработка для param
+      const nameAttr = attributes.find(([k]) => k === '@name');
+      const paramidAttr = attributes.find(([k]) => k === '@paramid');
+      const valueidAttr = attributes.find(([k]) => k === '@valueid');
+      const valueField = others.find(([k]) => k === 'value');
       
-      if (key.startsWith('@')) {
+      // 1. Название характеристики (@name)
+      if (nameAttr) {
+        const currentPath = parentPath ? `${parentPath}-${nameAttr[0]}` : nameAttr[0];
         nodes.push({
           id: `${currentPath}-${nodeId++}`,
-          name: key.substring(1),
-          value: String(value),
+          name: '@name',
+          value: String(nameAttr[1]),
           type: 'field'
         });
-      } else if (key === '_text') {
-        continue;
-      } else if (Array.isArray(value)) {
-        // МАССИВ - каждый элемент отдельно под родителем (БЕЗ индексов в имени)
-        console.log(`[buildTree] Массив найден: ${key}, элементов: ${value.length}`, value);
-        const children: TreeNode[] = [];
-        value.forEach((item, idx) => {
-          if (typeof item === 'object') {
-            children.push({
-              id: `${currentPath}-${idx}-${nodeId++}`,
-              name: key, // Убрали [${idx}]
-              children: buildTree(item, `${currentPath}-${idx}`),
-              type: 'field',
-              isExpanded: true
-            });
-          } else {
-            children.push({
-              id: `${currentPath}-${idx}-${nodeId++}`,
-              name: key, // Убрали [${idx}]
-              value: String(item),
-              type: 'field'
-            });
-          }
-        });
-        console.log(`[buildTree] Создано детей для ${key}:`, children.length);
+      }
+      
+      // 2. Значение (_text или value)
+      if (textValue !== null) {
+        const currentPath = parentPath ? `${parentPath}-value` : 'value';
         nodes.push({
           id: `${currentPath}-${nodeId++}`,
-          name: key,
-          children,
-          type: 'field',
-          isExpanded: true
+          name: 'value',
+          value: textValue,
+          type: 'field'
         });
-      } else if (typeof value === 'object' && value !== null) {
+      } else if (valueField) {
+        const [, val] = valueField;
+        const currentPath = parentPath ? `${parentPath}-value` : 'value';
+        if (typeof val === 'object' && val !== null) {
+          // Вложенные <value lang="uk"> и <value lang="ru">
+          nodes.push({
+            id: `${currentPath}-${nodeId++}`,
+            name: 'value',
+            children: buildTree(val, currentPath, 'value'),
+            type: 'field',
+            isExpanded: true
+          });
+        } else {
+          nodes.push({
+            id: `${currentPath}-${nodeId++}`,
+            name: 'value',
+            value: String(val),
+            type: 'field'
+          });
+        }
+      }
+      
+      // 3. ID параметра (@paramid)
+      if (paramidAttr) {
+        const currentPath = parentPath ? `${parentPath}-${paramidAttr[0]}` : paramidAttr[0];
         nodes.push({
           id: `${currentPath}-${nodeId++}`,
-          name: key,
-          children: buildTree(value, currentPath),
-          type: 'field',
-          isExpanded: true
+          name: '@paramid',
+          value: String(paramidAttr[1]),
+          type: 'field'
         });
-      } else {
-        // Простое значение - проверяем, может это массив в виде строки
-        const strValue = String(value);
-        const isArrayLike = strValue.startsWith('[') && strValue.endsWith(']');
-        
-        if (isArrayLike) {
-          // Парсим массив из строки
-          const items = strValue
-            .slice(1, -1)
-            .split(',')
-            .map(u => u.trim().replace(/^['"]|['"]$/g, ''))
-            .filter(u => u.length > 0);
+      }
+      
+      // 4. ID значения (@valueid)
+      if (valueidAttr) {
+        const currentPath = parentPath ? `${parentPath}-${valueidAttr[0]}` : valueidAttr[0];
+        nodes.push({
+          id: `${currentPath}-${nodeId++}`,
+          name: '@valueid',
+          value: String(valueidAttr[1]),
+          type: 'field'
+        });
+      }
+      
+      // Обработка остальных атрибутов и полей, которые не были обработаны
+      for (const [key, value] of attributes) {
+        if (!['@name', '@paramid', '@valueid'].includes(key)) {
+          const currentPath = parentPath ? `${parentPath}-${key}` : key;
+          nodes.push({
+            id: `${currentPath}-${nodeId++}`,
+            name: key,
+            value: String(value),
+            type: 'field'
+          });
+        }
+      }
+      
+      for (const [key, value] of others) {
+        if (key !== 'value') {
+          const currentPath = parentPath ? `${parentPath}-${key}` : key;
           
-          if (items.length > 0) {
-            const children: TreeNode[] = items.map((item, idx) => ({
-              id: `${currentPath}-${idx}-${nodeId++}`,
-              name: key, // Убрали [${idx}]
-              value: item,
-              type: 'field'
-            }));
-            
+          if (Array.isArray(value)) {
+            const children: TreeNode[] = [];
+            value.forEach((item, idx) => {
+              if (typeof item === 'object') {
+                children.push({
+                  id: `${currentPath}-${idx}-${nodeId++}`,
+                  name: key,
+                  children: buildTree(item, `${currentPath}-${idx}`, key),
+                  type: 'field',
+                  isExpanded: true
+                });
+              } else {
+                children.push({
+                  id: `${currentPath}-${idx}-${nodeId++}`,
+                  name: key,
+                  value: String(item),
+                  type: 'field'
+                });
+              }
+            });
             nodes.push({
               id: `${currentPath}-${nodeId++}`,
               name: key,
@@ -482,27 +510,161 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
               type: 'field',
               isExpanded: true
             });
-            continue;
+          } else if (typeof value === 'object' && value !== null) {
+            nodes.push({
+              id: `${currentPath}-${nodeId++}`,
+              name: key,
+              children: buildTree(value, currentPath, key),
+              type: 'field',
+              isExpanded: true
+            });
+          } else {
+            nodes.push({
+              id: `${currentPath}-${nodeId++}`,
+              name: key,
+              value: String(value),
+              type: 'field'
+            });
           }
         }
-        
-        // Обычное значение
+      }
+    } else {
+      // Обычная обработка для не-param элементов
+      // Обрабатываем атрибуты ПЕРВЫМИ (включая @date из yml_catalog)
+      for (const [key, value] of attributes) {
+        const currentPath = parentPath ? `${parentPath}-${key}` : key;
         nodes.push({
           id: `${currentPath}-${nodeId++}`,
-          name: key,
-          value: strValue,
+          name: key, // Оставляем @ в имени (@date, @id, @available)
+          value: String(value),
           type: 'field'
         });
       }
-    }
+      
+      // Потом обрабатываем остальные поля
+      for (const [key, value] of others) {
+        const currentPath = parentPath ? `${parentPath}-${key}` : key;
+        
+        if (key.startsWith('@')) {
+          nodes.push({
+            id: `${currentPath}-${nodeId++}`,
+            name: key.substring(1),
+            value: String(value),
+            type: 'field'
+          });
+        } else if (key === '_text') {
+          continue;
+        } else if (Array.isArray(value)) {
+          // МАССИВ - специальная обработка для param
+          if (key === 'param') {
+            // Каждый param - отдельный узел
+            value.forEach((item, idx) => {
+              if (typeof item === 'object') {
+                nodes.push({
+                  id: `${currentPath}-${idx}-${nodeId++}`,
+                  name: 'param',
+                  children: buildTree(item, `${currentPath}-${idx}`, 'param'),
+                  type: 'field',
+                  isExpanded: true
+                });
+              } else {
+                nodes.push({
+                  id: `${currentPath}-${idx}-${nodeId++}`,
+                  name: 'param',
+                  value: String(item),
+                  type: 'field'
+                });
+              }
+            });
+          } else {
+            // Обычный массив - каждый элемент отдельно под родителем (БЕЗ индексов в имени)
+            console.log(`[buildTree] Массив найден: ${key}, элементов: ${value.length}`, value);
+            const children: TreeNode[] = [];
+            value.forEach((item, idx) => {
+              if (typeof item === 'object') {
+                children.push({
+                  id: `${currentPath}-${idx}-${nodeId++}`,
+                  name: key,
+                  children: buildTree(item, `${currentPath}-${idx}`, key),
+                  type: 'field',
+                  isExpanded: true
+                });
+              } else {
+                children.push({
+                  id: `${currentPath}-${idx}-${nodeId++}`,
+                  name: key,
+                  value: String(item),
+                  type: 'field'
+                });
+              }
+            });
+            console.log(`[buildTree] Создано детей для ${key}:`, children.length);
+            nodes.push({
+              id: `${currentPath}-${nodeId++}`,
+              name: key,
+              children,
+              type: 'field',
+              isExpanded: true
+            });
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          nodes.push({
+            id: `${currentPath}-${nodeId++}`,
+            name: key,
+            children: buildTree(value, currentPath, key),
+            type: 'field',
+            isExpanded: true
+          });
+        } else {
+          // Простое значение - проверяем, может это массив в виде строки
+          const strValue = String(value);
+          const isArrayLike = strValue.startsWith('[') && strValue.endsWith(']');
+          
+          if (isArrayLike) {
+            // Парсим массив из строки
+            const items = strValue
+              .slice(1, -1)
+              .split(',')
+              .map(u => u.trim().replace(/^['"]|['"]$/g, ''))
+              .filter(u => u.length > 0);
+            
+            if (items.length > 0) {
+              const children: TreeNode[] = items.map((item, idx) => ({
+                id: `${currentPath}-${idx}-${nodeId++}`,
+                name: key, // Убрали [${idx}]
+                value: item,
+                type: 'field'
+              }));
+              
+              nodes.push({
+                id: `${currentPath}-${nodeId++}`,
+                name: key,
+                children,
+                type: 'field',
+                isExpanded: true
+              });
+              continue;
+            }
+          }
+          
+          // Обычное значение
+          nodes.push({
+            id: `${currentPath}-${nodeId++}`,
+            name: key,
+            value: strValue,
+            type: 'field'
+          });
+        }
+      }
 
-    if (textValue !== null && nodes.length > 0) {
-      nodes.push({
-        id: `${parentPath}-value-${nodeId++}`,
-        name: 'value',
-        value: textValue,
-        type: 'field'
-      });
+      if (textValue !== null && nodes.length > 0) {
+        nodes.push({
+          id: `${parentPath}-value-${nodeId++}`,
+          name: 'value',
+          value: textValue,
+          type: 'field'
+        });
+      }
     }
 
     return nodes;

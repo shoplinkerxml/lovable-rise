@@ -311,19 +311,17 @@ export class XMLTemplateService {
         return 'Валюти';
       }
       
-      // Характеристики товару - param с @name
+      // Характеристики товару - param з @name
       if (hasProductPath && format.paramPath) {
         const paramPathLower = format.paramPath.toLowerCase();
-        if (pathParts.includes(paramPathLower)) {
-          if (lowerPath.includes('.@name') || 
-              lowerPath.includes('.name') ||
-              lowerPath.includes('.value') ||
-              lowerPath.includes('._text') ||
-              lowerPath.includes('.@paramcode') ||
-              lowerPath.includes('.@valuecode') ||
-              lowerPath.includes('.@lang')) {
+        // Проверяем что в пути есть param
+        if (lowerPath.match(/\.param\[\d+\]/)) {
+          // Если есть @name - это характеристика
+          if (lowerPath.includes('.@name') || lowerPath.endsWith('._text')) {
             return 'Характеристики товару';
           }
+          // Все остальное в param - параметры
+          return 'Параметри товару';
         }
       }
       
@@ -408,9 +406,86 @@ export class XMLTemplateService {
               });
             } else {
               // Массив объектов без lang - обрабатываем ВСЕ элементы с индексами
+              // Для param - специальная обработка с группировкой
+              const isParamArray = cleanKey === 'param';
+              
               value.forEach((item: any, index: number) => {
                 const indexedPath = `${fieldPath}[${index}]`;
-                traverse(item, indexedPath, depth + 1);
+                
+                if (isParamArray && typeof item === 'object' && item !== null) {
+                  // Специальная обработка param: @name → _text → @paramid → @valueid
+                  const itemObj = item as Record<string, any>;
+                  
+                  // 1. @name
+                  if (itemObj['@name'] !== undefined) {
+                    fields.push({
+                      path: `${indexedPath}.@name`,
+                      type: this.detectType(itemObj['@name']),
+                      required: false,
+                      sample: this.getSample(itemObj['@name']),
+                      category: getCategory(`${indexedPath}.@name`),
+                      order: orderCounter++
+                    });
+                  }
+                  
+                  // 2. _text (значение)
+                  if (itemObj._text !== undefined) {
+                    fields.push({
+                      path: `${indexedPath}._text`,
+                      type: this.detectType(itemObj._text),
+                      required: false,
+                      sample: this.getSample(itemObj._text),
+                      category: getCategory(`${indexedPath}._text`),
+                      order: orderCounter++
+                    });
+                  }
+                  
+                  // 3. @paramid
+                  if (itemObj['@paramid'] !== undefined) {
+                    fields.push({
+                      path: `${indexedPath}.@paramid`,
+                      type: this.detectType(itemObj['@paramid']),
+                      required: false,
+                      sample: this.getSample(itemObj['@paramid']),
+                      category: getCategory(`${indexedPath}.@paramid`),
+                      order: orderCounter++
+                    });
+                  }
+                  
+                  // 4. @valueid
+                  if (itemObj['@valueid'] !== undefined) {
+                    fields.push({
+                      path: `${indexedPath}.@valueid`,
+                      type: this.detectType(itemObj['@valueid']),
+                      required: false,
+                      sample: this.getSample(itemObj['@valueid']),
+                      category: getCategory(`${indexedPath}.@valueid`),
+                      order: orderCounter++
+                    });
+                  }
+                  
+                  // 5. Остальные атрибуты и поля
+                  for (const [key, val] of Object.entries(itemObj)) {
+                    if (!['@name', '@paramid', '@valueid', '_text'].includes(key)) {
+                      if (key === 'value' && typeof val === 'object' && val !== null) {
+                        // Вложенные <value lang="uk"> и <value lang="ru">
+                        traverse(val, `${indexedPath}.value`, depth + 1);
+                      } else {
+                        fields.push({
+                          path: `${indexedPath}.${key}`,
+                          type: this.detectType(val),
+                          required: false,
+                          sample: this.getSample(val),
+                          category: getCategory(`${indexedPath}.${key}`),
+                          order: orderCounter++
+                        });
+                      }
+                    }
+                  }
+                } else {
+                  // Обычная обработка не-param массивов
+                  traverse(item, indexedPath, depth + 1);
+                }
               });
             }
           } else {
