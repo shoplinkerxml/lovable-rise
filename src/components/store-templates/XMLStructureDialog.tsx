@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { XmlPreviewViewer } from './XmlPreviewViewer';
+import { InteractiveXmlTree } from './InteractiveXmlTree';
 
 export interface XMLStructureMapping {
   formatType: 'rozetka' | 'epicentr' | 'prom' | 'price' | 'mma' | 'google_shopping' | 'custom';
@@ -218,9 +219,14 @@ export const XMLStructureDialog = ({
                 Скопіюйте назви тегів з цього превью
               </p>
             </div>
-            <XmlPreviewViewer 
+            <InteractiveXmlTree 
+              structure={{ 
+                root: '', 
+                fields: [], 
+                originalXml: xmlPreview || '' 
+              }}
               xmlContent={xmlPreview || '<загрузка...>'}
-              className="flex-1"
+              onSave={() => {}}
             />
           </div>
         </div>

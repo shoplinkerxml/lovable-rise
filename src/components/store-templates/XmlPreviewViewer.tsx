@@ -46,14 +46,7 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         attributeNamePrefix: '@',
         textNodeName: '_text',
         parseAttributeValue: true,
-        parseTagValue: true,
-        isArray: (name, jpath) => {
-          // Завжди обробляємо param, picture, category, currency як масиви
-          if (['param', 'picture', 'category', 'currency', 'offer', 'item'].includes(name)) {
-            return true;
-          }
-          return false;
-        }
+        parseTagValue: true
       });
 
       const parsed = parser.parse(xml);
