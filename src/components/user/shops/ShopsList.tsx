@@ -16,7 +16,12 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/
 import { Store, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop } from '@/lib/shop-service';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+interface ShopWithMarketplace extends Shop {
+  marketplace?: string;
+}
 
 interface ShopsListProps {
   onDelete?: (id: string) => void;
@@ -33,9 +38,9 @@ export const ShopsList = ({
 }: ShopsListProps) => {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [shops, setShops] = useState<Shop[]>([]);
+  const [shops, setShops] = useState<ShopWithMarketplace[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; shop: Shop | null }>({
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; shop: ShopWithMarketplace | null }>({
     open: false,
     shop: null
   });
@@ -48,8 +53,31 @@ export const ShopsList = ({
     try {
       setLoading(true);
       const data = await ShopService.getShops();
-      setShops(data);
-      onShopsLoaded?.(data.length);
+      
+      // Load marketplace for each shop
+      const shopsWithMarketplace = await Promise.all(
+        data.map(async (shop) => {
+          if (shop.template_id) {
+            const { data: template } = await (supabase as any)
+              .from('store_templates')
+              .select('marketplace')
+              .eq('id', shop.template_id)
+              .single();
+            
+            return {
+              ...shop,
+              marketplace: template?.marketplace || 'Не вказано'
+            };
+          }
+          return {
+            ...shop,
+            marketplace: 'Не вказано'
+          };
+        })
+      );
+      
+      setShops(shopsWithMarketplace);
+      onShopsLoaded?.(shopsWithMarketplace.length);
     } catch (error: any) {
       console.error('Load shops error:', error);
       toast.error(error?.message || t('failed_load_shops'));
@@ -126,7 +154,7 @@ export const ShopsList = ({
               </div>
               <CardTitle className="mt-2">{shop.store_name}</CardTitle>
               <CardDescription>
-                {new Date(shop.created_at).toLocaleDateString('uk-UA')}
+                Формат: {shop.marketplace}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
