@@ -192,6 +192,7 @@ export class ShopService {
     const { data, error } = await (supabase as any)
       .from('user_stores')
       .insert({
+        id: crypto.randomUUID(),
         user_id: user.id,
         store_name: shopData.store_name.trim(),
         template_id: shopData.template_id || null,
