@@ -36,7 +36,7 @@ import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import TariffPage from "./pages/TariffPage";
 import { Suppliers } from "./pages/user/Suppliers";
 import { Shops } from "./pages/user/Shops";
-import { ShopDetail } from "./pages/user/ShopDetail";
+import { ShopDetail } from "@/pages/user/ShopDetail";
 import { Products } from "./pages/user/Products";
 
 const queryClient = new QueryClient({
