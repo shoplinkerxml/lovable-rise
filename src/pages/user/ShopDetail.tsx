@@ -58,11 +58,11 @@ export const ShopDetail = () => {
     }
   };
 
-  // Add shop name to breadcrumbs
+  // Add marketplace type to breadcrumbs
   const shopBreadcrumbs = [
     ...breadcrumbs,
     {
-      label: marketplace ? `${shop?.store_name} - ${marketplace}` : (shop?.store_name || 'Loading...'),
+      label: marketplace || shop?.store_name || 'Loading...',
       current: true
     }
   ];
