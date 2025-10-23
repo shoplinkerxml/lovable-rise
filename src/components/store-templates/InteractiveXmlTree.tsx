@@ -1133,7 +1133,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
       {/* Tree */}
       <ScrollArea className="flex-1">
         <div className="p-4">
-          <div className="bg-card border rounded-lg">
+          <div className="bg-card">
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}

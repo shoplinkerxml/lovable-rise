@@ -57,29 +57,31 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col" hideClose>
-        <DialogHeader className="flex-row items-center justify-between space-y-0 pb-6 border-b">
-          <div>
-            <DialogTitle>Редагування XML структури - {shop.store_name}</DialogTitle>
-            <DialogDescription>
-              Це ваша копія шаблону. Зміни не впливають на адмін шаблон.
-            </DialogDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={handleSave}
-              disabled={loading}
-              title="Зберегти зміни"
-              className="hover:bg-accent"
-            >
-              <Save className="h-4 w-4" />
-            </Button>
-          </div>
-        </DialogHeader>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" hideClose>
+        <div className="sticky top-0 bg-background z-10">
+          <DialogHeader className="flex-row items-center justify-between space-y-0 p-6 pb-4">
+            <div>
+              <DialogTitle>Редагування XML структури - {shop.store_name}</DialogTitle>
+              <DialogDescription>
+                Це ваша копія шаблону. Зміни не впливають на адмін шаблон.
+              </DialogDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleSave}
+                disabled={loading}
+                title="Зберегти зміни"
+                className="hover:bg-accent"
+              >
+                <Save className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+        </div>
         
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto px-6 pb-6">
           {xmlStructure ? (
             <InteractiveXmlTree
               structure={xmlStructure}
