@@ -37,3 +37,5 @@ md/
 *testing*.js
 *validate*.txt
 *report*.txt
+*.sql
+*.temp
