@@ -143,19 +143,166 @@ const UserDashboard = () => {
       ) : null}
 
       {/* Dashboard Grid */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Quick Stats */}
-        <div className="p-6">
-          {/* Place tariff selection button after main info if expired */}
-          {expired && (
-            <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => window.location.href = '/user/tariff'}>
-              {t('select_plan') || 'Выбрать тариф'}
-            </Button>
-          )}
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {/* Quick Stats Cards */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {t('total_menu_items') || 'Всего пунктов меню'}
+            </CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{menuItems.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {t('active_menu_items') || 'активных пунктов меню'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {t('user_profile') || 'Профиль пользователя'}
+            </CardTitle>
+            <User className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{getUserInitials(user.name)}</div>
+            <p className="text-xs text-muted-foreground">
+              {user.email}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {t('subscription_status') || 'Статус подписки'}
+            </CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {tariffName ? (
+                <Badge variant={expired ? "destructive" : "default"}>
+                  {expired ? (t('expired') || 'Истекла') : (t('active') || 'Активна')}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">{t('no_subscription') || 'Нет подписки'}</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {tariffName || (t('no_active_plan') || 'Нет активного плана')}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Removed Menu Management Section and Getting Started Section as requested */}
+      {/* Recent Activity Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('recent_activity') || 'Последняя активность'}</CardTitle>
+          <CardDescription>
+            {t('recent_activity_desc') || 'Ваша последняя активность в системе'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map((item) => (
+              <div key={item} className="flex items-center space-x-4">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {t('activity_item') || 'Активность'} #{item}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('activity_description') || 'Описание активности'} {item}
+                  </p>
+                </div>
+                <div className="ml-auto font-medium">
+                  {new Date().toLocaleDateString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Settings Quick Access */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('quick_settings') || 'Быстрые настройки'}</CardTitle>
+          <CardDescription>
+            {t('quick_settings_desc') || 'Быстрый доступ к основным настройкам'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button variant="outline" className="justify-start">
+              <Settings className="mr-2 h-4 w-4" />
+              {t('profile_settings') || 'Настройки профиля'}
+            </Button>
+            <Button variant="outline" className="justify-start">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              {t('analytics') || 'Аналитика'}
+            </Button>
+            {expired && (
+              <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700 justify-start" onClick={() => window.location.href = '/user/tariff'}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('select_plan') || 'Выбрать тариф'}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Additional Content for Scroll Testing */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('system_info') || 'Информация о системе'}</CardTitle>
+          <CardDescription>
+            {t('system_info_desc') || 'Техническая информация о вашем аккаунте'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">{t('user_id') || 'ID пользователя'}:</span>
+              <span className="text-sm font-mono">{user.id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">{t('registration_date') || 'Дата регистрации'}:</span>
+              <span className="text-sm">{new Date(user.created_at || '').toLocaleDateString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">{t('last_update') || 'Последнее обновление'}:</span>
+              <span className="text-sm">{new Date(user.updated_at || '').toLocaleDateString()}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* More content to ensure scrolling */}
+      {[1, 2, 3].map((section) => (
+        <Card key={section}>
+          <CardHeader>
+            <CardTitle>{t('section') || 'Раздел'} {section}</CardTitle>
+            <CardDescription>
+              {t('section_description') || 'Описание раздела'} {section}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {t('lorem_ipsum') || 'Это демонстрационный контент для проверки прокрутки страницы. Боковое меню должно оставаться фиксированным, а этот контент должен прокручиваться.'} 
+              {' '.repeat(section * 50)}
+              {t('additional_content') || 'Дополнительный контент для увеличения высоты страницы и демонстрации работы прокрутки.'}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
     </div>;
 };
 export default UserDashboard;

@@ -455,7 +455,7 @@ const UserLayoutContent = ({
 
             {/* User Menu - Mobile (Fixed at bottom) */}
             <div className="pt-4 border-t shrink-0">
-              <div className="flex items-center gap-3 px-2 py-2">
+              <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 shrink-0">
                   <AvatarImage src={user.avatar_url} alt={user.name} />
                   <AvatarFallback className="bg-emerald-100 text-emerald-600 font-semibold">
@@ -485,8 +485,8 @@ const UserLayoutContent = ({
         </SheetContent>
       </Sheet>
 
-      {/* User Sidebar - Desktop */}
-      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col h-screen overflow-hidden`}>
+      {/* User Sidebar - Desktop - Fixed Position */}
+      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col fixed left-0 top-0 h-screen z-40 overflow-hidden`}>
         <div className="p-4 shrink-0">
           {/* Logo/Header */}
           <div className="flex items-center justify-between mb-6">
@@ -577,8 +577,8 @@ const UserLayoutContent = ({
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      {/* Main Content Area - Adjusted for fixed sidebar */}
+      <div className={`flex-1 min-w-0 flex flex-col ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'} transition-all duration-300`}>
         {/* Header */}
         <header className="h-16 border-b bg-background flex items-center px-4 md:px-6 justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -628,8 +628,8 @@ const UserLayoutContent = ({
           </div>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Content - Scrollable */}
+        <main className="flex-1 overflow-y-auto bg-emerald-50/40 dark:bg-neutral-950">
           <div className="h-full">
             <Outlet context={{
             user,
