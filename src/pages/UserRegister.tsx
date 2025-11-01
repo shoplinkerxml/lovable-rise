@@ -260,13 +260,14 @@ const UserRegister = () => {
                   <Label htmlFor="name">{t("full_name")}</Label>
                   <Input
                     id="name"
+                    data-testid="userRegister_name_input"
                     {...registerForm("name")}
                     placeholder={t("name_placeholder")}
                     className={registerErrors.name ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.name && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-destructive" data-testid="userRegister_name_error">
                       {t(registerErrors.name.message as any) || registerErrors.name.message}
                     </p>
                   )}
@@ -277,13 +278,14 @@ const UserRegister = () => {
                   <Input
                     id="email"
                     type="email"
+                    data-testid="userRegister_email_input"
                     {...registerForm("email")}
                     placeholder={t("email_placeholder")}
                     className={registerErrors.email ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.email && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-destructive" data-testid="userRegister_email_error">
                       {t(registerErrors.email.message as any) || registerErrors.email.message}
                     </p>
                   )}
@@ -294,13 +296,14 @@ const UserRegister = () => {
                   <Input
                     id="password"
                     type="password"
+                    data-testid="userRegister_password_input"
                     {...registerForm("password")}
                     placeholder={t("password_placeholder")}
                     className={registerErrors.password ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.password && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-destructive" data-testid="userRegister_password_error">
                       {t(registerErrors.password.message as any) || registerErrors.password.message}
                     </p>
                   )}
@@ -311,13 +314,14 @@ const UserRegister = () => {
                   <Input
                     id="confirmPassword"
                     type="password"
+                    data-testid="userRegister_confirmPassword_input"
                     {...registerForm("confirmPassword")}
                     placeholder={t("password_placeholder")}
                     className={registerErrors.confirmPassword ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {registerErrors.confirmPassword && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-destructive" data-testid="userRegister_confirmPassword_error">
                       {t(registerErrors.confirmPassword.message as any) || registerErrors.confirmPassword.message}
                     </p>
                   )}
@@ -331,6 +335,7 @@ const UserRegister = () => {
                     render={({ field }) => (
                       <Checkbox 
                         id="terms" 
+                        data-testid="userRegister_terms_checkbox"
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         disabled={loading}
@@ -348,7 +353,7 @@ const UserRegister = () => {
                   </Label>
                 </div>
                 {registerErrors.acceptTerms && (
-                  <p className="text-sm text-destructive">
+                  <p className="text-sm text-destructive" data-testid="userRegister_terms_error">
                     {lang === 'uk' ? 'Необхідно прийняти умови' : 'You must accept the terms'}
                   </p>
                 )}
@@ -358,6 +363,7 @@ const UserRegister = () => {
                   disabled={loading} 
                   className="w-full"
                   variant="default"
+                  data-testid="userRegister_submit_button"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center">

@@ -52,7 +52,7 @@ const UserAuth = () => {
         setTimeout(() => {
           toast.info(
             lang === 'uk'
-              ? 'Після підтвердження поверніться сюди і увійдіть знову.'
+              ? 'Після підвердження поверніться сюди і увійдіть знову.'
               : 'After confirming, come back here and sign in again.'
           );
         }, 2000);
@@ -217,19 +217,19 @@ const UserAuth = () => {
         </div>
 
         {/* Right Panel - Login Form */}
-        <div className="flex items-center md:items-start justify-center md:justify-start p-6 md:p-0 md:pl-8">
-          <Card className="w-full max-w-md shadow-lg">
-            <CardHeader className="text-center">
+        <div className="flex items-center md:items-start justify-center md:justify-start p-6 md:p-0 md:pl-8" data-testid="login-section">
+          <Card className="w-full max-w-md shadow-lg" data-testid="login-card">
+            <CardHeader className="text-center" data-testid="login-header">
               <div className="mx-auto h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mb-4">
                 <User className="h-6 w-6" />
               </div>
-              <CardTitle>{t("login_title_user")}</CardTitle>
-              <CardDescription className="mt-2">
+              <CardTitle data-testid="login-title">{t("login_title_user")}</CardTitle>
+              <CardDescription className="mt-2" data-testid="login-description">
                 {t("login_desc_user")}
               </CardDescription>
             </CardHeader>
             
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4" data-testid="login-content">
               {/* Social Auth Buttons - Single Row Layout */}
               <div className="grid grid-cols-2 gap-2">
                 <Button 
@@ -263,36 +263,38 @@ const UserAuth = () => {
                 </div>
               </div>
 
-              <form onSubmit={handleLoginSubmit(handleLogin)} className="space-y-4">
+              <form onSubmit={handleLoginSubmit(handleLogin)} className="space-y-4" data-testid="login-form">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">{t("email")}</Label>
+                  <Label htmlFor="login-email" data-testid="email-label">{t("email")}</Label>
                   <Input
                     id="login-email"
                     type="email"
+                    data-testid="email-input"
                     {...loginForm("email")}
                     placeholder={t("email_placeholder")}
                     className={loginErrors.email ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {loginErrors.email && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-destructive" data-testid="error-message">
                       {t(loginErrors.email.message as any) || loginErrors.email.message}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">{t("password")}</Label>
+                  <Label htmlFor="login-password" data-testid="password-label">{t("password")}</Label>
                   <Input
                     id="login-password"
                     type="password"
+                    data-testid="password-input"
                     {...loginForm("password")}
                     placeholder={t("password_placeholder")}
                     className={loginErrors.password ? "border-destructive" : ""}
                     disabled={loading}
                   />
                   {loginErrors.password && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-destructive" data-testid="error-message">
                       {t(loginErrors.password.message as any) || loginErrors.password.message}
                     </p>
                   )}
@@ -303,6 +305,7 @@ const UserAuth = () => {
                   disabled={loading} 
                   className="w-full"
                   variant="default"
+                  data-testid="login-button"
                 >
                   {loading ? "..." : t("login_button_user")}
                 </Button>
@@ -314,6 +317,7 @@ const UserAuth = () => {
                   <Link
                     to="/user-register"
                     className="text-emerald-600 hover:underline ml-1"
+                    data-testid="register-link"
                   >
                     {t("register_button")}
                   </Link>
@@ -322,6 +326,7 @@ const UserAuth = () => {
                   <Link
                     to="/user-forgot-password"
                     className="text-emerald-600 hover:underline"
+                    data-testid="forgot-password-link"
                   >
                     {t("forgot_password")}
                   </Link>
