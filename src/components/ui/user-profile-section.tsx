@@ -54,17 +54,17 @@ export const UserProfileSection: React.FC<UserProfileSectionProps> = ({
             {!collapsed && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid="admin_profileMenu_trigger">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => handleNavigate('/admin/personal')}>
+                <DropdownMenuContent align="end" className="w-48" data-testid="admin_profileMenu_content">
+                  <DropdownMenuItem onClick={() => handleNavigate('/admin/personal')} data-testid="admin_profileMenu_profile">
                     <User className="mr-2 h-4 w-4" />
                     {t('profile') || 'Profile'}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="focus:text-destructive">
+                  <DropdownMenuItem onClick={handleLogout} className="focus:text-destructive" data-testid="admin_profileMenu_logout">
                     <LogOut className="mr-2 h-4 w-4" />
                     {t('logout') || 'Log out'}
                   </DropdownMenuItem>

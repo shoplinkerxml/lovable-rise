@@ -46,6 +46,7 @@ export const ProfileTrigger = React.forwardRef<HTMLElement, ProfileTriggerProps>
         role="button" 
         className="pl-2 pr-3 py-1 h-auto rounded-lg border-l select-none cursor-pointer hover:bg-emerald-50 transition-colors"
         onClick={onClick}
+        data-testid="admin_profileTrigger_header"
       >
         <div className="flex items-center gap-2">
           <Avatar className="h-8 w-8">

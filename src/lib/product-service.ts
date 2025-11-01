@@ -4,28 +4,90 @@ import { SessionValidator } from "./session-validation";
 export interface Product {
   id: string;
   user_id: string;
-  product_name: string;
+  store_id: string;
+  external_id: string;
+  name: string;
+  name_ua?: string | null;
   description?: string | null;
-  price?: number | null;
+  description_ua?: string | null;
+  vendor?: string | null;
+  brand?: string | null;
+  article?: string | null;
   sku?: string | null;
-  is_active: boolean;
+  category_id?: string | null;
+  currency_id?: string | null;
+  price?: number | null;
+  price_old?: number | null;
+  price_promo?: number | null;
+  stock_quantity: number;
+  available: boolean;
+  state: string;
+  url?: string | null;
   created_at: string;
   updated_at: string;
 }
 
+export interface ProductParam {
+  id?: string;
+  product_id?: string;
+  name: string;
+  value: string;
+  order_index: number;
+}
+
+export interface ProductImage {
+  id?: string;
+  product_id?: string;
+  url: string;
+  order_index: number;
+}
+
 export interface CreateProductData {
-  product_name: string;
+  store_id: string;
+  external_id: string;
+  name: string;
+  name_ua?: string | null;
   description?: string | null;
-  price?: number | null;
+  description_ua?: string | null;
+  vendor?: string | null;
+  brand?: string | null;
+  article?: string | null;
   sku?: string | null;
+  category_id?: string | null;
+  currency_id?: string | null;
+  price?: number | null;
+  price_old?: number | null;
+  price_promo?: number | null;
+  stock_quantity?: number;
+  available?: boolean;
+  state?: string;
+  url?: string | null;
+  params?: ProductParam[];
+  images?: ProductImage[];
 }
 
 export interface UpdateProductData {
-  product_name?: string;
+  store_id?: string;
+  external_id?: string;
+  name?: string;
+  name_ua?: string | null;
   description?: string | null;
-  price?: number | null;
+  description_ua?: string | null;
+  vendor?: string | null;
+  brand?: string | null;
+  article?: string | null;
   sku?: string | null;
-  is_active?: boolean;
+  category_id?: string | null;
+  currency_id?: string | null;
+  price?: number | null;
+  price_old?: number | null;
+  price_promo?: number | null;
+  stock_quantity?: number;
+  available?: boolean;
+  state?: string;
+  url?: string | null;
+  params?: ProductParam[];
+  images?: ProductImage[];
 }
 
 export interface ProductLimitInfo {
@@ -35,6 +97,27 @@ export interface ProductLimitInfo {
 }
 
 export class ProductService {
+  /** Получение store_ids текущего пользователя */
+  private static async getUserStoreIds(): Promise<string[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('user_stores')
+      .select('id')
+      .eq('user_id', sessionValidation.user.id)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Get user stores error:', error);
+      throw new Error(error.message);
+    }
+
+    return (data || []).map((store: any) => store.id);
+  }
+
   /** Получение только максимального лимита продуктов (без подсчета текущих) */
   static async getProductLimitOnly(): Promise<number> {
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -82,8 +165,7 @@ export class ProductService {
   /** Получение лимита продуктов для текущего пользователя */
   static async getProductLimit(): Promise<ProductLimitInfo> {
     const maxProducts = await this.getProductLimitOnly();
-    // Пока таблицы user_products нет, возвращаем 0 как текущее количество
-    const currentCount = 0;
+    const currentCount = await this.getProductsCount();
 
     return {
       current: currentCount,
@@ -92,72 +174,332 @@ export class ProductService {
     };
   }
 
-  /** Получение количества продуктов текущего пользователя - временно возвращает 0 */
+  /** Получение количества продуктов текущего пользователя */
   static async getProductsCount(): Promise<number> {
-    // TODO: Когда таблица user_products будет создана, раскомментировать:
-    // const sessionValidation = await SessionValidator.ensureValidSession();
-    // if (!sessionValidation.isValid) {
-    //   throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    // }
+    const storeIds = await this.getUserStoreIds();
+    
+    if (storeIds.length === 0) {
+      return 0;
+    }
 
-    // const { data: { user } } = await supabase.auth.getUser();
-    // if (!user) {
-    //   throw new Error("User not authenticated");
-    // }
+    const { count, error } = await (supabase as any)
+      .from('store_products')
+      .select('*', { count: 'exact', head: true })
+      .in('store_id', storeIds);
 
-    // const { count, error } = await (supabase as any)
-    //   .from('user_products')
-    //   .select('*', { count: 'exact', head: true })
-    //   .eq('user_id', user.id);
+    if (error) {
+      console.error('Get products count error:', error);
+      throw new Error(error.message);
+    }
 
-    // if (error) {
-    //   console.error('Get products count error:', error);
-    //   return 0;
-    // }
-
-    // return count || 0;
-    return 0;
+    return count || 0;
   }
 
-  /** Получение списка продуктов текущего пользователя - временно возвращает пустой массив */
+  /** Получение списка продуктов текущего пользователя */
   static async getProducts(): Promise<Product[]> {
-    // TODO: Когда таблица user_products будет создана, раскомментировать:
-    // const sessionValidation = await SessionValidator.ensureValidSession();
-    // if (!sessionValidation.isValid) {
-    //   throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    // }
+    const storeIds = await this.getUserStoreIds();
+    
+    if (storeIds.length === 0) {
+      return [];
+    }
 
-    // const { data, error } = await (supabase as any)
-    //   .from('user_products')
-    //   .select('*')
-    //   .order('created_at', { ascending: false });
+    const { data, error } = await (supabase as any)
+      .from('store_products')
+      .select('*')
+      .in('store_id', storeIds)
+      .order('created_at', { ascending: false });
 
-    // if (error) {
-    //   console.error('Get products error:', error);
-    //   throw new Error(error.message);
-    // }
+    if (error) {
+      console.error('Get products error:', error);
+      throw new Error(error.message);
+    }
 
-    // return data || [];
-    return [];
+    return data || [];
   }
 
-  /** Получение одного продукта по ID - временно недоступно */
+  /** Получение параметров товара */
+  static async getProductParams(productId: string): Promise<ProductParam[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('store_product_params')
+      .select('*')
+      .eq('product_id', productId)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Get product params error:', error);
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  }
+
+  /** Получение изображений товара */
+  static async getProductImages(productId: string): Promise<ProductImage[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('store_product_images')
+      .select('*')
+      .eq('product_id', productId)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Get product images error:', error);
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  }
+
+  /** Получение товара по ID */
+  static async getProductById(id: string): Promise<Product | null> {
+    const storeIds = await this.getUserStoreIds();
+    
+    if (storeIds.length === 0) {
+      return null;
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('store_products')
+      .select('*')
+      .eq('id', id)
+      .in('store_id', storeIds)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Товар не найден
+      }
+      console.error('Get product by ID error:', error);
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  /** Получение одного продукта по ID - используем getProductById */
   static async getProduct(id: string): Promise<Product> {
-    throw new Error("Функціонал тимчасово недоступний. Таблиця user_products ще не створена.");
+    const product = await this.getProductById(id);
+    if (!product) {
+      throw new Error("Товар не найден");
+    }
+    return product;
   }
 
-  /** Создание нового продукта - временно недоступно */
+  /** Создание нового продукта */
   static async createProduct(productData: CreateProductData): Promise<Product> {
-    throw new Error("Функціонал тимчасово недоступний. Таблиця user_products ще не створена.");
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    // Подготавливаем данные для создания товара
+    const productInsertData = {
+      user_id: sessionValidation.user.id,
+      store_id: productData.store_id,
+      external_id: productData.external_id,
+      name: productData.name,
+      name_ua: productData.name_ua,
+      description: productData.description,
+      description_ua: productData.description_ua,
+      vendor: productData.vendor,
+      brand: productData.brand,
+      article: productData.article,
+      sku: productData.sku,
+      category_id: productData.category_id,
+      currency_id: productData.currency_id,
+      price: productData.price,
+      price_old: productData.price_old,
+      price_promo: productData.price_promo,
+      stock_quantity: productData.stock_quantity || 0,
+      available: productData.available !== false,
+      state: productData.state || 'active',
+      url: productData.url
+    };
+
+    // Создаем товар
+    const { data: product, error: productError } = await (supabase as any)
+      .from('store_products')
+      .insert([productInsertData])
+      .select()
+      .single();
+
+    if (productError) {
+      console.error('Create product error:', productError);
+      throw new Error(productError.message);
+    }
+
+    // Создаем параметры товара, если они есть
+    if (productData.params && productData.params.length > 0) {
+      const paramsData = productData.params.map((param, index) => ({
+        product_id: product.id,
+        name: param.name,
+        value: param.value,
+        order_index: param.order_index || index
+      }));
+
+      const { error: paramsError } = await (supabase as any)
+        .from('store_product_params')
+        .insert(paramsData);
+
+      if (paramsError) {
+        console.error('Create product params error:', paramsError);
+        // Не прерываем выполнение, просто логируем ошибку
+      }
+    }
+
+    // Создаем изображения товара, если они есть
+    if (productData.images && productData.images.length > 0) {
+      const imagesData = productData.images.map((image, index) => ({
+        product_id: product.id,
+        url: image.url,
+        order_index: image.order_index || index
+      }));
+
+      const { error: imagesError } = await (supabase as any)
+        .from('store_product_images')
+        .insert(imagesData);
+
+      if (imagesError) {
+        console.error('Create product images error:', imagesError);
+        // Не прерываем выполнение, просто логируем ошибку
+      }
+    }
+
+    return product;
   }
 
-  /** Обновление продукта - временно недоступно */
+  /** Обновление товара */
   static async updateProduct(id: string, productData: UpdateProductData): Promise<Product> {
-    throw new Error("Функціонал тимчасово недоступний. Таблиця user_products ще не створена.");
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    // Подготавливаем данные для обновления товара
+    const productUpdateData: any = {};
+    
+    if (productData.store_id !== undefined) productUpdateData.store_id = productData.store_id;
+    if (productData.external_id !== undefined) productUpdateData.external_id = productData.external_id;
+    if (productData.name !== undefined) productUpdateData.name = productData.name;
+    if (productData.name_ua !== undefined) productUpdateData.name_ua = productData.name_ua;
+    if (productData.description !== undefined) productUpdateData.description = productData.description;
+    if (productData.description_ua !== undefined) productUpdateData.description_ua = productData.description_ua;
+    if (productData.vendor !== undefined) productUpdateData.vendor = productData.vendor;
+    if (productData.brand !== undefined) productUpdateData.brand = productData.brand;
+    if (productData.article !== undefined) productUpdateData.article = productData.article;
+    if (productData.sku !== undefined) productUpdateData.sku = productData.sku;
+    if (productData.category_id !== undefined) productUpdateData.category_id = productData.category_id;
+    if (productData.currency_id !== undefined) productUpdateData.currency_id = productData.currency_id;
+    if (productData.price !== undefined) productUpdateData.price = productData.price;
+    if (productData.price_old !== undefined) productUpdateData.price_old = productData.price_old;
+    if (productData.price_promo !== undefined) productUpdateData.price_promo = productData.price_promo;
+    if (productData.stock_quantity !== undefined) productUpdateData.stock_quantity = productData.stock_quantity;
+    if (productData.available !== undefined) productUpdateData.available = productData.available;
+    if (productData.state !== undefined) productUpdateData.state = productData.state;
+    if (productData.url !== undefined) productUpdateData.url = productData.url;
+
+    // Обновляем товар
+    const { data: product, error: productError } = await (supabase as any)
+      .from('store_products')
+      .update(productUpdateData)
+      .eq('id', id)
+      .eq('user_id', sessionValidation.user.id)
+      .select()
+      .single();
+
+    if (productError) {
+      console.error('Update product error:', productError);
+      throw new Error(productError.message);
+    }
+
+    // Обновляем параметры товара, если они переданы
+    if (productData.params !== undefined) {
+      // Удаляем старые параметры
+      await (supabase as any)
+        .from('store_product_params')
+        .delete()
+        .eq('product_id', id);
+
+      // Добавляем новые параметры
+      if (productData.params.length > 0) {
+        const paramsData = productData.params.map((param, index) => ({
+          product_id: id,
+          name: param.name,
+          value: param.value,
+          order_index: param.order_index || index
+        }));
+
+        const { error: paramsError } = await (supabase as any)
+          .from('store_product_params')
+          .insert(paramsData);
+
+        if (paramsError) {
+          console.error('Update product params error:', paramsError);
+        }
+      }
+    }
+
+    // Обновляем изображения товара, если они переданы
+    if (productData.images !== undefined) {
+      // Удаляем старые изображения
+      await (supabase as any)
+        .from('store_product_images')
+        .delete()
+        .eq('product_id', id);
+
+      // Добавляем новые изображения
+      if (productData.images.length > 0) {
+        const imagesData = productData.images.map((image, index) => ({
+          product_id: id,
+          url: image.url,
+          order_index: image.order_index || index
+        }));
+
+        const { error: imagesError } = await (supabase as any)
+          .from('store_product_images')
+          .insert(imagesData);
+
+        if (imagesError) {
+          console.error('Update product images error:', imagesError);
+        }
+      }
+    }
+
+    return product;
   }
 
-  /** Удаление продукта - временно недоступно */
+  /** Удаление товара */
   static async deleteProduct(id: string): Promise<void> {
-    throw new Error("Функціонал тимчасово недоступний. Таблиця user_products ще не створена.");
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    // Удаляем связанные данные
+    await Promise.all([
+      (supabase as any).from('store_product_params').delete().eq('product_id', id),
+      (supabase as any).from('store_product_images').delete().eq('product_id', id)
+    ]);
+
+    // Удаляем товар
+    const { error } = await (supabase as any)
+      .from('store_products')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', sessionValidation.user.id);
+
+    if (error) {
+      console.error('Delete product error:', error);
+      throw new Error(error.message);
+    }
   }
 }

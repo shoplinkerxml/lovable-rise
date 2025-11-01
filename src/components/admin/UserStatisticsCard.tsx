@@ -49,34 +49,34 @@ const UserStatisticsCard = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6" data-testid="userStatistics_container">
       {/* Total Users Block */}
-      <Card className="p-4 sm:p-6 text-center border">
+      <Card className="p-4 sm:p-6 text-center border" data-testid="userStatistics_totalUsers_card">
         <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center">
             <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
           </div>
-          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">
+          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground" data-testid="userStatistics_totalUsers_title">
             {t("total_users")}
           </h3>
         </div>
-        <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-1">
+        <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-1" data-testid="userStatistics_totalUsers_count">
           {statistics?.totalUsers || 0}
         </div>
         
       </Card>
 
       {/* Active Users Block */}
-      <Card className="p-4 sm:p-6 text-center border">
+      <Card className="p-4 sm:p-6 text-center border" data-testid="userStatistics_activeUsers_card">
         <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center">
             <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
           </div>
-          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">
+          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground" data-testid="userStatistics_activeUsers_title">
             {t("active_users")}
           </h3>
         </div>
-        <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-1">
+        <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-1" data-testid="userStatistics_activeUsers_count">
           {statistics?.activeUsers || 0}
         </div>
         

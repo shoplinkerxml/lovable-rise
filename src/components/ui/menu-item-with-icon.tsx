@@ -115,12 +115,20 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
     </div>
   );
 
+  // Generate data-testid based on item title and path
+  const generateTestId = (item: MenuItemData) => {
+    const normalizedTitle = item.title.toLowerCase().replace(/\s+/g, '');
+    const normalizedPath = item.path.replace(/^\//, '').replace(/\//g, '_');
+    return `menuItem_${normalizedTitle}_${normalizedPath}`;
+  };
+
   const button = (
     <button
       onClick={() => onClick(item)}
       onMouseEnter={() => onHover(item)}
       className={cn(baseClasses, variantClasses[variant], stateClasses)}
       aria-label={collapsed ? translatedTitle : undefined}
+      data-testid={generateTestId(item)}
     >
       {renderContent()}
     </button>

@@ -35,17 +35,17 @@ export const LogoutSection: React.FC<LogoutSectionProps> = ({
     if (collapsed) return null;
     
     return (
-      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-50 transition-colors group cursor-pointer border border-transparent hover:border-emerald-200/30">
-        <Avatar className="h-8 w-8">
+      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-50 transition-colors group cursor-pointer border border-transparent hover:border-emerald-200/30" data-testid="user-profile-section">
+        <Avatar className="h-8 w-8" data-testid="user-avatar">
           <AvatarFallback className="bg-emerald-100 text-emerald-600 text-sm font-medium">
             {userInfo.name?.charAt(0) || "A"}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-600 transition-colors">
+        <div className="flex-1 min-w-0" data-testid="user-info">
+          <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-600 transition-colors" data-testid="user-name">
             {userInfo.name}
           </p>
-          <p className="text-xs text-gray-500 truncate group-hover:text-emerald-500 transition-colors">
+          <p className="text-xs text-gray-500 truncate group-hover:text-emerald-500 transition-colors" data-testid="user-role">
             {userInfo.role}
           </p>
         </div>
@@ -63,6 +63,7 @@ export const LogoutSection: React.FC<LogoutSectionProps> = ({
         collapsed ? "h-10 w-10 p-0" : "px-3 py-2"
       )}
       aria-label={collapsed ? t('auth_logout' as any) : undefined}
+      data-testid="logout-button"
     >
       <LogOut className={cn("h-4 w-4", !collapsed && "mr-3")} />
       {!collapsed && t('auth_logout' as any)}
@@ -70,7 +71,7 @@ export const LogoutSection: React.FC<LogoutSectionProps> = ({
   );
 
   return (
-    <div className="mt-auto border-t pt-4">
+    <div className="mt-auto border-t pt-4" data-testid="logout-section">
       {renderUserProfile()}
       <div className="space-y-1 mt-3">
         {collapsed ? (

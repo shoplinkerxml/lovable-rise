@@ -127,12 +127,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
   };
 
   return (
-    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 flex-col h-screen overflow-hidden bg-admin-sidebar`}>
-      <div className="p-4">
+    <aside className={`${isMobileSheet ? 'flex' : 'hidden md:flex'} ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 flex-col h-screen overflow-hidden bg-admin-sidebar`} data-testid="admin-sidebar">
+      <div className="p-4" data-testid="sidebar-logo-section">
         <Logo collapsed={collapsed} className="mb-8" />
       </div>
       
-      <nav className="space-y-1 flex-1 overflow-y-auto px-4">
+      <nav className="space-y-1 flex-1 overflow-y-auto px-4" data-testid="admin-navigation">
         {menuLoading ? (
           <MenuSkeleton />
         ) : (
@@ -141,7 +141,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
               if (!section.items.length) return null;
               
               return (
-                <div key={section.key}>
+                <div key={section.key} data-testid={`menu-section-${section.key}`}>
                   {/* Section separator */}
                   {sectionIndex > 0 && (
                     <div className="py-2">
@@ -168,7 +168,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
         )}
       </nav>
       
-      <div className="p-4">
+      <div className="p-4" data-testid="sidebar-user-section">
         <UserProfileSection collapsed={collapsed} onLogout={signOut} userProfile={userProfile || defaultUserProfile} />
       </div>
     </aside>

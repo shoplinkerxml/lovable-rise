@@ -38,6 +38,7 @@ const USER_ROUTE_MAPPING: Record<string, { labelKey: string; parentPath?: string
   "/user/Shops": { labelKey: "shops_title", parentPath: "/user" },
   "/user/products": { labelKey: "products_title", parentPath: "/user" },
   "/user/Products": { labelKey: "products_title", parentPath: "/user" },
+  "/user/products/new-product": { labelKey: "create_product", parentPath: "/user/products" },
 };
 
 export function useBreadcrumbs(): BreadcrumbItem[] {

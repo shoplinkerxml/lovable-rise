@@ -147,6 +147,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                       : "hover:bg-emerald-50 hover:text-[#10b981] border border-transparent hover:border-emerald-200/30 hover:shadow-sm"
                   )}
                   aria-label={`${translatedTitle} - ${isExpanded ? "Collapse" : "Expand"} submenu`}
+                  data-testid={`menuParent_${item.title.toLowerCase().replace(/\s+/g, '')}_${item.path.replace(/^\//, '').replace(/\//g, '_')}`}
                 >
                   <div className="flex items-center min-w-0 flex-1">
                     <DynamicIcon 

@@ -89,6 +89,7 @@ export const ProfileSheetContent: React.FC<ProfileSheetContentProps> = ({
           variant="default"
           className="w-full"
           onClick={handleLogoutClick}
+          data-testid="admin_profileSheet_logout"
         >
           {t("logout")}
         </Button>
