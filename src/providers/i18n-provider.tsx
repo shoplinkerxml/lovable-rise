@@ -1075,6 +1075,16 @@ const toastDictionary = {
   product_description_en_placeholder: { uk: "Введіть опис товару англійською", en: "Enter product description in English" },
   manufacturer_brand: { uk: "Виробник та бренд", en: "Manufacturer & Brand" },
   category_prices: { uk: "Категорія та ціни", en: "Category & Prices" },
+  
+  // Language tabs for product names and descriptions
+  product_name_ukrainian_tab: { uk: "Назва товару (українською)", en: "Product Name (Ukrainian)" },
+  product_name_russian_tab: { uk: "Назва товару (російською)", en: "Product Name (Russian)" },
+  short_name: { uk: "Коротка назва", en: "Short Name" },
+  short_name_placeholder: { uk: "Введіть коротку назву", en: "Enter short name" },
+  product_name: { uk: "Назва товару", en: "Product Name" },
+  product_name_placeholder: { uk: "Введіть назву товару", en: "Enter product name" },
+  product_description: { uk: "Опис товару", en: "Product Description" },
+  product_description_placeholder: { uk: "Введіть опис товару", en: "Enter product description" },
 };
 
 // Merge dictionaries

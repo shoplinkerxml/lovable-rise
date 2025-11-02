@@ -40,6 +40,8 @@ interface FormData {
   name_ua: string;
   description: string;
   description_ua: string;
+  docket: string;
+  docket_ua: string;
   vendor: string;
   brand: string;
   article: string;
@@ -74,6 +76,8 @@ export function ProductFormTabs({
     name_ua: '',
     description: '',
     description_ua: '',
+    docket: '',
+    docket_ua: '',
     vendor: '',
     brand: '',
     article: '',
@@ -154,6 +158,8 @@ export function ProductFormTabs({
         name_ua: product.name_ua || '',
         description: product.description || '',
         description_ua: product.description_ua || '',
+        docket: (product as any).docket || '',
+        docket_ua: (product as any).docket_ua || '',
         vendor: product.vendor || '',
         brand: product.brand || '',
         article: product.article || '',
@@ -352,7 +358,7 @@ export function ProductFormTabs({
                 <div className="lg:col-span-2">
                   <div className="space-y-4">
                     <Label>{t('product_photos')}</Label>
-                    <div className="w-full">
+                    <div className="w-full px-12 sm:px-14 md:px-16">
                       <Carousel className="w-full">
                         <CarouselContent>
                           {images.length > 0 ? images.map((image, index) => <CarouselItem key={index}>
@@ -450,27 +456,106 @@ export function ProductFormTabs({
                       <Separator className="flex-1" />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name_ua">{t('product_name_ua')} *</Label>
-                        <Input id="name_ua" value={formData.name_ua} onChange={e => setFormData({
-                        ...formData,
-                        name_ua: e.target.value
-                      })} placeholder={t('product_name_ua_placeholder')} data-testid="productFormTabs_nameUaInput" />
-                      </div>
-
+                    <Tabs defaultValue="ukrainian" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="ukrainian" data-testid="productFormTabs_ukrainianTab">
+                          {t('product_name_ukrainian_tab')}
+                        </TabsTrigger>
+                        <TabsTrigger value="russian" data-testid="productFormTabs_russianTab">
+                          {t('product_name_russian_tab')}
+                        </TabsTrigger>
+                      </TabsList>
                       
+                      <TabsContent value="ukrainian" className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name_ua">{t('product_name')} *</Label>
+                          <Input 
+                            id="name_ua" 
+                            value={formData.name_ua} 
+                            onChange={e => setFormData({
+                              ...formData,
+                              name_ua: e.target.value
+                            })} 
+                            placeholder={t('product_name_placeholder')} 
+                            data-testid="productFormTabs_nameUaInput" 
+                          />
+                        </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="description_ua">{t('product_description_ua')}</Label>
-                        <Textarea id="description_ua" value={formData.description_ua} onChange={e => setFormData({
-                        ...formData,
-                        description_ua: e.target.value
-                      })} placeholder={t('product_description_ua_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" />
-                      </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="docket_ua">{t('short_name')}</Label>
+                          <Input 
+                            id="docket_ua" 
+                            value={formData.docket_ua} 
+                            onChange={e => setFormData({
+                              ...formData,
+                              docket_ua: e.target.value
+                            })} 
+                            placeholder={t('short_name_placeholder')} 
+                            data-testid="productFormTabs_docketUaInput" 
+                          />
+                        </div>
 
+                        <div className="space-y-2">
+                          <Label htmlFor="description_ua">{t('product_description')}</Label>
+                          <Textarea 
+                            id="description_ua" 
+                            value={formData.description_ua} 
+                            onChange={e => setFormData({
+                              ...formData,
+                              description_ua: e.target.value
+                            })} 
+                            placeholder={t('product_description_placeholder')} 
+                            rows={3} 
+                            data-testid="productFormTabs_descriptionUaInput" 
+                          />
+                        </div>
+                      </TabsContent>
                       
-                    </div>
+                      <TabsContent value="russian" className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">{t('product_name')}</Label>
+                          <Input 
+                            id="name" 
+                            value={formData.name} 
+                            onChange={e => setFormData({
+                              ...formData,
+                              name: e.target.value
+                            })} 
+                            placeholder={t('product_name_placeholder')} 
+                            data-testid="productFormTabs_nameInput" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="docket">{t('short_name')}</Label>
+                          <Input 
+                            id="docket" 
+                            value={formData.docket} 
+                            onChange={e => setFormData({
+                              ...formData,
+                              docket: e.target.value
+                            })} 
+                            placeholder={t('short_name_placeholder')} 
+                            data-testid="productFormTabs_docketInput" 
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="description">{t('product_description')}</Label>
+                          <Textarea 
+                            id="description" 
+                            value={formData.description} 
+                            onChange={e => setFormData({
+                              ...formData,
+                              description: e.target.value
+                            })} 
+                            placeholder={t('product_description_placeholder')} 
+                            rows={3} 
+                            data-testid="productFormTabs_descriptionInput" 
+                          />
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
 
                   {/* Секция: Виробник та бренд */}
