@@ -80,6 +80,12 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     }
   }, [product]);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Stores state updated:', stores);
+    console.log('Stores length:', stores.length);
+  }, [stores]);
+
   const loadProductData = async () => {
     if (!product) return;
     
@@ -139,12 +145,17 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
   const loadInitialData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.error('No user found');
+        return;
+      }
+      
+      console.log('Loading stores for user:', user.id);
 
       // Load stores - використовуємо прямий запит до Supabase замість сервісу
       const { data: storesData, error: storesError } = await supabase
         .from('user_stores')
-        .select('id, user_id, store_name, store_url, template_id, is_active, created_at, updated_at')
+        .select('id, store_name')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('store_name');
@@ -153,6 +164,12 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         console.error('Error loading stores:', storesError);
       } else {
         console.log('Loaded stores:', storesData);
+        console.log('Stores count:', storesData?.length || 0);
+        if (storesData && storesData.length > 0) {
+          console.log('First store:', storesData[0]);
+          console.log('First store id:', storesData[0].id);
+          console.log('First store name:', storesData[0].store_name);
+        }
         setStores(storesData || []);
       }
 
@@ -628,19 +645,36 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="store">Магазин *</Label>
+                {stores.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    Завантаження магазинів... (знайдено: {stores.length})
+                  </div>
+                ) : null}
                 <Select
                   value={formData.store_id}
-                  onValueChange={(value) => setFormData({ ...formData, store_id: value })}
+                  onValueChange={(value) => {
+                    console.log('Selected store:', value);
+                    setFormData({ ...formData, store_id: value });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Оберіть магазин" />
                   </SelectTrigger>
                   <SelectContent>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.store_name}
-                      </SelectItem>
-                    ))}
+                    {stores.length === 0 ? (
+                      <div className="px-2 py-1 text-sm text-muted-foreground">
+                        Магазини не знайдено
+                      </div>
+                    ) : (
+                      stores.map((store) => {
+                        console.log('Rendering store option:', store.id, store.store_name);
+                        return (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.store_name}
+                          </SelectItem>
+                        );
+                      })
+                    )}
                   </SelectContent>
                 </Select>
               </div>
