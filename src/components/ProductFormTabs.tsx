@@ -355,28 +355,60 @@ export function ProductFormTabs({
               {/* Основной контейнер с каруселью слева и полями справа */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 {/* Карусель фото - левая часть (2 колонки из 5) */}
-                <div className="lg:col-span-2">
-                  <div className="space-y-4">
-                    <Label>{t('product_photos')}</Label>
-                    <div className="w-full px-12 sm:px-14 md:px-16">
-                      <Carousel className="w-full">
-                        <CarouselContent>
-                          {images.length > 0 ? images.map((image, index) => <CarouselItem key={index}>
-                                <div className="aspect-square">
-                                  <img src={image.url} alt={image.alt_text || `Фото ${index + 1}`} className="w-full h-full object-cover rounded-lg border" data-testid={`productFormTabs_carouselImage_${index}`} />
-                                </div>
-                              </CarouselItem>) : <CarouselItem>
-                              <div className="aspect-square flex items-center justify-center">
-                                <ProductPlaceholder className="w-full h-full" />
-                              </div>
-                            </CarouselItem>}
-                        </CarouselContent>
-                        {images.length > 1 && <>
-                            <CarouselPrevious />
-                            <CarouselNext />
-                          </>}
-                      </Carousel>
-                    </div>
+                <div className="lg:col-span-2 space-y-4">
+                  <Label>{t('product_photos')}</Label>
+                  <div className={`p-4 rounded-lg ${images.length === 0 ? 'border' : ''}`}>
+                    {/* Отображение до 3 фото вертикально */}
+                    {images.length <= 3 ? (
+                      <div className="space-y-4">
+                        {images.length > 0 ? images.map((image, index) => (
+                          <div key={index} className="aspect-square relative p-2">
+                            <img 
+                              src={image.url} 
+                              alt={image.alt_text || `Фото ${index + 1}`} 
+                              className="w-full h-full object-cover rounded-lg border" 
+                              data-testid={`productFormTabs_verticalImage_${index}`} 
+                            />
+                            {image.is_main && (
+                              <Badge className="absolute top-3 left-3" variant="default">
+                                Главное
+                              </Badge>
+                            )}
+                          </div>
+                        )) : (
+                          <div className="aspect-square flex items-center justify-center p-2">
+                            <ProductPlaceholder className="w-full h-full" />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                       /* Вертикальная карусель для 4+ фото */
+                       <div className="w-full py-4">
+                         <Carousel className="w-full" orientation="vertical">
+                           <CarouselContent className="h-96 -mt-1">
+                             {images.map((image, index) => (
+                               <CarouselItem key={index} className="pt-1 basis-1/3 p-2">
+                                 <div className="aspect-square p-2 relative">
+                                   <img 
+                                     src={image.url} 
+                                     alt={image.alt_text || `Фото ${index + 1}`} 
+                                     className="w-full h-full object-cover rounded-lg border" 
+                                     data-testid={`productFormTabs_carouselImage_${index}`} 
+                                   />
+                                   {image.is_main && (
+                                     <Badge className="absolute top-3 left-3" variant="default">
+                                       Главное
+                                     </Badge>
+                                   )}
+                                 </div>
+                               </CarouselItem>
+                             ))}
+                           </CarouselContent>
+                           <CarouselPrevious />
+                           <CarouselNext />
+                         </Carousel>
+                       </div>
+                     )}
                   </div>
                 </div>
 
