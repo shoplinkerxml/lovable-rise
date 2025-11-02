@@ -448,7 +448,7 @@ export function ProductFormTabs({
                       <Separator className="flex-1" />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="name_ua">{t('product_name_ua')} *</Label>
                         <Input id="name_ua" value={formData.name_ua} onChange={e => setFormData({
