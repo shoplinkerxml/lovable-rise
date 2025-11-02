@@ -71,6 +71,9 @@ const App = () => (
             {/* Admin Authentication Routes */}
             <Route path="/admin-auth" element={<AdminAuth />} />
             
+            {/* Catch-all for non-existent admin routes - redirect to admin auth */}
+            <Route path="/admin-*" element={<NotFound />} />
+            
             {/* Admin Settings Routes */}
             <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>
               <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
