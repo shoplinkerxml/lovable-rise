@@ -122,9 +122,6 @@ export function ProductFormTabs({
       // Load stores
       const storesData = await ProductService.getUserStores();
       setStores(storesData || []);
-      if ((storesData?.length ?? 0) > 0 && !formData.store_id) {
-        setFormData(prev => ({ ...prev, store_id: storesData[0].id }));
-      }
       // Load suppliers
       const {
         data: suppliersData
