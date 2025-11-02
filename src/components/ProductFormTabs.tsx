@@ -457,13 +457,7 @@ export function ProductFormTabs({
                       })} placeholder={t('product_name_ua_placeholder')} data-testid="productFormTabs_nameUaInput" />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="name">{t('product_name_en')}</Label>
-                        <Input id="name" value={formData.name} onChange={e => setFormData({
-                        ...formData,
-                        name: e.target.value
-                      })} placeholder={t('product_name_en_placeholder')} data-testid="productFormTabs_nameInput" />
-                      </div>
+                      
 
                       <div className="space-y-2">
                         <Label htmlFor="description_ua">{t('product_description_ua')}</Label>
