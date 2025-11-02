@@ -152,10 +152,10 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       
       console.log('Loading stores for user:', user.id);
 
-      // Load stores - використовуємо прямий запит до Supabase замість сервісу
+      // Load stores з усіма полями
       const { data: storesData, error: storesError } = await supabase
         .from('user_stores')
-        .select('id, store_name')
+        .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('store_name');
@@ -164,13 +164,13 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         console.error('Error loading stores:', storesError);
       } else {
         console.log('Loaded stores:', storesData);
-        console.log('Stores count:', storesData?.length || 0);
-        if (storesData && storesData.length > 0) {
-          console.log('First store:', storesData[0]);
-          console.log('First store id:', storesData[0].id);
-          console.log('First store name:', storesData[0].store_name);
-        }
-        setStores(storesData || []);
+        // Додаємо унікальний ідентифікатор для кожного магазину
+        const storesWithId = (storesData || []).map(store => ({
+          ...store,
+          id: store.id || `${store.user_id}_${store.store_name}` // Використовуємо composit key якщо немає id
+        }));
+        console.log('Stores with IDs:', storesWithId);
+        setStores(storesWithId);
       }
 
       // Load suppliers
