@@ -362,19 +362,23 @@ export function ProductFormTabs({
                     {images.length <= 3 ? (
                       <div className="space-y-4">
                         {images.length > 0 ? images.map((image, index) => (
-                          <div key={index} className="aspect-square relative p-2">
-                            <img 
-                              src={image.url} 
-                              alt={image.alt_text || `Фото ${index + 1}`} 
-                              className="w-full h-full object-cover rounded-lg border" 
-                              data-testid={`productFormTabs_verticalImage_${index}`} 
-                            />
-                            {image.is_main && (
-                              <Badge className="absolute top-3 left-3" variant="default">
-                                Главное
-                              </Badge>
-                            )}
-                          </div>
+                          <Card key={index} className="relative group">
+                            <CardContent className="p-2">
+                              <div className="aspect-square relative overflow-hidden rounded-md">
+                                <img 
+                                  src={image.url} 
+                                  alt={image.alt_text || `Фото ${index + 1}`} 
+                                  className="w-full h-full object-cover" 
+                                  data-testid={`productFormTabs_verticalImage_${index}`} 
+                                />
+                              </div>
+                              {image.is_main && (
+                                <Badge className="absolute top-2 left-2" variant="default">
+                                  Главное
+                                </Badge>
+                              )}
+                            </CardContent>
+                          </Card>
                         )) : (
                           <div className="aspect-square flex items-center justify-center p-2">
                             <ProductPlaceholder className="w-full h-full" />
@@ -387,20 +391,24 @@ export function ProductFormTabs({
                          <Carousel className="w-full" orientation="vertical">
                            <CarouselContent className="h-96 -mt-1">
                              {images.map((image, index) => (
-                               <CarouselItem key={index} className="pt-1 basis-1/3 p-2">
-                                 <div className="aspect-square p-2 relative">
-                                   <img 
-                                     src={image.url} 
-                                     alt={image.alt_text || `Фото ${index + 1}`} 
-                                     className="w-full h-full object-cover rounded-lg border" 
-                                     data-testid={`productFormTabs_carouselImage_${index}`} 
-                                   />
-                                   {image.is_main && (
-                                     <Badge className="absolute top-3 left-3" variant="default">
-                                       Главное
-                                     </Badge>
-                                   )}
-                                 </div>
+                               <CarouselItem key={index} className="pt-1 basis-1/3">
+                                 <Card className="relative group">
+                                   <CardContent className="p-2">
+                                     <div className="aspect-square relative overflow-hidden rounded-md">
+                                       <img 
+                                         src={image.url} 
+                                         alt={image.alt_text || `Фото ${index + 1}`} 
+                                         className="w-full h-full object-cover" 
+                                         data-testid={`productFormTabs_carouselImage_${index}`} 
+                                       />
+                                     </div>
+                                     {image.is_main && (
+                                       <Badge className="absolute top-2 left-2" variant="default">
+                                         Главное
+                                       </Badge>
+                                     )}
+                                   </CardContent>
+                                 </Card>
                                </CarouselItem>
                              ))}
                            </CarouselContent>
