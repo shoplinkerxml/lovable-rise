@@ -75,6 +75,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const [images, setImages] = useState<ProductImage[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [currencies, setCurrencies] = useState<any[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
 
   useEffect(() => {
@@ -168,6 +169,14 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       // Загружаем поставщиков
       const suppliersData = await SupplierService.getSuppliers();
       setSuppliers(suppliersData);
+
+      // Загружаем валюты
+      const { data: currenciesData } = await supabase
+        .from('currencies')
+        .select('*')
+        .eq('status', true)
+        .order('name');
+      setCurrencies(currenciesData || []);
     } catch (error) {
       console.error('Load initial data error:', error);
       toast.error('Помилка завантаження початкових даних');
@@ -262,11 +271,35 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     setLoading(true);
 
     try {
+      // Находим валюту по коду для получения currency_id
+      const selectedCurrency = currencies.find(c => c.code === formData.currency_code);
+      
+      // Создаем или обновляем запись в store_currencies
+      if (selectedCurrency) {
+        const { error: storeCurrencyError } = await supabase
+          .from('store_currencies')
+          .upsert({
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            store_id: formData.store_id,
+            currency_id: selectedCurrency.id,
+            name: selectedCurrency.name,
+            code: selectedCurrency.code,
+            symbol: selectedCurrency.symbol,
+            is_active: true
+          }, {
+            onConflict: 'user_id,store_id,currency_id'
+          });
+
+        if (storeCurrencyError) {
+          console.error('Store currency upsert error:', storeCurrencyError);
+        }
+      }
+
       const productData = {
         store_id: formData.store_id,
         external_id: formData.external_id,
         category_external_id: formData.category_external_id || null,
-        currency_code: formData.currency_code,
+        currency_id: selectedCurrency?.id || null,
         name: formData.name,
         name_ua: formData.name_ua || null,
         vendor: formData.vendor || null,
@@ -423,6 +456,25 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                       rows={4}
                       data-testid="productForm_descriptionUa"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="currency_code">{t('currency')} *</Label>
+                    <Select
+                      value={formData.currency_code}
+                      onValueChange={(value) => setFormData({ ...formData, currency_code: value })}
+                    >
+                      <SelectTrigger data-testid="productForm_currency">
+                        <SelectValue placeholder={t('select_currency')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency.code} value={currency.code}>
+                            {currency.code} - {currency.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

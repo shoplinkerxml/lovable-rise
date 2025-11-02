@@ -135,8 +135,9 @@ export function ProductFormTabs({ product, onSubmit, onCancel }: ProductFormTabs
       
       // Load currencies
       const { data: currenciesData } = await supabase
-        .from('store_currencies')
+        .from('currencies')
         .select('*')
+        .eq('status', true)
         .order('name');
 
       setStores(storesData || []);

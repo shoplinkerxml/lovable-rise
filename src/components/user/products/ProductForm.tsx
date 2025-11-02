@@ -153,21 +153,16 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       const suppliersData = await SupplierService.getSuppliers();
       setSuppliers(suppliersData || []);
 
-      // Load currencies for current user
+      // Load currencies from global currencies table
       const { data: currenciesData, error: currenciesError } = await (supabase as any)
-        .from('store_currencies')
+        .from('currencies')
         .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+        .eq('status', true)
+        .order('name');
       
       if (currenciesError) {
         console.error('Error loading currencies:', currenciesError);
-        // If there's an error, try to load from global currencies table as fallback
-        const { data: globalCurrencies } = await (supabase as any)
-          .from('currencies')
-          .select('*')
-          .eq('status', true);
-        setCurrencies(globalCurrencies || []);
+        setCurrencies([]);
       } else {
         setCurrencies(currenciesData || []);
       }
