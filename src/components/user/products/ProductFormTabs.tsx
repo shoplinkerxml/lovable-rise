@@ -10,6 +10,7 @@ import { Loader2, Plus, X, Upload, Link, Package, Image, Settings, Save, ArrowLe
 import { toast } from "sonner";
 import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
+import { ShopService } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/providers/i18n-provider";
 
@@ -154,16 +155,12 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const loadInitialData = async () => {
     try {
       // Загружаем магазины
-      const { data: storesData } = await supabase
-        .from('user_stores')
-        .select('*')
-        .order('store_name');
+      const storesData = await ShopService.getShops();
+      console.log('STORES DEBUG:', storesData);
+      setStores(storesData || []);
       
-      if (storesData) {
-        setStores(storesData);
-        if (storesData.length > 0 && !formData.store_id) {
-          setFormData(prev => ({ ...prev, store_id: storesData[0].id }));
-        }
+      if (storesData && storesData.length > 0 && !formData.store_id) {
+        setFormData(prev => ({ ...prev, store_id: storesData[0].id }));
       }
 
       // Загружаем поставщиков
@@ -340,10 +337,10 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex items-center justify-between mb-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+    <form onSubmit={handleSubmit} className="space-y-6" data-testid="productFormTabs_form">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-testid="productFormTabs_tabs">
+        <div className="flex items-center justify-between mb-6" data-testid="productFormTabs_header">
+          <TabsList className="grid w-full max-w-md grid-cols-3" data-testid="productFormTabs_tabsList">
             <TabsTrigger 
               value="basic" 
               className="flex items-center gap-2"
@@ -398,11 +395,11 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         </div>
 
         {/* Основна інформація */}
-        <TabsContent value="basic" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <TabsContent value="basic" className="space-y-6" data-testid="productFormTabs_basicContent">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" data-testid="productFormTabs_basicGrid">
             {/* Основні поля */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
+            <div className="lg:col-span-2 space-y-6" data-testid="productFormTabs_mainFields">
+              <Card data-testid="productFormTabs_basicInfoCard">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Package className="h-5 w-5" />
@@ -527,9 +524,9 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
             </div>
 
             {/* Бічна панель */}
-            <div className="space-y-6">
+            <div className="space-y-6" data-testid="productFormTabs_sidebar">
               {/* Магазин та постачальник */}
-              <Card>
+              <Card data-testid="productFormTabs_storeSupplierCard">
                 <CardHeader>
                   <CardTitle>{t('store_supplier')}</CardTitle>
                 </CardHeader>
@@ -540,7 +537,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                       value={formData.store_id}
                       onValueChange={(value) => setFormData({ ...formData, store_id: value })}
                     >
-                      <SelectTrigger data-testid="productForm_storeSelect">
+                      <SelectTrigger data-testid="productFormTabs_storeSelect">
                         <SelectValue placeholder={t('select_store')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -559,7 +556,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                       value={formData.supplier_id}
                       onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
                     >
-                      <SelectTrigger data-testid="productForm_supplierSelect">
+                      <SelectTrigger data-testid="productFormTabs_supplierSelect">
                         <SelectValue placeholder={t('select_supplier')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -575,9 +572,9 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
               </Card>
 
               {/* Ціни */}
-              <Card>
+              <Card data-testid="productFormTabs_pricesCard">
                 <CardHeader>
-                  <CardTitle>{t('prices_stock')}</CardTitle>
+                  <CardTitle data-testid="productFormTabs_pricesTitle">{t('prices_stock')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -586,7 +583,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                       value={formData.currency_code}
                       onValueChange={(value) => setFormData({ ...formData, currency_code: value })}
                     >
-                      <SelectTrigger data-testid="productForm_currencySelect">
+                      <SelectTrigger data-testid="productFormTabs_currencySelect">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -666,8 +663,8 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         </TabsContent>
 
         {/* Зображення */}
-        <TabsContent value="images" className="space-y-6">
-          <Card>
+        <TabsContent value="images" className="space-y-6" data-testid="productFormTabs_imagesContent">
+          <Card data-testid="productFormTabs_imagesCard">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Image className="h-5 w-5" />
@@ -785,8 +782,8 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         </TabsContent>
 
         {/* Характеристики */}
-        <TabsContent value="params" className="space-y-6">
-          <Card>
+        <TabsContent value="params" className="space-y-6" data-testid="productFormTabs_paramsContent">
+          <Card data-testid="productFormTabs_paramsCard">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

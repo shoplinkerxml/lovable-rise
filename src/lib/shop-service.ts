@@ -124,18 +124,26 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
-      .from('user_stores')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      // @ts-ignore - table not in generated types yet
+      const { data, error } = await (supabase as any)
+        .from('user_stores')
+        .select('*')
+        .eq('is_active', true)
+        .order('store_name', { ascending: true });
 
-    if (error) {
+      if (error) {
+        console.error('Get shops error:', error);
+        // Return empty array instead of throwing error for empty table
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
       console.error('Get shops error:', error);
-      throw new Error(error.message);
+      // Return empty array instead of throwing error
+      return [];
     }
-
-    return data || [];
   }
 
   /** Получение одного магазина по ID */

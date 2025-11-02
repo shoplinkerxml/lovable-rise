@@ -104,18 +104,44 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
+    try {
+      const { data, error } = await (supabase as any)
+        .from('user_stores')
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Get user stores error:', error);
+        return [];
+      }
+
+      return (data || []).map((store: any) => store.id);
+    } catch (error) {
+      console.error('Get user stores error:', error);
+      return [];
+    }
+  }
+
+  /** Получение полной информации о магазинах пользователя */
+  static async getUserStores(): Promise<any[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
     const { data, error } = await (supabase as any)
       .from('user_stores')
-      .select('id')
+      .select('*')
       .eq('user_id', sessionValidation.user.id)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('store_name');
 
     if (error) {
       console.error('Get user stores error:', error);
       throw new Error(error.message);
     }
 
-    return (data || []).map((store: any) => store.id);
+    return data || [];
   }
 
   /** Получение только максимального лимита продуктов (без подсчета текущих) */
@@ -176,62 +202,74 @@ export class ProductService {
 
   /** Получение количества продуктов текущего пользователя */
   static async getProductsCount(): Promise<number> {
-    const storeIds = await this.getUserStoreIds();
-    
-    if (storeIds.length === 0) {
+    try {
+      const storeIds = await this.getUserStoreIds();
+      
+      if (storeIds.length === 0) {
+        return 0;
+      }
+
+      let query = (supabase as any)
+        .from('store_products')
+        .select('*', { count: 'exact', head: true });
+
+      // Используем eq для одного store_id, in для нескольких
+      if (storeIds.length === 1) {
+        query = query.eq('store_id', storeIds[0]);
+      } else {
+        query = query.in('store_id', storeIds);
+      }
+
+      const { count, error } = await query;
+
+      if (error) {
+        console.error('Get products count error:', error);
+        // Возвращаем 0 вместо выброса ошибки для случая пустой таблицы
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Get products count error (table may not exist):', error);
+      // Возвращаем 0 если таблица не существует или нет доступа
       return 0;
     }
-
-    let query = (supabase as any)
-      .from('store_products')
-      .select('*', { count: 'exact', head: true });
-
-    // Используем eq для одного store_id, in для нескольких
-    if (storeIds.length === 1) {
-      query = query.eq('store_id', storeIds[0]);
-    } else {
-      query = query.in('store_id', storeIds);
-    }
-
-    const { count, error } = await query;
-
-    if (error) {
-      console.error('Get products count error:', error);
-      // Возвращаем 0 вместо выброса ошибки для случая пустой таблицы
-      return 0;
-    }
-
-    return count || 0;
   }
 
   /** Получение списка продуктов текущего пользователя */
   static async getProducts(): Promise<Product[]> {
-    const storeIds = await this.getUserStoreIds();
-    
-    if (storeIds.length === 0) {
+    try {
+      const storeIds = await this.getUserStoreIds();
+      
+      if (storeIds.length === 0) {
+        return [];
+      }
+
+      let query = (supabase as any)
+        .from('store_products')
+        .select('*');
+
+      // Используем eq для одного store_id, in для нескольких
+      if (storeIds.length === 1) {
+        query = query.eq('store_id', storeIds[0]);
+      } else {
+        query = query.in('store_id', storeIds);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Get products error:', error);
+        // Возвращаем пустой массив вместо выброса ошибки для случая пустой таблицы
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Get products error (table may not exist):', error);
+      // Возвращаем пустой массив если таблица не существует или нет доступа
       return [];
     }
-
-    let query = (supabase as any)
-      .from('store_products')
-      .select('*');
-
-    // Используем eq для одного store_id, in для нескольких
-    if (storeIds.length === 1) {
-      query = query.eq('store_id', storeIds[0]);
-    } else {
-      query = query.in('store_id', storeIds);
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Get products error:', error);
-      // Возвращаем пустой массив вместо выброса ошибки для случая пустой таблицы
-      return [];
-    }
-
-    return data || [];
   }
 
   /** Получение параметров товара */

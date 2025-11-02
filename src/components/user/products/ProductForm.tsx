@@ -142,11 +142,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       if (!user) return;
 
       // Load stores
-      const { data: storesData } = await (supabase as any)
-        .from('user_stores')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+      const storesData = await ProductService.getUserStores();
       setStores(storesData || []);
 
       // Load suppliers

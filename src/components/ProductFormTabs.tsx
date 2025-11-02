@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
+import { ProductService } from '@/lib/product-service';
 
 interface ProductFormTabsProps {
   product?: Tables<'store_products'>;
@@ -116,10 +117,7 @@ export function ProductFormTabs({ product, onSubmit, onCancel }: ProductFormTabs
   const loadLookupData = async () => {
     try {
       // Load stores
-      const { data: storesData } = await supabase
-        .from('user_stores')
-        .select('*')
-        .order('store_name');
+      const storesData = await ProductService.getUserStores();
       
       // Load suppliers
       const { data: suppliersData } = await supabase
