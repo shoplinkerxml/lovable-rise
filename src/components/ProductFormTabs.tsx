@@ -121,7 +121,10 @@ export function ProductFormTabs({
     try {
       // Load stores
       const storesData = await ProductService.getUserStores();
-
+      setStores(storesData || []);
+      if ((storesData?.length ?? 0) > 0 && !formData.store_id) {
+        setFormData(prev => ({ ...prev, store_id: storesData[0].id }));
+      }
       // Load suppliers
       const {
         data: suppliersData
@@ -394,9 +397,11 @@ export function ProductFormTabs({
                             <SelectValue placeholder={t('select_store')} />
                           </SelectTrigger>
                           <SelectContent>
-                            {stores.map(store => <SelectItem key={store.id} value={store.id}>
-                                {store.name}
-                              </SelectItem>)}
+                            {stores.map(store => (
+                              <SelectItem key={store.id} value={store.id}>
+                                {store.store_name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
