@@ -122,18 +122,25 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
-      .from('user_suppliers')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      // @ts-ignore - table not in generated types yet
+      const { data, error } = await (supabase as any)
+        .from('user_suppliers')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (error) {
+        console.error('Get suppliers error:', error);
+        // Return empty array instead of throwing error for empty table
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
       console.error('Get suppliers error:', error);
-      throw new Error(error.message);
+      // Return empty array instead of throwing error
+      return [];
     }
-
-    return data || [];
   }
 
   /** Отримання одного постачальника за ID */

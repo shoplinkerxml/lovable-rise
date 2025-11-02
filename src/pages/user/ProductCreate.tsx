@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
-import { ProductForm } from '@/components/user/products';
+import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type ProductLimitInfo } from '@/lib/product-service';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -66,9 +66,17 @@ export const ProductCreate = () => {
         }
       />
 
-      <ProductForm
-        product={null}
-        onSuccess={handleSuccess}
+      <ProductFormTabs
+        product={undefined}
+        onSubmit={async (data) => {
+          try {
+            await ProductService.createProduct(data);
+            handleSuccess();
+          } catch (error) {
+            console.error('Error creating product:', error);
+            toast.error(t('failed_create_product'));
+          }
+        }}
         onCancel={handleCancel}
       />
     </div>

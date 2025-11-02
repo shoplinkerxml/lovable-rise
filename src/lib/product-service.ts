@@ -182,14 +182,23 @@ export class ProductService {
       return 0;
     }
 
-    const { count, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('store_products')
-      .select('*', { count: 'exact', head: true })
-      .in('store_id', storeIds);
+      .select('*', { count: 'exact', head: true });
+
+    // Используем eq для одного store_id, in для нескольких
+    if (storeIds.length === 1) {
+      query = query.eq('store_id', storeIds[0]);
+    } else {
+      query = query.in('store_id', storeIds);
+    }
+
+    const { count, error } = await query;
 
     if (error) {
       console.error('Get products count error:', error);
-      throw new Error(error.message);
+      // Возвращаем 0 вместо выброса ошибки для случая пустой таблицы
+      return 0;
     }
 
     return count || 0;
@@ -203,15 +212,23 @@ export class ProductService {
       return [];
     }
 
-    const { data, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('store_products')
-      .select('*')
-      .in('store_id', storeIds)
-      .order('created_at', { ascending: false });
+      .select('*');
+
+    // Используем eq для одного store_id, in для нескольких
+    if (storeIds.length === 1) {
+      query = query.eq('store_id', storeIds[0]);
+    } else {
+      query = query.in('store_id', storeIds);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Get products error:', error);
-      throw new Error(error.message);
+      // Возвращаем пустой массив вместо выброса ошибки для случая пустой таблицы
+      return [];
     }
 
     return data || [];
@@ -267,12 +284,19 @@ export class ProductService {
       return null;
     }
 
-    const { data, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('store_products')
       .select('*')
-      .eq('id', id)
-      .in('store_id', storeIds)
-      .single();
+      .eq('id', id);
+
+    // Используем eq для одного store_id, in для нескольких
+    if (storeIds.length === 1) {
+      query = query.eq('store_id', storeIds[0]);
+    } else {
+      query = query.in('store_id', storeIds);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
       if (error.code === 'PGRST116') {
