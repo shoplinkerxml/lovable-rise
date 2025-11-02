@@ -141,9 +141,20 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Load stores
-      const storesData = await ProductService.getUserStores();
-      setStores(storesData || []);
+      // Load stores - використовуємо прямий запит до Supabase замість сервісу
+      const { data: storesData, error: storesError } = await supabase
+        .from('user_stores')
+        .select('id, user_id, store_name, store_url, template_id, is_active, created_at, updated_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('store_name');
+      
+      if (storesError) {
+        console.error('Error loading stores:', storesError);
+      } else {
+        console.log('Loaded stores:', storesData);
+        setStores(storesData || []);
+      }
 
       // Load suppliers
       const suppliersData = await SupplierService.getSuppliers();
