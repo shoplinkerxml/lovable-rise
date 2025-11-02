@@ -448,7 +448,7 @@ export function ProductFormTabs({
                       <Separator className="flex-1" />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="name_ua">{t('product_name_ua')} *</Label>
                         <Input id="name_ua" value={formData.name_ua} onChange={e => setFormData({
@@ -457,7 +457,13 @@ export function ProductFormTabs({
                       })} placeholder={t('product_name_ua_placeholder')} data-testid="productFormTabs_nameUaInput" />
                       </div>
 
-                      
+                      <div className="space-y-2">
+                        <Label htmlFor="name">{t('product_name_en')}</Label>
+                        <Input id="name" value={formData.name} onChange={e => setFormData({
+                        ...formData,
+                        name: e.target.value
+                      })} placeholder={t('product_name_en_placeholder')} data-testid="productFormTabs_nameInput" />
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="description_ua">{t('product_description_ua')}</Label>
@@ -467,7 +473,13 @@ export function ProductFormTabs({
                       })} placeholder={t('product_description_ua_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" />
                       </div>
 
-                      
+                      <div className="space-y-2">
+                        <Label htmlFor="description">{t('product_description_en')}</Label>
+                        <Textarea id="description" value={formData.description} onChange={e => setFormData({
+                        ...formData,
+                        description: e.target.value
+                      })} placeholder={t('product_description_en_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" />
+                      </div>
                     </div>
                   </div>
 
