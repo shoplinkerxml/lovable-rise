@@ -128,7 +128,7 @@ export const ProductsList = ({
                   </Button>
                 </div>
               </div>
-              <CardTitle className="mt-2">{product.product_name}</CardTitle>
+              <CardTitle className="mt-2">{product.name}</CardTitle>
               <CardDescription>
                 {new Date(product.created_at).toLocaleDateString('uk-UA')}
               </CardDescription>
@@ -152,8 +152,8 @@ export const ProductsList = ({
                 )}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className={product.is_active ? "text-green-600" : "text-gray-400"}>
-                  {product.is_active ? 'Активний' : 'Неактивний'}
+                <span className={product.available ? "text-green-600" : "text-gray-400"}>
+                  {product.available ? 'Активний' : 'Неактивний'}
                 </span>
               </div>
             </CardContent>
@@ -166,7 +166,7 @@ export const ProductsList = ({
           <AlertDialogHeader>
             <AlertDialogTitle>{t('delete_product_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Цю дію неможливо скасувати. Продукт "{deleteDialog.product?.product_name}" буде повністю видалено з системи.
+              Цю дію неможливо скасувати. Продукт "{deleteDialog.product?.name}" буде повністю видалено з системи.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

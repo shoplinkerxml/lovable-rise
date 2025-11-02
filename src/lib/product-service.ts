@@ -131,7 +131,7 @@ export class ProductService {
 
     const { data, error } = await (supabase as any)
       .from('user_stores')
-      .select('*')
+      .select('id, user_id, store_name, store_url, template_id, custom_mapping, xml_config, is_active, created_at, updated_at, last_sync')
       .eq('user_id', sessionValidation.user.id)
       .eq('is_active', true)
       .order('store_name');

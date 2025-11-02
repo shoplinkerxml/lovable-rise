@@ -119,7 +119,9 @@ const UserDashboard = () => {
                   <span><strong>{tariffName}</strong>{endDate ? ` — ${t('end_date')}: ${new Date(endDate).toLocaleDateString()}` : ''}</span>
                 </div>}
               <ul className="list-inside list-disc text-sm">
-                {limits.map(l => <li key={l.id ?? `${l.limit_name}`}>{l.limit_name} - {l.value}</li>)}
+                {limits.map(l => (
+                  <li key={l.id ?? `${l.limit_name}`}>{l.limit_name} - {l.value}</li>
+                ))}
               </ul>
             </AlertDescription>
           </Alert> : <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
@@ -146,7 +148,9 @@ const UserDashboard = () => {
       
 
       {/* More content to ensure scrolling */}
-      {[1, 2, 3].map(section => {})}
+      {[1, 2, 3].map(section => (
+        <div key={section}></div>
+      ))}
     </div>;
 };
 export default UserDashboard;
