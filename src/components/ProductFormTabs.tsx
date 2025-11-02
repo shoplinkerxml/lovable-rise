@@ -473,13 +473,7 @@ export function ProductFormTabs({
                       })} placeholder={t('product_description_ua_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="description">{t('product_description_en')}</Label>
-                        <Textarea id="description" value={formData.description} onChange={e => setFormData({
-                        ...formData,
-                        description: e.target.value
-                      })} placeholder={t('product_description_en_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" />
-                      </div>
+                      
                     </div>
                   </div>
 
