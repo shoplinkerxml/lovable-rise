@@ -54,13 +54,19 @@ export const ProductCreate = () => {
         breadcrumbItems={breadcrumbs}
         actions={
           <div className="flex gap-2 items-center">
-            <Badge variant="outline" className="text-sm flex items-center gap-1.5">
+            <Badge variant="outline" className="text-sm flex items-center gap-1.5 shrink-0">
               <Package className="h-4 w-4" />
               <span>{limitInfo.current} / {limitInfo.max}</span>
             </Badge>
-            <Button variant="ghost" onClick={handleCancel}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {t('back_to_products')}
+            <Button
+              variant="ghost"
+              onClick={handleCancel}
+              className="shrink-0"
+              data-testid="header_back_button"
+              title={t('back_to_products')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-0" />
+              <span className="sr-only">{t('back_to_products')}</span>
             </Button>
           </div>
         }
