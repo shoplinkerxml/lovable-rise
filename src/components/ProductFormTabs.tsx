@@ -17,6 +17,7 @@ import { Tables } from '@/integrations/supabase/types';
 import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { ProductService } from '@/lib/product-service';
+import { R2Storage } from '@/lib/r2-storage';
 interface ProductFormTabsProps {
   product?: Tables<'store_products'>;
   onSubmit?: (data: any) => void;
@@ -317,13 +318,28 @@ export function ProductFormTabs({
         data: imagesData
       } = await supabase.from('store_product_images').select('*').eq('product_id', product.id).order('order_index');
       if (imagesData) {
-        setImages(imagesData.map(img => ({
-          id: img.id,
-          url: img.url,
-          alt_text: img.alt_text || '',
-          order_index: img.order_index,
-          is_main: img.is_main
-        })));
+        const resolved = await Promise.all(imagesData.map(async (img: any) => {
+          let previewUrl: string = img.url;
+          if (typeof previewUrl === 'string' && (previewUrl.includes('r2.dev') || previewUrl.includes('cloudflarestorage.com'))) {
+            const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
+            if (objectKey) {
+              try {
+                const signed = await R2Storage.getViewUrl(objectKey);
+                if (signed) previewUrl = signed;
+              } catch (e) {
+                console.warn('Failed to sign view URL for image:', e);
+              }
+            }
+          }
+          return {
+            id: img.id,
+            url: previewUrl,
+            alt_text: img.alt_text || '',
+            order_index: img.order_index,
+            is_main: img.is_main
+          } as ProductImage;
+        }));
+        setImages(resolved);
       }
 
       // Load parameters
@@ -410,15 +426,15 @@ export function ProductFormTabs({
       setIsDragOver(false);
     }
   };
-
-  const handleDrop = (e: React.DragEvent) => {
+  // Drop handler
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
 
     // Try to get image URL from different data types
-    let imageUrl = '';
-    
+    let droppedUrl = '';
+
     // Check for HTML data (dragged from web page)
     const htmlData = e.dataTransfer.getData('text/html');
     if (htmlData) {
@@ -426,33 +442,33 @@ export function ProductFormTabs({
       const doc = parser.parseFromString(htmlData, 'text/html');
       const img = doc.querySelector('img');
       if (img && img.src) {
-        imageUrl = img.src;
+        droppedUrl = img.src;
       }
     }
-    
+
     // Check for plain text URL
-    if (!imageUrl) {
+    if (!droppedUrl) {
       const textData = e.dataTransfer.getData('text/plain');
       if (textData && (textData.startsWith('http') || textData.startsWith('data:'))) {
         // Validate if it's an image URL
         if (textData.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || textData.startsWith('data:image/')) {
-          imageUrl = textData;
+          droppedUrl = textData;
         }
       }
     }
 
     // Check for files
-    if (!imageUrl && e.dataTransfer.files.length > 0) {
+    if (!droppedUrl && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
       if (file.type.startsWith('image/')) {
-        handleFileUpload({ target: { files: [file] } } as any);
+        await uploadFileDirect(file);
         return;
       }
     }
 
-    if (imageUrl) {
+    if (droppedUrl) {
       const newImage: ProductImage = {
-        url: imageUrl,
+        url: droppedUrl,
         order_index: images.length,
         is_main: images.length === 0
       };
@@ -462,36 +478,51 @@ export function ProductFormTabs({
       toast.error(t('invalid_image_format') || 'Неверный формат изображения');
     }
   };
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const uploadFileDirect = async (file: File) => {
     setUploadingImage(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
+      // Проверяем наличие сессии заранее, чтобы избежать 401 из Edge Function
       const {
-        data,
-        error
-      } = await supabase.storage.from('product-images').upload(fileName, file);
-      if (error) throw error;
-      const {
-        data: {
-          publicUrl
-        }
-      } = supabase.storage.from('product-images').getPublicUrl(fileName);
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error(t('unauthorized_upload') || 'Ошибка авторизации при загрузке');
+        return;
+      }
+      const response = await R2Storage.uploadFile(file, formData.store_id || '');
       const newImage: ProductImage = {
-        url: publicUrl,
+        url: response.viewUrl || response.publicUrl,
         order_index: images.length,
         is_main: images.length === 0
       };
       setImages([...images, newImage]);
       toast.success(t('image_uploaded_successfully'));
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error(t('failed_upload_image'));
+      console.error('Ошибка загрузки изображения в R2:', error);
+
+      // Русифицированная обработка ошибок с маппингом кодов
+      const err: any = error;
+      const code = err?.code as string | undefined;
+      if (code === 'unauthorized') {
+        toast.error(t('unauthorized_upload') || 'Ошибка авторизации при загрузке');
+      } else if (code === 'file_too_large') {
+        toast.error(t('file_too_large') || 'Файл слишком большой');
+      } else if (code === 'invalid_file_type') {
+        toast.error(t('invalid_image_format') || 'Неверный формат изображения');
+      } else if (code === 'validation_error') {
+        toast.error(t('failed_upload_image') || 'Ошибка загрузки изображения');
+      } else {
+        toast.error(t('failed_upload_image') || 'Ошибка загрузки изображения');
+      }
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadFileDirect(file);
   };
   const removeImage = (index: number) => {
     const newImages = images.filter((_, i) => i !== index);

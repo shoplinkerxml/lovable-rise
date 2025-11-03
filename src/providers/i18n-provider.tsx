@@ -947,6 +947,17 @@ const toastDictionary = {
   product_tab_images: { uk: "Зображення", en: "Images" },
   product_tab_parameters: { uk: "Параметри", en: "Parameters" },
   product_tab_seo: { uk: "SEO", en: "SEO" },
+
+  // Image Upload notifications
+  image_added_successfully: { uk: "Зображення додано успішно", en: "Image added successfully" },
+  invalid_image_format: { uk: "Невірний формат зображення", en: "Invalid image format" },
+  invalid_file_type: { uk: "Неприпустимий тип файлу", en: "Invalid file type" },
+  unauthorized_upload: { uk: "Помилка авторизації при завантаженні", en: "Unauthorized upload" },
+  file_too_large: { uk: "Файл занадто великий", en: "File too large" },
+  file_too_large_5mb: { uk: "Файл занадто великий (максимум 5 МБ)", en: "File too large (max 5MB)" },
+  choose_image_file: { uk: "Виберіть файл зображення", en: "Choose an image file" },
+  upload_unauthorized: { uk: "Завантаження неавторизоване", en: "Upload unauthorized" },
+  upload_server_error: { uk: "Помилка сервера під час завантаження", en: "Server error during upload" },
   
   // Product Form Fields
   product_main_data: { uk: "Основні дані", en: "Main Data" },
@@ -1058,6 +1069,8 @@ const toastDictionary = {
   product_saved_successfully: { uk: "Товар успішно збережено", en: "Product saved successfully" },
   image_uploaded_successfully: { uk: "Зображення завантажено", en: "Image uploaded successfully" },
   failed_upload_image: { uk: "Помилка завантаження зображення", en: "Failed to upload image" },
+  image_deleted_successfully: { uk: "Зображення видалено", en: "Image deleted successfully" },
+  failed_delete_image: { uk: "Не вдалося видалити зображення", en: "Failed to delete image" },
   create_new_product: { uk: "Створити новий товар", en: "Create New Product" },
   product_status: { uk: "Статус", en: "Status" },
   select_status: { uk: "Оберіть статус", en: "Select Status" },

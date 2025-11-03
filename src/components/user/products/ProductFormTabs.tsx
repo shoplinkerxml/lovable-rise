@@ -12,6 +12,7 @@ import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
 import { ShopService } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
+import { R2Storage } from "@/lib/r2-storage";
 import { useI18n } from "@/providers/i18n-provider";
 
 interface ProductFormTabsProps {
@@ -33,6 +34,7 @@ interface ProductImage {
   order_index: number;
   alt_text?: string;
   is_main?: boolean;
+  object_key?: string;
 }
 
 export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTabsProps) => {
@@ -139,11 +141,26 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           .order('order_index');
 
         if (productImages) {
-          setImages(productImages.map(img => ({
-            url: img.url,
-            order_index: img.order_index,
-            is_main: img.order_index === 0
-          })));
+          const resolved = await Promise.all(productImages.map(async (img) => {
+            let previewUrl = img.url;
+            if (typeof previewUrl === 'string' && (previewUrl.includes('r2.dev') || previewUrl.includes('cloudflarestorage.com'))) {
+              const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
+              if (objectKey) {
+                try {
+                  const signed = await R2Storage.getViewUrl(objectKey);
+                  if (signed) previewUrl = signed;
+                } catch (e) {
+                  console.warn('Failed to sign view URL for image:', e);
+                }
+              }
+            }
+            return {
+              url: previewUrl,
+              order_index: img.order_index,
+              is_main: img.order_index === 0
+            } as ProductImage;
+          }));
+          setImages(resolved);
         }
       }
     } catch (error) {
@@ -217,15 +234,24 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     toast.success('Зображення додано');
   };
 
-  const removeImage = (index: number) => {
-    const updatedImages = images.filter((_, i) => i !== index);
-    // Переназначаем порядковые номера
-    const reorderedImages = updatedImages.map((img, i) => ({
-      ...img,
-      order_index: i,
-      is_main: i === 0 && updatedImages.length > 0
-    }));
-    setImages(reorderedImages);
+  const removeImage = async (index: number) => {
+    const target = images[index];
+    try {
+      if (target?.object_key) {
+        await R2Storage.deleteFile(target.object_key);
+      }
+      const updatedImages = images.filter((_, i) => i !== index);
+      const reorderedImages = updatedImages.map((img, i) => ({
+        ...img,
+        order_index: i,
+        is_main: i === 0 && updatedImages.length > 0
+      }));
+      setImages(reorderedImages);
+      toast.success(t('image_deleted_successfully'));
+    } catch (error) {
+      console.error('Failed to delete image from R2:', error);
+      toast.error(t('failed_delete_image'));
+    }
   };
 
   const setMainImage = (index: number) => {
@@ -236,12 +262,57 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     setImages(updatedImages);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Здесь должна быть логика загрузки файла в Supabase Storage
-    toast.info('Завантаження файлів буде реалізовано пізніше');
+    // Валидация типа и размера
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('choose_image_file'));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t('file_too_large_5mb'));
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Используем новый API для загрузки через proxy
+      const result = await R2Storage.uploadFile(file, formData.external_id);
+
+      const newImage = {
+        url: result.viewUrl || result.publicUrl,
+        order_index: images.length,
+        is_main: images.length === 0,
+        object_key: result.objectKey,
+      };
+      setImages([...images, newImage]);
+      toast.success(t('image_uploaded_successfully'));
+    } catch (error) {
+      console.error('Error uploading image to R2:', error);
+      
+      // Улучшенная обработка ошибок
+      let errorMessage = t('failed_upload_image');
+      if (error instanceof Error) {
+        if (error.message.includes('unauthorized')) {
+          errorMessage = t('upload_unauthorized');
+        } else if (error.message.includes('file_too_large')) {
+          errorMessage = t('file_too_large_5mb');
+        } else if (error.message.includes('invalid_file_type')) {
+          errorMessage = t('choose_image_file');
+        } else if (error.message.includes('upload_failed')) {
+          errorMessage = t('upload_server_error');
+        }
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+      // Очищаем input для возможности повторной загрузки того же файла
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
