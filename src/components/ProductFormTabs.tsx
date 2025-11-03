@@ -941,7 +941,7 @@ export function ProductFormTabs({
             {/* Tab 2: Images */}
             <TabsContent value="images" className="space-y-6" data-testid="productFormTabs_imagesContent">
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
                   <div className="flex-1">
                     <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
                     <div className="flex gap-2 mt-2">
@@ -952,7 +952,7 @@ export function ProductFormTabs({
                     </div>
                   </div>
                   
-                  <div className="flex flex-col">
+                  <div className="flex flex-col lg:flex-shrink-0">
                     <Label>{t('upload_file')}</Label>
                     <div className="mt-2">
                       <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
