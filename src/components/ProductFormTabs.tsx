@@ -104,6 +104,9 @@ export function ProductFormTabs({
   const [galleryImageDimensions, setGalleryImageDimensions] = useState<Map<number, {width: number, height: number}>>(new Map());
   const [allImageDimensions, setAllImageDimensions] = useState<Map<number, {width: number, height: number}>>(new Map());
   const [maxContainerSize, setMaxContainerSize] = useState<{width: number, height: number} | null>(null);
+  
+  // Drag and drop state
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Navigation functions for main image carousel
   const goToPrevious = () => {
@@ -161,37 +164,17 @@ export function ProductFormTabs({
 
   // Calculate adaptive container style
   const getAdaptiveImageStyle = () => {
-    // Use max container size if available for consistent sizing
-    if (maxContainerSize) {
-      return {
-        width: `${maxContainerSize.width}px`,
-        height: `${maxContainerSize.height}px`,
-      };
-    }
+    // Prefer current image dimensions, fallback to max container size
+    const dims = imageDimensions || maxContainerSize;
+    const aspect = dims ? `${dims.width} / ${dims.height}` : '1 / 1';
 
-    // Fallback to current image dimensions
-    if (!imageDimensions) {
-      return { aspectRatio: '1 / 1' }; // Default square
-    }
-
-    const { width, height } = imageDimensions;
-    const maxSize = 600;
-    
-    // If image is larger than max size, scale it down proportionally
-    if (width > maxSize || height > maxSize) {
-      const scale = Math.min(maxSize / width, maxSize / height);
-      return {
-        width: `${width * scale}px`,
-        height: `${height * scale}px`,
-        aspectRatio: `${width} / ${height}`
-      };
-    }
-    
-    // Use natural dimensions for smaller images
+    // Responsive sizing: cap by parent width and viewport, avoid overflow
     return {
-      width: `${width}px`,
-      height: `${height}px`,
-      aspectRatio: `${width} / ${height}`
+      width: 'min(100%, clamp(16rem, 40vw, 37.5rem))',
+      maxWidth: '100%',
+      height: 'auto',
+      maxHeight: 'min(60vh, 37.5rem)',
+      aspectRatio: aspect
     };
   };
 
@@ -199,26 +182,19 @@ export function ProductFormTabs({
   const getGalleryAdaptiveImageStyle = (index: number) => {
     const dimensions = galleryImageDimensions.get(index);
     if (!dimensions) {
-      return { aspectRatio: '1 / 1' }; // Default square
+      return {
+        width: '100%',
+        maxWidth: 'clamp(8rem, 25vw, 18.75rem)',
+        maxHeight: 'clamp(8rem, 25vw, 18.75rem)',
+        aspectRatio: '1 / 1'
+      };
     }
 
     const { width, height } = dimensions;
-    const maxSize = 300; // Smaller max size for gallery
-    
-    // If image is larger than max size, scale it down proportionally
-    if (width > maxSize || height > maxSize) {
-      const scale = Math.min(maxSize / width, maxSize / height);
-      return {
-        width: `${width * scale}px`,
-        height: `${height * scale}px`,
-        aspectRatio: `${width} / ${height}`
-      };
-    }
-    
-    // Use natural dimensions for smaller images
     return {
-      width: `${width}px`,
-      height: `${height}px`,
+      width: '100%',
+      maxWidth: 'clamp(8rem, 25vw, 18.75rem)',
+      maxHeight: 'clamp(8rem, 25vw, 18.75rem)',
       aspectRatio: `${width} / ${height}`
     };
   };
@@ -409,6 +385,83 @@ export function ProductFormTabs({
     setImages([...images, newImage]);
     setImageUrl('');
   };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set isDragOver to false if we're leaving the drop zone element
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    // Try to get image URL from different data types
+    let imageUrl = '';
+    
+    // Check for HTML data (dragged from web page)
+    const htmlData = e.dataTransfer.getData('text/html');
+    if (htmlData) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlData, 'text/html');
+      const img = doc.querySelector('img');
+      if (img && img.src) {
+        imageUrl = img.src;
+      }
+    }
+    
+    // Check for plain text URL
+    if (!imageUrl) {
+      const textData = e.dataTransfer.getData('text/plain');
+      if (textData && (textData.startsWith('http') || textData.startsWith('data:'))) {
+        // Validate if it's an image URL
+        if (textData.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || textData.startsWith('data:image/')) {
+          imageUrl = textData;
+        }
+      }
+    }
+
+    // Check for files
+    if (!imageUrl && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        handleFileUpload({ target: { files: [file] } } as any);
+        return;
+      }
+    }
+
+    if (imageUrl) {
+      const newImage: ProductImage = {
+        url: imageUrl,
+        order_index: images.length,
+        is_main: images.length === 0
+      };
+      setImages([...images, newImage]);
+      toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
+    } else {
+      toast.error(t('invalid_image_format') || 'Неверный формат изображения');
+    }
+  };
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -531,7 +584,7 @@ export function ProductFormTabs({
                           <Card className="relative group">
                             <CardContent className="p-2 px-12 sm:px-14 md:px-16">
                               <div 
-                                className="relative overflow-hidden rounded-md flex items-center justify-center"
+                                className="relative overflow-hidden rounded-md flex items-center justify-center w-full max-w-full"
                                 style={getAdaptiveImageStyle()}
                               >
                                 <img 
@@ -939,7 +992,11 @@ export function ProductFormTabs({
             </TabsContent>
 
             {/* Tab 2: Images */}
-            <TabsContent value="images" className="space-y-6" data-testid="productFormTabs_imagesContent">
+            <TabsContent 
+              value="images" 
+              className="space-y-6"
+              data-testid="productFormTabs_imagesContent"
+            >
               <div className="space-y-4">
                 <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
                   <div className="flex-1">
@@ -966,7 +1023,40 @@ export function ProductFormTabs({
 
                 <Separator />
 
-                <div className="flex flex-wrap gap-4 justify-center">
+                <div className="flex flex-wrap gap-4">
+                  {/* Always visible drag-and-drop zone */}
+                  <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
+                    <CardContent className="p-2">
+                      <div 
+                        className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 ${
+                          isDragOver 
+                            ? 'bg-primary/10 border-2 border-dashed border-primary/30' 
+                            : 'bg-muted/30 hover:bg-muted/50 border-2 border-dashed border-muted-foreground/20 hover:border-muted-foreground/40'
+                        }`}
+                        style={{ 
+                          width: '100%',
+                          maxWidth: '100%',
+                          height: 'auto',
+                          minHeight: 'clamp(12rem, 30vh, 24rem)'
+                        }}
+                        onDragEnter={handleDragEnter}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                      >
+                        <ImageIcon className={`h-8 w-8 mb-2 transition-colors ${
+                          isDragOver ? 'text-primary' : 'text-muted-foreground/60'
+                        }`} />
+                        <p className={`text-sm text-center px-2 transition-colors ${
+                          isDragOver ? 'text-primary font-medium' : 'text-muted-foreground'
+                        }`}>
+                          {isDragOver ? t('drop_image_here') : t('add_images_instruction')}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Existing images */}
                   {images.map((image, index) => <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
                       <CardContent className="p-2">
                         <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={getGalleryAdaptiveImageStyle(index)}>
@@ -978,7 +1068,7 @@ export function ProductFormTabs({
                           />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                             <Button size="sm" variant={image.is_main ? "default" : "secondary"} onClick={() => setMainImage(index)} data-testid={`productFormTabs_setMainButton_${index}`}>
-                              {image.is_main ? 'Главное' : 'Сделать главным'}
+                              {image.is_main ? t('main_photo') : t('set_as_main_photo')}
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
                               <X className="h-4 w-4" />
@@ -986,17 +1076,11 @@ export function ProductFormTabs({
                           </div>
                         </div>
                         {image.is_main && <Badge className="absolute top-2 left-2" variant="default">
-                            Главное
+                            {t('main_photo')}
                           </Badge>}
                       </CardContent>
                     </Card>)}
                 </div>
-
-                {images.length === 0 && <div className="text-center py-12 text-muted-foreground">
-                    <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>{t('no_images_added')}</p>
-                    <p className="text-sm">{t('add_images_instruction')}</p>
-                  </div>}
               </div>
             </TabsContent>
 
