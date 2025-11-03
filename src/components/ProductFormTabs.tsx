@@ -529,7 +529,7 @@ export function ProductFormTabs({
                         {/* Main image display */}
                         <div className="relative flex justify-center">
                           <Card className="relative group">
-                            <CardContent className="p-2">
+                            <CardContent className="p-2 px-12 sm:px-14 md:px-16">
                               <div 
                                 className="relative overflow-hidden rounded-md flex items-center justify-center"
                                 style={getAdaptiveImageStyle()}
