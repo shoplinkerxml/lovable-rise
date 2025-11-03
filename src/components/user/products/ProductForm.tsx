@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
 import { supabase } from "@/integrations/supabase/client";
+import { R2Storage } from "@/lib/r2-storage";
 
 interface ProductFormProps {
   product?: any | null;
@@ -254,13 +255,11 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
+    // Валидация типа и размера
     if (!file.type.startsWith('image/')) {
       toast.error('Оберіть файл зображення');
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Розмір файлу не повинен перевищувати 5MB');
       return;
@@ -269,36 +268,38 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     try {
       setLoading(true);
       
-      // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `product-images/${fileName}`;
+      // Используем новый API для загрузки через proxy
+      const result = await R2Storage.uploadFile(file, formData.external_id);
 
-      const { data, error } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, file);
-
-      if (error) {
-        throw error;
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(filePath);
-
-      setImages([...images, { 
-        url: publicUrl, 
+      setImages([...images, {
+        url: result.publicUrl,
         order_index: images.length,
         is_main: images.length === 0
       }]);
-      
+
       toast.success('Зображення завантажено');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Помилка завантаження зображення');
+      
+      // Улучшенная обработка ошибок
+      let errorMessage = 'Помилка завантаження зображення';
+      if (error instanceof Error) {
+        if (error.message.includes('unauthorized')) {
+          errorMessage = 'Немає доступу для завантаження';
+        } else if (error.message.includes('file_too_large')) {
+          errorMessage = 'Розмір файлу не повинен перевищувати 5MB';
+        } else if (error.message.includes('invalid_file_type')) {
+          errorMessage = 'Оберіть файл зображення';
+        } else if (error.message.includes('upload_failed')) {
+          errorMessage = 'Помилка сервера при завантаженні';
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
+      // Очищаем input для возможности повторной загрузки того же файла
+      event.target.value = '';
     }
   };
 
