@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Plus, Minus, Upload, Link, X, Image as ImageIcon, Settings, Package } from 'lucide-react';
+import { Plus, Minus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
@@ -99,6 +99,165 @@ export function ProductFormTabs({
   const [images, setImages] = useState<ProductImage[]>([]);
   const [imageUrl, setImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [imageDimensions, setImageDimensions] = useState<{width: number, height: number} | null>(null);
+  const [galleryImageDimensions, setGalleryImageDimensions] = useState<Map<number, {width: number, height: number}>>(new Map());
+  const [allImageDimensions, setAllImageDimensions] = useState<Map<number, {width: number, height: number}>>(new Map());
+  const [maxContainerSize, setMaxContainerSize] = useState<{width: number, height: number} | null>(null);
+
+  // Navigation functions for main image carousel
+  const goToPrevious = () => {
+    const newIndex = activeImageIndex === 0 ? images.length - 1 : activeImageIndex - 1;
+    setActiveImageIndex(newIndex);
+    
+    // Update current image dimensions from stored data
+    const storedDimensions = allImageDimensions.get(newIndex);
+    if (storedDimensions) {
+      setImageDimensions(storedDimensions);
+    }
+  };
+
+  const goToNext = () => {
+    const newIndex = activeImageIndex === images.length - 1 ? 0 : activeImageIndex + 1;
+    setActiveImageIndex(newIndex);
+    
+    // Update current image dimensions from stored data
+    const storedDimensions = allImageDimensions.get(newIndex);
+    if (storedDimensions) {
+      setImageDimensions(storedDimensions);
+    }
+  };
+
+  // Handle image load to get dimensions
+  const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = event.currentTarget;
+    const dimensions = {
+      width: img.naturalWidth,
+      height: img.naturalHeight
+    };
+    
+    setImageDimensions(dimensions);
+    
+    // Store dimensions for this image index
+    setAllImageDimensions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(activeImageIndex, dimensions);
+      return newMap;
+    });
+  };
+
+  // Handle gallery image load to get dimensions
+  const handleGalleryImageLoad = (event: React.SyntheticEvent<HTMLImageElement>, index: number) => {
+    const img = event.currentTarget;
+    setGalleryImageDimensions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(index, {
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      });
+      return newMap;
+    });
+  };
+
+  // Calculate adaptive container style
+  const getAdaptiveImageStyle = () => {
+    // Use max container size if available for consistent sizing
+    if (maxContainerSize) {
+      return {
+        width: `${maxContainerSize.width}px`,
+        height: `${maxContainerSize.height}px`,
+      };
+    }
+
+    // Fallback to current image dimensions
+    if (!imageDimensions) {
+      return { aspectRatio: '1 / 1' }; // Default square
+    }
+
+    const { width, height } = imageDimensions;
+    const maxSize = 600;
+    
+    // If image is larger than max size, scale it down proportionally
+    if (width > maxSize || height > maxSize) {
+      const scale = Math.min(maxSize / width, maxSize / height);
+      return {
+        width: `${width * scale}px`,
+        height: `${height * scale}px`,
+        aspectRatio: `${width} / ${height}`
+      };
+    }
+    
+    // Use natural dimensions for smaller images
+    return {
+      width: `${width}px`,
+      height: `${height}px`,
+      aspectRatio: `${width} / ${height}`
+    };
+  };
+
+  // Calculate adaptive container style for gallery images
+  const getGalleryAdaptiveImageStyle = (index: number) => {
+    const dimensions = galleryImageDimensions.get(index);
+    if (!dimensions) {
+      return { aspectRatio: '1 / 1' }; // Default square
+    }
+
+    const { width, height } = dimensions;
+    const maxSize = 300; // Smaller max size for gallery
+    
+    // If image is larger than max size, scale it down proportionally
+    if (width > maxSize || height > maxSize) {
+      const scale = Math.min(maxSize / width, maxSize / height);
+      return {
+        width: `${width * scale}px`,
+        height: `${height * scale}px`,
+        aspectRatio: `${width} / ${height}`
+      };
+    }
+    
+    // Use natural dimensions for smaller images
+    return {
+      width: `${width}px`,
+      height: `${height}px`,
+      aspectRatio: `${width} / ${height}`
+    };
+  };
+
+  // Reset image dimensions when active image changes
+  useEffect(() => {
+    setImageDimensions(null);
+    setGalleryImageDimensions(new Map());
+  }, [activeImageIndex, images]);
+
+  // Calculate maximum container size from all images
+  useEffect(() => {
+    if (allImageDimensions.size === 0) {
+      setMaxContainerSize(null);
+      return;
+    }
+
+    const maxSize = 600;
+    let maxWidth = 0;
+    let maxHeight = 0;
+
+    // Find the maximum dimensions after scaling
+    allImageDimensions.forEach(({ width, height }) => {
+      let scaledWidth = width;
+      let scaledHeight = height;
+
+      // If image is larger than max size, scale it down proportionally
+      if (width > maxSize || height > maxSize) {
+        const scale = Math.min(maxSize / width, maxSize / height);
+        scaledWidth = width * scale;
+        scaledHeight = height * scale;
+      }
+
+      maxWidth = Math.max(maxWidth, scaledWidth);
+      maxHeight = Math.max(maxHeight, scaledHeight);
+    });
+
+    setMaxContainerSize({ width: maxWidth, height: maxHeight });
+  }, [allImageDimensions]);
 
   // Parameters state
   const [parameters, setParameters] = useState<ProductParam[]>([]);
@@ -287,6 +446,13 @@ export function ProductFormTabs({
       ...img,
       order_index: i
     })));
+    
+    // Update active image index if needed
+    if (activeImageIndex >= newImages.length) {
+      setActiveImageIndex(Math.max(0, newImages.length - 1));
+    } else if (activeImageIndex > index) {
+      setActiveImageIndex(activeImageIndex - 1);
+    }
   };
   const setMainImage = (index: number) => {
     const newImages = images.map((img, i) => ({
@@ -358,65 +524,98 @@ export function ProductFormTabs({
                 <div className="lg:col-span-2 space-y-4">
                   <Label>{t('product_photos')}</Label>
                   <div className={`p-4 rounded-lg ${images.length === 0 ? 'border' : ''}`}>
-                    {/* Отображение до 3 фото вертикально */}
-                    {images.length <= 3 ? (
+                    {images.length > 0 ? (
                       <div className="space-y-4">
-                        {images.length > 0 ? images.map((image, index) => (
-                          <Card key={index} className="relative group">
+                        {/* Main image display */}
+                        <div className="relative flex justify-center">
+                          <Card className="relative group">
                             <CardContent className="p-2">
-                              <div className="aspect-square relative overflow-hidden rounded-md">
+                              <div 
+                                className="relative overflow-hidden rounded-md flex items-center justify-center"
+                                style={getAdaptiveImageStyle()}
+                              >
                                 <img 
-                                  src={image.url} 
-                                  alt={image.alt_text || `Фото ${index + 1}`} 
-                                  className="w-full h-full object-cover" 
-                                  data-testid={`productFormTabs_verticalImage_${index}`} 
+                                  src={images[activeImageIndex]?.url} 
+                                  alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`} 
+                                  className="w-full h-full object-contain" 
+                                  data-testid={`productFormTabs_mainImage`}
+                                  onLoad={handleImageLoad}
                                 />
                               </div>
-                              {image.is_main && (
+                              {images[activeImageIndex]?.is_main && (
                                 <Badge className="absolute top-2 left-2" variant="default">
                                   Главное
                                 </Badge>
                               )}
                             </CardContent>
+                            
+                            {/* Navigation arrows for main image */}
+                            {images.length > 1 && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md"
+                                  onClick={goToPrevious}
+                                  data-testid="productFormTabs_prevButton"
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md"
+                                  onClick={goToNext}
+                                  data-testid="productFormTabs_nextButton"
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
                           </Card>
-                        )) : (
-                          <div className="aspect-square flex items-center justify-center p-2">
-                            <ProductPlaceholder className="w-full h-full" />
+                        </div>
+
+                        {/* Thumbnail navigation */}
+                        {images.length > 1 && (
+                          <div className="relative">
+                            <Carousel className="w-full">
+                              <CarouselContent className="-ml-2">
+                                {images.map((image, index) => (
+                                  <CarouselItem key={index} className="pl-2 basis-1/4 sm:basis-1/5 md:basis-1/6">
+                                    <Card 
+                                      className={`relative group cursor-pointer transition-all ${
+                                        activeImageIndex === index ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-gray-300'
+                                      }`}
+                                      onClick={() => setActiveImageIndex(index)}
+                                    >
+                                      <CardContent className="p-1">
+                                        <div className="aspect-square relative overflow-hidden rounded-md">
+                                          <img 
+                                            src={image.url} 
+                                            alt={image.alt_text || `Превью ${index + 1}`} 
+                                            className="w-full h-full object-cover" 
+                                            data-testid={`productFormTabs_thumbnail_${index}`} 
+                                          />
+                                        </div>
+                                        {image.is_main && (
+                                          <Badge className="absolute -top-1 -left-1 text-xs px-1 py-0" variant="default">
+                                            Г
+                                          </Badge>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  </CarouselItem>
+                                ))}
+                              </CarouselContent>
+                            </Carousel>
                           </div>
                         )}
                       </div>
                     ) : (
-                       /* Вертикальная карусель для 4+ фото */
-                       <div className="w-full py-4">
-                         <Carousel className="w-full" orientation="vertical">
-                           <CarouselContent className="h-96 -mt-1">
-                             {images.map((image, index) => (
-                               <CarouselItem key={index} className="pt-1 basis-1/3">
-                                 <Card className="relative group">
-                                   <CardContent className="p-2">
-                                     <div className="aspect-square relative overflow-hidden rounded-md">
-                                       <img 
-                                         src={image.url} 
-                                         alt={image.alt_text || `Фото ${index + 1}`} 
-                                         className="w-full h-full object-cover" 
-                                         data-testid={`productFormTabs_carouselImage_${index}`} 
-                                       />
-                                     </div>
-                                     {image.is_main && (
-                                       <Badge className="absolute top-2 left-2" variant="default">
-                                         Главное
-                                       </Badge>
-                                     )}
-                                   </CardContent>
-                                 </Card>
-                               </CarouselItem>
-                             ))}
-                           </CarouselContent>
-                           <CarouselPrevious />
-                           <CarouselNext />
-                         </Carousel>
-                       </div>
-                     )}
+                      <div className="aspect-square flex items-center justify-center p-2">
+                        <ProductPlaceholder className="w-full h-full" />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -767,11 +966,16 @@ export function ProductFormTabs({
 
                 <Separator />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="flex flex-wrap gap-4 justify-center">
                   {images.map((image, index) => <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
                       <CardContent className="p-2">
-                        <div className="aspect-square relative overflow-hidden rounded-md">
-                          <img src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-cover" />
+                        <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={getGalleryAdaptiveImageStyle(index)}>
+                          <img 
+                            src={image.url} 
+                            alt={image.alt_text || `Изображение ${index + 1}`} 
+                            className="w-full h-full object-contain" 
+                            onLoad={(e) => handleGalleryImageLoad(e, index)}
+                          />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                             <Button size="sm" variant={image.is_main ? "default" : "secondary"} onClick={() => setMainImage(index)} data-testid={`productFormTabs_setMainButton_${index}`}>
                               {image.is_main ? 'Главное' : 'Сделать главным'}
