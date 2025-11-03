@@ -450,8 +450,8 @@ export function ProductFormTabs({
     if (!droppedUrl) {
       const textData = e.dataTransfer.getData('text/plain');
       if (textData && (textData.startsWith('http') || textData.startsWith('data:'))) {
-        // Validate if it's an image URL
-        if (textData.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || textData.startsWith('data:image/')) {
+        // Validate if it's an image URL (включая .avif)
+        if (textData.match(/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?|$)/i) || textData.startsWith('data:image/')) {
           droppedUrl = textData;
         }
       }
@@ -460,7 +460,8 @@ export function ProductFormTabs({
     // Check for files
     if (!droppedUrl && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('image/')) {
+      const isImage = file.type.startsWith('image/') || (file.name || '').toLowerCase().endsWith('.avif');
+      if (isImage) {
         await uploadFileDirect(file);
         return;
       }
@@ -1043,7 +1044,7 @@ export function ProductFormTabs({
                   <div className="flex flex-col lg:flex-shrink-0">
                     <Label>{t('upload_file')}</Label>
                     <div className="mt-2">
-                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
+                      <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
                       <Button onClick={() => document.getElementById('fileUpload')?.click()} variant="outline" disabled={uploadingImage} data-testid="productFormTabs_uploadButton">
                         <Upload className="h-4 w-4 mr-2" />
                         {uploadingImage ? 'Загрузка...' : 'Выбрать файл'}

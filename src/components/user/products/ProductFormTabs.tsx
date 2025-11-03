@@ -774,7 +774,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                     <div className="flex items-center gap-2">
                       <Input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.avif,image/avif"
                         onChange={handleFileUpload}
                         className="flex-1"
                         data-testid="productForm_imageFile"

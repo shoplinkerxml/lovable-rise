@@ -1,3 +1,6 @@
+// @ts-nocheck
+// Deno Edge Function: TypeScript проверки в локальном редакторе могут сообщать об ошибках
+// разрешения remote/npm импортов. Эти импорты корректны для среды Deno/Supabase.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 // Use npm spec imports to ensure Deno-compatible AWS SDK without Node crypto requirements
 import { S3Client, PutObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3"
@@ -51,9 +54,12 @@ serve(async (req) => {
       )
     }
 
-    // Проверяем тип файла
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
-    if (!allowedTypes.includes(fileType)) {
+    // Проверяем тип файла (только изображения, включая AVIF)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/gif', 'image/avif']
+    const fileExt = String(fileName || '').toLowerCase().split('.').pop()
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif', 'avif']
+    const isAllowedByExt = allowedExts.includes(fileExt || '')
+    if (!allowedTypes.includes(fileType) && !isAllowedByExt) {
       return new Response(
         JSON.stringify({ error: 'invalid_file_type', message: 'File type not allowed' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -99,6 +105,7 @@ serve(async (req) => {
         : ext === 'webp' ? 'image/webp'
         : ext === 'gif' ? 'image/gif'
         : ext === 'svg' ? 'image/svg+xml'
+        : ext === 'avif' ? 'image/avif'
         : 'application/octet-stream')
     )
 
