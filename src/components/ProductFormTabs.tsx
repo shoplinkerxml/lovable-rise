@@ -910,6 +910,13 @@ export function ProductFormTabs({
                         sku: e.target.value
                       })} placeholder={t('sku_placeholder')} data-testid="productFormTabs_skuInput" />
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
+                        <Input id="stock_quantity" type="number" value={formData.stock_quantity} onChange={e => setFormData({
+                        ...formData,
+                        stock_quantity: parseInt(e.target.value) || 0
+                      })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
+                      </div>
                     </div>
                   </div>
 
@@ -921,10 +928,13 @@ export function ProductFormTabs({
                     </div>
                     
                     <Tabs defaultValue="ukrainian" className="w-full">
-                      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 gap-2 h-auto sm:h-9">
+                      <TabsList 
+                        className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start"
+                        data-testid="productFormTabs_langTabsList"
+                      >
                         <TabsTrigger
                           value="ukrainian"
-                          className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
+                          className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors"
                           data-testid="productFormTabs_ukrainianTab"
                           aria-label={t('product_name_ukrainian_tab')}
                         >
@@ -934,7 +944,7 @@ export function ProductFormTabs({
                         </TabsTrigger>
                         <TabsTrigger
                           value="russian"
-                          className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
+                          className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors"
                           data-testid="productFormTabs_russianTab"
                           aria-label={t('product_name_russian_tab')}
                         >
@@ -1126,14 +1136,6 @@ export function ProductFormTabs({
                         ...formData,
                         price_promo: parseFloat(e.target.value) || 0
                       })} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-                        <Input id="stock_quantity" type="number" value={formData.stock_quantity} onChange={e => setFormData({
-                        ...formData,
-                        stock_quantity: parseInt(e.target.value) || 0
-                      })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
                       </div>
                     </div>
                   </div>
