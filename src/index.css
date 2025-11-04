@@ -153,6 +153,15 @@ All colors MUST be HSL.
   .bg-admin-content {
     background-color: hsl(var(--admin-content-bg));
   }
+
+  /* Hide native scrollbars for a cleaner mobile UX */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 }
 
 /* Custom styles for dropdown menu items */
