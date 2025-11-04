@@ -83,7 +83,7 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
     ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50 shadow-sm"
     : "hover:bg-emerald-50 hover:text-[#10b981] border border-transparent hover:border-emerald-200/30 hover:shadow-sm");
 
-  const iconSize = variant === 'dashboard' ? "w-5 h-5" : "w-4 h-4";
+  const iconSize = variant === 'dashboard' ? "w-6 h-6" : "w-5 h-5";
   const iconMargin = collapsed ? "" : "mr-3"; // 12px gap between icon and text
   
   // Auto-assign icon if none is explicitly set
@@ -95,8 +95,8 @@ export const MenuItemWithIcon: React.FC<MenuItemWithIconProps> = ({
   }));
 
   const renderContent = () => (
-    <div className="flex items-center justify-between w-full">
-      <div className="flex items-center min-w-0 flex-1">
+    <div className={cn("flex items-center w-full", collapsed ? "justify-center" : "justify-between")}>
+      <div className={cn("flex items-center", collapsed ? "justify-center" : "min-w-0 flex-1")}>
         <DynamicIcon 
           name={iconName} 
           className={cn(iconSize, iconMargin, "shrink-0", variant === 'child' ? "fill-emerald-400 stroke-emerald-400 scale-50" : "")}

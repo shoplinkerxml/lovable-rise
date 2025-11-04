@@ -139,7 +139,8 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                   }}
                   onMouseEnter={() => onItemHover && onItemHover(item)}
                   className={cn(
-                    "w-full text-left rounded-md text-sm transition-all duration-200 group flex items-center justify-between",
+                    "w-full text-left rounded-md text-sm transition-all duration-200 group flex items-center",
+                    collapsed ? "justify-center" : "justify-between",
                     "px-3 py-2",
                     (!hasAccess && !isPricingItem(item)) ? "opacity-50 cursor-not-allowed pointer-events-none" : (
                       isActiveItem(item)
@@ -149,10 +150,10 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                   )}
                   aria-label={`${translatedTitle} - ${isExpanded ? "Collapse" : "Expand"} submenu`}
                 >
-                  <div className="flex items-center min-w-0 flex-1">
+                  <div className={cn("flex items-center", collapsed ? "justify-center" : "min-w-0 flex-1")}> 
                     <DynamicIcon 
                       name={item.icon_name || getAutoIcon({ title: item.title, path: item.path, page_type: item.page_type })} 
-                      className={cn("w-4 h-4 mr-3 shrink-0")}
+                      className={cn(collapsed ? "w-5 h-5 shrink-0" : "w-5 h-5 mr-3 shrink-0")}
                     />
                     {!collapsed && (
                       <span className="truncate flex-1">{translatedTitle}</span>
