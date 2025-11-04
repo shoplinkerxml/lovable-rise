@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,9 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const isSavedRef = useRef(false);
+  const cleanedRef = useRef(false);
+  const imagesRef = useRef<ProductImage[]>([]);
   
   const [formData, setFormData] = useState({
     // Основна інформація
@@ -88,10 +91,65 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     }
   }, [product]);
 
+  // При входе на страницу пытаться подчистить любые незакрытые временные загрузки
   useEffect(() => {
+    R2Storage.cleanupPendingUploads().catch(() => {});
+  }, []);
+
+  // Держим актуальный массив изображений в ref, чтобы обработчики имели свежие данные
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  // Функция аварийной очистки незакрепленных изображений из R2 при уходе со страницы
+  const cleanupUnsavedImages = async () => {
+    if (cleanedRef.current) return;
+    if (isSavedRef.current) return;
+    try {
+      const currentImages = imagesRef.current || [];
+      for (const img of currentImages) {
+        const objectKey = img?.object_key || (img?.url ? R2Storage.extractObjectKeyFromUrl(img.url) : null);
+        if (objectKey) {
+          try {
+            // Используем keepalive-вариант удаления, чтобы успеть на pagehide
+            await R2Storage.deleteFileKeepalive(objectKey);
+            // На случай, если ключ присутствует в локальном pending списке
+            await R2Storage.removePendingUpload(objectKey);
+          } catch (e) {
+            // гасим ошибки, чтобы не блокировать уход со страницы
+          }
+        }
+      }
+    } finally {
+      cleanedRef.current = true;
+    }
+  };
+
+  // Очистка на размонтаж компонента и при системных событиях скрытия/ухода со страницы
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        cleanupUnsavedImages();
+      }
+    };
+    const onPageHide = () => {
+      cleanupUnsavedImages();
+    };
+    const onBeforeUnload = () => {
+      // Дополнительная гарантия удаления при перезагрузке/закрытии вкладки
+      cleanupUnsavedImages();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
-      // Очистка временных загрузок при уходе со страницы
+      // Очистка временных загрузок, сохраненных через R2Storage (tmp-папка)
       R2Storage.cleanupPendingUploads();
+      // Целенаправленная очистка изображений формы, если товар не был сохранен
+      cleanupUnsavedImages();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
     };
   }, []);
 
@@ -249,6 +307,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       const objectKey = target?.object_key || (target?.url ? R2Storage.extractObjectKeyFromUrl(target.url) : null);
       if (objectKey) {
         await R2Storage.deleteFile(objectKey);
+        await R2Storage.removePendingUpload(objectKey);
       }
       const updatedImages = images.filter((_, i) => i !== index);
       const reorderedImages = updatedImages.map((img, i) => ({
@@ -409,6 +468,8 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       if (onSuccess) {
         onSuccess();
       }
+      // Фиксируем, что товар сохранен, чтобы не удалять изображения при уходе
+      isSavedRef.current = true;
     } catch (error) {
       console.error('Save product error:', error);
       toast.error('Помилка збереження товару');
@@ -420,11 +481,11 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   return (
     <form onSubmit={handleSubmit} className="space-y-6" data-testid="productFormTabs_form">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-testid="productFormTabs_tabs">
-        <div className="flex items-center justify-between mb-6" data-testid="productFormTabs_header">
-          <TabsList className="grid w-full max-w-md grid-cols-3" data-testid="productFormTabs_tabsList">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6" data-testid="productFormTabs_header">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2 h-auto sm:h-9" data-testid="productFormTabs_tabsList">
             <TabsTrigger 
               value="basic" 
-              className="flex items-center gap-2"
+              className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
               data-testid="productForm_basicTab"
             >
               <Package className="h-4 w-4" />
@@ -433,7 +494,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
             </TabsTrigger>
             <TabsTrigger 
               value="images" 
-              className="flex items-center gap-2"
+              className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
               data-testid="productForm_imagesTab"
             >
               <Image className="h-4 w-4" />
@@ -442,7 +503,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
             </TabsTrigger>
             <TabsTrigger 
               value="params" 
-              className="flex items-center gap-2"
+              className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
               data-testid="productForm_paramsTab"
             >
               <Settings className="h-4 w-4" />

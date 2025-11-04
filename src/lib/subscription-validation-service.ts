@@ -1,4 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
+// Dev-only logging toggle and transient abort detector
+const __DEV__ = import.meta.env?.DEV ?? false;
+function isTransientAbortError(err: unknown): boolean {
+  const name = (err as any)?.name as string | undefined;
+  const message = (err as any)?.message as string | undefined;
+  return (
+    name === 'AbortError' ||
+    (message?.includes('AbortError') ?? false) ||
+    (message?.includes('The user aborted a request') ?? false) ||
+    (message?.includes('net::ERR_ABORTED') ?? false) ||
+    // Some browsers surface aborted fetches as generic TypeError
+    (message?.includes('Failed to fetch') ?? false)
+  );
+}
 
 /**
  * Service for validating and managing user subscription status
@@ -11,19 +25,21 @@ export class SubscriptionValidationService {
    */
   private static isExpired(endDate: string | null): boolean {
     if (!endDate) {
-      console.log('[Subscription] Lifetime subscription (no end_date)');
+      if (__DEV__) console.log('[Subscription] Lifetime subscription (no end_date)');
       return false; // Lifetime subscriptions have no end_date
     }
     const endMs = new Date(endDate).getTime();
     const nowMs = Date.now();
     const expired = endMs < nowMs;
-    console.log('[Subscription] Check expiration:', {
-      endDate,
-      endMs,
-      nowMs,
-      currentDate: new Date().toISOString(),
-      expired
-    });
+    if (__DEV__) {
+      console.log('[Subscription] Check expiration:', {
+        endDate,
+        endMs,
+        nowMs,
+        currentDate: new Date().toISOString(),
+        expired
+      });
+    }
     return expired;
   }
 
@@ -47,7 +63,15 @@ export class SubscriptionValidationService {
         .maybeSingle();
 
       if (error) {
-        console.error('Error fetching active subscription:', error);
+        if (isTransientAbortError(error)) {
+          if (__DEV__) console.debug('[Subscription] Fetch aborted while loading active subscription');
+          return {
+            isValid: false,
+            subscription: null,
+            wasDeactivated: false
+          };
+        }
+        if (__DEV__) console.error('Error fetching active subscription:', error);
         throw error;
       }
 
@@ -71,11 +95,18 @@ export class SubscriptionValidationService {
           .eq('id', activeSubscription.id);
 
         if (updateError) {
-          console.error('Error deactivating expired subscription:', updateError);
+          if (isTransientAbortError(updateError)) {
+            if (__DEV__) console.debug('[Subscription] Fetch aborted while deactivating expired subscription');
+            return {
+              isValid: false,
+              subscription: activeSubscription,
+              wasDeactivated: false
+            };
+          }
+          if (__DEV__) console.error('Error deactivating expired subscription:', updateError);
           throw updateError;
         }
-
-        console.log('Subscription deactivated due to expiration:', activeSubscription.id);
+        if (__DEV__) console.log('Subscription deactivated due to expiration:', activeSubscription.id);
 
         return {
           isValid: false,
@@ -92,7 +123,15 @@ export class SubscriptionValidationService {
       };
 
     } catch (error) {
-      console.error('Error in validateUserSubscription:', error);
+      if (isTransientAbortError(error)) {
+        if (__DEV__) console.debug('[Subscription] Validation aborted due to navigation/reload');
+        return {
+          isValid: false,
+          subscription: null,
+          wasDeactivated: false
+        };
+      }
+      if (__DEV__) console.error('Error in validateUserSubscription:', error);
       throw error;
     }
   }
@@ -121,7 +160,7 @@ export class SubscriptionValidationService {
       }
 
       // No valid subscription - do NOT auto-create, just return false
-      console.log('[Subscription] No valid subscription found for user:', userId);
+      if (__DEV__) console.log('[Subscription] No valid subscription found for user:', userId);
       return {
         hasValidSubscription: false,
         subscription: null,
@@ -129,7 +168,15 @@ export class SubscriptionValidationService {
       };
 
     } catch (error) {
-      console.error('Error in ensureValidSubscription:', error);
+      if (isTransientAbortError(error)) {
+        if (__DEV__) console.debug('[Subscription] ensureValidSubscription aborted due to navigation/reload');
+        return {
+          hasValidSubscription: false,
+          subscription: null,
+          isDemo: false
+        };
+      }
+      if (__DEV__) console.error('Error in ensureValidSubscription:', error);
       throw error;
     }
   }

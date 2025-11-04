@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 export type UploadResponse = {
   success: boolean;
@@ -89,7 +89,8 @@ export const R2Storage = {
     const errors: string[] = [];
     for (const key of toDelete) {
       try {
-        await R2Storage.deleteFile(key);
+        // Используем тот же запрос к r2-delete, но с keepalive для надёжности при уходе/перезагрузке
+        await R2Storage.deleteFileKeepalive(key);
       } catch (e: any) {
         errors.push(key);
       }
@@ -225,6 +226,84 @@ export const R2Storage = {
     }
 
     return data as { success: boolean };
+  },
+
+  /**
+   * Удаляет файл через прямой запрос к Supabase Functions с keepalive для pagehide
+   * Используется как фолбэк при уходе со страницы, когда обычные вызовы могут оборваться
+   */
+  async deleteFileKeepalive(objectKey: string): Promise<void> {
+    try {
+      // Быстрое получение токена синхронно из localStorage, чтобы успеть до ухода со страницы
+      const getAccessTokenSync = (): string | null => {
+        try {
+          const raw = localStorage.getItem('supabase.auth.token');
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          return (
+            parsed?.currentSession?.access_token ||
+            parsed?.access_token ||
+            parsed?.accessToken ||
+            null
+          );
+        } catch {
+          return null;
+        }
+      };
+
+      let token = getAccessTokenSync();
+      // Фолбэк: если синхронно не нашли токен, попробуем получить его из supabase (может не успеть при уходе)
+      if (!token) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          token = session?.access_token || null;
+        } catch {}
+      }
+
+      // Для unload используем простое тело без нестандартных заголовков, чтобы не было preflight:
+      // - отправляем JSON строкой (text/plain)
+      // - токен передаём в body (authorization), а не в заголовке
+
+      // Формируем оба варианта URL для функций: subdomain и /functions/v1
+      const urlObj = new URL(SUPABASE_URL);
+      const projectRef = urlObj.host.split('.')[0];
+      const fnUrlSubdomain = `https://${projectRef}.functions.supabase.co/r2-delete`;
+      const fnUrlPathStyle = `${SUPABASE_URL}/functions/v1/r2-delete`;
+
+      const body = JSON.stringify({ objectKey, authorization: token ? `Bearer ${token}` : undefined });
+      const init: RequestInit = {
+        method: 'POST',
+        // Не задаём заголовки, чтобы не вызвать preflight; пусть будет text/plain по умолчанию
+        body,
+        mode: 'cors',
+        keepalive: true,
+      };
+
+      // В Dev-режиме выводим небольшой лог для отладки
+      if (import.meta.env.DEV) {
+        console.debug('[R2Storage] keepalive delete init', { objectKey, hasToken: !!token });
+      }
+
+      // Сначала пробуем navigator.sendBeacon — он предназначен для выгрузки страницы
+      const beaconPayload = body;
+      try {
+        navigator.sendBeacon(fnUrlSubdomain, beaconPayload);
+        navigator.sendBeacon(fnUrlPathStyle, beaconPayload);
+      } catch {}
+
+      // Дополнительно всегда выполняем fetch с keepalive, чтобы запрос был виден в Network (Fetch/XHR)
+      // Это повышает надёжность доставки при unload и упрощает диагностику.
+      try {
+        const res = await fetch(fnUrlSubdomain, init);
+        if (!res.ok) {
+          await fetch(fnUrlPathStyle, init);
+        }
+      } catch {
+        await fetch(fnUrlPathStyle, init);
+      }
+    } catch {
+      // Безопасно игнорируем ошибки в keepalive сценарию
+    }
   },
 
   /**

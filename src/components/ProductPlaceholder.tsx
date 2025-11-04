@@ -7,14 +7,14 @@ interface ProductPlaceholderProps {
 export const ProductPlaceholder: React.FC<ProductPlaceholderProps> = ({ className = "" }) => {
   return (
     <div 
-      className={`flex items-center justify-center bg-muted/30 rounded-lg w-full h-full min-h-[12rem] ${className}`}
+      className={`flex items-center justify-center rounded-lg w-full h-full min-h-[12rem] bg-emerald-50 border border-emerald-200/50 shadow-sm ${className}`}
       data-testid="product_placeholder"
     >
       <svg
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="w-1/2 h-1/2 max-w-[7.5rem] max-h-[7.5rem] text-muted-foreground/40"
+        className="w-1/2 h-1/2 max-w-[7.5rem] max-h-[7.5rem] text-emerald-700/40"
         data-testid="product_placeholder_icon"
       >
         {/* Основа коробки */}

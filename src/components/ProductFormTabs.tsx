@@ -596,7 +596,7 @@ export function ProductFormTabs({
     };
     setParameters(newParams);
   };
-  return <div className="container mx-auto p-6 max-w-7xl" data-testid="productFormTabs_container">
+  return <div className="container mx-auto px-2 sm:px-6 py-3 sm:py-6 max-w-7xl" data-testid="productFormTabs_container">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -606,16 +606,16 @@ export function ProductFormTabs({
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3" data-testid="productFormTabs_tabsList">
-              <TabsTrigger value="info" className="flex items-center gap-2" data-testid="productFormTabs_infoTab">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2 h-auto sm:h-9" data-testid="productFormTabs_tabsList">
+              <TabsTrigger value="info" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center" data-testid="productFormTabs_infoTab">
                 <Package className="h-4 w-4" />
                 {t('product_tab_main')}
               </TabsTrigger>
-              <TabsTrigger value="images" className="flex items-center gap-2" data-testid="productFormTabs_imagesTab">
+              <TabsTrigger value="images" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center" data-testid="productFormTabs_imagesTab">
                 <ImageIcon className="h-4 w-4" />
                 {t('product_tab_images')}
               </TabsTrigger>
-              <TabsTrigger value="params" className="flex items-center gap-2" data-testid="productFormTabs_paramsTab">
+              <TabsTrigger value="params" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center" data-testid="productFormTabs_paramsTab">
                 <Settings className="h-4 w-4" />
                 {t('product_tab_parameters')}
               </TabsTrigger>
@@ -727,7 +727,7 @@ export function ProductFormTabs({
                 {/* Поля справа от карусели (3 колонки из 5) */}
                 <div className="lg:col-span-3 space-y-6">
                   {/* Секция: Основні дані */}
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-testid="productFormTabs_basicSection">
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-semibold">{t('product_main_data')}</h3>
                       <Separator className="flex-1" />
@@ -801,11 +801,11 @@ export function ProductFormTabs({
                     </div>
                     
                     <Tabs defaultValue="ukrainian" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="ukrainian" data-testid="productFormTabs_ukrainianTab">
+                      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 h-auto sm:h-9">
+                        <TabsTrigger value="ukrainian" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3" data-testid="productFormTabs_ukrainianTab">
                           {t('product_name_ukrainian_tab')}
                         </TabsTrigger>
-                        <TabsTrigger value="russian" data-testid="productFormTabs_russianTab">
+                        <TabsTrigger value="russian" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3" data-testid="productFormTabs_russianTab">
                           {t('product_name_russian_tab')}
                         </TabsTrigger>
                       </TabsList>

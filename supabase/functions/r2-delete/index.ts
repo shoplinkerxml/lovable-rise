@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Этот файл выполняется в среде Deno (Supabase Edge Functions).
+// Импорты вида "https://deno.land/..." и "npm:..." валидны в Deno,
+// но редактор Node/TypeScript может ругаться на их типы.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { S3Client, DeleteObjectCommand } from "npm:@aws-sdk/client-s3";
 
@@ -9,18 +13,52 @@ const corsHeaders = {
 
 type DeleteBody = {
   objectKey: string;
+  authorization?: string;
+  token?: string;
 };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const auth = req.headers.get('authorization');
-    if (!auth) {
-      return new Response(JSON.stringify({ error: 'unauthorized', message: 'Missing authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Support both JSON and text/plain bodies (for keepalive/sendBeacon)
+    const contentType = req.headers.get('content-type') || '';
+    let body: DeleteBody | null = null;
+    if (contentType.includes('application/json')) {
+      try {
+        body = await req.json() as DeleteBody;
+      } catch (_) {
+        body = null;
+      }
+    } else {
+      let text = '';
+      try {
+        text = await req.text();
+      } catch (_) {
+        text = '';
+      }
+      if (text) {
+        try {
+          body = JSON.parse(text) as DeleteBody;
+        } catch (_) {
+          const params = new URLSearchParams(text);
+          const objectKeyParam = params.get('objectKey') || undefined;
+          const authParam = params.get('authorization') || params.get('token') || undefined;
+          if (objectKeyParam) {
+            body = { objectKey: objectKeyParam, authorization: authParam };
+          }
+        }
+      }
     }
 
-    const body = await req.json() as DeleteBody;
+    // Fallback: attempt to parse as JSON if not yet parsed
     const objectKey = body?.objectKey;
+    const auth = req.headers.get('authorization') || body?.authorization || body?.token || null;
+    if (!auth) {
+      // Allow unauthenticated deletion only for temporary uploads
+      if (!objectKey || !objectKey.includes('/uploads/tmp/')) {
+        return new Response(JSON.stringify({ error: 'unauthorized', message: 'Missing authorization' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
     if (!objectKey) {
       return new Response(JSON.stringify({ error: 'invalid_body', message: 'Missing objectKey' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -46,7 +84,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'delete_failed', message: e?.message ?? 'Failed to delete object' }), {
+    return new Response(JSON.stringify({ error: 'delete_failed', message: (e as any)?.message ?? 'Failed to delete object' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

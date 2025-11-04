@@ -20,6 +20,8 @@ export const ProductCreate = () => {
     loadLimitInfo();
   }, []);
 
+  // Убрана страничная очистка временных загрузок, чтобы не путаться
+
   const loadLimitInfo = async () => {
     try {
       const info = await ProductService.getProductLimit();
@@ -46,8 +48,45 @@ export const ProductCreate = () => {
     navigate('/user/products');
   };
 
+  // Восстанавливаем старый интерфейс: onSubmit получает formData, images, parameters
+  const handleFormSubmit = async ({ formData, images, parameters }: any) => {
+    try {
+      await ProductService.createProduct({
+        store_id: formData.store_id,
+        external_id: formData.external_id,
+        category_id: formData.category_id || null,
+        currency_id: formData.currency_id || null,
+        name: formData.name,
+        name_ua: formData.name_ua || null,
+        vendor: formData.vendor || null,
+        brand: formData.brand || null,
+        article: formData.article || null,
+        sku: formData.sku || null,
+        url: formData.url || null,
+        available: !!formData.available,
+        stock_quantity: Number(formData.stock_quantity) || 0,
+        price: typeof formData.price === 'number' ? formData.price : null,
+        price_old: typeof formData.price_old === 'number' ? formData.price_old : null,
+        price_promo: typeof formData.price_promo === 'number' ? formData.price_promo : null,
+        description: formData.description || null,
+        description_ua: formData.description_ua || null,
+        state: formData.state || 'active',
+        params: parameters || [],
+        images: (images || []).map((img: any, index: number) => ({
+          url: img.url,
+          order_index: typeof img.order_index === 'number' ? img.order_index : index
+        }))
+      });
+      toast.success(t('product_created'));
+      navigate('/user/products');
+    } catch (error: any) {
+      console.error('Error creating product:', error);
+      toast.error(t('failed_create_product'));
+    }
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-2 sm:px-6 py-3 sm:py-6 space-y-6" data-testid="product_create_page">
       <PageHeader
         title={t('create_product')}
         description={t('create_product_description')}
@@ -74,15 +113,7 @@ export const ProductCreate = () => {
 
       <ProductFormTabs
         product={undefined}
-        onSubmit={async (data) => {
-          try {
-            await ProductService.createProduct(data);
-            handleSuccess();
-          } catch (error) {
-            console.error('Error creating product:', error);
-            toast.error(t('failed_create_product'));
-          }
-        }}
+        onSubmit={handleFormSubmit}
         onCancel={handleCancel}
       />
     </div>
