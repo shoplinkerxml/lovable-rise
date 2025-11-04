@@ -150,6 +150,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         if (productImages) {
           const resolved = await Promise.all(productImages.map(async (img) => {
             let previewUrl = img.url;
+            const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
             if (typeof previewUrl === 'string' && (previewUrl.includes('r2.dev') || previewUrl.includes('cloudflarestorage.com'))) {
               const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
               if (objectKey) {
@@ -164,7 +165,8 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
             return {
               url: previewUrl,
               order_index: img.order_index,
-              is_main: img.order_index === 0
+              is_main: img.order_index === 0,
+              object_key: objectKeyRaw || undefined,
             } as ProductImage;
           }));
           setImages(resolved);
@@ -244,8 +246,9 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const removeImage = async (index: number) => {
     const target = images[index];
     try {
-      if (target?.object_key) {
-        await R2Storage.deleteFile(target.object_key);
+      const objectKey = target?.object_key || (target?.url ? R2Storage.extractObjectKeyFromUrl(target.url) : null);
+      if (objectKey) {
+        await R2Storage.deleteFile(objectKey);
       }
       const updatedImages = images.filter((_, i) => i !== index);
       const reorderedImages = updatedImages.map((img, i) => ({

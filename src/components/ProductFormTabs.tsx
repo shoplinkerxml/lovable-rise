@@ -35,6 +35,7 @@ interface ProductImage {
   alt_text?: string;
   order_index: number;
   is_main: boolean;
+  object_key?: string;
 }
 interface FormData {
   name: string;
@@ -320,6 +321,7 @@ export function ProductFormTabs({
       if (imagesData) {
         const resolved = await Promise.all(imagesData.map(async (img: any) => {
           let previewUrl: string = img.url;
+          const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
           if (typeof previewUrl === 'string' && (previewUrl.includes('r2.dev') || previewUrl.includes('cloudflarestorage.com'))) {
             const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
             if (objectKey) {
@@ -336,7 +338,8 @@ export function ProductFormTabs({
             url: previewUrl,
             alt_text: img.alt_text || '',
             order_index: img.order_index,
-            is_main: img.is_main
+            is_main: img.is_main,
+            object_key: objectKeyRaw || undefined
           } as ProductImage;
         }));
         setImages(resolved);
@@ -393,10 +396,12 @@ export function ProductFormTabs({
   // Image handling functions
   const addImageFromUrl = () => {
     if (!imageUrl.trim()) return;
+    const objectKey = R2Storage.extractObjectKeyFromUrl(imageUrl);
     const newImage: ProductImage = {
       url: imageUrl,
       order_index: images.length,
-      is_main: images.length === 0
+      is_main: images.length === 0,
+      object_key: objectKey || undefined
     };
     setImages([...images, newImage]);
     setImageUrl('');
@@ -490,11 +495,13 @@ export function ProductFormTabs({
         toast.error(t('unauthorized_upload') || 'Ошибка авторизации при загрузке');
         return;
       }
-      const response = await R2Storage.uploadFile(file, formData.store_id || '');
+      // Привязываем загрузку к продукту через external_id, а не store_id
+      const response = await R2Storage.uploadFile(file, formData.external_id || '');
       const newImage: ProductImage = {
         url: response.viewUrl || response.publicUrl,
         order_index: images.length,
-        is_main: images.length === 0
+        is_main: images.length === 0,
+        object_key: response.objectKey
       };
       setImages([...images, newImage]);
       toast.success(t('image_uploaded_successfully'));
@@ -525,14 +532,27 @@ export function ProductFormTabs({
     if (!file) return;
     await uploadFileDirect(file);
   };
-  const removeImage = (index: number) => {
+  const removeImage = async (index: number) => {
+    const target = images[index];
+    // Попробуем удалить файл из R2, если можем извлечь objectKey из URL
+    try {
+      const objectKey = target?.object_key || (target?.url ? R2Storage.extractObjectKeyFromUrl(target.url) : null);
+      if (objectKey) {
+        await R2Storage.deleteFile(objectKey);
+        await R2Storage.removePendingUpload(objectKey);
+      }
+    } catch (error) {
+      console.error('Failed to delete image from R2:', error);
+      toast.error(t('failed_delete_image'));
+    }
+
     const newImages = images.filter((_, i) => i !== index);
     setImages(newImages.map((img, i) => ({
       ...img,
       order_index: i
     })));
-    
-    // Update active image index if needed
+
+    // Обновляем активный индекс при необходимости
     if (activeImageIndex >= newImages.length) {
       setActiveImageIndex(Math.max(0, newImages.length - 1));
     } else if (activeImageIndex > index) {

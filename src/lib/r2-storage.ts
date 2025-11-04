@@ -68,7 +68,7 @@ export const R2Storage = {
     const resp = data as UploadResponse;
     // Если productId нет — это временная загрузка, фиксируем ключ
     const userId = session?.user?.id;
-    if (!productId && userId && resp?.objectKey?.includes(`/tmp/${userId}/`)) {
+    if (!productId && userId && resp?.objectKey?.includes(`/uploads/tmp/${userId}/`)) {
       const storageKey = `pending_uploads:${userId}`;
       const list = JSON.parse(localStorage.getItem(storageKey) || "[]");
       list.push(resp.objectKey);
@@ -138,17 +138,50 @@ export const R2Storage = {
   },
 
   /**
-   * Пытается извлечь objectKey из R2-публичных URL (r2.dev или cloudflarestorage.com)
+   * Извлекает objectKey из публичных URL R2.
+   * Поддерживает оба варианта:
+   * - r2.dev: https://<account>.r2.dev/<bucket>/<objectKey>
+   * - cloudflarestorage.com: https://<bucket>.<account>.r2.cloudflarestorage.com/<objectKey>
+   * Также содержит фолбэк: ищет подстроку "uploads/" и возвращает путь от неё.
    */
   extractObjectKeyFromUrl(url: string): string | null {
     try {
       const u = new URL(url);
-      const pathParts = u.pathname.split('/').filter(Boolean);
-      if (pathParts.length >= 2) {
-        // Первая часть — бакет, остальное — objectKey
-        return pathParts.slice(1).join('/');
+      const host = u.host || '';
+      const pathname = (u.pathname || '/').replace(/^\/+/, '');
+      const parts = pathname.split('/').filter(Boolean);
+
+      // Приоритет: если присутствует префикс uploads/, возвращаем путь от него
+      const uploadsIdx = pathname.indexOf('uploads/');
+      if (uploadsIdx >= 0) {
+        return pathname.slice(uploadsIdx);
       }
-      return null;
+
+      // cloudflarestorage.com поддерживает два формата:
+      // 1) Виртуальный хост: https://<bucket>.<account>.r2.cloudflarestorage.com/<objectKey>
+      //    В этом случае bucket в поддомене, а путь — это objectKey целиком.
+      // 2) Path-style (подписанные URL): https://<account>.r2.cloudflarestorage.com/<bucket>/<objectKey>
+      //    В этом случае первая часть path — bucket, её нужно отбросить.
+      if (host.includes('cloudflarestorage.com')) {
+        const hostParts = host.split('.');
+        // Формат без bucket в поддомене: <account>.r2.cloudflarestorage.com
+        const isPathStyle = hostParts.length === 4; // [account, r2, cloudflarestorage, com]
+        if (isPathStyle) {
+          if (parts.length >= 2) return parts.slice(1).join('/');
+          return parts[0] || null;
+        }
+        // Виртуальный хост — путь уже равен objectKey
+        return pathname || null;
+      }
+
+      // r2.dev: первая часть пути — bucket, дальше objectKey
+      if (host.includes('r2.dev')) {
+        if (parts.length >= 2) return parts.slice(1).join('/');
+        return parts[0] || null;
+      }
+
+      // Общий фолбэк: вернуть путь без ведущего слэша
+      return parts.join('/') || null;
     } catch {
       return null;
     }
@@ -192,6 +225,23 @@ export const R2Storage = {
     }
 
     return data as { success: boolean };
+  },
+
+  /**
+   * Удаляет ключ из локального списка незавершённых загрузок пользователя
+   */
+  async removePendingUpload(objectKey: string): Promise<void> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return;
+    const storageKey = `pending_uploads:${userId}`;
+    const list: string[] = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const next = list.filter((k) => k !== objectKey);
+    if (next.length) {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } else {
+      localStorage.removeItem(storageKey);
+    }
   },
 
   /**

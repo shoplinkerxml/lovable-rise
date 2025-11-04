@@ -1,175 +1,124 @@
-// @ts-nocheck
-// Deno Edge Function: TypeScript проверки в локальном редакторе могут сообщать об ошибках
-// разрешения remote/npm импортов. Эти импорты корректны для среды Deno/Supabase.
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-// Use npm spec imports to ensure Deno-compatible AWS SDK without Node crypto requirements
-import { S3Client, PutObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3"
-import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3";
+import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+
+type UploadBody = {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  fileData: string; // base64
+  productId?: string;
+};
+
+function base64UrlToBase64(input: string): string {
+  return input.replace(/-/g, '+').replace(/_/g, '/');
+}
+
+function decodeJwtSub(authHeader?: string | null): string | null {
+  if (!authHeader) return null;
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payload = atob(base64UrlToBase64(parts[1]));
+    const json = JSON.parse(payload);
+    return json?.sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeBase64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function randomId(): string {
+  return crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    // Проверяем авторизацию
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'unauthorized', message: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const auth = req.headers.get('authorization');
+    if (!auth) {
+      return new Response(JSON.stringify({ error: 'unauthorized', message: 'Missing authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user } } = await supabaseClient.auth.getUser()
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'unauthorized', message: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const userId = decodeJwtSub(auth);
+    // Разбор тела запроса
+    const body = await req.json() as UploadBody;
+    if (!body?.fileName || !body?.fileType || !body?.fileSize || !body?.fileData) {
+      return new Response(JSON.stringify({ error: 'invalid_body', message: 'Required fields: fileName, fileType, fileSize, fileData' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Получаем данные из body
-    const { fileName, fileType, fileSize, fileData, productId } = await req.json()
-
-    // Валидация
-    if (!fileName || !fileType || !fileData) {
-      return new Response(
-        JSON.stringify({ error: 'validation_error', message: 'Missing required fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const accountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID') ?? '';
+    const bucket = Deno.env.get('R2_BUCKET_NAME') ?? '';
+    const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID') ?? '';
+    const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY') ?? '';
+    if (!accountId || !bucket || !accessKeyId || !secretAccessKey) {
+      return new Response(JSON.stringify({ error: 'server_misconfig', message: 'Missing R2 environment configuration' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Проверяем тип файла (только изображения, включая AVIF)
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/gif', 'image/avif']
-    const fileExt = String(fileName || '').toLowerCase().split('.').pop()
-    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif', 'avif']
-    const isAllowedByExt = allowedExts.includes(fileExt || '')
-    if (!allowedTypes.includes(fileType) && !isAllowedByExt) {
-      return new Response(
-        JSON.stringify({ error: 'invalid_file_type', message: 'File type not allowed' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Проверяем размер файла (5MB max)
-    const maxSize = 5 * 1024 * 1024
-    if (fileSize > maxSize) {
-      return new Response(
-        JSON.stringify({ error: 'file_too_large', message: 'File size exceeds 5MB limit' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Конвертируем base64 обратно в Uint8Array
-    const fileBuffer = Uint8Array.from(atob(fileData), c => c.charCodeAt(0))
-
-    // Настройка R2 клиента
-    const s3Client = new S3Client({
+    const s3 = new S3Client({
       region: 'auto',
-      endpoint: `https://${Deno.env.get('CLOUDFLARE_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID') ?? '',
-        secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY') ?? '',
-      },
-    })
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+    });
 
-    // Генерируем уникальное имя файла
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 15)
-    const fileExtension = fileName.split('.').pop()
-    const objectKey = productId 
-      ? `products/${productId}/${timestamp}-${randomString}.${fileExtension}`
-      : `uploads/tmp/${user.id}/${timestamp}-${randomString}.${fileExtension}`
+    const fileBytes = decodeBase64ToBytes(body.fileData);
+    const now = new Date();
+    const yyyy = now.getUTCFullYear();
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    const datePath = `${yyyy}/${mm}/${dd}`;
+    const cleanName = safeFileName(body.fileName);
+    const suffix = randomId();
 
-    // Нормалізуємо content-type (деякі файли можуть не мати file.type)
-    const ext = (fileExtension || '').toLowerCase()
-    const normalizedType = (
-      fileType ||
-      (ext === 'png' ? 'image/png'
-        : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
-        : ext === 'webp' ? 'image/webp'
-        : ext === 'gif' ? 'image/gif'
-        : ext === 'svg' ? 'image/svg+xml'
-        : ext === 'avif' ? 'image/avif'
-        : 'application/octet-stream')
-    )
-
-    // Загружаем файл в R2 з правильними заголовками для відображення
-    const putCommand = new PutObjectCommand({
-      Bucket: Deno.env.get('R2_BUCKET_NAME'),
-      Key: objectKey,
-      Body: fileBuffer,
-      ContentType: normalizedType,
-      CacheControl: 'public, max-age=31536000, immutable',
-      ContentDisposition: 'inline'
-    })
-
-    await s3Client.send(putCommand)
-
-    // Формируем публичный URL
-    const configuredBase = Deno.env.get('R2_PUBLIC_DOMAIN') ?? Deno.env.get('R2_PUBLIC_BASE_URL')
-    let publicUrl = ''
-    if (configuredBase && configuredBase !== 'undefined') {
-      const base = configuredBase.replace(/\/+$/, '')
-      publicUrl = `${base}/${objectKey}`
+    let objectKey = '';
+    if (body.productId && body.productId.length > 0) {
+      objectKey = `uploads/products/${body.productId}/${datePath}/${suffix}-${cleanName}`;
+    } else if (userId) {
+      objectKey = `uploads/tmp/${userId}/${datePath}/${suffix}-${cleanName}`;
     } else {
-      const accountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID') ?? ''
-      const bucketName = Deno.env.get('R2_BUCKET_NAME') ?? ''
-      if (accountId && bucketName) {
-        // Fallback на стандартний R2 домен з включенням назви бакету
-        publicUrl = `https://${accountId}.r2.cloudflarestorage.com/${bucketName}/${objectKey}`
-      } else {
-        // Если конфигурация отсутствует, не возвращаем некорректный URL
-        publicUrl = ''
-      }
+      objectKey = `uploads/tmp/unknown/${datePath}/${suffix}-${cleanName}`;
     }
 
-    // Дополнительно формируем підписаний GET-URL для прев’ю, якщо бакет не публічний
-    let viewUrl = ''
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: Deno.env.get('R2_BUCKET_NAME'),
-        Key: objectKey,
-      })
-      // 1 година достатньо для UI-прев’ю; для продакшн сторінок можна робити рефреш
-      viewUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 })
-    } catch (_) {
-      // Ігноруємо помилку формування viewUrl; клієнт використає publicUrl як фолбек
-    }
+    await s3.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: objectKey,
+      Body: fileBytes,
+      ContentType: body.fileType,
+      ACL: undefined,
+    }));
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        publicUrl,
-        objectKey,
-        viewUrl,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    const publicUrl = `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${objectKey}`;
+    // Сразу формируем подписанный URL для предпросмотра (GET)
+    const getCmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
+    const viewUrl = await getSignedUrl(s3, getCmd, { expiresIn: 3600 });
 
-  } catch (error) {
-    console.error('Upload error:', error)
-    return new Response(
-      JSON.stringify({ 
-        error: 'upload_failed', 
-        message: error.message || 'Failed to upload file' 
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ success: true, objectKey, publicUrl, viewUrl }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: 'upload_failed', message: e?.message ?? 'Upload failed' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-})
+});
