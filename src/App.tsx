@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { R2Storage } from "@/lib/r2-storage";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { I18nProvider } from "@/providers/i18n-provider";
+// Dev diagnostics removed per request
 
 import Index from "./pages/Index";
 import ApiDocs from "./pages/ApiDocs";
@@ -71,6 +72,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <I18nProvider>
+          {/* Dev diagnostics removed. Ensure no dev components imports exist */}
           <BrowserRouter>
             <Routes>
             <Route path="/" element={<Index />} />

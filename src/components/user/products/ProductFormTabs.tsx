@@ -102,27 +102,23 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   }, [images]);
 
   // Функция аварийной очистки незакрепленных изображений из R2 при уходе со страницы
-  const cleanupUnsavedImages = async () => {
-    if (cleanedRef.current) return;
+  const cleanupUnsavedImages = () => {
     if (isSavedRef.current) return;
     try {
       const currentImages = imagesRef.current || [];
       for (const img of currentImages) {
         const objectKey = img?.object_key || (img?.url ? R2Storage.extractObjectKeyFromUrl(img.url) : null);
-        if (objectKey) {
-          try {
-            // Используем keepalive-вариант удаления, чтобы успеть на pagehide
-            await R2Storage.deleteFileKeepalive(objectKey);
-            // На случай, если ключ присутствует в локальном pending списке
-            await R2Storage.removePendingUpload(objectKey);
-          } catch (e) {
-            // гасим ошибки, чтобы не блокировать уход со страницы
-          }
-        }
+        if (!objectKey) continue;
+        // Отправляем keepalive-удаление без await, щоб не блокувати перехід
+        R2Storage.deleteFileKeepalive(objectKey)
+          .then((delivered) => {
+            if (delivered) {
+              R2Storage.removePendingUpload(objectKey).catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
-    } finally {
-      cleanedRef.current = true;
-    }
+    } catch {}
   };
 
   // Очистка на размонтаж компонента и при системных событиях скрытия/ухода со страницы
@@ -349,7 +345,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       setLoading(true);
       
       // Используем новый API для загрузки через proxy
-      const result = await R2Storage.uploadFile(file, formData.external_id);
+      const result = await R2Storage.uploadFile(file, product ? String(product.id) : undefined);
 
       const newImage = {
         url: result.viewUrl || result.publicUrl,
@@ -383,6 +379,11 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       e.target.value = '';
     }
   };
+
+  // Дополнительная очистка временных загрузок при смене товара/рендере нового товара
+  useEffect(() => {
+    R2Storage.cleanupPendingUploads().catch(() => {});
+  }, [product]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

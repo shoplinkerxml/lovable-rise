@@ -430,25 +430,27 @@ export function ProductFormTabs({
   };
 
   // Cleanup function: remove all unsaved images if user leaves without saving
-  const cleanupUnsavedImages = async () => {
-    if (cleanedRef.current || isSavedRef.current || !isNewProduct) return;
-    cleanedRef.current = true;
-    try {
-      // First, clear any pending tmp uploads tracked locally
-      await R2Storage.cleanupPendingUploads().catch(() => {});
+  const cleanupUnsavedImages = () => {
+    // Отправляем удаление только если товар не сохранён и это новый товар
+    if (isSavedRef.current || !isNewProduct) return;
 
-      // Then, best-effort delete any images currently present in the form
+    // Не блокируем уход со страницы: никаких await внутри
+    try {
+      // Локальная очистка списка незавершённых загрузок — без очікування
+      R2Storage.cleanupPendingUploads().catch(() => {});
+
       const list = imagesRef.current || [];
       for (const img of list) {
         const key = img?.object_key || (img?.url ? R2Storage.extractObjectKeyFromUrl(img.url) : null);
         if (!key) continue;
-        try {
-          // Use keepalive variant to survive pagehide/unload
-          await R2Storage.deleteFileKeepalive(key);
-        } catch {}
-        try {
-          await R2Storage.removePendingUpload(key);
-        } catch {}
+        // Форсовано шлём keepalive-запит на видалення, не чекаючи відповіді
+        R2Storage.deleteFileKeepalive(key)
+          .then((delivered) => {
+            if (delivered) {
+              R2Storage.removePendingUpload(key).catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
     } catch {}
   };
@@ -494,7 +496,10 @@ export function ProductFormTabs({
       is_main: images.length === 0,
       object_key: objectKey || undefined
     };
-    setImages([...images, newImage]);
+    const nextImages = [...images, newImage];
+    setImages(nextImages);
+    // Синхронно оновлюємо ref, щоб очистка на unmount мала актуальні дані
+    imagesRef.current = nextImages;
     setImageUrl('');
   };
 
@@ -569,7 +574,9 @@ export function ProductFormTabs({
         order_index: images.length,
         is_main: images.length === 0
       };
-      setImages([...images, newImage]);
+      const nextImages = [...images, newImage];
+      setImages(nextImages);
+      imagesRef.current = nextImages;
       toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
     } else {
       toast.error(t('invalid_image_format') || 'Неверный формат изображения');
@@ -594,7 +601,9 @@ export function ProductFormTabs({
         is_main: images.length === 0,
         object_key: response.objectKey
       };
-      setImages([...images, newImage]);
+      const nextImages = [...images, newImage];
+      setImages(nextImages);
+      imagesRef.current = nextImages;
       toast.success(t('image_uploaded_successfully'));
     } catch (error) {
       console.error('Ошибка загрузки изображения в R2:', error);
@@ -638,10 +647,12 @@ export function ProductFormTabs({
     }
 
     const newImages = images.filter((_, i) => i !== index);
-    setImages(newImages.map((img, i) => ({
+    const reorderedImages = newImages.map((img, i) => ({
       ...img,
       order_index: i
-    })));
+    }));
+    setImages(reorderedImages);
+    imagesRef.current = reorderedImages;
 
     // Обновляем активный индекс при необходимости
     if (activeImageIndex >= newImages.length) {
@@ -656,6 +667,7 @@ export function ProductFormTabs({
       is_main: i === index
     }));
     setImages(newImages);
+    imagesRef.current = newImages;
   };
 
   // Parameter handling functions

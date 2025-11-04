@@ -1107,6 +1107,15 @@ const toastDictionary = {
   product_name_placeholder: { uk: "Введіть назву товару", en: "Enter product name" },
   product_description: { uk: "Опис товару", en: "Product Description" },
   product_description_placeholder: { uk: "Введіть опис товару", en: "Enter product description" },
+  
+  // Dev diagnostics
+  dev_title: { uk: "Діагностика (Dev)", en: "Diagnostics (Dev)" },
+  dev_indicator: { uk: "Dev", en: "Dev" },
+  dev_toggle: { uk: "Показати/сховати діагностику", en: "Toggle diagnostics" },
+  dev_clear: { uk: "Очистити", en: "Clear" },
+  dev_close: { uk: "Закрити", en: "Close" },
+  dev_empty: { uk: "Логи відсутні", en: "No logs yet" },
+  dev_total_label: { uk: "Записів", en: "Logs" },
 };
 
 // Merge dictionaries

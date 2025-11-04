@@ -68,7 +68,13 @@ export const R2Storage = {
     const resp = data as UploadResponse;
     // Если productId нет — это временная загрузка, фиксируем ключ
     const userId = session?.user?.id;
-    if (!productId && userId && resp?.objectKey?.includes(`/uploads/tmp/${userId}/`)) {
+    // Accept both with and without leading slash to be robust
+    if (
+      !productId &&
+      userId &&
+      resp?.objectKey &&
+      (resp.objectKey.includes(`uploads/tmp/${userId}/`) || resp.objectKey.includes(`/uploads/tmp/${userId}/`))
+    ) {
       const storageKey = `pending_uploads:${userId}`;
       const list = JSON.parse(localStorage.getItem(storageKey) || "[]");
       list.push(resp.objectKey);
@@ -86,17 +92,19 @@ export const R2Storage = {
     if (!list.length) return;
 
     const toDelete = [...list];
-    const errors: string[] = [];
+    const remaining: string[] = [];
     for (const key of toDelete) {
       try {
-        // Используем тот же запрос к r2-delete, но с keepalive для надёжности при уходе/перезагрузке
-        await R2Storage.deleteFileKeepalive(key);
+        const res = await R2Storage.deleteFile(key);
+        if (!res?.success) {
+          remaining.push(key);
+        }
       } catch (e: any) {
-        errors.push(key);
+        remaining.push(key);
       }
     }
-    if (errors.length) {
-      localStorage.setItem(storageKey, JSON.stringify(errors));
+    if (remaining.length) {
+      localStorage.setItem(storageKey, JSON.stringify(remaining));
     } else {
       localStorage.removeItem(storageKey);
     }
@@ -151,12 +159,8 @@ export const R2Storage = {
       const host = u.host || '';
       const pathname = (u.pathname || '/').replace(/^\/+/, '');
       const parts = pathname.split('/').filter(Boolean);
-
-      // Приоритет: если присутствует префикс uploads/, возвращаем путь от него
-      const uploadsIdx = pathname.indexOf('uploads/');
-      if (uploadsIdx >= 0) {
-        return pathname.slice(uploadsIdx);
-      }
+      // ВАЖНО: сначала корректно обрабатываем известные форматы хостов,
+      // чтобы не перепутать bucket с частью objectKey
 
       // cloudflarestorage.com поддерживает два формата:
       // 1) Виртуальный хост: https://<bucket>.<account>.r2.cloudflarestorage.com/<objectKey>
@@ -181,6 +185,13 @@ export const R2Storage = {
         return parts[0] || null;
       }
 
+      // Фолбэк: если неизвестный хост и внутри пути есть uploads/, вернём путь от uploads/
+      // (Не применяем для известных хостов выше, чтобы не возвращать bucket как часть objectKey)
+      const uploadsIdx = pathname.indexOf('uploads/');
+      if (uploadsIdx > 0) {
+        return pathname.slice(uploadsIdx);
+      }
+
       // Общий фолбэк: вернуть путь без ведущего слэша
       return parts.join('/') || null;
     } catch {
@@ -196,12 +207,58 @@ export const R2Storage = {
       data: { session },
     } = await supabase.auth.getSession();
     const headers: Record<string, string> = {};
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    let authorizationInBody: string | undefined;
+    const sessionToken = session?.access_token || null;
+    if (sessionToken) {
+      headers['Authorization'] = `Bearer ${sessionToken}`;
+      authorizationInBody = `Bearer ${sessionToken}`;
+    } else {
+      // Фолбэк: попробуем быстро извлечь токен из localStorage (как в keepalive)
+      try {
+        const urlObj = new URL(SUPABASE_URL);
+        const projectRef = urlObj.host.split('.')[0];
+        const v2Key = `sb-${projectRef}-auth-token`;
+        const rawV2 = localStorage.getItem(v2Key);
+        if (rawV2) {
+          const parsed = JSON.parse(rawV2);
+          const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+          if (token) authorizationInBody = `Bearer ${token}`;
+        }
+        if (!authorizationInBody) {
+          const rawV1 = localStorage.getItem('supabase.auth.token');
+          if (rawV1) {
+            const parsed = JSON.parse(rawV1);
+            const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+            if (token) authorizationInBody = `Bearer ${token}`;
+          }
+        }
+        if (!authorizationInBody) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i) || '';
+            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              try {
+                const raw = localStorage.getItem(key);
+                if (!raw) continue;
+                const parsed = JSON.parse(raw);
+                const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+                if (token) {
+                  authorizationInBody = `Bearer ${token}`;
+                  break;
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Dev-диагностика: выводим удаляемый ключ
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[R2Storage] deleteFile invoke', { objectKey });
     }
 
     const { data, error } = await supabase.functions.invoke("r2-delete", {
-      body: { objectKey },
+      body: { objectKey, authorization: authorizationInBody },
       headers,
     });
 
@@ -232,20 +289,44 @@ export const R2Storage = {
    * Удаляет файл через прямой запрос к Supabase Functions с keepalive для pagehide
    * Используется как фолбэк при уходе со страницы, когда обычные вызовы могут оборваться
    */
-  async deleteFileKeepalive(objectKey: string): Promise<void> {
+  async deleteFileKeepalive(objectKey: string): Promise<boolean> {
     try {
       // Быстрое получение токена синхронно из localStorage, чтобы успеть до ухода со страницы
       const getAccessTokenSync = (): string | null => {
         try {
-          const raw = localStorage.getItem('supabase.auth.token');
-          if (!raw) return null;
-          const parsed = JSON.parse(raw);
-          return (
-            parsed?.currentSession?.access_token ||
-            parsed?.access_token ||
-            parsed?.accessToken ||
-            null
-          );
+          // 1) Пробуем старый ключ (v1)
+          const rawV1 = localStorage.getItem('supabase.auth.token');
+          if (rawV1) {
+            const parsed = JSON.parse(rawV1);
+            const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+            if (token) return token;
+          }
+
+          // 2) Пробуем v2 ключ формата sb-<projectRef>-auth-token
+          const urlObj = new URL(SUPABASE_URL);
+          const projectRef = urlObj.host.split('.')[0];
+          const v2Key = `sb-${projectRef}-auth-token`;
+          const rawV2 = localStorage.getItem(v2Key);
+          if (rawV2) {
+            const parsed = JSON.parse(rawV2);
+            const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+            if (token) return token;
+          }
+
+          // 3) Fallback: поиск любого ключа вида sb-*-auth-token (на случай нестандартного projectRef)
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i) || '';
+            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              try {
+                const raw = localStorage.getItem(key);
+                if (!raw) continue;
+                const parsed = JSON.parse(raw);
+                const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+                if (token) return token;
+              } catch {}
+            }
+          }
+          return null;
         } catch {
           return null;
         }
@@ -280,29 +361,38 @@ export const R2Storage = {
       };
 
       // В Dev-режиме выводим небольшой лог для отладки
-      if (import.meta.env.DEV) {
+      if (process.env.NODE_ENV !== 'production') {
         console.debug('[R2Storage] keepalive delete init', { objectKey, hasToken: !!token });
       }
 
       // Сначала пробуем navigator.sendBeacon — он предназначен для выгрузки страницы
       const beaconPayload = body;
+      let beaconDelivered = false;
       try {
-        navigator.sendBeacon(fnUrlSubdomain, beaconPayload);
-        navigator.sendBeacon(fnUrlPathStyle, beaconPayload);
+        beaconDelivered = navigator.sendBeacon(fnUrlSubdomain, beaconPayload) || beaconDelivered;
+        beaconDelivered = navigator.sendBeacon(fnUrlPathStyle, beaconPayload) || beaconDelivered;
       } catch {}
 
       // Дополнительно всегда выполняем fetch с keepalive, чтобы запрос был виден в Network (Fetch/XHR)
       // Это повышает надёжность доставки при unload и упрощает диагностику.
+      let fetchOk = false;
       try {
         const res = await fetch(fnUrlSubdomain, init);
+        fetchOk = res.ok;
         if (!res.ok) {
-          await fetch(fnUrlPathStyle, init);
+          const res2 = await fetch(fnUrlPathStyle, init);
+          fetchOk = res2.ok;
         }
       } catch {
-        await fetch(fnUrlPathStyle, init);
+        try {
+          const res2 = await fetch(fnUrlPathStyle, init);
+          fetchOk = res2.ok;
+        } catch {}
       }
+      return fetchOk || beaconDelivered;
     } catch {
       // Безопасно игнорируем ошибки в keepalive сценарию
+      return false;
     }
   },
 

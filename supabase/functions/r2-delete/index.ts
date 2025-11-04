@@ -55,7 +55,9 @@ serve(async (req) => {
     const auth = req.headers.get('authorization') || body?.authorization || body?.token || null;
     if (!auth) {
       // Allow unauthenticated deletion only for temporary uploads
-      if (!objectKey || !objectKey.includes('/uploads/tmp/')) {
+      // Support both path styles: with or without leading slash
+      const isTmp = objectKey && (objectKey.includes('uploads/tmp/') || objectKey.includes('/uploads/tmp/'));
+      if (!objectKey || !isTmp) {
         return new Response(JSON.stringify({ error: 'unauthorized', message: 'Missing authorization' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
