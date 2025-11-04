@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, X, Upload, Link } from "lucide-react";
+import { Loader2, Plus, X, Upload, Link, Check } from "lucide-react";
 import { toast } from "sonner";
 import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
@@ -557,19 +557,21 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
                         alt={`Product ${index + 1}`}
                         className="w-full h-32 object-cover rounded border"
                       />
-                      <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
                         <Button
                           type="button"
                           onClick={() => setMainImage(index)}
-                          size="sm"
-                          variant={image.is_main ? "default" : "secondary"}
+                          size="icon"
+                          variant="ghost"
+                          aria-label={image.is_main ? "Головне" : "Зробити головним"}
+                          className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}
                         >
-                          {image.is_main ? "Головне" : "Зробити головним"}
+                          <Check className="h-4 w-4" />
                         </Button>
                         <Button
                           type="button"
                           onClick={() => removeImage(index)}
-                          size="sm"
+                          size="icon"
                           variant="destructive"
                         >
                           <X className="h-4 w-4" />

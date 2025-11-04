@@ -1043,6 +1043,7 @@ const toastDictionary = {
   no_images_added: { uk: "Зображення не додані", en: "No Images Added" },
   add_images_instruction: { uk: "Додайте зображення по URL або завантажте файл", en: "Add images by URL or upload file" },
   drop_image_here: { uk: "Перетягніть зображення сюди", en: "Drop image here" },
+  image_types_and_limit: { uk: "Формати: JPEG, PNG, WebP, AVIF, GIF, SVG • Макс. 5 МБ", en: "Formats: JPEG, PNG, WebP, AVIF, GIF, SVG • Max 5MB" },
   added_images: { uk: "Додані зображення", en: "Added Images" },
   main_photo: { uk: "Головне", en: "Main" },
   set_as_main_photo: { uk: "Зробити головним", en: "Set as main" },

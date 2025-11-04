@@ -94,7 +94,7 @@ serve(async (req) => {
     const fileExtension = fileName.split('.').pop()
     const objectKey = productId 
       ? `products/${productId}/${timestamp}-${randomString}.${fileExtension}`
-      : `uploads/${user.id}/${timestamp}-${randomString}.${fileExtension}`
+      : `uploads/tmp/${user.id}/${timestamp}-${randomString}.${fileExtension}`
 
     // Нормалізуємо content-type (деякі файли можуть не мати file.type)
     const ext = (fileExtension || '').toLowerCase()

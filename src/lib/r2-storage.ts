@@ -65,9 +65,41 @@ export const R2Storage = {
       throw e;
     }
 
-    return data as UploadResponse;
+    const resp = data as UploadResponse;
+    // Если productId нет — это временная загрузка, фиксируем ключ
+    const userId = session?.user?.id;
+    if (!productId && userId && resp?.objectKey?.includes(`/tmp/${userId}/`)) {
+      const storageKey = `pending_uploads:${userId}`;
+      const list = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      list.push(resp.objectKey);
+      localStorage.setItem(storageKey, JSON.stringify(list));
+    }
+    return resp;
   },
 
+  async cleanupPendingUploads(): Promise<void> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return;
+    const storageKey = `pending_uploads:${userId}`;
+    const list: string[] = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    if (!list.length) return;
+
+    const toDelete = [...list];
+    const errors: string[] = [];
+    for (const key of toDelete) {
+      try {
+        await R2Storage.deleteFile(key);
+      } catch (e: any) {
+        errors.push(key);
+      }
+    }
+    if (errors.length) {
+      localStorage.setItem(storageKey, JSON.stringify(errors));
+    } else {
+      localStorage.removeItem(storageKey);
+    }
+  },
   /**
    * Возвращает подписанный view URL для предпросмотра по objectKey (GET)
    */

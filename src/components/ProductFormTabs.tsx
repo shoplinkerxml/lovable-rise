@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Plus, Minus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight } from 'lucide-react';
+  import { Plus, Minus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
@@ -1060,11 +1060,11 @@ export function ProductFormTabs({
                   <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
                     <CardContent className="p-2">
                       <div 
-                        className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 ${
+                        className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
                           isDragOver 
-                            ? 'bg-primary/10 border-2 border-dashed border-primary/30' 
-                            : 'bg-muted/30 hover:bg-muted/50 border-2 border-dashed border-muted-foreground/20 hover:border-muted-foreground/40'
-                        }`}
+                            ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm' 
+                            : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'
+                        } hover:scale-[1.01]`}
                         style={{ 
                           width: '100%',
                           maxWidth: '100%',
@@ -1075,14 +1075,26 @@ export function ProductFormTabs({
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
+                        onClick={() => document.getElementById('fileUpload')?.click()}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            document.getElementById('fileUpload')?.click();
+                          }
+                        }}
                       >
-                        <ImageIcon className={`h-8 w-8 mb-2 transition-colors ${
-                          isDragOver ? 'text-primary' : 'text-muted-foreground/60'
+                        <ImageIcon className={`h-12 w-12 mb-3 transition-colors ${
+                          isDragOver ? 'text-emerald-600' : 'text-emerald-500'
                         }`} />
                         <p className={`text-sm text-center px-2 transition-colors ${
-                          isDragOver ? 'text-primary font-medium' : 'text-muted-foreground'
+                          isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'
                         }`}>
-                          {isDragOver ? t('drop_image_here') : t('add_images_instruction')}
+                          {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
+                        </p>
+                        <p className="text-xs text-center text-muted-foreground mt-2 px-3" data-testid="productFormTabs_fileInfo">
+                          {t('image_types_and_limit')}
                         </p>
                       </div>
                     </CardContent>
@@ -1098,11 +1110,18 @@ export function ProductFormTabs({
                             className="w-full h-full object-contain" 
                             onLoad={(e) => handleGalleryImageLoad(e, index)}
                           />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <Button size="sm" variant={image.is_main ? "default" : "secondary"} onClick={() => setMainImage(index)} data-testid={`productFormTabs_setMainButton_${index}`}>
-                              {image.is_main ? t('main_photo') : t('set_as_main_photo')}
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setMainImage(index)}
+                              aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')}
+                              data-testid={`productFormTabs_setMainButton_${index}`}
+                              className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}
+                            >
+                              <Check className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
+                            <Button size="icon" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
