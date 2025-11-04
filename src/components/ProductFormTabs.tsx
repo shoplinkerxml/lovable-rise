@@ -768,8 +768,8 @@ export function ProductFormTabs({
                                 />
                               </div>
                               {images[activeImageIndex]?.is_main && (
-                                <Badge className="absolute top-2 left-2" variant="default">
-                                  Главное
+                                <Badge className="absolute top-2 left-2" variant="default" data-testid="productFormTabs_mainBadge">
+                                  {t('main_image')}
                                 </Badge>
                               )}
                             </CardContent>
