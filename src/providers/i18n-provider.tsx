@@ -1019,6 +1019,11 @@ const toastDictionary = {
   product_description_uk_placeholder: { uk: "Введіть опис товару українською", en: "Enter product description in Ukrainian" },
   product_url: { uk: "URL товару", en: "Product URL" },
   product_url_placeholder: { uk: "Введіть URL товару", en: "Enter product URL" },
+  // Placeholders for numeric inputs
+  price_placeholder: { uk: "0.00", en: "0.00" },
+  stock_quantity_placeholder: { uk: "0", en: "0" },
+  // File picker button
+  choose_file: { uk: "Вибрати файл", en: "Choose file" },
   store_supplier: { uk: "Магазин та постачальник", en: "Store and Supplier" },
   prices_stock: { uk: "Ціни та склад", en: "Prices and Stock" },
   

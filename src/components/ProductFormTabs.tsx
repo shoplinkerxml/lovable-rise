@@ -126,6 +126,11 @@ export function ProductFormTabs({
   const [galleryImageDimensions, setGalleryImageDimensions] = useState<Map<number, {width: number, height: number}>>(new Map());
   const [allImageDimensions, setAllImageDimensions] = useState<Map<number, {width: number, height: number}>>(new Map());
   const [maxContainerSize, setMaxContainerSize] = useState<{width: number, height: number} | null>(null);
+  // Refs for cleanup lifecycle
+  const isSavedRef = useRef(false);
+  const cleanedRef = useRef(false);
+  const imagesRef = useRef<ProductImage[]>([]);
+  const isNewProduct = !product?.id;
   
   // Drag and drop state
   const [isDragOver, setIsDragOver] = useState(false);
@@ -226,6 +231,11 @@ export function ProductFormTabs({
     setImageDimensions(null);
     setGalleryImageDimensions(new Map());
   }, [activeImageIndex, images]);
+
+  // Keep a live ref of images for cleanup during navigation/unload
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
 
   // Calculate maximum container size from all images
   useEffect(() => {
@@ -396,6 +406,8 @@ export function ProductFormTabs({
           parameters
         });
       }
+      // Mark as saved to prevent cleanup
+      isSavedRef.current = true;
       toast.success(t('product_saved_successfully'));
       navigate('/user/products');
     } catch (error) {
@@ -406,12 +418,71 @@ export function ProductFormTabs({
     }
   };
   const handleCancel = () => {
+    // Proactively cleanup temporary images on cancel for new product flow
+    if (isNewProduct) {
+      cleanupUnsavedImages();
+    }
     if (onCancel) {
       onCancel();
     } else {
       navigate('/user/products');
     }
   };
+
+  // Cleanup function: remove all unsaved images if user leaves without saving
+  const cleanupUnsavedImages = async () => {
+    if (cleanedRef.current || isSavedRef.current || !isNewProduct) return;
+    cleanedRef.current = true;
+    try {
+      // First, clear any pending tmp uploads tracked locally
+      await R2Storage.cleanupPendingUploads().catch(() => {});
+
+      // Then, best-effort delete any images currently present in the form
+      const list = imagesRef.current || [];
+      for (const img of list) {
+        const key = img?.object_key || (img?.url ? R2Storage.extractObjectKeyFromUrl(img.url) : null);
+        if (!key) continue;
+        try {
+          // Use keepalive variant to survive pagehide/unload
+          await R2Storage.deleteFileKeepalive(key);
+        } catch {}
+        try {
+          await R2Storage.removePendingUpload(key);
+        } catch {}
+      }
+    } catch {}
+  };
+
+  // Attach leave-page handlers for new product creation
+  useEffect(() => {
+    if (!isNewProduct) return;
+
+    // On entry, cleanup any dangling pending uploads from previous sessions
+    R2Storage.cleanupPendingUploads().catch(() => {});
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        cleanupUnsavedImages();
+      }
+    };
+    const onPageHide = () => {
+      cleanupUnsavedImages();
+    };
+    const onBeforeUnload = () => {
+      cleanupUnsavedImages();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      cleanupUnsavedImages();
+    };
+  }, [isNewProduct]);
 
   // Image handling functions
   const addImageFromUrl = () => {
@@ -1005,35 +1076,35 @@ export function ProductFormTabs({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="price">Ціна *</Label>
+                        <Label htmlFor="price">{t('price')} *</Label>
                         <Input id="price" type="number" step="0.01" value={formData.price} onChange={e => setFormData({
                         ...formData,
                         price: parseFloat(e.target.value) || 0
-                      })} placeholder="0.00" data-testid="productFormTabs_priceInput" />
+                      })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="price_old">Стара ціна</Label>
+                        <Label htmlFor="price_old">{t('old_price')}</Label>
                         <Input id="price_old" type="number" step="0.01" value={formData.price_old} onChange={e => setFormData({
                         ...formData,
                         price_old: parseFloat(e.target.value) || 0
-                      })} placeholder="0.00" data-testid="productFormTabs_priceOldInput" />
+                      })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="price_promo">Промо ціна</Label>
+                        <Label htmlFor="price_promo">{t('promo_price')}</Label>
                         <Input id="price_promo" type="number" step="0.01" value={formData.price_promo} onChange={e => setFormData({
                         ...formData,
                         price_promo: parseFloat(e.target.value) || 0
-                      })} placeholder="0.00" data-testid="productFormTabs_pricePromoInput" />
+                      })} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="stock_quantity">Кількість на складі</Label>
+                        <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
                         <Input id="stock_quantity" type="number" value={formData.stock_quantity} onChange={e => setFormData({
                         ...formData,
                         stock_quantity: parseInt(e.target.value) || 0
-                      })} placeholder="0" data-testid="productFormTabs_stockInput" />
+                      })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
                       </div>
                     </div>
                   </div>
@@ -1041,7 +1112,7 @@ export function ProductFormTabs({
                   {/* Секция: Додаткова інформація */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">Додаткова інформація</h3>
+                      <h3 className="text-lg font-semibold">{t('product_additional_info')}</h3>
                       <Separator className="flex-1" />
                     </div>
                     
@@ -1069,7 +1140,7 @@ export function ProductFormTabs({
                         <Input id="url" value={formData.url} onChange={e => setFormData({
                         ...formData,
                         url: e.target.value
-                      })} placeholder="https://example.com/product" data-testid="productFormTabs_urlInput" />
+                      })} placeholder={t('product_url_placeholder')} data-testid="productFormTabs_urlInput" />
                       </div>
                     </div>
                   </div>
@@ -1088,7 +1159,7 @@ export function ProductFormTabs({
                   <div className="flex-1">
                     <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
                     <div className="flex gap-2 mt-2">
-                      <Input id="imageUrl" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.jpg" data-testid="productFormTabs_imageUrlInput" />
+                      <Input id="imageUrl" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
                       <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
                         <Link className="h-4 w-4" />
                       </Button>
@@ -1101,7 +1172,7 @@ export function ProductFormTabs({
                       <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
                       <Button onClick={() => document.getElementById('fileUpload')?.click()} variant="outline" disabled={uploadingImage} data-testid="productFormTabs_uploadButton">
                         <Upload className="h-4 w-4 mr-2" />
-                        {uploadingImage ? 'Загрузка...' : 'Выбрать файл'}
+                        {uploadingImage ? t('profile_uploading') : t('choose_file')}
                       </Button>
                     </div>
                   </div>
@@ -1198,7 +1269,7 @@ export function ProductFormTabs({
                     <Input id="paramName" value={newParam.name} onChange={e => setNewParam({
                     ...newParam,
                     name: e.target.value
-                  })} placeholder="Например: Цвет, Размер, Материал" data-testid="productFormTabs_paramNameInput" />
+                  })} placeholder={t('characteristic_name_placeholder')} data-testid="productFormTabs_paramNameInput" />
                   </div>
                   <div className="flex-1">
                     <Label htmlFor="paramValue">{t('value')}</Label>
@@ -1252,10 +1323,10 @@ export function ProductFormTabs({
 
           <div className="flex flex-col sm:flex-row gap-4 justify-end">
             <Button variant="outline" onClick={handleCancel} data-testid="productFormTabs_cancelButton">
-              Отмена
+              {t('btn_cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={loading || !formData.name.trim()} data-testid="productFormTabs_submitButton">
-              {loading ? 'Сохранение...' : product ? 'Обновить товар' : 'Создать товар'}
+              {loading ? (product ? t('loading_updating') : t('loading_creating')) : (product ? t('btn_update') : t('btn_create'))}
             </Button>
           </div>
         </CardContent>
