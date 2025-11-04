@@ -14,7 +14,7 @@ export const ProductPlaceholder: React.FC<ProductPlaceholderProps> = ({ classNam
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="w-1/2 h-1/2 max-w-[7.5rem] max-h-[7.5rem] text-emerald-700/40"
+        className="w-[85%] h-[85%] max-w-[32rem] max-h-[32rem] text-emerald-700/40"
         data-testid="product_placeholder_icon"
       >
         {/* Основа коробки */}

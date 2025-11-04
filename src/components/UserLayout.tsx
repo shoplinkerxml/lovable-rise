@@ -394,6 +394,17 @@ const UserLayoutContent = ({
     };
   }, [user.id]);
 
+  // Auto-collapse sidebar at viewport widths ≤ 1270px
+  useEffect(() => {
+    const applyCollapse = () => {
+      const w = window.innerWidth;
+      setSidebarCollapsed(w <= 1270);
+    };
+    applyCollapse();
+    window.addEventListener('resize', applyCollapse);
+    return () => window.removeEventListener('resize', applyCollapse);
+  }, [setSidebarCollapsed]);
+
   // Organize menu items into sections
   const effectiveMenuItems = menuItems;
   const menuSections = [{

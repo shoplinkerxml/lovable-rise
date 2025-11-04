@@ -191,16 +191,16 @@ export function ProductFormTabs({
 
   // Calculate adaptive container style
   const getAdaptiveImageStyle = () => {
-    // Prefer current image dimensions, fallback to max container size
+    // Prefer current image dimensions, fallback to square
     const dims = imageDimensions || maxContainerSize;
     const aspect = dims ? `${dims.width} / ${dims.height}` : '1 / 1';
 
-    // Responsive sizing: cap by parent width and viewport, avoid overflow
+    // Fill the available column width, keep large height and center image
     return {
-      width: 'min(100%, clamp(16rem, 40vw, 37.5rem))',
+      width: '100%',
       maxWidth: '100%',
       height: 'auto',
-      maxHeight: 'min(60vh, 37.5rem)',
+      maxHeight: 'clamp(28rem, 65vh, 40rem)',
       aspectRatio: aspect
     };
   };
@@ -744,17 +744,16 @@ export function ProductFormTabs({
             {/* Tab 1: Basic Information */}
             <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
               {/* Основной контейнер с каруселью слева и полями справа */}
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                {/* Карусель фото - левая часть (2 колонки из 5) */}
-                <div className="lg:col-span-2 space-y-4">
-                  <Label>{t('product_photos')}</Label>
-                  <div className={`p-4 rounded-lg ${images.length === 0 ? 'border' : ''}`}>
+              <div className="flex flex-col lg:flex-row lg:flex-wrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
+                {/* Карусель фото — фиксированная левая колонка */}
+                <div className="lg:basis-[36rem] xl:basis-[40rem] shrink-0 space-y-4 mx-auto" data-testid="productFormTabs_photoContainer">
+                  <div className={`p-2 sm:p-3 rounded-lg ${images.length === 0 ? 'border' : ''}`}>
                     {images.length > 0 ? (
                       <div className="space-y-4">
                         {/* Main image display */}
                         <div className="relative flex justify-center">
                           <Card className="relative group">
-                            <CardContent className="p-2 px-12 sm:px-14 md:px-16">
+                            <CardContent className="p-2 sm:p-3 md:p-4">
                               <div 
                                 className="relative overflow-hidden rounded-md flex items-center justify-center w-full max-w-full"
                                 style={getAdaptiveImageStyle()}
@@ -837,15 +836,15 @@ export function ProductFormTabs({
                         )}
                       </div>
                     ) : (
-                      <div className="aspect-square flex items-center justify-center p-2">
+                      <div className="aspect-square flex items-center justify-center p-0">
                         <ProductPlaceholder className="w-full h-full" />
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Поля справа от карусели (3 колонки из 5) */}
-                <div className="lg:col-span-3 space-y-6">
+                {/* Правая часть — гибкая колонка с данными */}
+                <div className="flex-1 min-w-[20rem] space-y-6" data-testid="productFormTabs_formContainer">
                   {/* Секция: Основні дані */}
                   <div className="space-y-4" data-testid="productFormTabs_basicSection">
                     <div className="flex items-center gap-2">
@@ -876,7 +875,7 @@ export function ProductFormTabs({
                       <div className="space-y-2">
                         <Label htmlFor="supplier_id">{t('supplier')}</Label>
                         <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                          <SelectTrigger data-testid="productFormTabs_supplierSelect">
+                          <SelectTrigger className="w-full max-w-full min-w-0 whitespace-nowrap [&>span]:truncate" data-testid="productFormTabs_supplierSelect">
                             <SelectValue placeholder={t('select_supplier')} />
                           </SelectTrigger>
                           <SelectContent>
