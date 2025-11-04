@@ -921,12 +921,26 @@ export function ProductFormTabs({
                     </div>
                     
                     <Tabs defaultValue="ukrainian" className="w-full">
-                      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 h-auto sm:h-9">
-                        <TabsTrigger value="ukrainian" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3" data-testid="productFormTabs_ukrainianTab">
-                          {t('product_name_ukrainian_tab')}
+                      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 gap-2 h-auto sm:h-9">
+                        <TabsTrigger
+                          value="ukrainian"
+                          className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
+                          data-testid="productFormTabs_ukrainianTab"
+                          aria-label={t('product_name_ukrainian_tab')}
+                        >
+                          <span className="truncate">{t('product_name')}</span>
+                          <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
+                          <span className="sr-only">UA</span>
                         </TabsTrigger>
-                        <TabsTrigger value="russian" className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3" data-testid="productFormTabs_russianTab">
-                          {t('product_name_russian_tab')}
+                        <TabsTrigger
+                          value="russian"
+                          className="w-full min-w-0 truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start sm:justify-center"
+                          data-testid="productFormTabs_russianTab"
+                          aria-label={t('product_name_russian_tab')}
+                        >
+                          <span className="truncate">{t('product_name')}</span>
+                          <span className="text-success text-[0.7rem] font-semibold">RU</span>
+                          <span className="sr-only">RU</span>
                         </TabsTrigger>
                       </TabsList>
                       
