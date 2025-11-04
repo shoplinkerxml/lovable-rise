@@ -101,9 +101,12 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     imagesRef.current = images;
   }, [images]);
 
+
   // Функция аварийной очистки незакрепленных изображений из R2 при уходе со страницы
   const cleanupUnsavedImages = () => {
     if (isSavedRef.current) return;
+    if (cleanedRef.current) return;
+    cleanedRef.current = true;
     try {
       const currentImages = imagesRef.current || [];
       for (const img of currentImages) {
@@ -140,7 +143,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
       // Очистка временных загрузок, сохраненных через R2Storage (tmp-папка)
-      R2Storage.cleanupPendingUploads();
+      R2Storage.cleanupPendingUploads().catch(() => {});
       // Целенаправленная очистка изображений формы, если товар не был сохранен
       cleanupUnsavedImages();
       document.removeEventListener('visibilitychange', onVisibilityChange);

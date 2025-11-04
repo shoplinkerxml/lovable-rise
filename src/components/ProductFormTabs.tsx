@@ -433,12 +433,12 @@ export function ProductFormTabs({
   const cleanupUnsavedImages = () => {
     // Отправляем удаление только если товар не сохранён и это новый товар
     if (isSavedRef.current || !isNewProduct) return;
+    // Одноразовый запуск очистки на уход со страницы
+    if (cleanedRef.current) return;
+    cleanedRef.current = true;
 
     // Не блокируем уход со страницы: никаких await внутри
     try {
-      // Локальная очистка списка незавершённых загрузок — без очікування
-      R2Storage.cleanupPendingUploads().catch(() => {});
-
       const list = imagesRef.current || [];
       for (const img of list) {
         const key = img?.object_key || (img?.url ? R2Storage.extractObjectKeyFromUrl(img.url) : null);
@@ -482,6 +482,9 @@ export function ProductFormTabs({
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('beforeunload', onBeforeUnload);
+      // На уходе сначала запускаем надёжную очистку через Edge Function (200),
+      // затем фолбэк keepalive для оставшихся ключей.
+      R2Storage.cleanupPendingUploads().catch(() => {});
       cleanupUnsavedImages();
     };
   }, [isNewProduct]);

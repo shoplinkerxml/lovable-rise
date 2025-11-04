@@ -345,16 +345,14 @@ export const R2Storage = {
       // - отправляем JSON строкой (text/plain)
       // - токен передаём в body (authorization), а не в заголовке
 
-      // Формируем оба варианта URL для функций: subdomain и /functions/v1
-      const urlObj = new URL(SUPABASE_URL);
-      const projectRef = urlObj.host.split('.')[0];
-      const fnUrlSubdomain = `https://${projectRef}.functions.supabase.co/r2-delete`;
-      const fnUrlPathStyle = `${SUPABASE_URL}/functions/v1/r2-delete`;
+      // Формируем единственный URL для функций (path-style), чтобы избежать дублей запросов
+      const fnUrl = `${SUPABASE_URL}/functions/v1/r2-delete`;
 
       const body = JSON.stringify({ objectKey, authorization: token ? `Bearer ${token}` : undefined });
       const init: RequestInit = {
         method: 'POST',
-        // Не задаём заголовки, чтобы не вызвать preflight; пусть будет text/plain по умолчанию
+        // Минимизируем вероятность preflight: не добавляем лишние заголовки.
+        // Токен передаём в теле запроса как authorization.
         body,
         mode: 'cors',
         keepalive: true,
@@ -365,31 +363,14 @@ export const R2Storage = {
         console.debug('[R2Storage] keepalive delete init', { objectKey, hasToken: !!token });
       }
 
-      // Сначала пробуем navigator.sendBeacon — он предназначен для выгрузки страницы
-      const beaconPayload = body;
-      let beaconDelivered = false;
+      // Выполняем один fetch с keepalive, чтобы запрос был виден в Network (Fetch/XHR)
+      // Возвращаем успешность доставки ответа (res.ok)
       try {
-        beaconDelivered = navigator.sendBeacon(fnUrlSubdomain, beaconPayload) || beaconDelivered;
-        beaconDelivered = navigator.sendBeacon(fnUrlPathStyle, beaconPayload) || beaconDelivered;
-      } catch {}
-
-      // Дополнительно всегда выполняем fetch с keepalive, чтобы запрос был виден в Network (Fetch/XHR)
-      // Это повышает надёжность доставки при unload и упрощает диагностику.
-      let fetchOk = false;
-      try {
-        const res = await fetch(fnUrlSubdomain, init);
-        fetchOk = res.ok;
-        if (!res.ok) {
-          const res2 = await fetch(fnUrlPathStyle, init);
-          fetchOk = res2.ok;
-        }
+        const res = await fetch(fnUrl, init);
+        return res.ok;
       } catch {
-        try {
-          const res2 = await fetch(fnUrlPathStyle, init);
-          fetchOk = res2.ok;
-        } catch {}
+        return false;
       }
-      return fetchOk || beaconDelivered;
     } catch {
       // Безопасно игнорируем ошибки в keepalive сценарию
       return false;
