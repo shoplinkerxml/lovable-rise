@@ -20,7 +20,64 @@ const dictionary: Dictionary = {
   user_profile: { uk: "Профіль користувача", en: "User Profile" },
   menu_profile: { uk: "Мій профіль", en: "My Profile" },
   menu_profile_desc: { uk: "Налаштування облікового запису", en: "Account settings" },
-  hero_badge: { uk: "Збільшуємо прибуток на 30–50%", en: "Increase profit by 30–50%" },
+  // Navigation
+  nav_features: { uk: "Можливості", en: "Features" },
+  nav_how_it_works: { uk: "Як це працює", en: "How it works" },
+  nav_pricing: { uk: "Тарифи", en: "Pricing" },
+  nav_login: { uk: "Увійти", en: "Log in" },
+  nav_get_started: { uk: "Почати безкоштовно", en: "Get started free" },
+  
+  // Hero Section - updated
+  hero_badge: { uk: "Автоматизація бізнесу на маркетплейсах", en: "Marketplace Business Automation" },
+  hero_title_1: { uk: "Збільшуйте продажі на", en: "Boost your" },
+  hero_title_accent: { uk: "маркетплейсах", en: "marketplace sales" },
+  hero_title_2: { uk: "на автопілоті", en: "on autopilot" },
+  hero_subtitle: { uk: "Автоматизуємо роботу з прайсами та постачальниками. Перетворюємо складні дані в простий прибуток. Економимо ваш час для росту бізнесу.", en: "Automate price lists and supplier management. Turn complex data into simple profit. Save your time for business growth." },
+  hero_cta_primary: { uk: "Спробувати безкоштовно", en: "Try for free" },
+  hero_cta_secondary: { uk: "Дізнатися більше", en: "Learn more" },
+  hero_stat_1: { uk: "Зростання прибутку", en: "Profit growth" },
+  hero_stat_2: { uk: "Економія часу", en: "Time saved" },
+  hero_stat_3: { uk: "Задоволених клієнтів", en: "Happy clients" },
+  
+  // Solutions Section - new
+  solutions_badge: { uk: "Наше рішення", en: "Our solution" },
+  solutions_title: { uk: "Перетворюємо проблеми в", en: "Turn problems into" },
+  solutions_accent: { uk: "можливості", en: "opportunities" },
+  solutions_subtitle: { uk: "Повна автоматизація обробки прайсів від завантаження до розміщення на маркетплейсах", en: "Complete automation of price list processing from upload to marketplace deployment" },
+  
+  solution_1_title: { uk: "Автоматизуємо рутину", en: "Automate routine" },
+  solution_1_desc: { uk: "Завантажуєте файл — отримуєте готові картки товарів за хвилини, а не години", en: "Upload a file — get ready product cards in minutes, not hours" },
+  solution_1_feature_1: { uk: "Підтримка всіх форматів", en: "All formats supported" },
+  solution_1_feature_2: { uk: "Розумне розпізнавання", en: "Smart recognition" },
+  solution_1_feature_3: { uk: "Автоматична категоризація", en: "Auto categorization" },
+  
+  solution_2_title: { uk: "Готуємо дані для продажу", en: "Prepare data for sales" },
+  solution_2_desc: { uk: "Оптимізуємо описи, ціни та характеристики під кожен маркетплейс", en: "Optimize descriptions, prices and specs for each marketplace" },
+  solution_2_feature_1: { uk: "SEO-оптимізація", en: "SEO optimization" },
+  solution_2_feature_2: { uk: "Аналіз конкурентів", en: "Competitor analysis" },
+  solution_2_feature_3: { uk: "Динамічне ціноутворення", en: "Dynamic pricing" },
+  
+  solution_3_title: { uk: "Збільшуємо прибуток", en: "Increase profit" },
+  solution_3_desc: { uk: "Знижуємо витрати часу на 90% і підвищуємо конверсію продажів на 30%", en: "Reduce time costs by 90% and increase sales conversion by 30%" },
+  solution_3_feature_1: { uk: "Миттєве завантаження", en: "Instant upload" },
+  solution_3_feature_2: { uk: "Аналітика продажів", en: "Sales analytics" },
+  solution_3_feature_3: { uk: "Рекомендації по зростанню", en: "Growth recommendations" },
+  
+  before_after_title: { uk: "До → Після", en: "Before → After" },
+  before_title: { uk: "❌ Було", en: "❌ Before" },
+  before_1: { uk: "20 годин обробки прайсів", en: "20 hours of price list processing" },
+  before_2: { uk: "Постійні помилки в даних", en: "Constant data errors" },
+  before_3: { uk: "Низька швидкість завантаження товарів", en: "Low product upload speed" },
+  before_4: { uk: "Втрати прибутку до 30%", en: "Profit loss up to 30%" },
+  
+  after_title: { uk: "✅ Стало", en: "✅ After" },
+  after_1: { uk: "2 години на повну автоматизацію", en: "2 hours for full automation" },
+  after_2: { uk: "99.9% точність обробки", en: "99.9% processing accuracy" },
+  after_3: { uk: "Миттєве завантаження на маркетплейси", en: "Instant marketplace upload" },
+  after_4: { uk: "Зростання прибутку на 30-50%", en: "Profit growth 30-50%" },
+  
+  cta_get_result: { uk: "Отримати результат зараз", en: "Get results now" },
+  
   hero_title: { uk: "Допомагаємо бізнесу на маркетплейсах", en: "We help businesses on marketplaces" },
   hero_desc: {
     uk: "Перетворюємо складні прайси постачальників на акуратний каталог. Автоматизуємо обробку Excel/CSV/XML, пришвидшуємо запуск карток і підвищуємо продажі завдяки якісним даним.",

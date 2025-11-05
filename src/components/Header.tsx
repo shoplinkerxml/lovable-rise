@@ -2,91 +2,107 @@
 
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
-import { TrendingUp, Menu } from "lucide-react"
+import { TrendingUp, Menu, X, Globe } from "lucide-react"
 import { useState } from "react"
+import { useI18n } from "@/providers/i18n-provider"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { t, lang, setLang } = useI18n()
+
+  const toggleLanguage = () => {
+    setLang(lang === 'uk' ? 'en' : 'uk')
+  }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">
-          <div className="bg-gradient-success p-2 rounded-lg">
-            <TrendingUp className="h-6 w-6 text-primary-foreground" />
+          <div className="bg-gradient-success p-2 rounded-lg shadow-glow">
+            <TrendingUp className="h-6 w-6 text-white" />
           </div>
-          <span className="text-xl font-bold text-foreground">MarketGrow</span>
+          <span className="text-xl font-bold bg-gradient-success bg-clip-text text-transparent">MarketGrow</span>
         </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6">
-          <a href="/" className="text-foreground hover:text-primary transition-colors">
-            Главная
+          <a href="#features" className="text-foreground hover:text-primary transition-colors font-medium">
+            {t('nav_features')}
           </a>
           <a href="#how-it-works" className="text-muted-foreground hover:text-primary transition-colors">
-            Как работает
+            {t('nav_how_it_works')}
           </a>
-          <a href="#services" className="text-muted-foreground hover:text-primary transition-colors">
-            Услуги
+          <a href="#pricing" className="text-muted-foreground hover:text-primary transition-colors">
+            {t('nav_pricing')}
           </a>
           <a href="/docs" className="text-muted-foreground hover:text-primary transition-colors">
             API Docs
-          </a>
-          <a href="#contact" className="text-muted-foreground hover:text-primary transition-colors">
-            Контакты
           </a>
         </nav>
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center space-x-3">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={toggleLanguage}
+            className="relative"
+          >
+            <Globe className="h-5 w-5" />
+            <span className="sr-only">Toggle language</span>
+          </Button>
           <ThemeToggle />
           <Button variant="ghost" size="sm">
-            Войти
+            {t('nav_login')}
           </Button>
           <Button variant="hero" size="sm">
-            Начать бесплатно
+            {t('nav_get_started')}
           </Button>
         </div>
 
         {/* Mobile Menu Button */}
         <div className="flex md:hidden items-center space-x-2">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={toggleLanguage}
+          >
+            <Globe className="h-5 w-5" />
+          </Button>
           <ThemeToggle />
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            <Menu className="h-5 w-5" />
+            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         </div>
       </div>
 
       {/* Mobile Navigation */}
       {isMenuOpen && (
-        <div className="md:hidden border-t bg-background p-4">
+        <div className="md:hidden border-t bg-background/95 backdrop-blur-lg p-4">
           <nav className="flex flex-col space-y-3">
-            <a href="/" className="text-foreground font-medium">
-              Главная
+            <a href="#features" className="text-foreground font-medium py-2">
+              {t('nav_features')}
             </a>
-            <a href="#how-it-works" className="text-muted-foreground">
-              Как работает
+            <a href="#how-it-works" className="text-muted-foreground py-2">
+              {t('nav_how_it_works')}
             </a>
-            <a href="#services" className="text-muted-foreground">
-              Услуги
+            <a href="#pricing" className="text-muted-foreground py-2">
+              {t('nav_pricing')}
             </a>
-            <a href="/docs" className="text-muted-foreground">
+            <a href="/docs" className="text-muted-foreground py-2">
               API Docs
-            </a>
-            <a href="#contact" className="text-muted-foreground">
-              Контакты
             </a>
             <div className="pt-3 space-y-2">
               <Button variant="outline" className="w-full">
-                Войти
+                {t('nav_login')}
               </Button>
               <Button variant="hero" className="w-full">
-                Начать бесплатно
+                {t('nav_get_started')}
               </Button>
             </div>
           </nav>
