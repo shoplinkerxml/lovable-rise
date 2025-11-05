@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +65,91 @@ export function ProductFormTabs({
   onSubmit,
   onCancel
 }: ProductFormTabsProps) {
+  // Resize state for the entire photo block (shrink-only up to initial size)
+  const [photoBlockScale, setPhotoBlockScale] = useState(1);
+  const [photoBlockInitialRem, setPhotoBlockInitialRem] = useState<number | null>(null);
+  const [isLargeScreen, setIsLargeScreen] = useState<boolean>(false);
+  const photoBlockRef = useRef<HTMLDivElement | null>(null);
+  const isPhotoResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const startScaleRef = useRef(1);
+  const startWidthPxRef = useRef(0);
+  const photoBlockInitialPxRef = useRef<number | null>(null);
+
+  const clampScale = useCallback((value: number) => {
+    // Абсолютный минимум: 250px (15.625rem) и не меньше 50% от базовой ширины
+    const MIN_ABS_PX = 250;
+    const baselinePx = photoBlockInitialPxRef.current ?? startWidthPxRef.current;
+    const ratioMin = baselinePx ? MIN_ABS_PX / baselinePx : 0.5;
+    const MIN_SCALE = Math.max(0.5, ratioMin);
+    if (value < MIN_SCALE) return MIN_SCALE;
+    if (value > 1) return 1;
+    return value;
+  }, []);
+
+  const handlePhotoResizeMove = useCallback((e: MouseEvent) => {
+    if (!isPhotoResizingRef.current) return;
+    const dx = e.clientX - startXRef.current;
+    const denom = Math.max(photoBlockInitialPxRef.current ?? startWidthPxRef.current, 1);
+    const SENSITIVITY = 1.0; // более отзывчивое изменение размера
+    const deltaRatio = (dx / denom) * SENSITIVITY; // width-proportional change
+    const next = clampScale(startScaleRef.current + deltaRatio);
+    setPhotoBlockScale(next);
+  }, [clampScale]);
+
+  const handlePhotoResizeEnd = useCallback(() => {
+    if (!isPhotoResizingRef.current) return;
+    isPhotoResizingRef.current = false;
+    document.removeEventListener('mousemove', handlePhotoResizeMove);
+    document.removeEventListener('mouseup', handlePhotoResizeEnd);
+  }, [handlePhotoResizeMove]);
+
+  const handlePhotoResizeStart = useCallback((e: React.MouseEvent) => {
+    if (!photoBlockRef.current) return;
+    isPhotoResizingRef.current = true;
+    startXRef.current = (e as React.MouseEvent).clientX;
+    startYRef.current = (e as React.MouseEvent).clientY;
+    startScaleRef.current = photoBlockScale;
+    startWidthPxRef.current = photoBlockRef.current.offsetWidth;
+    document.addEventListener('mousemove', handlePhotoResizeMove);
+    document.addEventListener('mouseup', handlePhotoResizeEnd);
+  }, [handlePhotoResizeMove, handlePhotoResizeEnd, photoBlockScale]);
+
+  // Measure initial block width once (baseline) and update rem on viewport resize
+  useEffect(() => {
+    const measure = () => {
+      if (!photoBlockRef.current) return;
+      const px = photoBlockRef.current.offsetWidth;
+      const rem = px / 16;
+      setPhotoBlockInitialRem(rem);
+      if (photoBlockInitialPxRef.current == null) {
+        photoBlockInitialPxRef.current = px; // lock baseline for proportional math
+      }
+      if (photoBlockScale > 1) setPhotoBlockScale(1);
+    };
+    measure();
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      const matches = 'matches' in e ? e.matches : (e as MediaQueryList).matches;
+      setIsLargeScreen(matches);
+    };
+    handler(mq);
+    mq.addEventListener('change', handler as any);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      mq.removeEventListener('change', handler as any);
+    };
+  }, [photoBlockScale]);
+
+  // Cleanup listeners if unmounts mid-resize
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handlePhotoResizeMove);
+      document.removeEventListener('mouseup', handlePhotoResizeEnd);
+    };
+  }, [handlePhotoResizeMove, handlePhotoResizeEnd]);
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
   const [tabsOverflow, setTabsOverflow] = useState(false);
 
@@ -746,8 +831,18 @@ export function ProductFormTabs({
               {/* Основной контейнер с каруселью слева и полями справа */}
               <div className="flex flex-col lg:flex-row lg:flex-wrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
                 {/* Карусель фото — фиксированная левая колонка */}
-                <div className="lg:basis-[36rem] xl:basis-[40rem] shrink-0 space-y-4 mx-auto" data-testid="productFormTabs_photoContainer">
-                  <div className={`p-2 sm:p-3 rounded-lg ${images.length === 0 ? 'border' : ''}`}>
+                <div
+                  className="lg:basis-[36rem] xl:basis-[40rem] shrink-0 space-y-4 mx-auto relative"
+                  data-testid="productFormTabs_photoContainer"
+                  ref={photoBlockRef}
+                  style={photoBlockInitialRem ? {
+                    flexBasis: isLargeScreen ? `${photoBlockInitialRem * photoBlockScale}rem` : undefined,
+                    width: isLargeScreen ? `${photoBlockInitialRem * photoBlockScale}rem` : undefined,
+                    // Минимум: не меньше 50% базовой ширины и не меньше 15.625rem (250px)
+                    minWidth: isLargeScreen ? `${Math.max(photoBlockInitialRem * 0.5, 15.625)}rem` : undefined
+                  } : undefined}
+                >
+                  <div className={`p-2 sm:p-3 rounded-lg ${images.length === 0 ? 'border' : ''} aspect-square`}>
                     {images.length > 0 ? (
                       <div className="space-y-4">
                         {/* Main image display */}
@@ -755,7 +850,7 @@ export function ProductFormTabs({
                           <Card className="relative group">
                             <CardContent className="p-2 sm:p-3 md:p-4">
                               <div 
-                                className="relative overflow-hidden rounded-md flex items-center justify-center w-full max-w-full"
+                                className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square"
                                 style={getAdaptiveImageStyle()}
                               >
                                 <img 
@@ -841,6 +936,15 @@ export function ProductFormTabs({
                       </div>
                     )}
                   </div>
+                  {/* Resize handle for entire photo block */}
+                  <button
+                    type="button"
+                    aria-label="Resize photo block"
+                    className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 border border-primary/40 hover:bg-primary/30 cursor-nwse-resize hidden sm:block"
+                    onMouseDown={handlePhotoResizeStart}
+                    onDoubleClick={() => setPhotoBlockScale(1)}
+                    data-testid="resize_handle_photo_block"
+                  />
                 </div>
 
                 {/* Правая часть — гибкая колонка с данными */}
