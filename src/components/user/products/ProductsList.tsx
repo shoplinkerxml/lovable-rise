@@ -82,7 +82,11 @@ export const ProductsList = ({
   if (products.length === 0) {
     return (
       <div className="flex justify-center">
-        <Empty className="border max-w-md">
+        <div
+          className="rounded-xl border border-primary/20 bg-card/80 shadow-lg backdrop-blur-sm p-6 md:p-8"
+          data-testid="user_products_empty_wrap"
+        >
+          <Empty className="border-0 max-w-md">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <Package />
@@ -96,7 +100,8 @@ export const ProductsList = ({
             <Package className="h-4 w-4 mr-2" />
             {t('add_product')}
           </Button>
-        </Empty>
+          </Empty>
+        </div>
       </div>
     );
   }
