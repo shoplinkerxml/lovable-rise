@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { TrendingUp, Menu, X, Globe } from "lucide-react"
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useI18n } from "@/providers/i18n-provider"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { t, lang, setLang } = useI18n()
+  const navigate = useNavigate()
 
   const toggleLanguage = () => {
     setLang(lang === 'uk' ? 'en' : 'uk')
@@ -58,10 +60,18 @@ export function Header() {
             <span className="sr-only">Toggle language</span>
           </Button>
           <ThemeToggle />
-          <Button variant="ghost" size="sm">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/user-auth')}
+          >
             {t('nav_login')}
           </Button>
-          <Button variant="hero" size="sm">
+          <Button
+            variant="hero"
+            size="sm"
+            onClick={() => navigate('/user-register')}
+          >
             {t('nav_get_started')}
           </Button>
         </div>
@@ -103,10 +113,24 @@ export function Header() {
               API Docs
             </a>
             <div className="pt-3 space-y-2">
-              <Button variant="outline" className="w-full">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  navigate('/user-auth');
+                }}
+              >
                 {t('nav_login')}
               </Button>
-              <Button variant="hero" className="w-full">
+              <Button
+                variant="hero"
+                className="w-full"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  navigate('/user-register');
+                }}
+              >
                 {t('nav_get_started')}
               </Button>
             </div>

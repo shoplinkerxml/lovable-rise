@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import spreadsheetMockup from "@/assets/spreadsheet-mockup.jpg";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/providers/i18n-provider";
 
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false);
   const { t } = useI18n();
+  const navigate = useNavigate();
   
   useEffect(() => {
     setIsVisible(true);
@@ -55,6 +57,7 @@ export function HeroSection() {
                 variant="hero" 
                 size="lg" 
                 className="text-lg px-8 py-7 rounded-lg group"
+                onClick={() => navigate('/user-register')}
               >
                 {t('hero_cta_primary')}
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
