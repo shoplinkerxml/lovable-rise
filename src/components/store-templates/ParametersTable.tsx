@@ -57,7 +57,7 @@ export const ParametersTable: React.FC<ParametersTableProps> = ({
         return 'bg-green-100 text-green-800 border-green-200';
       case 'array':
       case 'масив':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-success-light text-success border-success/30';
       case 'object':
       case "об'єкт":
         return 'bg-orange-100 text-orange-800 border-orange-200';
