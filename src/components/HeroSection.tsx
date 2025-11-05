@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import spreadsheetMockup from "@/assets/spreadsheet-mockup.jpg";
 import { useState, useEffect } from "react";
 import { useI18n } from "@/providers/i18n-provider";
 
@@ -14,62 +15,67 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden bg-gradient-hero">
-      {/* Animated background elements */}
+    <section className="relative min-h-screen flex items-center overflow-hidden bg-background">
+      {/* Gradient glow effects */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 right-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 left-10 w-96 h-96 bg-success/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
       </div>
 
       <div className="container relative z-10">
-        <div className="max-w-5xl mx-auto text-center">
-          {/* Badge */}
-          <div className={`inline-flex items-center px-4 py-2 rounded-full bg-success-light border border-success/20 text-success text-sm font-medium mb-8 ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`}>
-            <Sparkles className="w-4 h-4 mr-2" />
-            {t('hero_badge')}
-          </div>
-
-          {/* Main Heading */}
-          <h1 className={`text-5xl md:text-7xl font-bold leading-tight mb-6 ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.1s' }}>
-            {t('hero_title_1')}{" "}
-            <span className="bg-gradient-success bg-clip-text text-transparent">
-              {t('hero_title_accent')}
-            </span>{" "}
-            {t('hero_title_2')}
-          </h1>
-
-          {/* Subtitle */}
-          <p className={`text-xl md:text-2xl text-muted-foreground leading-relaxed mb-10 max-w-3xl mx-auto ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
-            {t('hero_subtitle')}
-          </p>
-
-          {/* CTA Buttons */}
-          <div className={`flex flex-col sm:flex-row gap-4 justify-center mb-16 ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.3s' }}>
-            <Button variant="hero" size="lg" className="group text-lg px-8 py-6">
-              {t('hero_cta_primary')}
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-6 border-2">
-              {t('hero_cta_secondary')}
-            </Button>
-          </div>
-
-          {/* Stats */}
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.4s' }}>
-            <div className="bg-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50">
-              <div className="flex items-center justify-center mb-2">
-                <TrendingUp className="w-5 h-5 text-success mr-2" />
-                <div className="text-4xl font-bold text-success">30-50%</div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Left: Text Content */}
+          <div className={`space-y-8 ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`}>
+            {/* Badge */}
+            <div className="inline-block">
+              <div className="px-4 py-2 rounded-md bg-primary/10 border border-primary/20">
+                <span className="text-sm font-medium text-primary uppercase tracking-wider">
+                  {t('hero_badge')}
+                </span>
               </div>
-              <div className="text-muted-foreground">{t('hero_stat_1')}</div>
             </div>
-            <div className="bg-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50">
-              <div className="text-4xl font-bold text-success mb-2">90%</div>
-              <div className="text-muted-foreground">{t('hero_stat_2')}</div>
+
+            {/* Main Heading */}
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
+              {t('hero_title_1')}{" "}
+              <span className="text-primary">
+                {t('hero_title_accent')}
+              </span>{" "}
+              {t('hero_title_2')}
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-xl text-muted-foreground leading-relaxed max-w-xl">
+              {t('hero_subtitle')}
+            </p>
+
+            {/* CTA Button */}
+            <div>
+              <Button 
+                variant="hero" 
+                size="lg" 
+                className="text-lg px-8 py-7 rounded-lg group"
+              >
+                {t('hero_cta_primary')}
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
             </div>
-            <div className="bg-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border/50">
-              <div className="text-4xl font-bold text-success mb-2">500+</div>
-              <div className="text-muted-foreground">{t('hero_stat_3')}</div>
+          </div>
+
+          {/* Right: Mockup Image */}
+          <div className={`relative ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
+            <div className="relative">
+              {/* Glow effect behind image */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/30 to-primary/10 rounded-2xl blur-3xl" />
+              
+              {/* Image */}
+              <div className="relative rounded-2xl overflow-hidden border border-primary/20 shadow-2xl">
+                <img 
+                  src={spreadsheetMockup} 
+                  alt="Business data spreadsheet mockup" 
+                  className="w-full h-auto"
+                />
+              </div>
             </div>
           </div>
         </div>
