@@ -26,6 +26,7 @@ const dictionary: Dictionary = {
   nav_pricing: { uk: "Тарифи", en: "Pricing" },
   nav_login: { uk: "Увійти", en: "Log in" },
   nav_get_started: { uk: "Почати безкоштовно", en: "Get started free" },
+  brand_name: { uk: "MarketGrow", en: "MarketGrow" },
   
   // Hero Section - updated
   hero_badge: { uk: "Автоматизація бізнесу на маркетплейсах", en: "Marketplace Business Automation" },

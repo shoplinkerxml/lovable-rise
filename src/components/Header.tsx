@@ -22,7 +22,12 @@ export function Header() {
           <div className="bg-gradient-success p-2 rounded-lg shadow-glow">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
-          <span className="text-xl font-bold bg-gradient-success bg-clip-text text-transparent">MarketGrow</span>
+          <span
+            data-testid="header_brand"
+            className="inline-flex items-center px-3 py-1 rounded-md bg-success-light border border-success/20 text-success text-base font-semibold"
+          >
+            {t('brand_name')}
+          </span>
         </div>
 
         {/* Desktop Navigation */}

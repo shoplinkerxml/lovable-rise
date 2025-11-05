@@ -394,11 +394,11 @@ const UserLayoutContent = ({
     };
   }, [user.id]);
 
-  // Auto-collapse sidebar at viewport widths ≤ 1270px
+  // Auto-collapse sidebar at viewport widths ≤ 1393px
   useEffect(() => {
     const applyCollapse = () => {
       const w = window.innerWidth;
-      setSidebarCollapsed(w <= 1270);
+      setSidebarCollapsed(w <= 1393);
     };
     applyCollapse();
     window.addEventListener('resize', applyCollapse);
@@ -497,7 +497,7 @@ const UserLayoutContent = ({
       </Sheet>
 
       {/* User Sidebar - Desktop - Fixed Position */}
-      <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col fixed left-0 top-0 h-screen z-40 overflow-hidden`}>
+      <aside className={`hidden md:flex max-[1393px]:hidden ${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 shrink-0 border-r bg-background flex-col fixed left-0 top-0 h-screen z-40 overflow-hidden`}>
         <div className="p-4 shrink-0">
           {/* Logo/Header */}
           <div className="flex items-center justify-between mb-6">
@@ -589,7 +589,7 @@ const UserLayoutContent = ({
       </aside>
 
       {/* Main Content Area - Adjusted for fixed sidebar */}
-      <div className={`flex-1 min-w-0 flex flex-col ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'} transition-all duration-300`}>
+      <div className={`flex-1 min-w-0 flex flex-col ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'} max-[1393px]:ml-0 transition-all duration-300`}>
         {/* Header */}
         <header className="h-16 border-b bg-background flex items-center px-4 md:px-6 justify-between shrink-0">
           <div className="flex items-center gap-3">
