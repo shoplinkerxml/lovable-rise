@@ -181,4 +181,46 @@ export const CategoryService = {
     if (error) handleError(error);
     return true;
   },
+
+  // 9. Cascade delete: delete a category and all its descendants for a supplier
+  async deleteCategoryCascade(supplierId: string | number, externalId: string): Promise<boolean> {
+    const normalized = normalizeSupplierId(supplierId);
+    const client = supabase as any;
+
+    // Fetch all categories for supplier (only fields needed for tree traversal)
+    const { data, error } = await client
+      .from('store_categories')
+      .select('external_id,parent_external_id')
+      .eq('supplier_id', normalized);
+    if (error) handleError(error);
+
+    const rows: { external_id: string; parent_external_id: string | null }[] = (data ?? []) as any[];
+
+    // Build set of external_ids to delete (start with selected node)
+    const toDelete = new Set<string>([externalId]);
+
+    // Traverse descendants iteratively to avoid deep recursion
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const r of rows) {
+        const parent = r.parent_external_id ?? undefined;
+        if (parent && toDelete.has(String(parent)) && !toDelete.has(r.external_id)) {
+          toDelete.add(r.external_id);
+          changed = true;
+        }
+      }
+    }
+
+    const ids = Array.from(toDelete);
+    if (ids.length === 0) return true;
+
+    const { error: delError } = await client
+      .from('store_categories')
+      .delete()
+      .eq('supplier_id', normalized)
+      .in('external_id', ids);
+    if (delError) handleError(delError);
+    return true;
+  },
 };

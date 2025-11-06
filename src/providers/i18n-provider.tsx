@@ -104,6 +104,7 @@ const dictionary: Dictionary = {
   menu_categories: { uk: "Категорії", en: "Categories" },
   menu_products: { uk: "Товари", en: "Products" },
   menu_main: { uk: "Головна", en: "Main" },
+  menu: { uk: "Меню", en: "Menu" },
   // Additional menu translations
   menu_pricing: { uk: "Тарифні плани", en: "Pricing Plans" },
   menu_currency: { uk: "Валюта", en: "Currency" },
@@ -1087,7 +1088,9 @@ const toastDictionary = {
   loading_creating: { uk: "Створення...", en: "Creating..." },
   create_category: { uk: "Створити категорію", en: "Create Category" },
   category_created: { uk: "Категорію створено", en: "Category created" },
+  category_deleted: { uk: "Категорію видалено", en: "Category deleted" },
   failed_create_category: { uk: "Не вдалося створити категорію", en: "Failed to create category" },
+  failed_delete_category: { uk: "Не вдалося видалити категорію", en: "Failed to delete category" },
   external_id_exists: { uk: "Такий зовнішній ID вже існує для цього постачальника", en: "This external ID already exists for this supplier" },
   fill_required_fields: { uk: "Заповніть обов'язкові поля", en: "Fill required fields" },
   select_supplier_error: { uk: "Оберіть постачальника", en: "Select a supplier" },

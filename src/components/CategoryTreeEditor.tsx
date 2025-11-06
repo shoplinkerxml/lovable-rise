@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/providers/i18n-provider";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X } from "lucide-react";
 
 type Supplier = { id: string; supplier_name: string };
 type Store = { id: string; store_name: string };
@@ -180,12 +180,12 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const handleDelete = async (externalId: string) => {
     if (!supplierId) return;
     try {
-      await CategoryService.deleteCategory(supplierId, externalId);
+      await CategoryService.deleteCategoryCascade(supplierId, externalId);
       await queryClient.invalidateQueries({ queryKey: ["categories", supplierId || "none"] });
-      toast.success(t("btn_delete"));
+      toast.success(t("category_deleted"));
     } catch (err) {
       console.error(err);
-      toast.error(t("failed_create_category"));
+      toast.error(t("failed_delete_category"));
     }
   };
 
@@ -248,17 +248,44 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
                 {t("rename_category")}
               </DropdownMenuItem>
               <AlertDialog>
-                <DropdownMenuItem onClick={(e) => e.stopPropagation()} data-testid={`categoryTree_delete_${node.external_id}`}>
-                  <Trash2 className="h-[1rem] w-[1rem] mr-[0.25rem]" />
-                  {t("delete_category")}
-                </DropdownMenuItem>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`categoryTree_delete_${node.external_id}`}
+                  >
+                    <Trash2 className="h-[1rem] w-[1rem] mr-[0.25rem]" />
+                    {t("delete_category")}
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>{t("confirm_delete_category")}</AlertDialogTitle>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>{t("btn_cancel")}</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDelete(node.external_id)}>{t("btn_delete")}</AlertDialogAction>
+                    <AlertDialogCancel asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-[2rem] w-[2rem] p-0 rounded-full border border-border"
+                        aria-label={t("btn_cancel")}
+                        data-testid={`categoryTree_deleteCancel_${node.external_id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        title={t("btn_cancel")}
+                      >
+                        <X className="h-[1rem] w-[1rem] text-destructive" />
+                      </Button>
+                    </AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button
+                        className="h-[2rem] w-[2rem] p-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                        aria-label={t("delete_category")}
+                        data-testid={`categoryTree_deleteConfirm_${node.external_id}`}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(node.external_id); }}
+                        title={t("delete_category")}
+                      >
+                        <Check className="h-[1rem] w-[1rem]" />
+                      </Button>
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
