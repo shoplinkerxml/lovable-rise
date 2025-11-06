@@ -204,7 +204,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     return (
       <div className="pl-[clamp(0rem,2vw,1rem)]" data-testid={`categoryTree_node_${node.external_id}`}>
         <div
-          className={`flex items-center gap-[0.5rem] rounded-md hover:bg-muted px-[0.5rem] py-[0.25rem] cursor-pointer ${selected === node.external_id ? "bg-muted" : ""}`}
+          className={`flex items-center gap-[0.5rem] rounded-md px-[0.5rem] py-[0.25rem] cursor-pointer border-l-2 ${selected === node.external_id ? "border-green-500" : "border-transparent"}`}
           onClick={() => setSelected(node.external_id)}
         >
           {hasChildren ? (
@@ -225,13 +225,14 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
             <span className="flex-1 truncate" title={node.name}>{node.name}</span>
           )}
 
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => { if (open) setSelected(node.external_id); }}>
             <DropdownMenuTrigger asChild>
               <div
-                className="inline-flex items-center justify-center gap-[0.25rem] whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-accent hover:text-accent-foreground h-[1.75rem] w-[1.75rem]"
+                className="inline-flex items-center justify-center gap-[0.25rem] whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500 hover:bg-green-50 hover:text-green-700 h-[1.75rem] w-[1.75rem]"
                 role="button"
                 aria-haspopup="menu"
-                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => { e.stopPropagation(); setSelected(node.external_id); }}
+                onClick={(e) => { e.stopPropagation(); setSelected(node.external_id); }}
                 data-testid={`categoryTree_actions_${node.external_id}`}
                 title={t("menu")}
               >
