@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+// AlertDialog не используется: удаление выполняется сразу без модалки
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -247,48 +247,13 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
                 <Pencil className="h-[1rem] w-[1rem] mr-[0.25rem]" />
                 {t("rename_category")}
               </DropdownMenuItem>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    onClick={(e) => e.stopPropagation()}
-                    data-testid={`categoryTree_delete_${node.external_id}`}
-                  >
-                    <Trash2 className="h-[1rem] w-[1rem] mr-[0.25rem]" />
-                    {t("delete_category")}
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("confirm_delete_category")}</AlertDialogTitle>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-[2rem] w-[2rem] p-0 rounded-full border border-border"
-                        aria-label={t("btn_cancel")}
-                        data-testid={`categoryTree_deleteCancel_${node.external_id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        title={t("btn_cancel")}
-                      >
-                        <X className="h-[1rem] w-[1rem] text-destructive" />
-                      </Button>
-                    </AlertDialogCancel>
-                    <AlertDialogAction asChild>
-                      <Button
-                        className="h-[2rem] w-[2rem] p-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                        aria-label={t("delete_category")}
-                        data-testid={`categoryTree_deleteConfirm_${node.external_id}`}
-                        onClick={(e) => { e.stopPropagation(); handleDelete(node.external_id); }}
-                        title={t("delete_category")}
-                      >
-                        <Check className="h-[1rem] w-[1rem]" />
-                      </Button>
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <DropdownMenuItem
+                onSelect={() => handleDelete(node.external_id)}
+                data-testid={`categoryTree_delete_${node.external_id}`}
+              >
+                <Trash2 className="h-[1rem] w-[1rem] mr-[0.25rem]" />
+                {t("delete_category")}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
