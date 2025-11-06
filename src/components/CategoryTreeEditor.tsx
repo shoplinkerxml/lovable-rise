@@ -124,8 +124,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={(cat as any).external_id || ""}>
-                    {(cat as any).name}
+                  <SelectItem key={cat.external_id} value={cat.external_id}>
+                    {cat.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -13,13 +13,13 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
   import { Plus, Minus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
+import { type Product } from '@/lib/product-service';
 import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
 import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
 interface ProductFormTabsProps {
-  product?: Tables<'store_products'>;
+  product?: Product | null;
   onSubmit?: (data: any) => void;
   onCancel?: () => void;
 }
@@ -37,6 +37,10 @@ interface ProductImage {
   is_main: boolean;
   object_key?: string;
 }
+// Shallow lookup types to avoid deep Supabase generics
+type SupplierOption = { id: string; supplier_name: string };
+type CategoryOption = { id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null };
+type CurrencyOption = { id: number; name: string; code: string; status: boolean | null };
 interface FormData {
   name: string;
   name_ua: string;
@@ -49,6 +53,7 @@ interface FormData {
   article: string;
   sku: string;
   external_id: string;
+  supplier_id: string;
   category_id: string;
   currency_id: string;
   price: number;
@@ -208,6 +213,7 @@ export function ProductFormTabs({
     article: '',
     sku: '',
     external_id: '',
+    supplier_id: '',
     category_id: '',
     currency_id: '',
     price: 0,
@@ -378,10 +384,20 @@ export function ProductFormTabs({
   });
 
   // Lookup data
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [currencies, setCurrencies] = useState<any[]>([]);
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
+  // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
+
+  // Helper: fetch categories by supplier with minimized type inference to avoid deep instantiation
+  const fetchCategoriesBySupplier = async (supplierId: number): Promise<CategoryOption[]> => {
+    const { data, error } = await (supabase as any)
+      .from('store_categories')
+      .select('id,name,external_id,supplier_id,parent_external_id')
+      .eq('supplier_id', supplierId)
+      .order('name');
+    return error ? [] : ((data ?? []) as unknown as CategoryOption[]);
+  };
 
   // Load initial data
   useEffect(() => {
@@ -395,21 +411,24 @@ export function ProductFormTabs({
       // Load suppliers
       const { data: suppliersData } = await supabase
         .from('user_suppliers')
-        .select('*')
-        .order('supplier_name');
+        .select('id,supplier_name')
+        .order('supplier_name').returns<SupplierOption[]>();
 
-      // Load categories
-      const { data: categoriesData } = await supabase
-        .from('store_categories')
-        .select('*')
-        .order('name');
+      // Load categories filtered by supplier if selected
+      let categoriesData: any[] | null = null;
+      if (!formData.supplier_id) {
+        categoriesData = [];
+      } else {
+        const supplierId = Number(formData.supplier_id);
+        categoriesData = await fetchCategoriesBySupplier(supplierId);
+      }
 
       // Load currencies
       const { data: currenciesData } = await supabase
         .from('currencies')
-        .select('*')
+        .select('id,name,code,status')
         .eq('status', true)
-        .order('name');
+        .order('name').returns<CurrencyOption[]>();
 
       setSuppliers(suppliersData || []);
       setCategories(categoriesData || []);
@@ -419,6 +438,15 @@ export function ProductFormTabs({
       toast.error(t('failed_load_data'));
     }
   };
+
+  // Refetch categories when supplier changes
+  useEffect(() => {
+    // Reset selected category when supplier changes
+    setFormData(prev => ({ ...prev, category_id: '' }));
+    // Reload lookup data to refresh categories for the selected supplier
+    loadLookupData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.supplier_id]);
   const loadProductData = async () => {
     if (!product) return;
     try {
@@ -435,6 +463,7 @@ export function ProductFormTabs({
         article: product.article || '',
         sku: product.sku || '',
         external_id: product.external_id || '',
+        supplier_id: (product as any).supplier_id || '',
         category_id: product.category_id || '',
         currency_id: product.currency_id || '',
         price: product.price || 0,
@@ -993,7 +1022,7 @@ export function ProductFormTabs({
 
                       <div className="space-y-2">
                         <Label htmlFor="external_id">{t('external_id')}</Label>
-                        <Input id="external_id" value={formData.external_id} onChange={e => setFormData({
+                        <Input id="external_id" name="external_id" autoComplete="off" value={formData.external_id} onChange={e => setFormData({
                         ...formData,
                         external_id: e.target.value
                       })} placeholder={t('external_id_placeholder')} data-testid="productFormTabs_externalIdInput" />
@@ -1001,7 +1030,7 @@ export function ProductFormTabs({
 
                       <div className="space-y-2">
                         <Label htmlFor="article">{t('article')}</Label>
-                        <Input id="article" value={formData.article} onChange={e => setFormData({
+                        <Input id="article" name="article" autoComplete="off" value={formData.article} onChange={e => setFormData({
                         ...formData,
                         article: e.target.value
                       })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
@@ -1009,14 +1038,14 @@ export function ProductFormTabs({
 
                       <div className="space-y-2">
                         <Label htmlFor="sku">{t('sku')}</Label>
-                        <Input id="sku" value={formData.sku} onChange={e => setFormData({
+                        <Input id="sku" name="sku" autoComplete="off" value={formData.sku} onChange={e => setFormData({
                         ...formData,
                         sku: e.target.value
                       })} placeholder={t('sku_placeholder')} data-testid="productFormTabs_skuInput" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-                        <Input id="stock_quantity" type="number" value={formData.stock_quantity} onChange={e => setFormData({
+                        <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
                         ...formData,
                         stock_quantity: parseInt(e.target.value) || 0
                       })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
@@ -1036,7 +1065,7 @@ export function ProductFormTabs({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="vendor">{t('manufacturer')}</Label>
-                        <Input id="vendor" value={formData.vendor} onChange={e => setFormData({
+                        <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
                         ...formData,
                         vendor: e.target.value
                       })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" />
@@ -1044,7 +1073,7 @@ export function ProductFormTabs({
 
                       <div className="space-y-2">
                         <Label htmlFor="brand">{t('brand')}</Label>
-                        <Input id="brand" value={formData.brand} onChange={e => setFormData({
+                        <Input id="brand" name="brand" autoComplete="off" value={formData.brand} onChange={e => setFormData({
                         ...formData,
                         brand: e.target.value
                       })} placeholder={t('brand_placeholder')} data-testid="productFormTabs_brandInput" />
@@ -1061,12 +1090,12 @@ export function ProductFormTabs({
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="state">{t('product_status')}</Label>
+                        <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
                         <Select value={formData.state} onValueChange={value => setFormData({
                         ...formData,
                         state: value
                       })}>
-                          <SelectTrigger data-testid="productFormTabs_stateSelect">
+                          <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect">
                             <SelectValue placeholder={t('select_status')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -1080,7 +1109,7 @@ export function ProductFormTabs({
 
                       <div className="space-y-2">
                         <Label htmlFor="url">{t('product_url')}</Label>
-                        <Input id="url" value={formData.url} onChange={e => setFormData({
+                        <Input id="url" name="url" autoComplete="url" value={formData.url} onChange={e => setFormData({
                         ...formData,
                         url: e.target.value
                       })} placeholder={t('product_url_placeholder')} data-testid="productFormTabs_urlInput" />
@@ -1129,6 +1158,8 @@ export function ProductFormTabs({
                       <Label htmlFor="name_ua">{t('product_name')} *</Label>
                       <Input 
                         id="name_ua" 
+                        name="name_ua" 
+                        autoComplete="off" 
                         value={formData.name_ua} 
                         onChange={e => setFormData({
                           ...formData,
@@ -1143,6 +1174,8 @@ export function ProductFormTabs({
                       <Label htmlFor="docket_ua">{t('short_name')}</Label>
                       <Input 
                         id="docket_ua" 
+                        name="docket_ua" 
+                        autoComplete="off" 
                         value={formData.docket_ua} 
                         onChange={e => setFormData({
                           ...formData,
@@ -1157,6 +1190,8 @@ export function ProductFormTabs({
                       <Label htmlFor="description_ua">{t('product_description')}</Label>
                       <Textarea 
                         id="description_ua" 
+                        name="description_ua" 
+                        autoComplete="off" 
                         value={formData.description_ua} 
                         onChange={e => setFormData({
                           ...formData,
@@ -1174,6 +1209,8 @@ export function ProductFormTabs({
                       <Label htmlFor="name">{t('product_name')}</Label>
                       <Input 
                         id="name" 
+                        name="name" 
+                        autoComplete="off" 
                         value={formData.name} 
                         onChange={e => setFormData({
                           ...formData,
@@ -1188,6 +1225,8 @@ export function ProductFormTabs({
                       <Label htmlFor="docket">{t('short_name')}</Label>
                       <Input 
                         id="docket" 
+                        name="docket" 
+                        autoComplete="off" 
                         value={formData.docket} 
                         onChange={e => setFormData({
                           ...formData,
@@ -1202,6 +1241,8 @@ export function ProductFormTabs({
                       <Label htmlFor="description">{t('product_description')}</Label>
                       <Textarea 
                         id="description" 
+                        name="description" 
+                        autoComplete="off" 
                         value={formData.description} 
                         onChange={e => setFormData({
                           ...formData,
@@ -1226,11 +1267,20 @@ export function ProductFormTabs({
                   suppliers={suppliers}
                   stores={[]}
                   categories={categories}
-                  defaultSupplierId={selectedSupplierId}
+                  defaultSupplierId={formData.supplier_id}
                   showStoreSelect={false}
-                  onCategoryCreated={(cat) => {
-                    setCategories((prev) => [cat as any, ...prev]);
-                    setFormData({ ...formData, category_id: (cat as any).id });
+                  onCategoryCreated={async (cat) => {
+                    if (!formData.supplier_id) {
+                      setCategories([]);
+                      return;
+                    }
+                    const supplierId = Number(formData.supplier_id);
+                    const list = await fetchCategoriesBySupplier(supplierId);
+                    setCategories(list);
+                    const matched = list.find(c => c.external_id === cat.external_id);
+                    if (matched) {
+                      setFormData(prev => ({ ...prev, category_id: matched.id }));
+                    }
                   }}
                 />
               </div>
@@ -1244,12 +1294,12 @@ export function ProductFormTabs({
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="category_id">{t('category')} *</Label>
+                    <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
                     <Select value={formData.category_id} onValueChange={value => setFormData({
                     ...formData,
                     category_id: value
                   })}>
-                      <SelectTrigger data-testid="productFormTabs_categorySelect">
+                      <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
                         <SelectValue placeholder={t('select_category')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1261,16 +1311,16 @@ export function ProductFormTabs({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="currency_id">{t('currency')} *</Label>
+                    <span id="currency_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_currencyText">{t('currency')} *</span>
                     <Select value={formData.currency_id} onValueChange={value => setFormData({
                     ...formData,
                     currency_id: value
                   })}>
-                      <SelectTrigger data-testid="productFormTabs_currencySelect">
+                      <SelectTrigger aria-labelledby="currency_label" data-testid="productFormTabs_currencySelect">
                         <SelectValue placeholder={t('select_currency')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {currencies.map(currency => <SelectItem key={currency.id} value={currency.id}>
+                        {currencies.map(currency => <SelectItem key={currency.id} value={String(currency.id)}>
                             {currency.name} ({currency.code})
                           </SelectItem>)}
                       </SelectContent>
@@ -1279,7 +1329,7 @@ export function ProductFormTabs({
 
                   <div className="space-y-2">
                     <Label htmlFor="price">{t('price')} *</Label>
-                    <Input id="price" type="number" step="0.01" value={formData.price} onChange={e => setFormData({
+                    <Input id="price" name="price" autoComplete="off" type="number" step="0.01" value={formData.price} onChange={e => setFormData({
                     ...formData,
                     price: parseFloat(e.target.value) || 0
                   })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" />
@@ -1287,7 +1337,7 @@ export function ProductFormTabs({
 
                   <div className="space-y-2">
                     <Label htmlFor="price_old">{t('old_price')}</Label>
-                    <Input id="price_old" type="number" step="0.01" value={formData.price_old} onChange={e => setFormData({
+                    <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => setFormData({
                     ...formData,
                     price_old: parseFloat(e.target.value) || 0
                   })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" />
@@ -1295,7 +1345,7 @@ export function ProductFormTabs({
 
                   <div className="space-y-2">
                     <Label htmlFor="price_promo">{t('promo_price')}</Label>
-                    <Input id="price_promo" type="number" step="0.01" value={formData.price_promo} onChange={e => setFormData({
+                    <Input id="price_promo" name="price_promo" autoComplete="off" type="number" step="0.01" value={formData.price_promo} onChange={e => setFormData({
                     ...formData,
                     price_promo: parseFloat(e.target.value) || 0
                   })} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" />
@@ -1315,7 +1365,7 @@ export function ProductFormTabs({
                   <div className="flex-1">
                     <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
                     <div className="flex gap-2 mt-2">
-                      <Input id="imageUrl" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
+                      <Input id="imageUrl" name="imageUrl" autoComplete="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
                       <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
                         <Link className="h-4 w-4" />
                       </Button>
@@ -1421,14 +1471,14 @@ export function ProductFormTabs({
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <Label htmlFor="paramName">{t('characteristic_name')}</Label>
-                    <Input id="paramName" value={newParam.name} onChange={e => setNewParam({
+                    <Input id="paramName" name="paramName" autoComplete="off" value={newParam.name} onChange={e => setNewParam({
                     ...newParam,
                     name: e.target.value
                   })} placeholder={t('characteristic_name_placeholder')} data-testid="productFormTabs_paramNameInput" />
                   </div>
                   <div className="flex-1">
                     <Label htmlFor="paramValue">{t('value')}</Label>
-                    <Input id="paramValue" value={newParam.value} onChange={e => setNewParam({
+                    <Input id="paramValue" name="paramValue" autoComplete="off" value={newParam.value} onChange={e => setNewParam({
                     ...newParam,
                     value: e.target.value
                   })} placeholder={t('value_example')} data-testid="productFormTabs_paramValueInput" />

@@ -166,24 +166,44 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         setCurrencies(currenciesData || []);
       }
 
-      // Load categories for current user
-      const { data: categoriesData, error: categoriesError } = await (supabase as any)
-        .from('store_categories')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
-      
-      if (categoriesError) {
-        console.error('Error loading store categories:', categoriesError);
-        // Set empty categories array as fallback
-        setCategories([]);
-      } else {
-        setCategories(categoriesData || []);
-      }
+      // Categories will be loaded reactively based on selected supplier
+      setCategories([]);
     } catch (error) {
       console.error('Load initial data error:', error);
     }
   };
+
+  // Reactive categories fetch by supplier_id
+  useEffect(() => {
+    const fetchCategories = async (supplierId: string) => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('store_categories')
+          .select('*')
+          .eq('supplier_id', supplierId)
+          .order('name');
+        if (error) {
+          console.error('Error loading categories by supplier:', error);
+          setCategories([]);
+        } else {
+          setCategories(data || []);
+        }
+      } catch (err) {
+        console.error('Unexpected error loading categories:', err);
+        setCategories([]);
+      }
+    };
+
+    // Reset category selection whenever supplier changes
+    setFormData(prev => ({ ...prev, category_id: '' }));
+
+    if (formData.supplier_id) {
+      fetchCategories(formData.supplier_id);
+    } else {
+      setCategories([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.supplier_id]);
 
   const addParam = () => {
     setParams([...params, { name: '', value: '', order_index: params.length }]);

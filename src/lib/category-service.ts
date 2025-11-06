@@ -1,10 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Tables } from "@/integrations/supabase/types";
 
-export type StoreCategory = Tables<'store_categories'>;
+// Minimal DTO shape aligned with new API select
+export type StoreCategory = {
+  external_id: string;
+  name: string;
+  parent_external_id: string | null;
+};
 
 export interface CreateCategoryInput {
-  supplier_id: string;
+  supplier_id: string | number;
   external_id: string;
   name: string;
   store_id?: string;
@@ -12,42 +16,37 @@ export interface CreateCategoryInput {
 }
 
 export const CategoryService = {
-  async listCategories(): Promise<StoreCategory[]> {
-    const { data, error } = await supabase
+  async listCategories(supplierId?: string | number): Promise<StoreCategory[]> {
+    const client = supabase as any;
+    let query = client
       .from('store_categories')
-      .select('*')
+      .select('external_id,name,parent_external_id')
       .order('name');
+
+    if (supplierId !== undefined && supplierId !== null) {
+      query = query.eq('supplier_id', supplierId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
-    return (data as StoreCategory[]) || [];
+    return (data as unknown as StoreCategory[]) || [];
   },
 
   async createCategory(input: CreateCategoryInput): Promise<StoreCategory> {
-    let parentId: string | undefined;
-    if (input.parent_external_id) {
-      const { data: parentData, error: parentError } = await supabase
-        .from('store_categories')
-        .select('id')
-        .eq('external_id', input.parent_external_id)
-        .limit(1)
-        .single();
-      if (parentError && parentError.code !== 'PGRST116') {
-        throw parentError;
-      }
-      parentId = (parentData as any)?.id;
-    }
-
     const payload: any = {
+      supplier_id: input.supplier_id,
       external_id: input.external_id,
       name: input.name,
-      parent_id: parentId,
+      parent_external_id: input.parent_external_id ?? null,
     };
 
-    const { data, error } = await supabase
+    const client = supabase as any;
+    const { data, error } = await client
       .from('store_categories')
       .insert([payload])
-      .select('*')
+      .select('external_id,name,parent_external_id')
       .single();
     if (error) throw error;
-    return data as StoreCategory;
+    return data as unknown as StoreCategory;
   },
 };
