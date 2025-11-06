@@ -90,6 +90,7 @@ export const ProductCreate = () => {
         title={t('create_product')}
         description={t('create_product_description')}
         breadcrumbItems={breadcrumbs}
+        className="pl-6"
         actions={
           <div className="flex gap-2 items-center">
             <Badge variant="outline" className="text-sm flex items-center gap-1.5 shrink-0">

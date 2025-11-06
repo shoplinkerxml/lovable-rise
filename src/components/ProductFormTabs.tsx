@@ -1009,7 +1009,7 @@ export function ProductFormTabs({
                 </div>
 
                 {/* Правая часть — гибкая колонка с данными */}
-                <div className="flex-1 min-w-[20rem] space-y-6" data-testid="productFormTabs_formContainer">
+                <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
                   {/* Секция: Основні дані */}
                   <div className="space-y-4" data-testid="productFormTabs_basicSection">
                     <div className="flex items-center gap-2">
