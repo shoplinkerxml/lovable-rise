@@ -16,7 +16,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
-import { ProductService } from '@/lib/product-service';
 import { R2Storage } from '@/lib/r2-storage';
 import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
 interface ProductFormTabsProps {
@@ -379,7 +378,6 @@ export function ProductFormTabs({
   });
 
   // Lookup data
-  const [stores, setStores] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
@@ -394,24 +392,25 @@ export function ProductFormTabs({
   }, [product]);
   const loadLookupData = async () => {
     try {
-      // Load stores
-      const storesData = await ProductService.getUserStores();
-      setStores(storesData || []);
       // Load suppliers
-      const {
-        data: suppliersData
-      } = await supabase.from('user_suppliers').select('*').order('supplier_name');
+      const { data: suppliersData } = await supabase
+        .from('user_suppliers')
+        .select('*')
+        .order('supplier_name');
 
       // Load categories
-      const {
-        data: categoriesData
-      } = await supabase.from('store_categories').select('*').order('name');
+      const { data: categoriesData } = await supabase
+        .from('store_categories')
+        .select('*')
+        .order('name');
 
       // Load currencies
-      const {
-        data: currenciesData
-      } = await supabase.from('currencies').select('*').eq('status', true).order('name');
-      setStores(storesData || []);
+      const { data: currenciesData } = await supabase
+        .from('currencies')
+        .select('*')
+        .eq('status', true)
+        .order('name');
+
       setSuppliers(suppliersData || []);
       setCategories(categoriesData || []);
       setCurrencies(currenciesData || []);
@@ -990,38 +989,7 @@ export function ProductFormTabs({
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="store_id">{t('store')} *</Label>
-                        <Select value={formData.store_id} onValueChange={value => setFormData({
-                        ...formData,
-                        store_id: value
-                      })}>
-                          <SelectTrigger data-testid="productFormTabs_storeSelect">
-                            <SelectValue placeholder={t('select_store')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stores.map(store => (
-                              <SelectItem key={store.id} value={store.id}>
-                                {store.store_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="supplier_id">{t('supplier')}</Label>
-                        <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                          <SelectTrigger className="w-full max-w-full min-w-0 whitespace-nowrap [&>span]:truncate" data-testid="productFormTabs_supplierSelect">
-                            <SelectValue placeholder={t('select_supplier')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map(supplier => <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.supplier_name}
-                              </SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {/* Удалены блоки выбора магазина и постачальника на странице нового товара */}
 
                       <div className="space-y-2">
                         <Label htmlFor="external_id">{t('external_id')}</Label>
@@ -1216,10 +1184,10 @@ export function ProductFormTabs({
                     </div>
                     <CategoryTreeEditor
                       suppliers={suppliers}
-                      stores={stores}
+                      stores={[]}
                       categories={categories}
                       defaultSupplierId={selectedSupplierId}
-                      defaultStoreId={formData.store_id}
+                      showStoreSelect={false}
                       onCategoryCreated={(cat) => {
                         setCategories((prev) => [cat as any, ...prev]);
                         setFormData({ ...formData, category_id: (cat as any).id });

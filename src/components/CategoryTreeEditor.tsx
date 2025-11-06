@@ -19,6 +19,7 @@ interface CategoryTreeEditorProps {
   defaultSupplierId?: string;
   defaultStoreId?: string;
   onCategoryCreated?: (category: StoreCategory) => void;
+  showStoreSelect?: boolean;
 }
 
 export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
@@ -28,6 +29,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   defaultSupplierId,
   defaultStoreId,
   onCategoryCreated,
+  showStoreSelect = true,
 }) => {
   const { t } = useI18n();
 
@@ -92,21 +94,23 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cte_store">{t("store")}</Label>
-            <Select value={storeId} onValueChange={setStoreId}>
-              <SelectTrigger id="cte_store" data-testid="categoryTreeEditor_storeSelect">
-                <SelectValue placeholder={t("select_store")} />
-              </SelectTrigger>
-              <SelectContent>
-                {stores.map((st) => (
-                  <SelectItem key={st.id} value={st.id}>
-                    {st.store_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {showStoreSelect && (
+            <div className="space-y-2">
+              <Label htmlFor="cte_store">{t("store")}</Label>
+              <Select value={storeId} onValueChange={setStoreId}>
+                <SelectTrigger id="cte_store" data-testid="categoryTreeEditor_storeSelect">
+                  <SelectValue placeholder={t("select_store")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {stores.map((st) => (
+                    <SelectItem key={st.id} value={st.id}>
+                      {st.store_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <Separator />
