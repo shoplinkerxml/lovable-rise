@@ -1024,131 +1024,7 @@ export function ProductFormTabs({
                     </div>
                   </div>
 
-                  {/* Секция: Назви та опис */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{t('product_names_description')}</h3>
-                      <Separator className="flex-1" />
-                    </div>
-                    
-                    <Tabs defaultValue="ukrainian" className="w-full">
-                      <TabsList 
-                        className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start"
-                        data-testid="productFormTabs_langTabsList"
-                      >
-                        <TabsTrigger
-                          value="ukrainian"
-                          className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors"
-                          data-testid="productFormTabs_ukrainianTab"
-                          aria-label={t('product_name_ukrainian_tab')}
-                        >
-                          <span className="truncate">{t('product_name')}</span>
-                          <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
-                          <span className="sr-only">UA</span>
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="russian"
-                          className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors"
-                          data-testid="productFormTabs_russianTab"
-                          aria-label={t('product_name_russian_tab')}
-                        >
-                          <span className="truncate">{t('product_name')}</span>
-                          <span className="text-success text-[0.7rem] font-semibold">RU</span>
-                          <span className="sr-only">RU</span>
-                        </TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="ukrainian" className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="name_ua">{t('product_name')} *</Label>
-                          <Input 
-                            id="name_ua" 
-                            value={formData.name_ua} 
-                            onChange={e => setFormData({
-                              ...formData,
-                              name_ua: e.target.value
-                            })} 
-                            placeholder={t('product_name_placeholder')} 
-                            data-testid="productFormTabs_nameUaInput" 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="docket_ua">{t('short_name')}</Label>
-                          <Input 
-                            id="docket_ua" 
-                            value={formData.docket_ua} 
-                            onChange={e => setFormData({
-                              ...formData,
-                              docket_ua: e.target.value
-                            })} 
-                            placeholder={t('short_name_placeholder')} 
-                            data-testid="productFormTabs_docketUaInput" 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="description_ua">{t('product_description')}</Label>
-                          <Textarea 
-                            id="description_ua" 
-                            value={formData.description_ua} 
-                            onChange={e => setFormData({
-                              ...formData,
-                              description_ua: e.target.value
-                            })} 
-                            placeholder={t('product_description_placeholder')} 
-                            rows={3} 
-                            data-testid="productFormTabs_descriptionUaInput" 
-                          />
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="russian" className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="name">{t('product_name')}</Label>
-                          <Input 
-                            id="name" 
-                            value={formData.name} 
-                            onChange={e => setFormData({
-                              ...formData,
-                              name: e.target.value
-                            })} 
-                            placeholder={t('product_name_placeholder')} 
-                            data-testid="productFormTabs_nameInput" 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="docket">{t('short_name')}</Label>
-                          <Input 
-                            id="docket" 
-                            value={formData.docket} 
-                            onChange={e => setFormData({
-                              ...formData,
-                              docket: e.target.value
-                            })} 
-                            placeholder={t('short_name_placeholder')} 
-                            data-testid="productFormTabs_docketInput" 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="description">{t('product_description')}</Label>
-                          <Textarea 
-                            id="description" 
-                            value={formData.description} 
-                            onChange={e => setFormData({
-                              ...formData,
-                              description: e.target.value
-                            })} 
-                            placeholder={t('product_description_placeholder')} 
-                            rows={3} 
-                            data-testid="productFormTabs_descriptionInput" 
-                          />
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
+                  {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
 
                   {/* Секция: Виробник та бренд */}
                   <div className="space-y-4">
@@ -1176,94 +1052,7 @@ export function ProductFormTabs({
                     </div>
                   </div>
 
-                  {/* Секция: Редактор деревa категорій */}
-                  <div className="space-y-4" data-testid="productFormTabs_categoryTreeEditorSection">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
-                      <Separator className="flex-1" />
-                    </div>
-                    <CategoryTreeEditor
-                      suppliers={suppliers}
-                      stores={[]}
-                      categories={categories}
-                      defaultSupplierId={selectedSupplierId}
-                      showStoreSelect={false}
-                      onCategoryCreated={(cat) => {
-                        setCategories((prev) => [cat as any, ...prev]);
-                        setFormData({ ...formData, category_id: (cat as any).id });
-                      }}
-                    />
-                  </div>
-
-                  {/* Секция: Категорія та ціни */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{t('category_prices')}</h3>
-                      <Separator className="flex-1" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="category_id">{t('category')} *</Label>
-                        <Select value={formData.category_id} onValueChange={value => setFormData({
-                        ...formData,
-                        category_id: value
-                      })}>
-                          <SelectTrigger data-testid="productFormTabs_categorySelect">
-                            <SelectValue placeholder={t('select_category')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map(category => <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="currency_id">{t('currency')} *</Label>
-                        <Select value={formData.currency_id} onValueChange={value => setFormData({
-                        ...formData,
-                        currency_id: value
-                      })}>
-                          <SelectTrigger data-testid="productFormTabs_currencySelect">
-                            <SelectValue placeholder={t('select_currency')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {currencies.map(currency => <SelectItem key={currency.id} value={currency.id}>
-                                {currency.name} ({currency.code})
-                              </SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="price">{t('price')} *</Label>
-                        <Input id="price" type="number" step="0.01" value={formData.price} onChange={e => setFormData({
-                        ...formData,
-                        price: parseFloat(e.target.value) || 0
-                      })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="price_old">{t('old_price')}</Label>
-                        <Input id="price_old" type="number" step="0.01" value={formData.price_old} onChange={e => setFormData({
-                        ...formData,
-                        price_old: parseFloat(e.target.value) || 0
-                      })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="price_promo">{t('promo_price')}</Label>
-                        <Input id="price_promo" type="number" step="0.01" value={formData.price_promo} onChange={e => setFormData({
-                        ...formData,
-                        price_promo: parseFloat(e.target.value) || 0
-                      })} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Секция: Додаткова інформація */}
+                  {/* Секция: Додаткова інформація (поднята выше) */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-semibold">{t('product_additional_info')}</h3>
@@ -1297,6 +1086,219 @@ export function ProductFormTabs({
                       })} placeholder={t('product_url_placeholder')} data-testid="productFormTabs_urlInput" />
                       </div>
                     </div>
+                  </div>
+
+                </div>
+              </div>
+              {/* Блок назви та опис — вынесен под фото, на всю ширину */}
+              <div className="space-y-4 mt-2 w-full" data-testid="productFormTabs_namesDescriptionFullWidth">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">{t('product_names_description')}</h3>
+                  <Separator className="flex-1" />
+                </div>
+                
+                <Tabs defaultValue="ukrainian" className="w-full">
+                  <TabsList 
+                    className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start"
+                    data-testid="productFormTabs_langTabsList"
+                  >
+                    <TabsTrigger
+                      value="ukrainian"
+                      className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors"
+                      data-testid="productFormTabs_ukrainianTab"
+                      aria-label={t('product_name_ukrainian_tab')}
+                    >
+                      <span className="truncate">{t('product_name')}</span>
+                      <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
+                      <span className="sr-only">UA</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="russian"
+                      className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors"
+                      data-testid="productFormTabs_russianTab"
+                      aria-label={t('product_name_russian_tab')}
+                    >
+                      <span className="truncate">{t('product_name')}</span>
+                      <span className="text-success text-[0.7rem] font-semibold">RU</span>
+                      <span className="sr-only">RU</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="ukrainian" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name_ua">{t('product_name')} *</Label>
+                      <Input 
+                        id="name_ua" 
+                        value={formData.name_ua} 
+                        onChange={e => setFormData({
+                          ...formData,
+                          name_ua: e.target.value
+                        })} 
+                        placeholder={t('product_name_placeholder')} 
+                        data-testid="productFormTabs_nameUaInput" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="docket_ua">{t('short_name')}</Label>
+                      <Input 
+                        id="docket_ua" 
+                        value={formData.docket_ua} 
+                        onChange={e => setFormData({
+                          ...formData,
+                          docket_ua: e.target.value
+                        })} 
+                        placeholder={t('short_name_placeholder')} 
+                        data-testid="productFormTabs_docketUaInput" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description_ua">{t('product_description')}</Label>
+                      <Textarea 
+                        id="description_ua" 
+                        value={formData.description_ua} 
+                        onChange={e => setFormData({
+                          ...formData,
+                          description_ua: e.target.value
+                        })} 
+                        placeholder={t('product_description_placeholder')} 
+                        rows={3} 
+                        data-testid="productFormTabs_descriptionUaInput" 
+                      />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="russian" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">{t('product_name')}</Label>
+                      <Input 
+                        id="name" 
+                        value={formData.name} 
+                        onChange={e => setFormData({
+                          ...formData,
+                          name: e.target.value
+                        })} 
+                        placeholder={t('product_name_placeholder')} 
+                        data-testid="productFormTabs_nameInput" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="docket">{t('short_name')}</Label>
+                      <Input 
+                        id="docket" 
+                        value={formData.docket} 
+                        onChange={e => setFormData({
+                          ...formData,
+                          docket: e.target.value
+                        })} 
+                        placeholder={t('short_name_placeholder')} 
+                        data-testid="productFormTabs_docketInput" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description">{t('product_description')}</Label>
+                      <Textarea 
+                        id="description" 
+                        value={formData.description} 
+                        onChange={e => setFormData({
+                          ...formData,
+                          description: e.target.value
+                        })} 
+                        placeholder={t('product_description_placeholder')} 
+                        rows={3} 
+                        data-testid="productFormTabs_descriptionInput" 
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+              
+              {/* Секция: Редактор деревa категорій — перемещено ниже назви та опис */}
+              <div className="space-y-4" data-testid="productFormTabs_categoryTreeEditorSection">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
+                  <Separator className="flex-1" />
+                </div>
+                <CategoryTreeEditor
+                  suppliers={suppliers}
+                  stores={[]}
+                  categories={categories}
+                  defaultSupplierId={selectedSupplierId}
+                  showStoreSelect={false}
+                  onCategoryCreated={(cat) => {
+                    setCategories((prev) => [cat as any, ...prev]);
+                    setFormData({ ...formData, category_id: (cat as any).id });
+                  }}
+                />
+              </div>
+
+              {/* Секция: Категорія та ціни — перемещено ниже назви та опис */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">{t('category_prices')}</h3>
+                  <Separator className="flex-1" />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category_id">{t('category')} *</Label>
+                    <Select value={formData.category_id} onValueChange={value => setFormData({
+                    ...formData,
+                    category_id: value
+                  })}>
+                      <SelectTrigger data-testid="productFormTabs_categorySelect">
+                        <SelectValue placeholder={t('select_category')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(category => <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="currency_id">{t('currency')} *</Label>
+                    <Select value={formData.currency_id} onValueChange={value => setFormData({
+                    ...formData,
+                    currency_id: value
+                  })}>
+                      <SelectTrigger data-testid="productFormTabs_currencySelect">
+                        <SelectValue placeholder={t('select_currency')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map(currency => <SelectItem key={currency.id} value={currency.id}>
+                            {currency.name} ({currency.code})
+                          </SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="price">{t('price')} *</Label>
+                    <Input id="price" type="number" step="0.01" value={formData.price} onChange={e => setFormData({
+                    ...formData,
+                    price: parseFloat(e.target.value) || 0
+                  })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="price_old">{t('old_price')}</Label>
+                    <Input id="price_old" type="number" step="0.01" value={formData.price_old} onChange={e => setFormData({
+                    ...formData,
+                    price_old: parseFloat(e.target.value) || 0
+                  })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="price_promo">{t('promo_price')}</Label>
+                    <Input id="price_promo" type="number" step="0.01" value={formData.price_promo} onChange={e => setFormData({
+                    ...formData,
+                    price_promo: parseFloat(e.target.value) || 0
+                  })} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" />
                   </div>
                 </div>
               </div>
