@@ -1321,18 +1321,17 @@ export function ProductFormTabs({
                       </Button>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-col lg:flex-shrink-0">
-                    <Label>{t('upload_file')}</Label>
-                    <div className="mt-2">
-                      <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
-                      <Button onClick={() => document.getElementById('fileUpload')?.click()} variant="outline" disabled={uploadingImage} data-testid="productFormTabs_uploadButton">
-                        <Upload className="h-4 w-4 mr-2" />
-                        {uploadingImage ? t('profile_uploading') : t('choose_file')}
-                      </Button>
-                    </div>
-                  </div>
                 </div>
+
+                {/* Hidden file input retained for drop zone click */}
+                <input
+                  type="file"
+                  accept="image/*,.avif,image/avif"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="fileUpload"
+                  data-testid="productFormTabs_fileInput"
+                />
 
                 <Separator />
 
