@@ -1140,6 +1140,9 @@ const toastDictionary = {
   characteristic_value_placeholder: { uk: "Значення характеристики", en: "Characteristic value" },
   param_id_placeholder: { uk: "ID параметра", en: "Parameter ID" },
   value_id_placeholder: { uk: "ID значення", en: "Value ID" },
+  edit_characteristic: { uk: "Редагувати характеристику", en: "Edit Characteristic" },
+  param_id_optional: { uk: "Param ID (необов'язково)", en: "Param ID (optional)" },
+  value_id_optional: { uk: "Value ID (необов'язково)", en: "Value ID (optional)" },
   
   // Currency translations
   currency_uah: { uk: "UAH - Гривня", en: "UAH - Hryvnia" },

@@ -6,7 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Loader2, Plus, X, Upload, Link, Package, Image, Settings, Save, ArrowLeft, Check } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+  import { Loader2, Plus, X, Upload, Link, Package, Image, Settings, Save, ArrowLeft, Check, MoreHorizontal, Pencil, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
@@ -279,8 +281,48 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     setParams(updatedParams);
   };
 
+  // Modal state for adding/editing characteristics
+  const [isParamModalOpen, setIsParamModalOpen] = useState(false);
+  const [editingParamIndex, setEditingParamIndex] = useState<number | null>(null);
+  const [paramForm, setParamForm] = useState<ProductParam>({
+    name: "",
+    value: "",
+    paramid: "",
+    valueid: "",
+    order_index: 0,
+  });
+
+  const openAddParamModal = () => {
+    setEditingParamIndex(null);
+    setParamForm({ name: "", value: "", paramid: "", valueid: "", order_index: params.length });
+    setIsParamModalOpen(true);
+  };
+
+  const openEditParamModal = (index: number) => {
+    setEditingParamIndex(index);
+    setParamForm({ ...params[index] });
+    setIsParamModalOpen(true);
+  };
+
+  const saveParamModal = () => {
+    const name = paramForm.name?.trim();
+    const value = paramForm.value?.trim();
+    if (!name || !value) return;
+
+    if (editingParamIndex === null) {
+      const newParams = [...params, { ...paramForm, order_index: params.length }];
+      setParams(newParams);
+    } else {
+      const updatedParams = [...params];
+      updatedParams[editingParamIndex] = { ...paramForm, order_index: editingParamIndex };
+      setParams(updatedParams);
+    }
+    setIsParamModalOpen(false);
+  };
+
   const removeParam = (index: number) => {
-    setParams(params.filter((_, i) => i !== index));
+    const updated = params.filter((_, i) => i !== index).map((p, i) => ({ ...p, order_index: i }));
+    setParams(updated);
   };
 
   const addImageByUrl = () => {
@@ -938,12 +980,12 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                   <Settings className="h-5 w-5" />
                   {t('product_characteristics')}
                 </div>
-                <Button 
-                  type="button" 
-                  onClick={addParam} 
-                  size="sm" 
+                <Button
+                  type="button"
+                  onClick={openAddParamModal}
+                  size="sm"
                   variant="outline"
-                  data-testid="productForm_addParam"
+                  data-testid="productForm_addCharacteristic"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   {t('add_characteristic')}
@@ -960,67 +1002,121 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="divide-y">
                   {params.map((param, index) => (
-                    <Card key={index} className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                        <div className="space-y-2">
-                          <Label htmlFor={`param-name-${index}`}>{t('characteristic_name')} *</Label>
-                          <Input
-                            id={`param-name-${index}`}
-                            value={param.name}
-                            onChange={(e) => updateParam(index, 'name', e.target.value)}
-                            placeholder={t('characteristic_name_placeholder')}
-                            data-testid={`productForm_paramName_${index}`}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`param-value-${index}`}>{t('value')} *</Label>
-                          <Input
-                            id={`param-value-${index}`}
-                            value={param.value}
-                            onChange={(e) => updateParam(index, 'value', e.target.value)}
-                            placeholder={t('characteristic_value_placeholder')}
-                            data-testid={`productForm_paramValue_${index}`}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`param-paramid-${index}`}>Param ID</Label>
-                          <Input
-                            id={`param-paramid-${index}`}
-                            value={param.paramid || ''}
-                            onChange={(e) => updateParam(index, 'paramid', e.target.value)}
-                            placeholder={t('param_id_placeholder')}
-                            data-testid={`productForm_paramId_${index}`}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`param-valueid-${index}`}>Value ID</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id={`param-valueid-${index}`}
-                              value={param.valueid || ''}
-                              onChange={(e) => updateParam(index, 'valueid', e.target.value)}
-                              placeholder={t('value_id_placeholder')}
-                              data-testid={`productForm_valueId_${index}`}
-                            />
-                            <Button
-                              type="button"
-                              onClick={() => removeParam(index)}
-                              size="sm"
-                              variant="outline"
-                              className="shrink-0"
-                              data-testid={`productForm_removeParam_${index}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
+                    <div
+                      key={index}
+                      className="flex items-center justify-between py-3 group"
+                      data-testid={`productForm_paramRow_${index}`}
+                    >
+                      <div className="grid grid-cols-2 gap-4 w-full">
+                        <span className="text-sm text-muted-foreground">{param.name}</span>
+                        <span className="text-sm font-medium">{param.value}</span>
                       </div>
-                    </Card>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label={t('actions')}
+                            data-testid={`productForm_paramMenu_${index}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => openEditParamModal(index)}
+                            data-testid={`productForm_paramEdit_${index}`}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />{t('edit')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => removeParam(index)}
+                            data-testid={`productForm_paramDelete_${index}`}
+                          >
+                            <Trash className="h-4 w-4 mr-2" />{t('delete')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   ))}
                 </div>
               )}
+
+              {/* Modal for add/edit characteristic */}
+              <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
+                <DialogContent data-testid="productForm_paramModal">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingParamIndex === null ? t('add_characteristic') : t('edit_characteristic')}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="param-name-modal">{t('characteristic_name')}</Label>
+                      <Input
+                        id="param-name-modal"
+                        value={paramForm.name}
+                        onChange={(e) => setParamForm({ ...paramForm, name: e.target.value })}
+                        placeholder={t('characteristic_name_placeholder')}
+                        data-testid="productForm_modal_paramName"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="param-value-modal">{t('value')}</Label>
+                      <Input
+                        id="param-value-modal"
+                        value={paramForm.value}
+                        onChange={(e) => setParamForm({ ...paramForm, value: e.target.value })}
+                        placeholder={t('characteristic_value_placeholder')}
+                        data-testid="productForm_modal_paramValue"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="param-paramid-modal">{t('param_id_optional')}</Label>
+                        <Input
+                          id="param-paramid-modal"
+                          value={paramForm.paramid || ''}
+                          onChange={(e) => setParamForm({ ...paramForm, paramid: e.target.value })}
+                          placeholder={t('param_id_placeholder')}
+                          data-testid="productForm_modal_paramId"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="param-valueid-modal">{t('value_id_optional')}</Label>
+                        <Input
+                          id="param-valueid-modal"
+                          value={paramForm.valueid || ''}
+                          onChange={(e) => setParamForm({ ...paramForm, valueid: e.target.value })}
+                          placeholder={t('value_id_placeholder')}
+                          data-testid="productForm_modal_valueId"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsParamModalOpen(false)}
+                      data-testid="productForm_modal_cancel"
+                    >
+                      {t('btn_cancel')}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={saveParamModal}
+                      data-testid="productForm_modal_save"
+                    >
+                      {editingParamIndex === null ? t('btn_create') : t('btn_update')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>

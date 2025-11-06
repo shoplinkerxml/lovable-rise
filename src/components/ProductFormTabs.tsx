@@ -5,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-  import { Plus, Minus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check, MoreHorizontal, Pencil, Trash } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { type Product } from '@/lib/product-service';
@@ -378,10 +380,10 @@ export function ProductFormTabs({
 
   // Parameters state
   const [parameters, setParameters] = useState<ProductParam[]>([]);
-  const [newParam, setNewParam] = useState({
-    name: '',
-    value: ''
-  });
+  // Modal state for add/edit characteristic
+  const [isParamModalOpen, setIsParamModalOpen] = useState(false);
+  const [editingParamIndex, setEditingParamIndex] = useState<number | null>(null);
+  const [paramForm, setParamForm] = useState<{ name: string; value: string }>({ name: '', value: '' });
 
   // Lookup data
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -806,32 +808,34 @@ export function ProductFormTabs({
   };
 
   // Parameter handling functions
-  const addParameter = () => {
-    if (!newParam.name.trim() || !newParam.value.trim()) return;
-    const parameter: ProductParam = {
-      name: newParam.name,
-      value: newParam.value,
-      order_index: parameters.length
-    };
-    setParameters([...parameters, parameter]);
-    setNewParam({
-      name: '',
-      value: ''
-    });
+  // Characteristic modal handlers
+  const openAddParamModal = () => {
+    setEditingParamIndex(null);
+    setParamForm({ name: '', value: '' });
+    setIsParamModalOpen(true);
   };
-  const removeParameter = (index: number) => {
-    const newParams = parameters.filter((_, i) => i !== index);
-    setParameters(newParams.map((param, i) => ({
-      ...param,
-      order_index: i
-    })));
+  const openEditParamModal = (index: number) => {
+    const p = parameters[index];
+    setEditingParamIndex(index);
+    setParamForm({ name: p.name, value: p.value });
+    setIsParamModalOpen(true);
   };
-  const updateParameter = (index: number, field: 'name' | 'value', value: string) => {
-    const newParams = [...parameters];
-    newParams[index] = {
-      ...newParams[index],
-      [field]: value
-    };
+  const saveParamModal = () => {
+    const name = paramForm.name.trim();
+    const value = paramForm.value.trim();
+    if (!name || !value) return;
+    if (editingParamIndex === null) {
+      const newParams = [...parameters, { name, value, order_index: parameters.length }];
+      setParameters(newParams);
+    } else {
+      const updated = [...parameters];
+      updated[editingParamIndex] = { ...updated[editingParamIndex], name, value };
+      setParameters(updated);
+    }
+    setIsParamModalOpen(false);
+  };
+  const deleteParam = (index: number) => {
+    const newParams = parameters.filter((_, i) => i !== index).map((p, i) => ({ ...p, order_index: i }));
     setParameters(newParams);
   };
   return <div className="container mx-auto px-2 sm:px-6 py-3 sm:py-6 max-w-7xl" data-testid="productFormTabs_container">
@@ -1487,60 +1491,81 @@ export function ProductFormTabs({
 
             {/* Tab 3: Parameters */}
             <TabsContent value="params" className="space-y-6" data-testid="productFormTabs_paramsContent">
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="paramName">{t('characteristic_name')}</Label>
-                    <Input id="paramName" name="paramName" autoComplete="off" value={newParam.name} onChange={e => setNewParam({
-                    ...newParam,
-                    name: e.target.value
-                  })} placeholder={t('characteristic_name_placeholder')} data-testid="productFormTabs_paramNameInput" />
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor="paramValue">{t('value')}</Label>
-                    <Input id="paramValue" name="paramValue" autoComplete="off" value={newParam.value} onChange={e => setNewParam({
-                    ...newParam,
-                    value: e.target.value
-                  })} placeholder={t('value_example')} data-testid="productFormTabs_paramValueInput" />
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={addParameter} disabled={!newParam.name.trim() || !newParam.value.trim()} data-testid="productFormTabs_addParamButton">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{t('product_characteristics')}</span>
+                    <Button type="button" onClick={openAddParamModal} size="sm" variant="outline" data-testid="productForm_addCharacteristic">
                       <Plus className="h-4 w-4 mr-2" />
-                      {t('add')}
+                      {t('add_characteristic')}
                     </Button>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  {parameters.map((param, index) => <Card key={index} data-testid={`productFormTabs_paramCard_${index}`}>
-                      <CardContent className="p-4">
-                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                          <div className="flex-1">
-                            <Label htmlFor={`param-name-${index}`}>{t('name')}</Label>
-                            <Input id={`param-name-${index}`} value={param.name} onChange={e => updateParameter(index, 'name', e.target.value)} data-testid={`productFormTabs_paramNameEdit_${index}`} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {parameters.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                      <Settings className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">{t('no_characteristics_added')}</p>
+                      <p className="text-sm text-muted-foreground mt-2">{t('add_characteristics_instruction')}</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {parameters.map((param, index) => (
+                        <div key={index} className="flex items-center justify-between py-3 group" data-testid={`productForm_paramRow_${index}`}>
+                          <div className="grid grid-cols-2 gap-4 w-full">
+                            <span className="text-sm text-muted-foreground">{param.name}</span>
+                            <span className="text-sm font-medium">{param.value}</span>
                           </div>
-                          <div className="flex-1">
-                            <Label htmlFor={`param-value-${index}`}>{t('value')}</Label>
-                            <Input id={`param-value-${index}`} value={param.value} onChange={e => updateParameter(index, 'value', e.target.value)} data-testid={`productFormTabs_paramValueEdit_${index}`} />
-                          </div>
-                          <div className="flex items-end">
-                            <Button variant="outline" size="icon" onClick={() => removeParameter(index)} data-testid={`productFormTabs_removeParamButton_${index}`}>
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" data-testid={`productForm_paramMenu_${index}`}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditParamModal(index)} data-testid={`productForm_paramEdit_${index}`}>
+                                <Pencil className="h-4 w-4 mr-2" /> {t('edit_characteristic')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => deleteParam(index)} data-testid={`productForm_paramDelete_${index}`}>
+                                <Trash className="h-4 w-4 mr-2" /> {t('btn_delete')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                      </CardContent>
-                    </Card>)}
-                </div>
+                      ))}
+                    </div>
+                  )}
 
-                {parameters.length === 0 && <div className="text-center py-12 text-muted-foreground">
-                    <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>{t('no_characteristics_added')}</p>
-                    <p className="text-sm">{t('add_characteristics_instruction')}</p>
-                  </div>}
-              </div>
+                  {/* Add/Edit characteristic modal */}
+                  <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
+                    <DialogContent data-testid="productForm_paramModal">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingParamIndex === null ? t('add_characteristic') : t('edit_characteristic')}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="param-name-modal">{t('characteristic_name')}</Label>
+                          <Input id="param-name-modal" value={paramForm.name} onChange={(e) => setParamForm({ ...paramForm, name: e.target.value })} placeholder={t('characteristic_name_placeholder')} data-testid="productForm_modal_paramName" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="param-value-modal">{t('value')}</Label>
+                          <Input id="param-value-modal" value={paramForm.value} onChange={(e) => setParamForm({ ...paramForm, value: e.target.value })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
+                        </div>
+                      </div>
+                      <DialogFooter className="gap-2">
+                        <Button type="button" variant="outline" onClick={() => setIsParamModalOpen(false)} data-testid="productForm_modal_cancel">
+                          {t('btn_cancel')}
+                        </Button>
+                        <Button type="button" onClick={saveParamModal} data-testid="productForm_modal_save">
+                          {editingParamIndex === null ? t('btn_create') : t('btn_update')}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
 
