@@ -998,7 +998,8 @@ const toastDictionary = {
   product_tab_main: { uk: "Основні дані", en: "Main Data" },
   product_tab_description: { uk: "Опис", en: "Description" },
   product_tab_images: { uk: "Зображення", en: "Images" },
-  product_tab_parameters: { uk: "Параметри", en: "Parameters" },
+  // Rename tab from "Параметри" to "Характеристики" (uk/en)
+  product_tab_parameters: { uk: "Характеристики", en: "Characteristics" },
   product_tab_seo: { uk: "SEO", en: "SEO" },
 
   // Image Upload notifications

@@ -511,8 +511,8 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
               data-testid="productForm_paramsTab"
             >
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Характеристики</span>
-              <span className="sm:hidden">Параметри</span>
+              <span className="hidden sm:inline">{t('product_tab_parameters')}</span>
+              <span className="sm:hidden">{t('product_tab_parameters')}</span>
             </TabsTrigger>
           </TabsList>
 
