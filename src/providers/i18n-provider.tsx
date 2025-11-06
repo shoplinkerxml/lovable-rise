@@ -179,12 +179,7 @@ const dictionary: Dictionary = {
   back_to_products: { uk: "Назад до товарів", en: "Back to Products" },
   no_products: { uk: "Немає товарів", en: "No Products" },
   no_products_description: { uk: "Створіть перший товар для початку роботи", en: "Create your first product to get started" },
-  product_name: { uk: "Назва товару", en: "Product Name" },
-  product_name_placeholder: { uk: "Введіть назву товару", en: "Enter product name" },
-  product_description: { uk: "Опис товару", en: "Product Description" },
   description_placeholder: { uk: "Введіть опис товару", en: "Enter product description" },
-  price_placeholder: { uk: "0.00", en: "0.00" },
-  sku_placeholder: { uk: "SKU-001", en: "SKU-001" },
   product_created: { uk: "Товар створено", en: "Product created" },
   product_updated: { uk: "Товар оновлено", en: "Product updated" },
   product_deleted: { uk: "Товар видалено", en: "Product deleted" },
@@ -952,7 +947,6 @@ const toastDictionary = {
   
   // Form Page notifications
   validation_error: { uk: "Помилка валідації", en: "Validation Error" },
-  fill_required_fields: { uk: "Будь ласка, заповніть обов'язкові поля", en: "Please fill in required fields" },
   success: { uk: "Успіх", en: "Success" },
   form_submitted: { uk: "Форму успішно надіслано!", en: "Form submitted successfully!" },
   
@@ -1077,6 +1071,18 @@ const toastDictionary = {
   product_description_uk_placeholder: { uk: "Введіть опис товару українською", en: "Enter product description in Ukrainian" },
   product_url: { uk: "URL товару", en: "Product URL" },
   product_url_placeholder: { uk: "Введіть URL товару", en: "Enter product URL" },
+  // Category editor
+  category_editor_title: { uk: "Редактор категорій", en: "Category Editor" },
+  parent_category: { uk: "Батьківська категорія", en: "Parent Category" },
+  select_parent_category: { uk: "Оберіть батьківську категорію", en: "Select parent category" },
+  category_name: { uk: "Назва категорії", en: "Category Name" },
+  category_name_placeholder: { uk: "Введіть назву категорії", en: "Enter category name" },
+  loading_creating: { uk: "Створення...", en: "Creating..." },
+  create_category: { uk: "Створити категорію", en: "Create Category" },
+  category_created: { uk: "Категорію створено", en: "Category created" },
+  failed_create_category: { uk: "Не вдалося створити категорію", en: "Failed to create category" },
+  fill_required_fields: { uk: "Заповніть обов'язкові поля", en: "Fill required fields" },
+  select_supplier_error: { uk: "Оберіть постачальника", en: "Select a supplier" },
   // Placeholders for numeric inputs
   price_placeholder: { uk: "0.00", en: "0.00" },
   stock_quantity_placeholder: { uk: "0", en: "0" },

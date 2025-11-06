@@ -18,6 +18,7 @@ import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { ProductService } from '@/lib/product-service';
 import { R2Storage } from '@/lib/r2-storage';
+import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
 interface ProductFormTabsProps {
   product?: Tables<'store_products'>;
   onSubmit?: (data: any) => void;
@@ -1193,6 +1194,25 @@ export function ProductFormTabs({
                       })} placeholder={t('brand_placeholder')} data-testid="productFormTabs_brandInput" />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Секция: Редактор деревa категорій */}
+                  <div className="space-y-4" data-testid="productFormTabs_categoryTreeEditorSection">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
+                      <Separator className="flex-1" />
+                    </div>
+                    <CategoryTreeEditor
+                      suppliers={suppliers}
+                      stores={stores}
+                      categories={categories}
+                      defaultSupplierId={selectedSupplierId}
+                      defaultStoreId={formData.store_id}
+                      onCategoryCreated={(cat) => {
+                        setCategories((prev) => [cat as any, ...prev]);
+                        setFormData({ ...formData, category_id: (cat as any).id });
+                      }}
+                    />
                   </div>
 
                   {/* Секция: Категорія та ціни */}
