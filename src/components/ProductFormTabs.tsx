@@ -1089,6 +1089,25 @@ export function ProductFormTabs({
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Supplier select */}
+                      <div className="space-y-2">
+                        <Label htmlFor="supplier">{t('supplier')}</Label>
+                        <Select
+                          value={formData.supplier_id}
+                          onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                        >
+                          <SelectTrigger data-testid="productFormTabs_supplierSelect">
+                            <SelectValue placeholder={t('select_supplier')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliers.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.id}>
+                                {supplier.supplier_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="space-y-2">
                         <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
                         <Select value={formData.state} onValueChange={value => setFormData({
@@ -1269,6 +1288,7 @@ export function ProductFormTabs({
                   categories={categories}
                   defaultSupplierId={formData.supplier_id}
                   showStoreSelect={false}
+                  onSupplierChange={(id) => setFormData(prev => ({ ...prev, supplier_id: id }))}
                   onCategoryCreated={async (cat) => {
                     if (!formData.supplier_id) {
                       setCategories([]);

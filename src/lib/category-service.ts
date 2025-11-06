@@ -29,8 +29,8 @@ function normalizeSupplierId(supplierId?: string | number): number | undefined {
 }
 
 function handleError(error: any): never {
-  // Keep errors simple and consistent without deep types
-  throw new Error(error?.message || 'Supabase request failed');
+  // Preserve Supabase error object to retain code/details for UI handling
+  throw error;
 }
 
 export const CategoryService = {
