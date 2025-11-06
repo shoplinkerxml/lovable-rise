@@ -66,6 +66,8 @@ export function ProductFormTabs({
   onSubmit,
   onCancel
 }: ProductFormTabsProps) {
+  // 500px in rem (to avoid fixed px in CSS): 500 / 16 = 31.25
+  const DEFAULT_PHOTO_SIZE_REM = 31.25;
   // Resize state for the entire photo block (shrink-only up to initial size)
   const [photoBlockScale, setPhotoBlockScale] = useState(1);
   const [photoBlockInitialRem, setPhotoBlockInitialRem] = useState<number | null>(null);
@@ -89,6 +91,13 @@ export function ProductFormTabs({
     if (value > 1) return 1;
     return value;
   }, []);
+
+  const resetPhotoBlockToDefaultSize = useCallback(() => {
+    const initialRem = photoBlockInitialRemRef.current;
+    if (!initialRem) return;
+    const desiredScale = DEFAULT_PHOTO_SIZE_REM / initialRem;
+    setPhotoBlockScale(clampScale(desiredScale));
+  }, [clampScale]);
 
   const handlePhotoResizeMove = useCallback((e: MouseEvent) => {
     if (!isPhotoResizingRef.current) return;
@@ -133,6 +142,9 @@ export function ProductFormTabs({
       if (photoBlockInitialRemRef.current == null) {
         photoBlockInitialRemRef.current = rem; // baseline in rem
         setPhotoBlockInitialRem(rem);
+        // Set initial size to 500x500 (31.25rem) relative to baseline
+        const desiredScale = DEFAULT_PHOTO_SIZE_REM / rem;
+        setPhotoBlockScale(clampScale(desiredScale));
       }
     };
     measure();
@@ -842,7 +854,7 @@ export function ProductFormTabs({
                   className="lg:basis-[36rem] xl:basis-[40rem] shrink-0 space-y-4 mx-auto relative"
                   data-testid="productFormTabs_photoContainer"
                   ref={photoBlockRef}
-                  onDoubleClick={() => setPhotoBlockScale(1)}
+                  onDoubleClick={resetPhotoBlockToDefaultSize}
                   style={photoBlockInitialRem ? {
                     flexBasis: `${photoBlockInitialRem * photoBlockScale}rem`,
                     width: `${photoBlockInitialRem * photoBlockScale}rem`,
@@ -860,7 +872,7 @@ export function ProductFormTabs({
                               <div 
                                 className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer"
                                 style={getAdaptiveImageStyle()}
-                                onDoubleClick={() => setPhotoBlockScale(1)}
+                                onDoubleClick={resetPhotoBlockToDefaultSize}
                                 data-testid="productFormTabs_photoMain"
                               >
                                 <img 
@@ -907,7 +919,7 @@ export function ProductFormTabs({
                               aria-label="Resize photo block"
                               className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 border border-primary/40 hover:bg-primary/30 cursor-nwse-resize hidden sm:block"
                               onMouseDown={handlePhotoResizeStart}
-                              onDoubleClick={() => setPhotoBlockScale(1)}
+                              onDoubleClick={resetPhotoBlockToDefaultSize}
                               data-testid="resize_handle_photo_card"
                             />
                           </Card>
@@ -950,7 +962,7 @@ export function ProductFormTabs({
                         )}
                       </div>
                     ) : (
-                      <div className="aspect-square flex items-center justify-center p-0 cursor-pointer" onDoubleClick={() => setPhotoBlockScale(1)} data-testid="productFormTabs_photoPlaceholder">
+                      <div className="aspect-square flex items-center justify-center p-0 cursor-pointer" onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoPlaceholder">
                         <ProductPlaceholder className="w-full h-full" />
                       </div>
                     )}
@@ -962,7 +974,7 @@ export function ProductFormTabs({
                       aria-label="Resize photo block"
                       className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 border border-primary/40 hover:bg-primary/30 cursor-nwse-resize hidden sm:block"
                       onMouseDown={handlePhotoResizeStart}
-                      onDoubleClick={() => setPhotoBlockScale(1)}
+                      onDoubleClick={resetPhotoBlockToDefaultSize}
                       data-testid="resize_handle_photo_block"
                     />
                   )}
