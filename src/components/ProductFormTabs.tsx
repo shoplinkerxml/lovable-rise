@@ -1307,10 +1307,10 @@ export function ProductFormTabs({
             {/* Tab 2: Images */}
             <TabsContent 
               value="images" 
-              className="space-y-6"
+              className="space-y-5 md:space-y-6"
               data-testid="productFormTabs_imagesContent"
             >
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
                   <div className="flex-1">
                     <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
@@ -1335,10 +1335,10 @@ export function ProductFormTabs({
 
                 <Separator />
 
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-3 md:gap-4">
                   {/* Always visible drag-and-drop zone */}
                   <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
-                    <CardContent className="p-2">
+                    <CardContent className="p-1 md:p-2">
                       <div 
                         className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
                           isDragOver 
@@ -1365,7 +1365,7 @@ export function ProductFormTabs({
                           }
                         }}
                       >
-                        <ImageIcon className={`h-12 w-12 mb-3 transition-colors ${
+                        <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${
                           isDragOver ? 'text-emerald-600' : 'text-emerald-500'
                         }`} />
                         <p className={`text-sm text-center px-2 transition-colors ${
@@ -1373,7 +1373,7 @@ export function ProductFormTabs({
                         }`}>
                           {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
                         </p>
-                        <p className="text-xs text-center text-muted-foreground mt-2 px-3" data-testid="productFormTabs_fileInfo">
+                        <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
                           {t('image_types_and_limit')}
                         </p>
                       </div>
