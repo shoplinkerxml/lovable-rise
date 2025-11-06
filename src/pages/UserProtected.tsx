@@ -10,6 +10,7 @@ const UserProtected = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(true);
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -44,7 +45,8 @@ const UserProtected = () => {
           if (currentUser.role === 'user') {
             // Validate subscription and deactivate if expired
             try {
-              await SubscriptionValidationService.ensureValidSubscription(currentUser.id);
+              const result = await SubscriptionValidationService.ensureValidSubscription(currentUser.id);
+              setHasAccess(result.hasValidSubscription);
             } catch (subError) {
               console.error('[UserProtected] Subscription validation error:', subError);
               // Continue anyway - subscription validation is non-blocking
@@ -77,6 +79,31 @@ const UserProtected = () => {
     checkAuthentication();
   }, []);
 
+  // Refresh subscription access on window focus / visibility change
+  useEffect(() => {
+    if (!user?.id) return;
+    const onFocus = async () => {
+      try {
+        const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
+        setHasAccess(result.hasValidSubscription);
+      } catch {}
+    };
+    const onVisibility = async () => {
+      if (!document.hidden) {
+        try {
+          const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
+          setHasAccess(result.hasValidSubscription);
+        } catch {}
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [user?.id]);
+
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -99,7 +126,7 @@ const UserProtected = () => {
     return <Navigate to="/admin" replace />;
   }
 
-  return <Outlet />;
+  return <Outlet context={{ hasAccess }} />;
 };
 
 export default UserProtected;

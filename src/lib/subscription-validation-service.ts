@@ -19,6 +19,25 @@ function isTransientAbortError(err: unknown): boolean {
  * Automatically deactivates expired subscriptions based on end_date
  */
 export class SubscriptionValidationService {
+  // Simple in-memory cache for subscription validation per user
+  private static cache: Map<string, {
+    timestamp: number;
+    result: {
+      hasValidSubscription: boolean;
+      subscription: any | null;
+      isDemo: boolean;
+    };
+  }> = new Map();
+
+  // Track in-flight validations to dedupe concurrent calls
+  private static inFlight: Map<string, Promise<{
+    hasValidSubscription: boolean;
+    subscription: any | null;
+    isDemo: boolean;
+  }>> = new Map();
+
+  // Cache TTL (ms) for subscription status
+  private static readonly TTL_MS = 15000;
   
   /**
    * Check if a subscription is expired based on end_date
@@ -140,32 +159,61 @@ export class SubscriptionValidationService {
    * Validate subscription without auto-creating new ones
    * This should be called on every page load/navigation
    */
-  static async ensureValidSubscription(userId: string): Promise<{
+  static async ensureValidSubscription(userId: string, options?: { forceRefresh?: boolean }): Promise<{
     hasValidSubscription: boolean;
     subscription: any | null;
     isDemo: boolean;
   }> {
     try {
-      // Validate existing subscription and deactivate if expired
-      const validation = await this.validateUserSubscription(userId);
+      const forceRefresh = options?.forceRefresh === true;
 
-      // If valid subscription exists, return it
-      if (validation.isValid && validation.subscription) {
-        return {
-          hasValidSubscription: true,
-          subscription: validation.subscription,
-          isDemo: (validation.subscription.tariffs?.is_free === true) && 
-                  (validation.subscription.tariffs?.visible === false)
-        };
+      // Serve from cache if fresh and no force refresh requested
+      const cached = this.cache.get(userId);
+      const now = Date.now();
+      if (!forceRefresh && cached && (now - cached.timestamp) < this.TTL_MS) {
+        return cached.result;
       }
 
-      // No valid subscription - do NOT auto-create, just return false
-      if (__DEV__) console.log('[Subscription] No valid subscription found for user:', userId);
-      return {
-        hasValidSubscription: false,
-        subscription: null,
-        isDemo: false
-      };
+      // Dedupe concurrent validations for same user
+      const existingFlight = this.inFlight.get(userId);
+      if (!forceRefresh && existingFlight) {
+        return await existingFlight;
+      }
+
+      const flight = (async () => {
+        // Validate existing subscription and deactivate if expired
+        const validation = await this.validateUserSubscription(userId);
+
+        // If valid subscription exists, return it
+        if (validation.isValid && validation.subscription) {
+          const result = {
+            hasValidSubscription: true,
+            subscription: validation.subscription,
+            isDemo: (validation.subscription.tariffs?.is_free === true) && 
+                    (validation.subscription.tariffs?.visible === false)
+          };
+          // Cache successful result
+          this.cache.set(userId, { timestamp: Date.now(), result });
+          return result;
+        }
+
+        // No valid subscription - do NOT auto-create, just return false
+        if (__DEV__) console.log('[Subscription] No valid subscription found for user:', userId);
+        const result = {
+          hasValidSubscription: false,
+          subscription: null,
+          isDemo: false
+        };
+        this.cache.set(userId, { timestamp: Date.now(), result });
+        return result;
+
+      })();
+
+      // Store in-flight promise and await
+      this.inFlight.set(userId, flight);
+      const res = await flight;
+      this.inFlight.delete(userId);
+      return res;
 
     } catch (error) {
       if (isTransientAbortError(error)) {
@@ -185,8 +233,8 @@ export class SubscriptionValidationService {
    * Get subscription info with validation
    * Returns subscription details or null if expired/invalid
    */
-  static async getValidSubscription(userId: string): Promise<any | null> {
-    const result = await this.ensureValidSubscription(userId);
+  static async getValidSubscription(userId: string, options?: { forceRefresh?: boolean }): Promise<any | null> {
+    const result = await this.ensureValidSubscription(userId, options);
     return result.hasValidSubscription ? result.subscription : null;
   }
 }

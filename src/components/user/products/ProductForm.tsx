@@ -67,7 +67,6 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
   
   const [params, setParams] = useState<ProductParam[]>([]);
   const [images, setImages] = useState<ProductImage[]>([]);
-  const [stores, setStores] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -81,11 +80,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     }
   }, [product]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Stores state updated:', stores);
-    console.log('Stores length:', stores.length);
-  }, [stores]);
+  // Debug logging (removed stores logging)
 
   const loadProductData = async () => {
     if (!product) return;
@@ -151,28 +146,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         return;
       }
       
-      console.log('Loading stores for user:', user.id);
-
-      // Load stores з усіма полями
-      const { data: storesData, error: storesError } = await supabase
-        .from('user_stores')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('store_name');
-      
-      if (storesError) {
-        console.error('Error loading stores:', storesError);
-      } else {
-        console.log('Loaded stores:', storesData);
-        // Додаємо унікальний ідентифікатор для кожного магазину
-        const storesWithId = (storesData || []).map(store => ({
-          ...store,
-          id: store.id || `${store.user_id}_${store.store_name}` // Використовуємо composit key якщо немає id
-        }));
-        console.log('Stores with IDs:', storesWithId);
-        setStores(storesWithId);
-      }
+      // Removed stores loading and selection; ProductService will resolve store_id
 
       // Load suppliers
       const suppliersData = await SupplierService.getSuppliers();
@@ -321,11 +295,6 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       return;
     }
 
-    if (!formData.store_id) {
-      toast.error('Оберіть магазин');
-      return;
-    }
-
     if (!formData.external_id) {
       toast.error('External ID обов\'язковий');
       return;
@@ -350,7 +319,6 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         description: formData.description || null,
         description_ua: formData.description_ua || null,
         external_id: formData.external_id,
-        store_id: formData.store_id,
         supplier_id: formData.supplier_id || null,
         category_id: formData.category_id || null,
         currency_id: formData.currency_id || null,
@@ -640,48 +608,12 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
 
         {/* Right Column - Settings */}
         <div className="space-y-6">
-          {/* Store and Supplier */}
+          {/* Supplier */}
           <Card>
             <CardHeader>
-              <CardTitle>Магазин та постачальник</CardTitle>
+              <CardTitle>Постачальник</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="store">Магазин *</Label>
-                {stores.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">
-                    Завантаження магазинів... (знайдено: {stores.length})
-                  </div>
-                ) : null}
-                <Select
-                  value={formData.store_id}
-                  onValueChange={(value) => {
-                    console.log('Selected store:', value);
-                    setFormData({ ...formData, store_id: value });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Оберіть магазин" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stores.length === 0 ? (
-                      <div className="px-2 py-1 text-sm text-muted-foreground">
-                        Магазини не знайдено
-                      </div>
-                    ) : (
-                      stores.map((store) => {
-                        console.log('Rendering store option:', store.id, store.store_name);
-                        return (
-                          <SelectItem key={store.id} value={store.id}>
-                            {store.store_name}
-                          </SelectItem>
-                        );
-                      })
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="supplier">Постачальник</Label>
                 <Select

@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from "react";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from "@/components/ui/sheet-no-overlay";
@@ -15,7 +15,7 @@ import { ProfileService } from "@/lib/profile-service";
 import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
-import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
+// Subscription access is validated in UserProtected and passed via Outlet context
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MenuSection } from "@/components/user/MenuSection";
@@ -53,6 +53,7 @@ interface UserMenuContextState {
   setActiveMenuItem: (item: UserMenuItem | null) => void;
   navigateToMenuItem: (item: UserMenuItem) => void;
   refreshMenuItems: () => Promise<void>;
+  hasAccess: boolean;
 }
 const UserMenuContext = createContext<UserMenuContextState | null>(null);
 export const useUserMenu = () => {
@@ -79,16 +80,17 @@ function buildTree(items: UserMenuItem[]): Record<number | "root", UserMenuItem[
 const UserMenuProvider: React.FC<{
   children: React.ReactNode;
   userId: string;
+  hasAccess: boolean;
 }> = ({
   children,
-  userId
+  userId,
+  hasAccess
 }) => {
   const [menuItems, setMenuItems] = useState<UserMenuItem[]>([]);
   const [activeMenuItem, setActiveMenuItemState] = useState<UserMenuItem | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const [hasAccess, setHasAccess] = useState(true);
 
   // Load menu items on mount
   const loadMenuItems = async () => {
@@ -174,28 +176,7 @@ const UserMenuProvider: React.FC<{
     }
   };
 
-  // Check active subscription access based on end_date
-  useEffect(() => {
-    async function checkAccess() {
-      try {
-        // Use new validation service that checks end_date and deactivates expired subscriptions
-        const result = await SubscriptionValidationService.ensureValidSubscription(userId);
-        setHasAccess(result.hasValidSubscription);
-      } catch (error) {
-        console.error('Error checking subscription access:', error);
-        setHasAccess(true); // fail open on error
-      }
-    }
-    checkAccess();
-    const onFocus = () => checkAccess();
-    const onVisibility = () => { if (!document.hidden) checkAccess(); };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [userId]);
+  // Subscription access is provided via props; reactive updates handled higher up
 
   // Update active menu item when location changes
   useEffect(() => {
@@ -225,7 +206,8 @@ const UserMenuProvider: React.FC<{
     menuLoading,
     setActiveMenuItem,
     navigateToMenuItem,
-    refreshMenuItems
+    refreshMenuItems,
+    hasAccess
   };
   return <UserMenuContext.Provider value={contextValue}>
       {children}
@@ -313,6 +295,8 @@ const UserLayout = () => {
   const toggleTheme = () => {
     document.documentElement.classList.toggle("dark");
   };
+  // Read hasAccess from UserProtected Outlet context early to keep hook order stable
+  const { hasAccess } = useOutletContext<{ hasAccess: boolean }>();
   if (loading) {
     return <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
@@ -326,7 +310,7 @@ const UserLayout = () => {
         </div>
       </div>;
   }
-  return <UserMenuProvider userId={user.id}>
+  return <UserMenuProvider userId={user.id} hasAccess={hasAccess}>
       <UserLayoutContent user={user} uiUserProfile={uiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
     </UserMenuProvider>;
 };
@@ -366,33 +350,11 @@ const UserLayoutContent = ({
     menuLoading,
     activeMenuItem,
     navigateToMenuItem,
-    refreshMenuItems
+    refreshMenuItems,
+    hasAccess
   } = useUserMenu();
   const location = useLocation();
   const navigate = useNavigate();
-  const [hasAccess, setHasAccess] = useState(true);
-
-  useEffect(() => {
-    async function checkAccess() {
-      try {
-        // Use new validation service that checks end_date and deactivates expired subscriptions
-        const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
-        setHasAccess(result.hasValidSubscription);
-      } catch (error) {
-        console.error('Error checking subscription access:', error);
-        setHasAccess(true); // fail open on error
-      }
-    }
-    checkAccess();
-    const onFocus = () => checkAccess();
-    const onVisibility = () => { if (!document.hidden) checkAccess(); };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [user.id]);
 
   // Auto-collapse sidebar at viewport widths ≤ 1393px
   useEffect(() => {

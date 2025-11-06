@@ -1,9 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
+import { SubscriptionValidationService } from "./subscription-validation-service";
 
 export interface Product {
   id: string;
-  user_id: string;
   store_id: string;
   external_id: string;
   name: string;
@@ -43,7 +43,7 @@ export interface ProductImage {
 }
 
 export interface CreateProductData {
-  store_id: string;
+  store_id?: string;
   external_id: string;
   name: string;
   name_ua?: string | null;
@@ -107,7 +107,8 @@ export class ProductService {
     try {
       const { data, error } = await (supabase as any)
         .from('user_stores')
-        .select('*')
+        .select('id')
+        .eq('user_id', sessionValidation.user.id)
         .eq('is_active', true);
 
       if (error) {
@@ -156,26 +157,21 @@ export class ProductService {
       throw new Error("User not authenticated");
     }
 
-    // Get user's current active subscription
-    const { data: subscriptions, error: subscriptionError } = await supabase
-      .from('user_subscriptions')
-      .select('tariff_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('start_date', { ascending: false })
-      .limit(1);
-
-    if (subscriptionError || !subscriptions?.[0]) {
+    // Use cached/validated subscription to avoid duplicate requests
+    const subscription = await SubscriptionValidationService.getValidSubscription(user.id);
+    if (!subscription) {
       return 0;
     }
-
-    const subscription = subscriptions[0];
+    const tariffId = subscription.tariffs?.id ?? subscription.tariff_id;
+    if (!tariffId) {
+      return 0;
+    }
 
     // Get the product limit directly from tariff_limits by limit_name
     const { data: limitData, error: limitError } = await supabase
       .from('tariff_limits')
       .select('value')
-      .eq('tariff_id', subscription.tariff_id)
+      .eq('tariff_id', tariffId)
       .ilike('limit_name', '%товар%')
       .eq('is_active', true)
       .maybeSingle();
@@ -203,24 +199,17 @@ export class ProductService {
   /** Получение количества продуктов текущего пользователя */
   static async getProductsCount(): Promise<number> {
     try {
-      const storeIds = await this.getUserStoreIds();
-      
-      if (storeIds.length === 0) {
-        return 0;
+      const sessionValidation = await SessionValidator.ensureValidSession();
+      if (!sessionValidation.isValid) {
+        throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
       }
 
-      let query = (supabase as any)
+      const { count, error } = await (supabase as any)
         .from('store_products')
-        .select('*', { count: 'exact', head: true });
-
-      // Используем eq для одного store_id, in для нескольких
-      if (storeIds.length === 1) {
-        query = query.eq('store_id', storeIds[0]);
-      } else {
-        query = query.in('store_id', storeIds);
-      }
-
-      const { count, error } = await query;
+        .select('id', { count: 'exact', head: true })
+        // RLS should restrict rows to the current user's stores; no explicit user_id column
+        // Keep the query simple to avoid referencing non-existent columns
+        .order('id', { ascending: true });
 
       if (error) {
         console.error('Get products count error:', error);
@@ -239,24 +228,15 @@ export class ProductService {
   /** Получение списка продуктов текущего пользователя */
   static async getProducts(): Promise<Product[]> {
     try {
-      const storeIds = await this.getUserStoreIds();
-      
-      if (storeIds.length === 0) {
-        return [];
+      const sessionValidation = await SessionValidator.ensureValidSession();
+      if (!sessionValidation.isValid) {
+        throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
       }
 
-      let query = (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('store_products')
-        .select('*');
-
-      // Используем eq для одного store_id, in для нескольких
-      if (storeIds.length === 1) {
-        query = query.eq('store_id', storeIds[0]);
-      } else {
-        query = query.in('store_id', storeIds);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Get products error:', error);
@@ -316,25 +296,16 @@ export class ProductService {
 
   /** Получение товара по ID */
   static async getProductById(id: string): Promise<Product | null> {
-    const storeIds = await this.getUserStoreIds();
-    
-    if (storeIds.length === 0) {
-      return null;
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    let query = (supabase as any)
+    const { data, error } = await (supabase as any)
       .from('store_products')
       .select('*')
-      .eq('id', id);
-
-    // Используем eq для одного store_id, in для нескольких
-    if (storeIds.length === 1) {
-      query = query.eq('store_id', storeIds[0]);
-    } else {
-      query = query.in('store_id', storeIds);
-    }
-
-    const { data, error } = await query.single();
+      .eq('id', id)
+      .maybeSingle();
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -363,10 +334,19 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
+    // Determine effective store_id: use provided or first active user store
+    let effectiveStoreId = productData.store_id;
+    if (!effectiveStoreId || effectiveStoreId.trim() === '') {
+      const storeIds = await this.getUserStoreIds();
+      effectiveStoreId = storeIds[0];
+      if (!effectiveStoreId) {
+        throw new Error("Активний магазин не знайдено");
+      }
+    }
+
     // Подготавливаем данные для создания товара
     const productInsertData = {
-      user_id: sessionValidation.user.id,
-      store_id: productData.store_id,
+      store_id: effectiveStoreId,
       external_id: productData.external_id,
       name: productData.name,
       name_ua: productData.name_ua,
@@ -474,7 +454,6 @@ export class ProductService {
       .from('store_products')
       .update(productUpdateData)
       .eq('id', id)
-      .eq('user_id', sessionValidation.user.id)
       .select()
       .single();
 
@@ -557,7 +536,8 @@ export class ProductService {
       .from('store_products')
       .delete()
       .eq('id', id)
-      .eq('user_id', sessionValidation.user.id);
+      // RLS should ensure only the owner can delete
+      ;
 
     if (error) {
       console.error('Delete product error:', error);

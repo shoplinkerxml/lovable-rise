@@ -52,7 +52,6 @@ export const ProductCreate = () => {
   const handleFormSubmit = async ({ formData, images, parameters }: any) => {
     try {
       await ProductService.createProduct({
-        store_id: formData.store_id,
         external_id: formData.external_id,
         category_id: formData.category_id || null,
         currency_id: formData.currency_id || null,
