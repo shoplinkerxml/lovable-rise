@@ -228,7 +228,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           <DropdownMenu onOpenChange={(open) => { if (open) setSelected(node.external_id); }}>
             <DropdownMenuTrigger asChild>
               <div
-                className="inline-flex items-center justify-center gap-[0.25rem] whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500 hover:bg-green-50 hover:text-green-700 h-[1.75rem] w-[1.75rem]"
+                className="inline-flex items-center justify-center gap-[0.25rem] whitespace-nowrap rounded-md text-sm font-medium transition-colors border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 hover:bg-green-50 hover:text-green-700 h-[1.75rem] w-[1.75rem]"
                 role="button"
                 aria-haspopup="menu"
                 onPointerDown={(e) => { e.stopPropagation(); setSelected(node.external_id); }}
@@ -284,8 +284,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   }, [treeData, search]);
 
   return (
-    <Card data-testid="categoryTree_card">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="border-0 shadow-none" data-testid="categoryTree_card">
+      <CardHeader className="flex flex-row items-center justify-between p-0">
         <CardTitle className="text-base" data-testid="categoryTree_title">{t("categories_title")}</CardTitle>
         <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetCreateState(); }}>
           <DialogTrigger asChild>
@@ -360,7 +360,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         </Dialog>
       </CardHeader>
 
-      <CardContent className="space-y-[0.75rem]">
+      <CardContent className="space-y-[0.5rem] p-0">
         {/* Supplier tabs for switching category trees by supplier */}
         <Tabs value={supplierId || "none"} onValueChange={(val) => { setSupplierId(val); onSupplierChange?.(val); }} className="w-full">
           <TabsList

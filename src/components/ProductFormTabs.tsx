@@ -1277,7 +1277,7 @@ export function ProductFormTabs({
               </div>
               
               {/* Секция: Редактор деревa категорій — перемещено ниже назви та опис */}
-              <div className="space-y-4" data-testid="productFormTabs_categoryTreeEditorSection">
+              <div className="space-y-[0.5rem]" data-testid="productFormTabs_categoryTreeEditorSection">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
                   <Separator className="flex-1" />
