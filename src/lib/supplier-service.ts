@@ -6,7 +6,7 @@ export interface Supplier {
   user_id: string;
   supplier_name: string;
   website_url?: string;
-  xml_feed_url: string;
+  xml_feed_url: string | null;
   phone?: string;
   created_at: string;
   updated_at: string;
@@ -15,14 +15,14 @@ export interface Supplier {
 export interface CreateSupplierData {
   supplier_name: string;
   website_url?: string;
-  xml_feed_url: string;
+  xml_feed_url?: string | null;
   phone?: string;
 }
 
 export interface UpdateSupplierData {
   supplier_name?: string;
   website_url?: string;
-  xml_feed_url?: string;
+  xml_feed_url?: string | null;
   phone?: string;
 }
 
@@ -177,9 +177,7 @@ export class SupplierService {
       throw new Error("Назва постачальника обов'язкова");
     }
 
-    if (!supplierData.xml_feed_url?.trim()) {
-      throw new Error("Посилання на прайс обов'язкове");
-    }
+    // xml_feed_url є НЕобов'язковим
 
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
@@ -197,6 +195,8 @@ export class SupplierService {
       throw new Error(`Досягнуто ліміту постачальників (${limitInfo.max}). Оновіть тарифний план.`);
     }
 
+    const xmlUrl = supplierData.xml_feed_url ? supplierData.xml_feed_url.trim() : '';
+
     // @ts-ignore - table not in generated types yet
     const { data, error } = await (supabase as any)
       .from('user_suppliers')
@@ -204,7 +204,7 @@ export class SupplierService {
         user_id: user.id,
         supplier_name: supplierData.supplier_name.trim(),
         website_url: supplierData.website_url?.trim() || null,
-        xml_feed_url: supplierData.xml_feed_url.trim(),
+        xml_feed_url: xmlUrl ? xmlUrl : null,
         phone: supplierData.phone?.trim() || null,
       })
       .select()
@@ -235,10 +235,9 @@ export class SupplierService {
       cleanData.supplier_name = supplierData.supplier_name.trim();
     }
     if (supplierData.xml_feed_url !== undefined) {
-      if (!supplierData.xml_feed_url.trim()) {
-        throw new Error("Посилання на прайс обов'язкове");
-      }
-      cleanData.xml_feed_url = supplierData.xml_feed_url.trim();
+      const trimmed = (supplierData.xml_feed_url ?? '').toString().trim();
+      // Порожній рядок означає очистити значення до null
+      cleanData.xml_feed_url = trimmed ? trimmed : null;
     }
     if (supplierData.website_url !== undefined) {
       cleanData.website_url = supplierData.website_url?.trim() || null;

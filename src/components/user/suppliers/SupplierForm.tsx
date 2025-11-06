@@ -43,9 +43,8 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
       newErrors.supplier_name = "Назва постачальника обов'язкова";
     }
 
-    if (!formData.xml_feed_url.trim()) {
-      newErrors.xml_feed_url = "Посилання на прайс обов'язкове";
-    } else {
+    // Поле посилання на прайс НЕобов'язкове; якщо вказано — перевіряємо формат URL
+    if (formData.xml_feed_url.trim()) {
       try {
         new URL(formData.xml_feed_url);
       } catch {
@@ -71,7 +70,7 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
         const updateData: UpdateSupplierData = {
           supplier_name: formData.supplier_name.trim(),
           website_url: formData.website_url.trim() || undefined,
-          xml_feed_url: formData.xml_feed_url.trim(),
+          xml_feed_url: formData.xml_feed_url.trim() || null,
           phone: formData.phone.trim() || undefined,
         };
         await SupplierService.updateSupplier(supplier.id, updateData);
@@ -81,7 +80,7 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
         const createData: CreateSupplierData = {
           supplier_name: formData.supplier_name.trim(),
           website_url: formData.website_url.trim() || undefined,
-          xml_feed_url: formData.xml_feed_url.trim(),
+          xml_feed_url: formData.xml_feed_url.trim() || null,
           phone: formData.phone.trim() || undefined,
         };
         await SupplierService.createSupplier(createData);
@@ -158,7 +157,7 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
           {/* Посилання на прайс */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              {t('xml_feed_url')} <span className="text-destructive">*</span>
+              {t('xml_feed_url')}
             </label>
             <InputGroup className={errors.xml_feed_url ? 'border-destructive' : ''}>
               <InputGroupAddon align="inline-start">
