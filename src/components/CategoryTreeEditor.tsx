@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/providers/i18n-provider";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ChevronDown, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2 } from "lucide-react";
 
 type Supplier = { id: string; supplier_name: string };
 type Store = { id: string; store_name: string };
@@ -227,19 +227,29 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-[1.75rem] w-[1.75rem]" onClick={(e) => e.stopPropagation()} data-testid={`categoryTree_actions_${node.external_id}`}>
-                <MoreHorizontal className="h-[1rem] w-[1rem]" />
-              </Button>
+              <div
+                className="inline-flex items-center justify-center gap-[0.25rem] whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-accent hover:text-accent-foreground h-[1.75rem] w-[1.75rem]"
+                role="button"
+                aria-haspopup="menu"
+                onClick={(e) => e.stopPropagation()}
+                data-testid={`categoryTree_actions_${node.external_id}`}
+                title={t("menu")}
+              >
+                <MoreVertical className="h-[1rem] w-[1rem]" aria-hidden="true" />
+              </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsCreateOpen(true); setCreateParentExternalId(node.external_id); }} data-testid={`categoryTree_addSub_${node.external_id}`}>
+                <Plus className="h-[1rem] w-[1rem] mr-[0.25rem]" />
                 {t("add_subcategory")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsRenaming(true); }} data-testid={`categoryTree_rename_${node.external_id}`}>
+                <Pencil className="h-[1rem] w-[1rem] mr-[0.25rem]" />
                 {t("rename_category")}
               </DropdownMenuItem>
               <AlertDialog>
                 <DropdownMenuItem onClick={(e) => e.stopPropagation()} data-testid={`categoryTree_delete_${node.external_id}`}>
+                  <Trash2 className="h-[1rem] w-[1rem] mr-[0.25rem]" />
                   {t("delete_category")}
                 </DropdownMenuItem>
                 <AlertDialogContent>
