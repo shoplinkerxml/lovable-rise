@@ -20,6 +20,7 @@ import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
 import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
+import ParametersDataTable from '@/components/products/ParametersDataTable';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -30,6 +31,8 @@ interface ProductParam {
   name: string;
   value: string;
   order_index: number;
+  paramid?: string;
+  valueid?: string;
 }
 interface ProductImage {
   id?: string;
@@ -383,7 +386,7 @@ export function ProductFormTabs({
   // Modal state for add/edit characteristic
   const [isParamModalOpen, setIsParamModalOpen] = useState(false);
   const [editingParamIndex, setEditingParamIndex] = useState<number | null>(null);
-  const [paramForm, setParamForm] = useState<{ name: string; value: string }>({ name: '', value: '' });
+const [paramForm, setParamForm] = useState<{ name: string; value: string; paramid?: string; valueid?: string }>({ name: '', value: '', paramid: '', valueid: '' });
 
   // Lookup data
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -518,7 +521,9 @@ export function ProductFormTabs({
           id: param.id,
           name: param.name,
           value: param.value,
-          order_index: param.order_index
+          order_index: param.order_index,
+          paramid: (param as any).paramid || '',
+          valueid: (param as any).valueid || ''
         })));
       }
     } catch (error) {
@@ -811,25 +816,27 @@ export function ProductFormTabs({
   // Characteristic modal handlers
   const openAddParamModal = () => {
     setEditingParamIndex(null);
-    setParamForm({ name: '', value: '' });
+    setParamForm({ name: '', value: '', paramid: '', valueid: '' });
     setIsParamModalOpen(true);
   };
   const openEditParamModal = (index: number) => {
     const p = parameters[index];
     setEditingParamIndex(index);
-    setParamForm({ name: p.name, value: p.value });
+    setParamForm({ name: p.name, value: p.value, paramid: p.paramid || '', valueid: p.valueid || '' });
     setIsParamModalOpen(true);
   };
   const saveParamModal = () => {
     const name = paramForm.name.trim();
     const value = paramForm.value.trim();
+    const paramid = (paramForm.paramid || '').trim();
+    const valueid = (paramForm.valueid || '').trim();
     if (!name || !value) return;
     if (editingParamIndex === null) {
-      const newParams = [...parameters, { name, value, order_index: parameters.length }];
+      const newParams = [...parameters, { name, value, paramid, valueid, order_index: parameters.length }];
       setParameters(newParams);
     } else {
       const updated = [...parameters];
-      updated[editingParamIndex] = { ...updated[editingParamIndex], name, value };
+      updated[editingParamIndex] = { ...updated[editingParamIndex], name, value, paramid, valueid };
       setParameters(updated);
     }
     setIsParamModalOpen(false);
@@ -1517,31 +1524,11 @@ export function ProductFormTabs({
                       <p className="text-sm text-muted-foreground mt-2">{t('add_characteristics_instruction')}</p>
                     </div>
                   ) : (
-                    <div className="divide-y">
-                      {parameters.map((param, index) => (
-                        <div key={index} className="flex items-center justify-between py-3 group" data-testid={`productForm_paramRow_${index}`}>
-                          <div className="grid grid-cols-2 gap-4 w-full">
-                            <span className="text-sm text-muted-foreground">{param.name}</span>
-                            <span className="text-sm font-medium">{param.value}</span>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" data-testid={`productForm_paramMenu_${index}`}>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditParamModal(index)} data-testid={`productForm_paramEdit_${index}`}>
-                                <Pencil className="h-4 w-4 mr-2" /> {t('edit_characteristic')}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => deleteParam(index)} data-testid={`productForm_paramDelete_${index}`}>
-                                <Trash className="h-4 w-4 mr-2" /> {t('btn_delete')}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      ))}
-                    </div>
+                    <ParametersDataTable
+                      data={parameters}
+                      onEditRow={(index) => openEditParamModal(index)}
+                      onDeleteRow={(index) => deleteParam(index)}
+                    />
                   )}
 
                   {/* Add/Edit characteristic modal */}
@@ -1560,6 +1547,26 @@ export function ProductFormTabs({
                         <div className="space-y-2">
                           <Label htmlFor="param-value-modal">{t('value')}</Label>
                           <Input id="param-value-modal" value={paramForm.value} onChange={(e) => setParamForm({ ...paramForm, value: e.target.value })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="param-paramid-modal">{t('param_id_optional')}</Label>
+                          <Input
+                            id="param-paramid-modal"
+                            value={paramForm.paramid || ''}
+                            onChange={(e) => setParamForm({ ...paramForm, paramid: e.target.value })}
+                            placeholder={t('param_id_placeholder')}
+                            data-testid="productForm_modal_paramId"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="param-valueid-modal">{t('value_id_optional')}</Label>
+                          <Input
+                            id="param-valueid-modal"
+                            value={paramForm.valueid || ''}
+                            onChange={(e) => setParamForm({ ...paramForm, valueid: e.target.value })}
+                            placeholder={t('value_id_placeholder')}
+                            data-testid="productForm_modal_valueId"
+                          />
                         </div>
                       </div>
                       <DialogFooter className="gap-2">

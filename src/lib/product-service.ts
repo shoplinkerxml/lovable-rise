@@ -33,6 +33,8 @@ export interface ProductParam {
   name: string;
   value: string;
   order_index: number;
+  paramid?: string;
+  valueid?: string;
 }
 
 export interface ProductImage {
@@ -385,7 +387,9 @@ export class ProductService {
         product_id: product.id,
         name: param.name,
         value: param.value,
-        order_index: param.order_index || index
+        order_index: param.order_index || index,
+        paramid: param.paramid || null,
+        valueid: param.valueid || null
       }));
 
       const { error: paramsError } = await (supabase as any)
@@ -476,7 +480,9 @@ export class ProductService {
           product_id: id,
           name: param.name,
           value: param.value,
-          order_index: param.order_index || index
+          order_index: param.order_index || index,
+          paramid: param.paramid || null,
+          valueid: param.valueid || null
         }));
 
         const { error: paramsError } = await (supabase as any)

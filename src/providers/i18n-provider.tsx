@@ -1143,6 +1143,24 @@ const toastDictionary = {
   edit_characteristic: { uk: "Редагувати характеристику", en: "Edit Characteristic" },
   param_id_optional: { uk: "Param ID (необов'язково)", en: "Param ID (optional)" },
   value_id_optional: { uk: "Value ID (необов'язково)", en: "Value ID (optional)" },
+  // Parameters data table
+  param_id: { uk: "Param ID", en: "Param ID" },
+  value_id: { uk: "Value ID", en: "Value ID" },
+  order: { uk: "Порядок", en: "Order" },
+  actions: { uk: "Дії", en: "Actions" },
+  select_all: { uk: "Вибрати все", en: "Select all" },
+  select_row: { uk: "Вибрати рядок", en: "Select row" },
+  search_placeholder: { uk: "Пошук за назвою", en: "Search by name" },
+  delete_selected: { uk: "Видалити вибране", en: "Delete selected" },
+  customize_columns: { uk: "Налаштувати колонки", en: "Customize Columns" },
+  columns_short: { uk: "Колонки", en: "Columns" },
+  no_results: { uk: "Немає результатів", en: "No results" },
+  rows_selected: { uk: "Вибрано", en: "Selected" },
+  // ParametersDataTable toolbar
+  page_size: { uk: "Розмір сторінки", en: "Page size" },
+  btn_delete_selected: { uk: "Видалити вибране", en: "Delete selected" },
+  view_options: { uk: "Опції перегляду", en: "View options" },
+  toggle_columns: { uk: "Перемикання колонок", en: "Toggle columns" },
   
   // Currency translations
   currency_uah: { uk: "UAH - Гривня", en: "UAH - Hryvnia" },
