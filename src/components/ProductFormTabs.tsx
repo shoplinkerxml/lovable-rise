@@ -532,7 +532,7 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
     }
   };
   const handleSubmit = async () => {
-    if (!formData.name.trim()) {
+    if (!formData.name_ua.trim()) {
       toast.error(t('product_name_required'));
       return;
     }
@@ -1169,6 +1169,7 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                     >
                       <span className="truncate">{t('product_name')}</span>
                       <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
+                      <span aria-hidden="true" className="text-destructive text-[0.8rem] font-semibold" data-testid="productFormTabs_ukrainianTabRequiredStar">*</span>
                       <span className="sr-only">UA</span>
                     </TabsTrigger>
                     <TabsTrigger
@@ -1590,7 +1591,7 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
             <Button variant="outline" onClick={handleCancel} data-testid="productFormTabs_cancelButton">
               {t('btn_cancel')}
             </Button>
-            <Button onClick={handleSubmit} disabled={loading || !formData.name.trim()} data-testid="productFormTabs_submitButton">
+  <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
               {loading ? (product ? t('loading_updating') : t('loading_creating')) : (product ? t('btn_update') : t('btn_create'))}
             </Button>
           </div>
