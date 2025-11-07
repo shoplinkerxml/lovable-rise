@@ -411,6 +411,11 @@ const dictionary: Dictionary = {
   table_created: { uk: "Створено", en: "Created" },
   table_actions: { uk: "Дії", en: "Actions" },
   
+  // Product Table
+  table_product: { uk: "Товар", en: "Product" },
+  table_price: { uk: "Ціна", en: "Price" },
+  table_stock: { uk: "Запас", en: "Stock" },
+  
   // User Status
   status_active: { uk: "Активний", en: "Active" },
   status_inactive: { uk: "Неактивний", en: "Inactive" },
