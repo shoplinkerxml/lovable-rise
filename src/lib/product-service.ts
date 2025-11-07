@@ -52,9 +52,8 @@ export interface CreateProductData {
   description_ua?: string | null;
   vendor?: string | null;
   article?: string | null;
-  sku?: string | null;
   category_id?: string | null;
-  currency_id?: string | null;
+  currency_code?: string | null;
   price?: number | null;
   price_old?: number | null;
   price_promo?: number | null;
@@ -75,9 +74,8 @@ export interface UpdateProductData {
   description_ua?: string | null;
   vendor?: string | null;
   article?: string | null;
-  sku?: string | null;
   category_id?: string | null;
-  currency_id?: string | null;
+  currency_code?: string | null;
   price?: number | null;
   price_old?: number | null;
   price_promo?: number | null;
@@ -343,6 +341,22 @@ export class ProductService {
       }
     }
 
+    // Resolve currency_id from currency_code if provided
+    let resolvedCurrencyId: string | null = null;
+    if (productData.currency_code) {
+      try {
+        const { data: currencyRow } = await (supabase as any)
+          .from('currencies')
+          .select('id, code, status')
+          .eq('code', productData.currency_code)
+          .eq('status', true)
+          .maybeSingle();
+        resolvedCurrencyId = currencyRow?.id !== undefined ? String(currencyRow.id) : null;
+      } catch (e) {
+        resolvedCurrencyId = null;
+      }
+    }
+
     // Подготавливаем данные для создания товара
     const productInsertData = {
       store_id: effectiveStoreId,
@@ -353,9 +367,8 @@ export class ProductService {
       description_ua: productData.description_ua,
       vendor: productData.vendor,
       article: productData.article,
-      sku: productData.sku,
       category_id: productData.category_id,
-      currency_id: productData.currency_id,
+      currency_id: resolvedCurrencyId,
       price: productData.price,
       price_old: productData.price_old,
       price_promo: productData.price_promo,
@@ -437,9 +450,25 @@ export class ProductService {
     if (productData.description_ua !== undefined) productUpdateData.description_ua = productData.description_ua;
     if (productData.vendor !== undefined) productUpdateData.vendor = productData.vendor;
     if (productData.article !== undefined) productUpdateData.article = productData.article;
-    if (productData.sku !== undefined) productUpdateData.sku = productData.sku;
     if (productData.category_id !== undefined) productUpdateData.category_id = productData.category_id;
-    if (productData.currency_id !== undefined) productUpdateData.currency_id = productData.currency_id;
+    // Resolve currency_id from currency_code if provided
+    if (productData.currency_code !== undefined) {
+      let resolvedCurrencyId: string | null = null;
+      if (productData.currency_code) {
+        try {
+          const { data: currencyRow } = await (supabase as any)
+            .from('currencies')
+            .select('id, code, status')
+            .eq('code', productData.currency_code)
+            .eq('status', true)
+            .maybeSingle();
+          resolvedCurrencyId = currencyRow?.id !== undefined ? String(currencyRow.id) : null;
+        } catch (e) {
+          resolvedCurrencyId = null;
+        }
+      }
+      productUpdateData.currency_id = resolvedCurrencyId;
+    }
     if (productData.price !== undefined) productUpdateData.price = productData.price;
     if (productData.price_old !== undefined) productUpdateData.price_old = productData.price_old;
     if (productData.price_promo !== undefined) productUpdateData.price_promo = productData.price_promo;

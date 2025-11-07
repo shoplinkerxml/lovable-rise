@@ -482,7 +482,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         store_id: formData.store_id,
         external_id: formData.external_id,
         category_external_id: formData.category_external_id || null,
-        currency_id: selectedCurrency?.id || null,
+        currency_code: formData.currency_code || null,
         name: formData.name,
         name_ua: formData.name_ua || null,
         vendor: formData.vendor || null,

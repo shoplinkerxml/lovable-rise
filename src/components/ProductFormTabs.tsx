@@ -55,11 +55,10 @@ interface FormData {
   docket_ua: string;
   vendor: string;
   article: string;
-  sku: string;
   external_id: string;
   supplier_id: string;
   category_id: string;
-  currency_id: string;
+  currency_code: string;
   price: number;
   price_old: number;
   price_promo: number;
@@ -214,11 +213,10 @@ export function ProductFormTabs({
     docket_ua: '',
     vendor: '',
     article: '',
-    sku: '',
     external_id: '',
     supplier_id: '',
     category_id: '',
-    currency_id: '',
+    currency_code: 'UAH',
     price: 0,
     price_old: 0,
     price_promo: 0,
@@ -454,6 +452,8 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
     if (!product) return;
     try {
       // Load product data
+      // Try to resolve currency_code from loaded currencies
+      const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
       setFormData({
         name: product.name || '',
         name_ua: product.name_ua || '',
@@ -463,11 +463,10 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
         docket_ua: (product as any).docket_ua || '',
       vendor: product.vendor || '',
       article: product.article || '',
-      sku: product.sku || '',
       external_id: product.external_id || '',
       supplier_id: (product as any).supplier_id || '',
       category_id: product.category_id || '',
-      currency_id: product.currency_id || '',
+      currency_code: selectedCurrency?.code || 'UAH',
       price: product.price || 0,
       price_old: product.price_old || 0,
       price_promo: product.price_promo || 0,
@@ -1044,13 +1043,7 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                       })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="sku">{t('sku')}</Label>
-                        <Input id="sku" name="sku" autoComplete="off" value={formData.sku} onChange={e => setFormData({
-                        ...formData,
-                        sku: e.target.value
-                      })} placeholder={t('sku_placeholder')} data-testid="productFormTabs_skuInput" />
-                      </div>
+                      {/* SKU field removed */}
                       <div className="space-y-2">
                         <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
                         <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
@@ -1333,15 +1326,15 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
 
                   <div className="space-y-2">
                     <span id="currency_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_currencyText">{t('currency')} *</span>
-                    <Select value={formData.currency_id} onValueChange={value => setFormData({
+                    <Select value={formData.currency_code} onValueChange={value => setFormData({
                     ...formData,
-                    currency_id: value
+                    currency_code: value
                   })}>
                       <SelectTrigger aria-labelledby="currency_label" data-testid="productFormTabs_currencySelect">
                         <SelectValue placeholder={t('select_currency')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {currencies.map(currency => <SelectItem key={currency.id} value={String(currency.id)}>
+                        {currencies.map(currency => <SelectItem key={currency.code} value={currency.code}>
                             {currency.name} ({currency.code})
                           </SelectItem>)}
                       </SelectContent>

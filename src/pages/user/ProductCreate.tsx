@@ -54,12 +54,11 @@ export const ProductCreate = () => {
       await ProductService.createProduct({
         external_id: formData.external_id,
         category_id: formData.category_id || null,
-        currency_id: formData.currency_id || null,
+        currency_code: formData.currency_code || null,
         name: formData.name,
         name_ua: formData.name_ua || null,
         vendor: formData.vendor || null,
         article: formData.article || null,
-        sku: formData.sku || null,
         url: formData.url || null,
         available: !!formData.available,
         stock_quantity: Number(formData.stock_quantity) || 0,
