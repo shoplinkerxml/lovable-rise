@@ -42,12 +42,10 @@ export const StoreTemplates = () => {
     { id: 'description', name: 'description', label: 'Опис', required: false, type: 'string', category: 'Опис' },
     { id: 'price', name: 'price', label: 'Ціна', required: true, type: 'number', category: 'Ціна' },
     { id: 'currency', name: 'currency', label: 'Валюта', required: true, type: 'string', category: 'Ціна' },
-    { id: 'url', name: 'url', label: 'URL', required: false, type: 'string', category: 'Посилання' },
     { id: 'images', name: 'images', label: 'Зображення', required: false, type: 'array', category: 'Медіа' },
-    { id: 'brand', name: 'brand', label: 'Бренд', required: false, type: 'string', category: 'Основна' },
     { id: 'vendor', name: 'vendor', label: 'Виробник', required: false, type: 'string', category: 'Основна' },
     { id: 'category_id', name: 'category_id', label: 'Категорія', required: false, type: 'string', category: 'Основна' },
-    { id: 'sku', name: 'sku', label: 'Артикул', required: false, type: 'string', category: 'Основна' },
+    { id: 'article', name: 'article', label: 'Артикул', required: false, type: 'string', category: 'Основна' },
     { id: 'stock_quantity', name: 'stock_quantity', label: 'Залишок', required: false, type: 'number', category: 'Основна' }
   ];
 

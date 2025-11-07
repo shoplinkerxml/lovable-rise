@@ -239,7 +239,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
                     Основна інформація
                   </h4>
                   <div className="space-y-2">
-                    {['name', 'external_id', 'sku'].map(fieldId => {
+                    {['name', 'external_id', 'article'].map(fieldId => {
                       const field = systemFields.find(f => f.id === fieldId);
                       const value = getFieldValue(fieldId);
                       if (!field || !value) return null;
@@ -307,7 +307,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
                   <h4 className="font-semibold mb-3">Додаткові дані</h4>
                   <div className="space-y-2">
                     {mappedFields
-                      .filter(f => !['name', 'external_id', 'sku', 'price', 'currency', 'description', 'images'].includes(f.id))
+                      .filter(f => !['name', 'external_id', 'article', 'price', 'currency', 'description', 'images'].includes(f.id))
                       .map(field => {
                         const value = getFieldValue(field.id);
                         if (!value) return null;

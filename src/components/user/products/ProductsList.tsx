@@ -150,11 +150,7 @@ export const ProductsList = ({
                     ₴{product.price.toFixed(2)}
                   </span>
                 )}
-                {product.sku && (
-                  <span className="text-muted-foreground">
-                    SKU: {product.sku}
-                  </span>
-                )}
+                {/* SKU removed per schema update */}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className={product.available ? "text-green-600" : "text-gray-400"}>

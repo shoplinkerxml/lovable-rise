@@ -50,7 +50,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     // Товарна інформація
     vendor: '',
     article: '',
-    sku: '',
+    
     
     // Ціни
     price: '',
@@ -61,7 +61,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     stock_quantity: '',
     available: true,
     state: 'active',
-    url: ''
+    
   });
   
   const [params, setParams] = useState<ProductParam[]>([]);
@@ -95,16 +95,14 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         supplier_id: product.supplier_id || '',
         category_id: product.category_id || '',
         currency_id: product.currency_id || '',
-      vendor: product.vendor || '',
-      article: product.article || '',
-      sku: product.sku || '',
+        vendor: product.vendor || '',
+        article: product.article || '',
         price: product.price?.toString() || '',
         price_old: product.price_old?.toString() || '',
         price_promo: product.price_promo?.toString() || '',
         stock_quantity: product.stock_quantity?.toString() || '',
         available: product.available ?? true,
-        state: product.state || 'active',
-        url: product.url || ''
+        state: product.state || 'active'
       });
 
       // Load product params
@@ -342,14 +340,13 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         currency_id: formData.currency_id || null,
         vendor: formData.vendor || null,
         article: formData.article || null,
-        sku: formData.sku || null,
+        
         price: formData.price ? parseFloat(formData.price) : null,
         price_old: formData.price_old ? parseFloat(formData.price_old) : null,
         price_promo: formData.price_promo ? parseFloat(formData.price_promo) : null,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         available: formData.available,
         state: formData.state || 'active',
-        url: formData.url || null,
         params: params,
         images: images
       };
@@ -461,27 +458,10 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
                     placeholder="Введіть виробника"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="Введіть SKU"
-                  />
-                </div>
+                
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="url">URL товару</Label>
-                <Input
-                  id="url"
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  placeholder="Введіть URL товару"
-                  type="url"
-                />
-              </div>
+              {/* URL field removed per requirements */}
             </CardContent>
           </Card>
 

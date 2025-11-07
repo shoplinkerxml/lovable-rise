@@ -1021,7 +1021,6 @@ const toastDictionary = {
   // Product Form Fields
   product_main_data: { uk: "Основні дані", en: "Main Data" },
   product_names_description: { uk: "Назви та опис", en: "Names and Description" },
-  product_manufacturer_brand: { uk: "Виробник та бренд", en: "Manufacturer and Brand" },
   product_category_prices: { uk: "Категорія та ціни", en: "Category and Prices" },
   product_additional_info: { uk: "Додаткова інформація", en: "Additional Information" },
   
@@ -1034,8 +1033,6 @@ const toastDictionary = {
   external_id_placeholder: { uk: "Введіть зовнішній ID", en: "Enter external ID" },
   article: { uk: "Артикул", en: "Article" },
   article_placeholder: { uk: "Введіть артикул", en: "Enter article" },
-  sku: { uk: "SKU", en: "SKU" },
-  sku_placeholder: { uk: "Введіть SKU", en: "Enter SKU" },
   product_name_uk: { uk: "Назва (українська)", en: "Name (Ukrainian)" },
   product_name_uk_placeholder: { uk: "Введіть назву українською", en: "Enter name in Ukrainian" },
   product_name_en: { uk: "Назва (англійська)", en: "Name (English)" },
@@ -1046,8 +1043,6 @@ const toastDictionary = {
   description_en_placeholder: { uk: "Введіть опис англійською", en: "Enter description in English" },
   manufacturer: { uk: "Виробник", en: "Manufacturer" },
   manufacturer_placeholder: { uk: "Введіть виробника", en: "Enter manufacturer" },
-  brand: { uk: "Бренд", en: "Brand" },
-  brand_placeholder: { uk: "Введіть бренд", en: "Enter brand" },
   category: { uk: "Категорія", en: "Category" },
   select_category: { uk: "Оберіть категорію", en: "Select category" },
   currency: { uk: "Валюта", en: "Currency" },
@@ -1199,7 +1194,6 @@ const toastDictionary = {
   product_description_ua_placeholder: { uk: "Введіть опис товару українською", en: "Enter product description in Ukrainian" },
   product_description_en: { uk: "Опис товару (англійською)", en: "Product Description (English)" },
   product_description_en_placeholder: { uk: "Введіть опис товару англійською", en: "Enter product description in English" },
-  manufacturer_brand: { uk: "Виробник та бренд", en: "Manufacturer & Brand" },
   category_prices: { uk: "Категорія та ціни", en: "Category & Prices" },
   
   // Language tabs for product names and descriptions

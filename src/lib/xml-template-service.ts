@@ -581,7 +581,6 @@ export class XMLTemplateService {
       'offer.price': 'price',
       'offer.name': 'name',
       'offer.description': 'description',
-      'offer.url': 'url',
       'offer.picture': 'images',
       'offer.vendor': 'vendor',
       'offer.categoryId': 'category_id'

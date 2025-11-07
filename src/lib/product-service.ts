@@ -12,7 +12,6 @@ export interface Product {
   description_ua?: string | null;
   vendor?: string | null;
   article?: string | null;
-  sku?: string | null;
   category_id?: string | null;
   currency_id?: string | null;
   price?: number | null;
@@ -21,7 +20,6 @@ export interface Product {
   stock_quantity: number;
   available: boolean;
   state: string;
-  url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,7 +58,6 @@ export interface CreateProductData {
   stock_quantity?: number;
   available?: boolean;
   state?: string;
-  url?: string | null;
   params?: ProductParam[];
   images?: ProductImage[];
 }
@@ -82,7 +79,6 @@ export interface UpdateProductData {
   stock_quantity?: number;
   available?: boolean;
   state?: string;
-  url?: string | null;
   params?: ProductParam[];
   images?: ProductImage[];
 }
@@ -374,8 +370,7 @@ export class ProductService {
       price_promo: productData.price_promo,
       stock_quantity: productData.stock_quantity || 0,
       available: productData.available !== false,
-      state: productData.state || 'active',
-      url: productData.url
+      state: productData.state || 'active'
     };
 
     // Создаем товар
@@ -475,7 +470,6 @@ export class ProductService {
     if (productData.stock_quantity !== undefined) productUpdateData.stock_quantity = productData.stock_quantity;
     if (productData.available !== undefined) productUpdateData.available = productData.available;
     if (productData.state !== undefined) productUpdateData.state = productData.state;
-    if (productData.url !== undefined) productUpdateData.url = productData.url;
 
     // Обновляем товар
     const { data: product, error: productError } = await (supabase as any)

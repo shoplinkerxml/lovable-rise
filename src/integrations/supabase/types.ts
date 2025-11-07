@@ -779,9 +779,7 @@ export type Database = {
           description: string | null
           description_ua: string | null
           vendor: string | null
-          brand: string | null
           article: string | null
-          sku: string | null
           category_id: string | null
           currency_id: string | null
           price: number | null
@@ -790,7 +788,6 @@ export type Database = {
           stock_quantity: number
           available: boolean
           state: string
-          url: string | null
           created_at: string
           updated_at: string
         }
@@ -804,9 +801,7 @@ export type Database = {
           description?: string | null
           description_ua?: string | null
           vendor?: string | null
-          brand?: string | null
           article?: string | null
-          sku?: string | null
           category_id?: string | null
           currency_id?: string | null
           price?: number | null
@@ -815,7 +810,6 @@ export type Database = {
           stock_quantity?: number
           available?: boolean
           state?: string
-          url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -829,9 +823,7 @@ export type Database = {
           description?: string | null
           description_ua?: string | null
           vendor?: string | null
-          brand?: string | null
           article?: string | null
-          sku?: string | null
           category_id?: string | null
           currency_id?: string | null
           price?: number | null
@@ -840,7 +832,6 @@ export type Database = {
           stock_quantity?: number
           available?: boolean
           state?: string
-          url?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -59,7 +59,6 @@ export const ProductCreate = () => {
         name_ua: formData.name_ua || null,
         vendor: formData.vendor || null,
         article: formData.article || null,
-        url: formData.url || null,
         available: !!formData.available,
         stock_quantity: Number(formData.stock_quantity) || 0,
         price: typeof formData.price === 'number' ? formData.price : null,

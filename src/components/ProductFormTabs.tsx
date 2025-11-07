@@ -65,7 +65,6 @@ interface FormData {
   stock_quantity: number;
   available: boolean;
   state: string;
-  url: string;
   store_id: string;
 }
 export function ProductFormTabs({
@@ -223,7 +222,6 @@ export function ProductFormTabs({
     stock_quantity: 0,
     available: true,
     state: 'new',
-    url: '',
     store_id: ''
   });
 
@@ -473,7 +471,6 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
       stock_quantity: product.stock_quantity || 0,
       available: product.available || true,
       state: product.state || 'new',
-      url: product.url || '',
       store_id: product.store_id || ''
     });
 
@@ -1051,19 +1048,8 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                         stock_quantity: parseInt(e.target.value) || 0
                       })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
-
-                  {/* Секция: Виробник та бренд */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{t('manufacturer_brand')}</h3>
-                      <Separator className="flex-1" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 gap-4">
+                      {/* Перенесено: виробник */}
                       <div className="space-y-2">
                         <Label htmlFor="vendor">{t('manufacturer')}</Label>
                         <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
@@ -1071,36 +1057,8 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                         vendor: e.target.value
                       })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" />
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Секция: Додаткова інформація (поднята выше) */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{t('product_additional_info')}</h3>
-                      <Separator className="flex-1" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Supplier select */}
-                      <div className="space-y-2">
-                        <Label htmlFor="supplier">{t('supplier')}</Label>
-                        <Select
-                          value={formData.supplier_id}
-                          onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                        >
-                          <SelectTrigger data-testid="productFormTabs_supplierSelect">
-                            <SelectValue placeholder={t('select_supplier')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map((supplier) => (
-                              <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.supplier_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {/* Перенесено: статус товара */}
                       <div className="space-y-2">
                         <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
                         <Select value={formData.state} onValueChange={value => setFormData({
@@ -1118,16 +1076,12 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                           </SelectContent>
                         </Select>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="url">{t('product_url')}</Label>
-                        <Input id="url" name="url" autoComplete="url" value={formData.url} onChange={e => setFormData({
-                        ...formData,
-                        url: e.target.value
-                      })} placeholder={t('product_url_placeholder')} data-testid="productFormTabs_urlInput" />
-                      </div>
                     </div>
                   </div>
+
+                  {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
+
+                  {/* Секция: Додаткова інформація удалена; статус и виробник перенесены в основні дані */}
 
                 </div>
               </div>

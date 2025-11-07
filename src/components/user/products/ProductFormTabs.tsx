@@ -64,7 +64,6 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     // Товарна інформація
     vendor: '',
     article: '',
-    url: '',
     
     // Ціни
     price: '',
@@ -170,7 +169,6 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         currency_code: product.currency_code || 'UAH',
         vendor: product.vendor || '',
         article: product.article || '',
-        url: product.url || '',
         price: product.price?.toString() || '',
         price_old: product.price_old?.toString() || '',
         price_promo: product.price_promo?.toString() || '',
@@ -487,7 +485,6 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         name_ua: formData.name_ua || null,
         vendor: formData.vendor || null,
         article: formData.article || null,
-        url: formData.url || null,
         available: formData.available,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         price: formData.price ? parseFloat(formData.price) : null,
@@ -696,17 +693,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="url">{t('product_url')}</Label>
-                    <Input
-                      id="url"
-                      value={formData.url}
-                      onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                      placeholder={t('product_url_placeholder')}
-                      type="url"
-                      data-testid="productForm_url"
-                    />
-                  </div>
+                  {/* URL field removed per requirements */}
                 </CardContent>
               </Card>
             </div>
@@ -737,25 +724,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="supplier">{t('supplier')}</Label>
-                    <Select
-                      value={formData.supplier_id}
-                      onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                    >
-                      <SelectTrigger data-testid="productFormTabs_supplierSelect">
-                        <SelectValue placeholder={t('select_supplier')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                            {supplier.supplier_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Supplier select removed; supplier chosen inside category editor */}
                 </CardContent>
               </Card>
 

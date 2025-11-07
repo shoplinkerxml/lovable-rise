@@ -56,11 +56,8 @@ export const MappingTable: React.FC<MappingTableProps> = ({
       'image': 'images',
       'зображення': 'images',
       'picture': 'images',
-      'url': 'url',
-      'link': 'url',
-      'посилання': 'url',
-      'sku': 'sku',
-      'артикул': 'sku',
+      'article': 'article',
+      'артикул': 'article',
       'id': 'external_id',
       'stock': 'stock_quantity',
       'залишок': 'stock_quantity',
@@ -68,8 +65,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
       'кількість': 'stock_quantity',
       'vendor': 'vendor',
       'виробник': 'vendor',
-      'brand': 'brand',
-      'бренд': 'brand'
+      
     };
 
     for (const [key, value] of Object.entries(suggestions)) {
