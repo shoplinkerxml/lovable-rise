@@ -224,8 +224,8 @@ export const ProductsTable = ({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate" title={product.name || ""}>{product.name || "—"}</div>
-                      {product.brand && (
-                        <div className="text-sm text-muted-foreground truncate">{product.brand}</div>
+                      {product.vendor && (
+                        <div className="text-sm text-muted-foreground truncate">{product.vendor}</div>
                       )}
                     </div>
                   </div>

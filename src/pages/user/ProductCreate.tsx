@@ -58,7 +58,6 @@ export const ProductCreate = () => {
         name: formData.name,
         name_ua: formData.name_ua || null,
         vendor: formData.vendor || null,
-        brand: formData.brand || null,
         article: formData.article || null,
         sku: formData.sku || null,
         url: formData.url || null,

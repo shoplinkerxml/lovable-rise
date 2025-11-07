@@ -54,7 +54,6 @@ interface FormData {
   docket: string;
   docket_ua: string;
   vendor: string;
-  brand: string;
   article: string;
   sku: string;
   external_id: string;
@@ -214,7 +213,6 @@ export function ProductFormTabs({
     docket: '',
     docket_ua: '',
     vendor: '',
-    brand: '',
     article: '',
     sku: '',
     external_id: '',
@@ -463,23 +461,22 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
         description_ua: product.description_ua || '',
         docket: (product as any).docket || '',
         docket_ua: (product as any).docket_ua || '',
-        vendor: product.vendor || '',
-        brand: product.brand || '',
-        article: product.article || '',
-        sku: product.sku || '',
-        external_id: product.external_id || '',
-        supplier_id: (product as any).supplier_id || '',
-        category_id: product.category_id || '',
-        currency_id: product.currency_id || '',
-        price: product.price || 0,
-        price_old: product.price_old || 0,
-        price_promo: product.price_promo || 0,
-        stock_quantity: product.stock_quantity || 0,
-        available: product.available || true,
-        state: product.state || 'new',
-        url: product.url || '',
-        store_id: product.store_id || ''
-      });
+      vendor: product.vendor || '',
+      article: product.article || '',
+      sku: product.sku || '',
+      external_id: product.external_id || '',
+      supplier_id: (product as any).supplier_id || '',
+      category_id: product.category_id || '',
+      currency_id: product.currency_id || '',
+      price: product.price || 0,
+      price_old: product.price_old || 0,
+      price_promo: product.price_promo || 0,
+      stock_quantity: product.stock_quantity || 0,
+      available: product.available || true,
+      state: product.state || 'new',
+      url: product.url || '',
+      store_id: product.store_id || ''
+    });
 
       // Load images
       const {
@@ -1073,21 +1070,13 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                       <Separator className="flex-1" />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="vendor">{t('manufacturer')}</Label>
                         <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
                         ...formData,
                         vendor: e.target.value
                       })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="brand">{t('brand')}</Label>
-                        <Input id="brand" name="brand" autoComplete="off" value={formData.brand} onChange={e => setFormData({
-                        ...formData,
-                        brand: e.target.value
-                      })} placeholder={t('brand_placeholder')} data-testid="productFormTabs_brandInput" />
                       </div>
                     </div>
                   </div>

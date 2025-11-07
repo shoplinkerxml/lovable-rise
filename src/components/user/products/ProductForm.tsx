@@ -49,7 +49,6 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     
     // Товарна інформація
     vendor: '',
-    brand: '',
     article: '',
     sku: '',
     
@@ -96,10 +95,9 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         supplier_id: product.supplier_id || '',
         category_id: product.category_id || '',
         currency_id: product.currency_id || '',
-        vendor: product.vendor || '',
-        brand: product.brand || '',
-        article: product.article || '',
-        sku: product.sku || '',
+      vendor: product.vendor || '',
+      article: product.article || '',
+      sku: product.sku || '',
         price: product.price?.toString() || '',
         price_old: product.price_old?.toString() || '',
         price_promo: product.price_promo?.toString() || '',
@@ -343,7 +341,6 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         category_id: formData.category_id || null,
         currency_id: formData.currency_id || null,
         vendor: formData.vendor || null,
-        brand: formData.brand || null,
         article: formData.article || null,
         sku: formData.sku || null,
         price: formData.price ? parseFloat(formData.price) : null,
@@ -454,7 +451,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="vendor">Виробник</Label>
                   <Input
@@ -462,15 +459,6 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
                     value={formData.vendor}
                     onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                     placeholder="Введіть виробника"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="brand">Бренд</Label>
-                  <Input
-                    id="brand"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    placeholder="Введіть бренд"
                   />
                 </div>
                 <div className="space-y-2">

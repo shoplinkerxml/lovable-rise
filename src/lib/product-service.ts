@@ -11,7 +11,6 @@ export interface Product {
   description?: string | null;
   description_ua?: string | null;
   vendor?: string | null;
-  brand?: string | null;
   article?: string | null;
   sku?: string | null;
   category_id?: string | null;
@@ -52,7 +51,6 @@ export interface CreateProductData {
   description?: string | null;
   description_ua?: string | null;
   vendor?: string | null;
-  brand?: string | null;
   article?: string | null;
   sku?: string | null;
   category_id?: string | null;
@@ -76,7 +74,6 @@ export interface UpdateProductData {
   description?: string | null;
   description_ua?: string | null;
   vendor?: string | null;
-  brand?: string | null;
   article?: string | null;
   sku?: string | null;
   category_id?: string | null;
@@ -355,7 +352,6 @@ export class ProductService {
       description: productData.description,
       description_ua: productData.description_ua,
       vendor: productData.vendor,
-      brand: productData.brand,
       article: productData.article,
       sku: productData.sku,
       category_id: productData.category_id,
@@ -440,7 +436,6 @@ export class ProductService {
     if (productData.description !== undefined) productUpdateData.description = productData.description;
     if (productData.description_ua !== undefined) productUpdateData.description_ua = productData.description_ua;
     if (productData.vendor !== undefined) productUpdateData.vendor = productData.vendor;
-    if (productData.brand !== undefined) productUpdateData.brand = productData.brand;
     if (productData.article !== undefined) productUpdateData.article = productData.article;
     if (productData.sku !== undefined) productUpdateData.sku = productData.sku;
     if (productData.category_id !== undefined) productUpdateData.category_id = productData.category_id;

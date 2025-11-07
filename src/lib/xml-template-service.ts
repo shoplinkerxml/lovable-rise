@@ -583,7 +583,7 @@ export class XMLTemplateService {
       'offer.description': 'description',
       'offer.url': 'url',
       'offer.picture': 'images',
-      'offer.vendor': 'brand',
+      'offer.vendor': 'vendor',
       'offer.categoryId': 'category_id'
     };
 
