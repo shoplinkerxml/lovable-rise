@@ -986,9 +986,11 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                   size="sm"
                   variant="outline"
                   data-testid="productForm_addCharacteristic"
+                  aria-label={t('add_characteristic')}
+                  className="max-[550px]:ml-auto"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t('add_characteristic')}
+                  <Plus className="h-4 w-4 mr-2 max-[550px]:mr-0" />
+                  <span className="max-[550px]:hidden">{t('add_characteristic')}</span>
                 </Button>
               </CardTitle>
             </CardHeader>

@@ -27,6 +27,7 @@ import TariffCache from '@/lib/tariff-cache';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
+import { Spinner } from '@/components/ui/spinner';
 
 const AdminTariffManagement = () => {
   const { t } = useI18n();
@@ -38,6 +39,7 @@ const AdminTariffManagement = () => {
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tariffToDelete, setTariffToDelete] = useState<Tariff | null>(null);
 
@@ -67,6 +69,13 @@ const AdminTariffManagement = () => {
     
     return () => clearInterval(interval);
   }, [location.search]);
+
+  // Handle initial loading flag once data arrives
+  useEffect(() => {
+    if (!loading && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [loading, isInitialLoad]);
 
   const fetchTariffs = async (useCache = true) => {
     try {
@@ -252,6 +261,50 @@ const AdminTariffManagement = () => {
     }
   };
 
+  // Show initial green spinner during the very first load
+  if (loading && isInitialLoad) {
+    return (
+      <div className="p-4 xs:p-5 sm:p-6 space-y-6">
+        {/* Page Header with Breadcrumbs */}
+        <PageHeader
+          title={t('menu_pricing')}
+          description={t('manage_tariffs_and_pricing_options')}
+          breadcrumbItems={breadcrumbs}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              {tariffs.length === 0 && (
+                <Button variant="outline" className="text-sm xs:text-base" onClick={handleCreateSampleData}>
+                  {t('create_sample_data')}
+                </Button>
+              )}
+              <Button variant="outline" className="text-sm xs:text-base" onClick={handleRefresh}>
+                {t('refresh')}
+              </Button>
+              <Button className="text-sm xs:text-base" onClick={() => navigate('/admin/tariff/new')}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('add_new_tariff')}
+              </Button>
+            </div>
+          }
+        />
+
+        {/* Initial Loader */}
+        <Card>
+          <CardContent className="p-0">
+            <div
+              className="flex items-center justify-center py-12"
+              data-testid="admin_tariff_loader"
+              aria-busy="true"
+            >
+              <Spinner className="h-12 w-12" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Skeletons for subsequent refetches (filters, sorting, pagination)
   if (loading) {
     return (
       <div className="p-4 xs:p-5 sm:p-6 space-y-6">
