@@ -20,6 +20,7 @@ import { DeleteUserDialog } from "@/components/admin/DeleteUserDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
 import { useUsers, useToggleUserStatus, usePrefetchUsers } from "@/hooks/useUsers";
+import { Spinner } from "@/components/ui/spinner";
 
 interface UserFilters {
   search: string;
@@ -247,21 +248,31 @@ export default function AdminUsersPage() {
       {/* Users Table */}
       <Card>
         <CardContent className="p-0">
-          <UsersTable
-            users={usersData?.users || []}
-            loading={isLoading && !isInitialLoad}
-            onEditUser={handleEditUser}
-            onDeleteUser={handleDeleteUser}
-            onViewUserDetails={handleViewUserDetails}
-            onStatusToggle={handleStatusToggle}
-            statusToggleLoading={toggleUserStatusMutation.isPending}
-            sortBy={filters.sortBy}
-            sortOrder={filters.sortOrder}
-            onSort={(column) => {
-              const newOrder = filters.sortBy === column && filters.sortOrder === "asc" ? "desc" : "asc";
-              setFilters(prev => ({ ...prev, sortBy: column, sortOrder: newOrder }));
-            }}
-          />
+          {isLoading && isInitialLoad ? (
+            <div
+              className="flex items-center justify-center py-12"
+              data-testid="admin_users_loader"
+              aria-busy="true"
+            >
+              <Spinner className="h-12 w-12" />
+            </div>
+          ) : (
+            <UsersTable
+              users={usersData?.users || []}
+              loading={isLoading && !isInitialLoad}
+              onEditUser={handleEditUser}
+              onDeleteUser={handleDeleteUser}
+              onViewUserDetails={handleViewUserDetails}
+              onStatusToggle={handleStatusToggle}
+              statusToggleLoading={toggleUserStatusMutation.isPending}
+              sortBy={filters.sortBy}
+              sortOrder={filters.sortOrder}
+              onSort={(column) => {
+                const newOrder = filters.sortBy === column && filters.sortOrder === "asc" ? "desc" : "asc";
+                setFilters(prev => ({ ...prev, sortBy: column, sortOrder: newOrder }));
+              }}
+            />
+          )}
         </CardContent>
       </Card>
       
