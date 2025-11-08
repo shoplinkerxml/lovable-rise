@@ -1194,7 +1194,7 @@ const toastDictionary = {
   product_description_ua_placeholder: { uk: "Введіть опис товару українською", en: "Enter product description in Ukrainian" },
   product_description_en: { uk: "Опис товару (англійською)", en: "Product Description (English)" },
   product_description_en_placeholder: { uk: "Введіть опис товару англійською", en: "Enter product description in English" },
-  category_prices: { uk: "Категорія та ціни", en: "Category & Prices" },
+  category_prices: { uk: "Ціна товару", en: "Product Price" },
   
   // Language tabs for product names and descriptions
   product_name_ukrainian_tab: { uk: "Назва товару (українською)", en: "Product Name (Ukrainian)" },

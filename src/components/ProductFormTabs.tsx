@@ -1040,13 +1040,22 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                       })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
                       </div>
 
-                      {/* SKU field removed */}
+                      {/* Категорія — перенесено у "Основні дані" та размещено слева от виробника */}
                       <div className="space-y-2">
-                        <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-                        <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
+                        <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
+                        <Select value={formData.category_id} onValueChange={value => setFormData({
                         ...formData,
-                        stock_quantity: parseInt(e.target.value) || 0
-                      })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
+                        category_id: value
+                      })}>
+                          <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
+                            <SelectValue placeholder={t('select_category')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map(category => <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       {/* Перенесено: виробник */}
@@ -1076,6 +1085,15 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* Кількість на складі — перенесено справа от статуса */}
+                      <div className="space-y-2">
+                        <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
+                        <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
+                        ...formData,
+                        stock_quantity: parseInt(e.target.value) || 0
+                      })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
+                      </div>
                     </div>
                   </div>
 
@@ -1085,7 +1103,36 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
 
                 </div>
               </div>
-              {/* Блок назви та опис — вынесен под фото, на всю ширину */}
+              {/* Секция: Редактор деревa категорій — перемещено выше назви та опис */}
+              <div className="space-y-[0.5rem]" data-testid="productFormTabs_categoryTreeEditorSection">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
+                  <Separator className="flex-1" />
+                </div>
+                <CategoryTreeEditor
+                  suppliers={suppliers}
+                  stores={[]}
+                  categories={categories}
+                  defaultSupplierId={formData.supplier_id}
+                  showStoreSelect={false}
+                  onSupplierChange={(id) => setFormData(prev => ({ ...prev, supplier_id: id }))}
+                  onCategoryCreated={async (cat) => {
+                    if (!formData.supplier_id) {
+                      setCategories([]);
+                      return;
+                    }
+                    const supplierId = Number(formData.supplier_id);
+                    const list = await fetchCategoriesBySupplier(supplierId);
+                    setCategories(list);
+                    const matched = list.find(c => c.external_id === cat.external_id);
+                    if (matched) {
+                      setFormData(prev => ({ ...prev, category_id: matched.id }));
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Блок назви та опис — вынесен ниже редактора категорій, на всю ширину */}
               <div className="space-y-4 mt-2 w-full" data-testid="productFormTabs_namesDescriptionFullWidth">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold">{t('product_names_description')}</h3>
@@ -1223,35 +1270,6 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                   </TabsContent>
                 </Tabs>
               </div>
-              
-              {/* Секция: Редактор деревa категорій — перемещено ниже назви та опис */}
-              <div className="space-y-[0.5rem]" data-testid="productFormTabs_categoryTreeEditorSection">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
-                  <Separator className="flex-1" />
-                </div>
-                <CategoryTreeEditor
-                  suppliers={suppliers}
-                  stores={[]}
-                  categories={categories}
-                  defaultSupplierId={formData.supplier_id}
-                  showStoreSelect={false}
-                  onSupplierChange={(id) => setFormData(prev => ({ ...prev, supplier_id: id }))}
-                  onCategoryCreated={async (cat) => {
-                    if (!formData.supplier_id) {
-                      setCategories([]);
-                      return;
-                    }
-                    const supplierId = Number(formData.supplier_id);
-                    const list = await fetchCategoriesBySupplier(supplierId);
-                    setCategories(list);
-                    const matched = list.find(c => c.external_id === cat.external_id);
-                    if (matched) {
-                      setFormData(prev => ({ ...prev, category_id: matched.id }));
-                    }
-                  }}
-                />
-              </div>
 
               {/* Секция: Категорія та ціни — перемещено ниже назви та опис */}
               <div className="space-y-4">
@@ -1261,22 +1279,6 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
-                    <Select value={formData.category_id} onValueChange={value => setFormData({
-                    ...formData,
-                    category_id: value
-                  })}>
-                      <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
-                        <SelectValue placeholder={t('select_category')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(category => <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div className="space-y-2">
                     <span id="currency_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_currencyText">{t('currency')} *</span>
