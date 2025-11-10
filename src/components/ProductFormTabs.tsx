@@ -86,6 +86,12 @@ export function ProductFormTabs({
   const startScaleRef = useRef(1);
   const startWidthPxRef = useRef(0);
   const photoBlockInitialPxRef = useRef<number | null>(null);
+  // Высота фото-блока для ограничения правой колонки
+  const [photoBlockHeight, setPhotoBlockHeight] = useState<number>(0);
+  const updatePhotoHeight = useCallback(() => {
+    if (!photoBlockRef.current) return;
+    setPhotoBlockHeight(photoBlockRef.current.offsetHeight);
+  }, []);
 
   const clampScale = useCallback((value: number) => {
     // Абсолютный минимум: 250px (15.625rem) и не меньше 50% от базовой ширины
@@ -154,6 +160,7 @@ export function ProductFormTabs({
       }
     };
     measure();
+    updatePhotoHeight();
     const mq = window.matchMedia('(min-width: 1024px)');
     const handler = (e: MediaQueryListEvent | MediaQueryList) => {
       const matches = 'matches' in e ? e.matches : (e as MediaQueryList).matches;
@@ -162,11 +169,13 @@ export function ProductFormTabs({
     handler(mq);
     mq.addEventListener('change', handler as any);
     window.addEventListener('resize', measure);
+    window.addEventListener('resize', updatePhotoHeight);
     return () => {
       window.removeEventListener('resize', measure);
+      window.removeEventListener('resize', updatePhotoHeight);
       mq.removeEventListener('change', handler as any);
     };
-  }, []);
+  }, [updatePhotoHeight]);
 
   // Cleanup listeners if unmounts mid-resize
   useEffect(() => {
@@ -282,6 +291,8 @@ export function ProductFormTabs({
       newMap.set(activeImageIndex, dimensions);
       return newMap;
     });
+    // После загрузки изображения обновляем высоту фото-блока
+    updatePhotoHeight();
   };
 
   // Handle gallery image load to get dimensions
@@ -344,6 +355,11 @@ export function ProductFormTabs({
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
+
+  // Обновляем высоту фото-блока при изменении масштаба/брейкпоинта
+  useEffect(() => {
+    updatePhotoHeight();
+  }, [photoBlockScale, isLargeScreen, updatePhotoHeight]);
 
   // Calculate maximum container size from all images
   useEffect(() => {
@@ -1014,87 +1030,37 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
 
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
-                  {/* Секция: Основні дані */}
-                  <div className="space-y-4" data-testid="productFormTabs_basicSection">
+                  {/* Секция: Редактор деревa категорій — перемещено в правую колонку на место "Основні дані" */}
+                  <div
+                    className="space-y-[0.5rem] overflow-y-auto"
+                    style={{ maxHeight: photoBlockHeight ? `${photoBlockHeight}px` : undefined }}
+                    data-testid="productFormTabs_categoryTreeEditorSection"
+                  >
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold">{t('product_main_data')}</h3>
+                      <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
                       <Separator className="flex-1" />
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Удалены блоки выбора магазина и постачальника на странице нового товара */}
-
-                      <div className="space-y-2">
-                        <Label htmlFor="external_id">{t('external_id')}</Label>
-                        <Input id="external_id" name="external_id" autoComplete="off" value={formData.external_id} onChange={e => setFormData({
-                        ...formData,
-                        external_id: e.target.value
-                      })} placeholder={t('external_id_placeholder')} data-testid="productFormTabs_externalIdInput" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="article">{t('article')}</Label>
-                        <Input id="article" name="article" autoComplete="off" value={formData.article} onChange={e => setFormData({
-                        ...formData,
-                        article: e.target.value
-                      })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
-                      </div>
-
-                      {/* Категорія — перенесено у "Основні дані" та размещено слева от виробника */}
-                      <div className="space-y-2">
-                        <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
-                        <Select value={formData.category_id} onValueChange={value => setFormData({
-                        ...formData,
-                        category_id: value
-                      })}>
-                          <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
-                            <SelectValue placeholder={t('select_category')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map(category => <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Перенесено: виробник */}
-                      <div className="space-y-2">
-                        <Label htmlFor="vendor">{t('manufacturer')}</Label>
-                        <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
-                        ...formData,
-                        vendor: e.target.value
-                      })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" />
-                      </div>
-
-                      {/* Перенесено: статус товара */}
-                      <div className="space-y-2">
-                        <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
-                        <Select value={formData.state} onValueChange={value => setFormData({
-                        ...formData,
-                        state: value
-                      })}>
-                          <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect">
-                            <SelectValue placeholder={t('select_status')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="new">{t('status_new')}</SelectItem>
-                            <SelectItem value="active">{t('status_active')}</SelectItem>
-                            <SelectItem value="inactive">{t('status_inactive')}</SelectItem>
-                            <SelectItem value="archived">{t('status_archived')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Кількість на складі — перенесено справа от статуса */}
-                      <div className="space-y-2">
-                        <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-                        <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
-                        ...formData,
-                        stock_quantity: parseInt(e.target.value) || 0
-                      })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
-                      </div>
-                    </div>
+                    <CategoryTreeEditor
+                      suppliers={suppliers}
+                      stores={[]}
+                      categories={categories}
+                      defaultSupplierId={formData.supplier_id}
+                      showStoreSelect={false}
+                      onSupplierChange={(id) => setFormData(prev => ({ ...prev, supplier_id: id }))}
+                      onCategoryCreated={async (cat) => {
+                        if (!formData.supplier_id) {
+                          setCategories([]);
+                          return;
+                        }
+                        const supplierId = Number(formData.supplier_id);
+                        const list = await fetchCategoriesBySupplier(supplierId);
+                        setCategories(list);
+                        const matched = list.find(c => c.external_id === cat.external_id);
+                        if (matched) {
+                          setFormData(prev => ({ ...prev, category_id: matched.id }));
+                        }
+                      }}
+                    />
                   </div>
 
                   {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
@@ -1103,33 +1069,87 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
 
                 </div>
               </div>
-              {/* Секция: Редактор деревa категорій — перемещено выше назви та опис */}
-              <div className="space-y-[0.5rem]" data-testid="productFormTabs_categoryTreeEditorSection">
+              {/* Секция: Основні дані — перенесено ниже, на место редактора категорій */}
+              <div className="space-y-4" data-testid="productFormTabs_basicSection">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
+                  <h3 className="text-lg font-semibold">{t('product_main_data')}</h3>
                   <Separator className="flex-1" />
                 </div>
-                <CategoryTreeEditor
-                  suppliers={suppliers}
-                  stores={[]}
-                  categories={categories}
-                  defaultSupplierId={formData.supplier_id}
-                  showStoreSelect={false}
-                  onSupplierChange={(id) => setFormData(prev => ({ ...prev, supplier_id: id }))}
-                  onCategoryCreated={async (cat) => {
-                    if (!formData.supplier_id) {
-                      setCategories([]);
-                      return;
-                    }
-                    const supplierId = Number(formData.supplier_id);
-                    const list = await fetchCategoriesBySupplier(supplierId);
-                    setCategories(list);
-                    const matched = list.find(c => c.external_id === cat.external_id);
-                    if (matched) {
-                      setFormData(prev => ({ ...prev, category_id: matched.id }));
-                    }
-                  }}
-                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Удалены блоки выбора магазина и постачальника на странице нового товара */}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="external_id">{t('external_id')}</Label>
+                    <Input id="external_id" name="external_id" autoComplete="off" value={formData.external_id} onChange={e => setFormData({
+                    ...formData,
+                    external_id: e.target.value
+                  })} placeholder={t('external_id_placeholder')} data-testid="productFormTabs_externalIdInput" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="article">{t('article')}</Label>
+                    <Input id="article" name="article" autoComplete="off" value={formData.article} onChange={e => setFormData({
+                    ...formData,
+                    article: e.target.value
+                  })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
+                  </div>
+
+                  {/* Категорія — перенесено у "Основні дані" та размещено слева от виробника */}
+                  <div className="space-y-2">
+                    <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
+                    <Select value={formData.category_id} onValueChange={value => setFormData({
+                    ...formData,
+                    category_id: value
+                  })}>
+                      <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
+                        <SelectValue placeholder={t('select_category')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(category => <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Перенесено: виробник */}
+                  <div className="space-y-2">
+                    <Label htmlFor="vendor">{t('manufacturer')}</Label>
+                    <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
+                    ...formData,
+                    vendor: e.target.value
+                  })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" />
+                  </div>
+
+                  {/* Перенесено: статус товара */}
+                  <div className="space-y-2">
+                    <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
+                    <Select value={formData.state} onValueChange={value => setFormData({
+                    ...formData,
+                    state: value
+                  })}>
+                      <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect">
+                        <SelectValue placeholder={t('select_status')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">{t('status_new')}</SelectItem>
+                        <SelectItem value="active">{t('status_active')}</SelectItem>
+                        <SelectItem value="inactive">{t('status_inactive')}</SelectItem>
+                        <SelectItem value="archived">{t('status_archived')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Кількість на складі — перенесено справа от статуса */}
+                  <div className="space-y-2">
+                    <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
+                    <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
+                    ...formData,
+                    stock_quantity: parseInt(e.target.value) || 0
+                  })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
+                  </div>
+                </div>
               </div>
 
               {/* Блок назви та опис — вынесен ниже редактора категорій, на всю ширину */}
