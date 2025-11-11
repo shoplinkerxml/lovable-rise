@@ -17,70 +17,51 @@ export const ProductPlaceholder: React.FC<ProductPlaceholderProps> = ({ classNam
         className="w-[85%] h-[85%] max-w-[32rem] max-h-[32rem] text-emerald-700/40"
         data-testid="product_placeholder_icon"
       >
-        {/* Основа коробки */}
+        {/* Карточка товара: рамка */}
         <rect
-          x="20"
-          y="35"
-          width="80"
-          height="65"
-          rx="4"
-          fill="currentColor"
-          fillOpacity="0.1"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
-        />
-        
-        {/* Крышка коробки */}
-        <path
-          d="M20 35 L60 20 L100 35 L60 50 Z"
-          fill="currentColor"
-          fillOpacity="0.15"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
-        />
-        
-        {/* Боковая грань */}
-        <path
-          d="M100 35 L100 100 L60 85 L60 50 Z"
-          fill="currentColor"
-          fillOpacity="0.08"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
-        />
-        
-        {/* Иконка изображения в центре */}
-        <rect
-          x="45"
-          y="55"
-          width="30"
-          height="25"
-          rx="2"
+          x="15"
+          y="25"
+          width="90"
+          height="70"
+          rx="8"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
         />
-        
-        {/* Горы в иконке */}
+
+        {/* Изображение товара слева */}
+        <rect
+          x="22"
+          y="35"
+          width="40"
+          height="32"
+          rx="4"
+          fill="currentColor"
+          fillOpacity="0.08"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+
+        {/* Псевдо-изображение: горы + солнце */}
         <path
-          d="M50 70 L55 65 L60 70 L65 62 L70 70"
+          d="M26 58 L33 52 L40 58 L47 50 L54 58"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        
-        {/* Солнце в иконке */}
-        <circle
-          cx="52"
-          cy="60"
-          r="2"
-          fill="currentColor"
-          fillOpacity="0.6"
-        />
+        <circle cx="30" cy="45" r="3" fill="currentColor" fillOpacity="0.5" />
+
+        {/* Заголовок справа */}
+        <rect x="66" y="38" width="32" height="6" rx="3" fill="currentColor" fillOpacity="0.2" />
+        {/* Подзаголовки/описание */}
+        <rect x="66" y="48" width="24" height="5" rx="2" fill="currentColor" fillOpacity="0.15" />
+        <rect x="66" y="58" width="28" height="5" rx="2" fill="currentColor" fillOpacity="0.15" />
+
+        {/* Цена/бейдж справа внизу */}
+        <rect x="66" y="74" width="32" height="12" rx="6" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M78 80 h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       </svg>
     </div>
   );
