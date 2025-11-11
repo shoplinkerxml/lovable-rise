@@ -51,6 +51,8 @@ export interface CreateProductData {
   vendor?: string | null;
   article?: string | null;
   category_id?: string | null;
+  category_external_id?: string | null;
+  supplier_id?: number | string | null;
   currency_code?: string | null;
   price?: number | null;
   price_old?: number | null;
@@ -72,6 +74,8 @@ export interface UpdateProductData {
   vendor?: string | null;
   article?: string | null;
   category_id?: string | null;
+  category_external_id?: string | null;
+  supplier_id?: number | string | null;
   currency_code?: string | null;
   price?: number | null;
   price_old?: number | null;
@@ -337,25 +341,10 @@ export class ProductService {
       }
     }
 
-    // Resolve currency_id from currency_code if provided
-    let resolvedCurrencyId: string | null = null;
-    if (productData.currency_code) {
-      try {
-        const { data: currencyRow } = await (supabase as any)
-          .from('currencies')
-          .select('id, code, status')
-          .eq('code', productData.currency_code)
-          .eq('status', true)
-          .maybeSingle();
-        resolvedCurrencyId = currencyRow?.id !== undefined ? String(currencyRow.id) : null;
-      } catch (e) {
-        resolvedCurrencyId = null;
-      }
-    }
-
     // Подготавливаем данные для создания товара
     const productInsertData = {
       store_id: effectiveStoreId,
+      supplier_id: productData.supplier_id !== undefined && productData.supplier_id !== null ? Number(productData.supplier_id) : undefined,
       external_id: productData.external_id,
       name: productData.name,
       name_ua: productData.name_ua,
@@ -363,8 +352,8 @@ export class ProductService {
       description_ua: productData.description_ua,
       vendor: productData.vendor,
       article: productData.article,
-      category_id: productData.category_id,
-      currency_id: resolvedCurrencyId,
+      category_external_id: productData.category_external_id ?? null,
+      currency_code: productData.currency_code ?? null,
       price: productData.price,
       price_old: productData.price_old,
       price_promo: productData.price_promo,
@@ -446,24 +435,9 @@ export class ProductService {
     if (productData.vendor !== undefined) productUpdateData.vendor = productData.vendor;
     if (productData.article !== undefined) productUpdateData.article = productData.article;
     if (productData.category_id !== undefined) productUpdateData.category_id = productData.category_id;
-    // Resolve currency_id from currency_code if provided
-    if (productData.currency_code !== undefined) {
-      let resolvedCurrencyId: string | null = null;
-      if (productData.currency_code) {
-        try {
-          const { data: currencyRow } = await (supabase as any)
-            .from('currencies')
-            .select('id, code, status')
-            .eq('code', productData.currency_code)
-            .eq('status', true)
-            .maybeSingle();
-          resolvedCurrencyId = currencyRow?.id !== undefined ? String(currencyRow.id) : null;
-        } catch (e) {
-          resolvedCurrencyId = null;
-        }
-      }
-      productUpdateData.currency_id = resolvedCurrencyId;
-    }
+    if (productData.category_external_id !== undefined) productUpdateData.category_external_id = productData.category_external_id;
+    if (productData.supplier_id !== undefined) productUpdateData.supplier_id = productData.supplier_id !== null ? Number(productData.supplier_id) : null;
+    if (productData.currency_code !== undefined) productUpdateData.currency_code = productData.currency_code;
     if (productData.price !== undefined) productUpdateData.price = productData.price;
     if (productData.price_old !== undefined) productUpdateData.price_old = productData.price_old;
     if (productData.price_promo !== undefined) productUpdateData.price_promo = productData.price_promo;

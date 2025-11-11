@@ -72,6 +72,7 @@ interface FormData {
   external_id: string;
   supplier_id: string;
   category_id: string;
+  category_external_id: string;
   currency_code: string;
   price: number;
   price_old: number;
@@ -234,6 +235,7 @@ export function ProductFormTabs({
     external_id: '',
     supplier_id: '',
     category_id: '',
+    category_external_id: '',
     currency_code: 'UAH',
     price: 0,
     price_old: 0,
@@ -489,7 +491,8 @@ export function ProductFormTabs({
     // Reset selected category when supplier changes
     setFormData(prev => ({
       ...prev,
-      category_id: ''
+      category_id: '',
+      category_external_id: ''
     }));
     // Reload lookup data to refresh categories for the selected supplier
     loadLookupData();
@@ -501,6 +504,7 @@ export function ProductFormTabs({
       // Load product data
       // Try to resolve currency_code from loaded currencies
       const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
+      const matchedCategory = categories.find(c => String(c.id) === String(product.category_id));
       setFormData({
         name: product.name || '',
         name_ua: product.name_ua || '',
@@ -513,12 +517,13 @@ export function ProductFormTabs({
         external_id: product.external_id || '',
         supplier_id: (product as any).supplier_id || '',
         category_id: product.category_id || '',
-        currency_code: selectedCurrency?.code || 'UAH',
+        category_external_id: matchedCategory?.external_id || (product as any).category_external_id || '',
+        currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
         price: product.price || 0,
         price_old: product.price_old || 0,
         price_promo: product.price_promo || 0,
         stock_quantity: product.stock_quantity || 0,
-        available: product.available || true,
+        available: product.available ?? true,
         state: product.state || 'new',
         store_id: product.store_id || ''
       });
@@ -1027,7 +1032,8 @@ export function ProductFormTabs({
                     if (matched) {
                       setFormData(prev => ({
                         ...prev,
-                        category_id: matched.id
+                        category_id: matched.id,
+                        category_external_id: matched.external_id
                       }));
                     }
                   }} />
@@ -1068,10 +1074,14 @@ export function ProductFormTabs({
                   {/* Категорія — перенесено у "Основні дані" та размещено слева от виробника */}
                   <div className="space-y-2">
                     <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
-                    <Select value={formData.category_id} onValueChange={value => setFormData({
-                    ...formData,
-                    category_id: value
-                  })}>
+                    <Select value={formData.category_id} onValueChange={value => {
+                      const cat = categories.find(c => String(c.id) === String(value));
+                      setFormData({
+                        ...formData,
+                        category_id: value,
+                        category_external_id: cat?.external_id || ''
+                      });
+                    }}>
                       <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
                         <SelectValue placeholder={t('select_category')} />
                       </SelectTrigger>

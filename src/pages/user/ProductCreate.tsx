@@ -54,6 +54,8 @@ export const ProductCreate = () => {
       await ProductService.createProduct({
         external_id: formData.external_id,
         category_id: formData.category_id || null,
+        category_external_id: formData.category_external_id || null,
+        supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
         currency_code: formData.currency_code || null,
         name: formData.name,
         name_ua: formData.name_ua || null,
