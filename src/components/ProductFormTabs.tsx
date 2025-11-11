@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check, MoreHorizontal, Pencil, Trash } from 'lucide-react';
+import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check, MoreHorizontal, Pencil, Trash, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { type Product } from '@/lib/product-service';
@@ -1139,7 +1139,7 @@ export function ProductFormTabs({
                     </TabsTrigger>
                     <TabsTrigger value="russian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_russianTab" aria-label={t('product_name_russian_tab')}>
                       <span className="truncate">{t('product_name')}</span>
-                      <span className="text-success text-[0.7rem] font-semibold">RU</span>
+                      <Globe aria-hidden="true" className="inline-block h-[0.9rem] w-[0.9rem] text-success" />
                       <span className="sr-only">RU</span>
                     </TabsTrigger>
                   </TabsList>
