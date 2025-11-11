@@ -1005,30 +1005,36 @@ export function ProductFormTabs({
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
                   {/* Секция: Редактор деревa категорій — перемещено в правую колонку на место "Основні дані" */}
-                  <div className="space-y-[0.5rem]" data-testid="productFormTabs_categoryTreeEditorSection">
-                    <div className="flex items-center gap-2">
+                  <div 
+                    className="flex flex-col space-y-[0.5rem]" 
+                    style={{ maxHeight: photoBlockHeight ? `${photoBlockHeight}px` : undefined }}
+                    data-testid="productFormTabs_categoryTreeEditorSection"
+                  >
+                    <div className="flex items-center gap-2 shrink-0">
                       <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
                       <Separator className="flex-1" />
                     </div>
-                    <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
-                    ...prev,
-                    supplier_id: id
-                  }))} onCategoryCreated={async cat => {
-                    if (!formData.supplier_id) {
-                      setCategories([]);
-                      return;
-                    }
-                    const supplierId = Number(formData.supplier_id);
-                    const list = await fetchCategoriesBySupplier(supplierId);
-                    setCategories(list);
-                    const matched = list.find(c => c.external_id === cat.external_id);
-                    if (matched) {
-                      setFormData(prev => ({
-                        ...prev,
-                        category_id: matched.id
-                      }));
-                    }
-                  }} />
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
+                      ...prev,
+                      supplier_id: id
+                    }))} onCategoryCreated={async cat => {
+                      if (!formData.supplier_id) {
+                        setCategories([]);
+                        return;
+                      }
+                      const supplierId = Number(formData.supplier_id);
+                      const list = await fetchCategoriesBySupplier(supplierId);
+                      setCategories(list);
+                      const matched = list.find(c => c.external_id === cat.external_id);
+                      if (matched) {
+                        setFormData(prev => ({
+                          ...prev,
+                          category_id: matched.id
+                        }));
+                      }
+                    }} />
+                    </div>
                   </div>
 
                   {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
