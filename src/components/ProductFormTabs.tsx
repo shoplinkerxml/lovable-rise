@@ -1032,8 +1032,7 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
                   {/* Секция: Редактор деревa категорій — перемещено в правую колонку на место "Основні дані" */}
                   <div
-                    className="space-y-[0.5rem] overflow-y-auto"
-                    style={{ maxHeight: photoBlockHeight ? `${photoBlockHeight}px` : undefined }}
+                    className="space-y-[0.5rem]"
                     data-testid="productFormTabs_categoryTreeEditorSection"
                   >
                     <div className="flex items-center gap-2">
