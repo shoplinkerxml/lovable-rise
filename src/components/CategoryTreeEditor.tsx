@@ -300,8 +300,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     };
     return treeData.map(filterNode).filter(Boolean) as any[];
   }, [treeData, search]);
-  return <Card className="border-0 shadow-none" data-testid="categoryTree_card">
-      <CardHeader className="flex flex-row items-center justify-between p-0">
+  return <Card className="border-0 shadow-none h-full flex flex-col" data-testid="categoryTree_card">
+      <CardHeader className="flex flex-row items-center justify-between p-0 shrink-0">
         <CardTitle className="text-base" data-testid="categoryTree_title">{t("categories_title")}</CardTitle>
         <Dialog open={isCreateOpen} onOpenChange={open => {
         setIsCreateOpen(open);
@@ -368,12 +368,12 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         </Dialog>
       </CardHeader>
 
-      <CardContent className="space-y-[0.5rem] p-0">
+      <CardContent className="flex-1 flex flex-col min-h-0 p-0 space-y-[0.5rem]">
         {/* Supplier tabs for switching category trees by supplier */}
         <Tabs value={supplierId || "none"} onValueChange={val => {
         setSupplierId(val);
         onSupplierChange?.(val);
-      }} className="w-full">
+      }} className="w-full shrink-0">
           <TabsList className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="categoryTree_supplierTabsList">
             {suppliers.map(s => <TabsTrigger key={s.id} value={s.id} className="whitespace-nowrap py-1 font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow shrink-0 md:shrink snap-start md:snap-none w-auto truncate text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid={`categoryTree_supplierTab_${s.id}`} aria-label={s.supplier_name}>
                 <span className="truncate">{s.supplier_name}</span>
@@ -381,7 +381,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </TabsList>
         </Tabs>
 
-        <div className="space-y-[0.5rem]">
+        <div className="shrink-0">
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("search")} data-testid="categoryTree_searchInput" />
         </div>
 
@@ -392,11 +392,13 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </div> : filteredTree.length === 0 ? <div className="rounded-md border p-[1rem] text-muted-foreground" data-testid="categoryTree_empty">
             <div className="font-medium">{t("no_categories_title")}</div>
             <div className="text-sm">{t("no_categories_description")}</div>
-          </div> : <ScrollArea className="h-full">
-            <div className="space-y-[0.25rem]" data-testid="categoryTree_root">
-              {filteredTree.map(n => <TreeNode key={n.id} node={n} />)}
-            </div>
-          </ScrollArea>}
+          </div> : <div className="flex-1 min-h-0">
+            <ScrollArea className="h-full">
+              <div className="space-y-[0.25rem]" data-testid="categoryTree_root">
+                {filteredTree.map(n => <TreeNode key={n.id} node={n} />)}
+              </div>
+            </ScrollArea>
+          </div>}
       </CardContent>
     </Card>;
 };
