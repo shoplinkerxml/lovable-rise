@@ -1032,14 +1032,16 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
                   {/* Секция: Редактор деревa категорій — перемещено в правую колонку на место "Основні дані" */}
                   <div
-                    className="space-y-[0.5rem]"
+                    className="flex flex-col space-y-[0.5rem]"
+                    style={{ maxHeight: photoBlockHeight ? `${photoBlockHeight}px` : undefined }}
                     data-testid="productFormTabs_categoryTreeEditorSection"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
                       <Separator className="flex-1" />
                     </div>
-                    <CategoryTreeEditor
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                      <CategoryTreeEditor
                       suppliers={suppliers}
                       stores={[]}
                       categories={categories}
@@ -1060,6 +1062,7 @@ const [paramForm, setParamForm] = useState<{ name: string; value: string; parami
                         }
                       }}
                     />
+                    </div>
                   </div>
 
                   {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}

@@ -392,7 +392,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </div> : filteredTree.length === 0 ? <div className="rounded-md border p-[1rem] text-muted-foreground" data-testid="categoryTree_empty">
             <div className="font-medium">{t("no_categories_title")}</div>
             <div className="text-sm">{t("no_categories_description")}</div>
-          </div> : <ScrollArea className="max-h-[50vh]">
+          </div> : <ScrollArea className="max-h-[60vh]">
             <div className="space-y-[0.25rem]" data-testid="categoryTree_root">
               {filteredTree.map(n => <TreeNode key={n.id} node={n} />)}
             </div>
