@@ -222,7 +222,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
       setIsRenaming(false);
     };
     return <div className="pl-[clamp(0rem,2vw,1rem)]" data-testid={`categoryTree_node_${node.external_id}`}>
-        <div className={`flex items-center gap-[0.5rem] rounded-md px-[0.5rem] py-[0.25rem] cursor-pointer border-l-2 ${selected === node.external_id ? "border-green-500" : "border-transparent"}`} onClick={() => setSelected(node.external_id)}>
+        <div className="flex items-center gap-[0.5rem] rounded-md px-[0.5rem] py-[0.25rem] cursor-pointer" onClick={() => setSelected(node.external_id)}>
           {hasChildren ? <Button variant="ghost" size="icon" className="h-[1.5rem] w-[1.5rem]" onClick={e => {
           e.stopPropagation();
           toggleExpand(node.id);
@@ -240,7 +240,12 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
             e.stopPropagation();
             setIsRenaming(false);
           }} data-testid={`categoryTree_renameCancel_${node.external_id}`}>{t("btn_cancel")}</Button>
-            </div> : <span title={node.name} className="flex-1 truncate font-extralight text-sm">{node.name}</span>}
+            </div> : <span
+              title={node.name}
+              className={`${selected === node.external_id ? "font-semibold text-success" : "font-extralight"} flex-1 truncate text-sm hover:font-semibold hover:text-success`}
+            >
+              {node.name}
+            </span>}
 
           <DropdownMenu onOpenChange={open => {
           if (open) setSelected(node.external_id);
@@ -301,14 +306,14 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     return treeData.map(filterNode).filter(Boolean) as any[];
   }, [treeData, search]);
   return <Card className="border-0 shadow-none" data-testid="categoryTree_card">
-      <CardHeader className="flex flex-row items-center justify-between p-0">
+      <CardHeader className="flex flex-row items-center justify-between p-0 mb-2.5">
         <CardTitle className="text-base" data-testid="categoryTree_title">{t("categories_title")}</CardTitle>
         <Dialog open={isCreateOpen} onOpenChange={open => {
         setIsCreateOpen(open);
         if (!open) resetCreateState();
       }}>
           <DialogTrigger asChild>
-            <Button size="sm" onClick={() => setIsCreateOpen(true)} data-testid="categoryTree_newButton">
+            <Button variant="outline" size="sm" onClick={() => setIsCreateOpen(true)} data-testid="categoryTree_newButton">
               <Plus className="mr-[0.25rem] h-[1rem] w-[1rem]" /> {t("new_category")}
             </Button>
           </DialogTrigger>
