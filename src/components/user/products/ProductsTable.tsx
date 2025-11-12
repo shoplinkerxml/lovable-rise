@@ -750,7 +750,12 @@ export const ProductsTable = ({
         </Table>
       </div>
 
-      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, product: null })}>
+      <AlertDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) =>
+          setDeleteDialog((prev) => ({ open, product: open ? prev.product : null }))
+        }
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("delete_product_confirm")}</AlertDialogTitle>
@@ -765,30 +770,36 @@ export const ProductsTable = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={async () => {
-              // Закрываем диалог сразу
-              setDeleteDialog({ open: false, product: null });
+            <AlertDialogCancel data-testid="user_products_delete_cancel">{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="user_products_delete_confirm"
+              onClick={async () => {
+                // Фиксируем удаляемый товар до изменения состояния диалога
+                const productToDelete = deleteDialog.product;
+                // Закрываем диалог сразу
+                setDeleteDialog({ open: false, product: null });
 
-              try {
-                if (deleteDialog.product) {
-                  await onDelete?.(deleteDialog.product.id);
-                } else {
-                  const selected = table.getSelectedRowModel().rows;
-                  const ids = selected.map(r => r.original.id).filter(Boolean);
-                  for (const id of ids) {
-                    await onDelete?.(id);
+                try {
+                  if (productToDelete) {
+                    await onDelete?.(productToDelete.id);
+                  } else {
+                    const selected = table.getSelectedRowModel().rows;
+                    const ids = selected.map((r) => r.original.id).filter(Boolean);
+                    for (const id of ids) {
+                      await onDelete?.(id);
+                    }
+                    table.resetRowSelection();
                   }
-                  table.resetRowSelection();
-                }
 
-                if (typeof refreshTrigger === 'undefined') {
-                  await loadProducts();
+                  if (typeof refreshTrigger === 'undefined') {
+                    await loadProducts();
+                  }
+                } catch (error) {
+                  console.error("Delete error:", error);
                 }
-              } catch (error) {
-                console.error("Delete error:", error);
-              }
-            }} className="bg-destructive hover:bg-destructive/90">
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
               {t("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
