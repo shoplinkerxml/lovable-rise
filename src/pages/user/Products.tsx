@@ -89,6 +89,7 @@ export const Products = () => {
         onCreateNew={handleCreateNew}
         onProductsLoaded={handleProductsLoaded}
         refreshTrigger={refreshTrigger}
+        canCreate={limitInfo.canCreate}
       />
     </div>
   );

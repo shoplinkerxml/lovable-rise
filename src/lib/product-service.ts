@@ -351,6 +351,13 @@ export class ProductService {
       }
     }
 
+    // Проверка лимита перед созданием товара (включая дублирование)
+    const limitInfo = await this.getProductLimit();
+    if (!limitInfo.canCreate) {
+      // Сообщение об ошибке будет отображено на UI через i18n
+      throw new Error("Ліміт товарів вичерпано");
+    }
+
     // Подготавливаем данные для создания товара
     const productInsertData = {
       store_id: effectiveStoreId,

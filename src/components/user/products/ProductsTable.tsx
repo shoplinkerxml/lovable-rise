@@ -46,6 +46,7 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/
 import { format } from "date-fns";
 import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -55,6 +56,7 @@ type ProductsTableProps = {
   onCreateNew?: () => void;
   onProductsLoaded?: (count: number) => void;
   refreshTrigger?: number;
+  canCreate?: boolean;
 };
 
 const LoadingSkeleton = () => (
@@ -109,7 +111,7 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger }: { onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void }) {
+function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger, canCreate }: { onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean }) {
   const { t } = useI18n();
   return (
     <DropdownMenu>
@@ -132,7 +134,7 @@ function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger }: { 
           <Edit className="mr-2 h-4 w-4" />
           {t("edit")}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate">
+        <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false}>
           <Copy className="mr-2 h-4 w-4" />
           {t("duplicate")}
         </DropdownMenuItem>
@@ -157,6 +159,7 @@ export const ProductsTable = ({
   onCreateNew,
   onProductsLoaded,
   refreshTrigger,
+  canCreate,
 }: ProductsTableProps) => {
   const { t } = useI18n();
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -255,10 +258,20 @@ export const ProductsTable = ({
   // Дублирование товара и обновление таблицы
   const handleDuplicate = async (product: Product) => {
     try {
+      if (canCreate === false) {
+        toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
+        return;
+      }
       await ProductService.duplicateProduct(product.id);
       await loadProducts();
     } catch (error) {
       console.error("Duplicate product failed", error);
+      const msg = String((error as any)?.message || '');
+      if (msg.toLowerCase().includes('ліміт') || msg.toLowerCase().includes('limit')) {
+        toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
+      } else {
+        toast.error(t('failed_duplicate_product'));
+      }
     }
   };
 
@@ -512,6 +525,7 @@ export const ProductsTable = ({
             onDelete={() => setDeleteDialog({ open: true, product: row.original })}
             onDuplicate={() => handleDuplicate(row.original)}
             onTrigger={() => row.toggleSelected(true)}
+            canCreate={canCreate}
           />
         </div>
       ),
@@ -566,7 +580,7 @@ export const ProductsTable = ({
               <EmptyTitle>{t("no_products")}</EmptyTitle>
               <EmptyDescription>{t("no_products_description")}</EmptyDescription>
             </EmptyHeader>
-            <Button onClick={onCreateNew} className="mt-4" data-testid="user_products_create_btn">
+            <Button onClick={onCreateNew} className="mt-4" data-testid="user_products_create_btn" disabled={canCreate === false} aria-disabled={canCreate === false}>
               {t("create_product")}
             </Button>
           </Empty>
@@ -594,6 +608,8 @@ export const ProductsTable = ({
               className="h-8 w-8"
               onClick={onCreateNew}
               title={t("add_product")}
+              disabled={canCreate === false}
+              aria-disabled={canCreate === false}
               data-testid="user_products_dataTable_createNew"
             >
               <Plus className="h-4 w-4" />
@@ -614,6 +630,8 @@ export const ProductsTable = ({
                     onClick={() => handleDuplicate(selectedRow.original)}
                     aria-label={t("duplicate")}
                     title={t("duplicate")}
+                    disabled={canCreate === false}
+                    aria-disabled={canCreate === false}
                     data-testid="user_products_dataTable_duplicateSelected"
                   >
                     <Copy className="h-4 w-4" />
