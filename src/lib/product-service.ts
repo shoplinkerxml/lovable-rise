@@ -6,6 +6,7 @@ import { SubscriptionValidationService } from "./subscription-validation-service
 export interface Product {
   id: string;
   store_id: string;
+  supplier_id?: number | null;
   external_id: string;
   name: string;
   name_ua?: string | null;
@@ -16,7 +17,9 @@ export interface Product {
   vendor?: string | null;
   article?: string | null;
   category_id?: string | null;
+  category_external_id?: string | null;
   currency_id?: string | null;
+  currency_code?: string | null;
   price?: number | null;
   price_old?: number | null;
   price_promo?: number | null;
