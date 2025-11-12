@@ -587,17 +587,25 @@ export function ProductFormTabs({
 
   // Refetch categories when supplier changes
   useEffect(() => {
+    console.log('[ProductFormTabs] Supplier changed, isHydrating:', isHydratingRef.current, 'product exists:', !!product);
+    
     // Reload lookup data to refresh categories for the selected supplier
     loadLookupData();
+    
     // Skip clearing category during initial hydration from loaded product
     if (isHydratingRef.current) {
+      console.log('[ProductFormTabs] Skipping category clear - still hydrating');
       return;
     }
+    
     // Also skip clearing if we have external_id from product and category not yet selected
     if (product && formData.category_external_id && !formData.category_id) {
+      console.log('[ProductFormTabs] Skipping category clear - waiting for category resolution');
       return;
     }
+    
     // Reset selected category only on user-initiated supplier change
+    console.log('[ProductFormTabs] Clearing category due to supplier change');
     setFormData(prev => ({
       ...prev,
       category_id: '',
