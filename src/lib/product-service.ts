@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { R2Storage } from "@/lib/r2-storage";
 import { SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
 
@@ -523,13 +524,46 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // Удаляем связанные данные
+    // 1) Удаляем связанные изображения из R2 (r2-delete)
+    try {
+      const { data: images, error: imagesFetchError } = await (supabase as any)
+        .from('store_product_images')
+        .select('*')
+        .eq('product_id', id)
+        .order('order_index', { ascending: true });
+
+      if (!imagesFetchError && Array.isArray(images) && images.length) {
+        const keys = images
+          .map((img: any) => img?.object_key || (typeof img?.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null))
+          .filter(Boolean) as string[];
+
+        if (keys.length) {
+          await Promise.all(
+            keys.map(async (key) => {
+              try {
+                await R2Storage.deleteFile(key);
+                // Очистка возможных временных загрузок
+                await R2Storage.removePendingUpload(key);
+              } catch (e) {
+                // Не блокируем удаление товара, но фиксируем проблему удаления файла
+                console.warn('R2 delete error for key:', key, e);
+              }
+            })
+          );
+        }
+      }
+    } catch (e) {
+      // Безопасно игнорируем ошибки на этапе удаления из R2, чтобы не блокировать удаление товара
+      console.warn('Failed to delete product images from R2:', e);
+    }
+
+    // 2) Удаляем связанные данные в БД
     await Promise.all([
       (supabase as any).from('store_product_params').delete().eq('product_id', id),
       (supabase as any).from('store_product_images').delete().eq('product_id', id)
     ]);
 
-    // Удаляем товар
+    // 3) Удаляем товар
     const { error } = await (supabase as any)
       .from('store_products')
       .delete()

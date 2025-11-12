@@ -415,6 +415,7 @@ const dictionary: Dictionary = {
   table_product: { uk: "Товар", en: "Product" },
   table_price: { uk: "Ціна", en: "Price" },
   table_stock: { uk: "Запас", en: "Stock" },
+  photo: { uk: "Фото", en: "Photo" },
   
   // User Status
   status_active: { uk: "Активний", en: "Active" },
@@ -487,6 +488,7 @@ const dictionary: Dictionary = {
   of: { uk: "з", en: "of" },
   users_total: { uk: "користувачів", en: "users" },
   previous: { uk: "Попередня", en: "Previous" },
+  prev: { uk: "Попередня", en: "Previous" },
   next: { uk: "Наступна", en: "Next" },
   
   // Empty States
@@ -1043,6 +1045,7 @@ const toastDictionary = {
   description_en_placeholder: { uk: "Введіть опис англійською", en: "Enter description in English" },
   manufacturer: { uk: "Виробник", en: "Manufacturer" },
   manufacturer_placeholder: { uk: "Введіть виробника", en: "Enter manufacturer" },
+  vendor: { uk: "Виробник", en: "Vendor" },
   category: { uk: "Категорія", en: "Category" },
   select_category: { uk: "Оберіть категорію", en: "Select category" },
   currency: { uk: "Валюта", en: "Currency" },
@@ -1188,7 +1191,7 @@ const toastDictionary = {
   value_example: { uk: "Наприклад: Червоний, XL, Бавовна", en: "Example: Red, XL, Cotton" },
   
   // Product form field translations
-  product_name_ua: { uk: "Назва товару (українською)", en: "Product Name (Ukrainian)" },
+  product_name_ua: { uk: "Назва товару", en: "Product Name" },
   product_name_ua_placeholder: { uk: "Введіть назву товару українською", en: "Enter product name in Ukrainian" },
   product_description_ua: { uk: "Опис товару (українською)", en: "Product Description (Ukrainian)" },
   product_description_ua_placeholder: { uk: "Введіть опис товару українською", en: "Enter product description in Ukrainian" },
@@ -1197,9 +1200,10 @@ const toastDictionary = {
   category_prices: { uk: "Ціна товару", en: "Product Price" },
   
   // Language tabs for product names and descriptions
-  product_name_ukrainian_tab: { uk: "Назва товару (українською)", en: "Product Name (Ukrainian)" },
+  product_name_ukrainian_tab: { uk: "Назва товару", en: "Product Name" },
   product_name_russian_tab: { uk: "Назва товару (російською)", en: "Product Name (Russian)" },
   short_name: { uk: "Коротка назва", en: "Short Name" },
+  short_name_ua: { uk: "Коротка назва", en: "Short Name UA" },
   short_name_placeholder: { uk: "Введіть коротку назву", en: "Enter short name" },
   product_name: { uk: "Назва товару", en: "Product Name" },
   product_name_placeholder: { uk: "Введіть назву товару", en: "Enter product name" },
