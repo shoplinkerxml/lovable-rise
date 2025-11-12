@@ -9,6 +9,8 @@ export interface Product {
   external_id: string;
   name: string;
   name_ua?: string | null;
+  docket?: string | null;
+  docket_ua?: string | null;
   description?: string | null;
   description_ua?: string | null;
   vendor?: string | null;
@@ -47,6 +49,8 @@ export interface CreateProductData {
   external_id: string;
   name: string;
   name_ua?: string | null;
+  docket?: string | null;
+  docket_ua?: string | null;
   description?: string | null;
   description_ua?: string | null;
   vendor?: string | null;
@@ -70,6 +74,8 @@ export interface UpdateProductData {
   external_id?: string;
   name?: string;
   name_ua?: string | null;
+  docket?: string | null;
+  docket_ua?: string | null;
   description?: string | null;
   description_ua?: string | null;
   vendor?: string | null;
@@ -349,6 +355,8 @@ export class ProductService {
       external_id: productData.external_id,
       name: productData.name,
       name_ua: productData.name_ua,
+      docket: productData.docket,
+      docket_ua: productData.docket_ua,
       description: productData.description,
       description_ua: productData.description_ua,
       vendor: productData.vendor,
@@ -360,7 +368,7 @@ export class ProductService {
       price_promo: productData.price_promo,
       stock_quantity: productData.stock_quantity || 0,
       available: productData.available !== false,
-      state: productData.state || 'active'
+      state: productData.state || 'new'
     };
 
     // Создаем товар
@@ -431,6 +439,8 @@ export class ProductService {
     if (productData.external_id !== undefined) productUpdateData.external_id = productData.external_id;
     if (productData.name !== undefined) productUpdateData.name = productData.name;
     if (productData.name_ua !== undefined) productUpdateData.name_ua = productData.name_ua;
+    if (productData.docket !== undefined) productUpdateData.docket = productData.docket;
+    if (productData.docket_ua !== undefined) productUpdateData.docket_ua = productData.docket_ua;
     if (productData.description !== undefined) productUpdateData.description = productData.description;
     if (productData.description_ua !== undefined) productUpdateData.description_ua = productData.description_ua;
     if (productData.vendor !== undefined) productUpdateData.vendor = productData.vendor;

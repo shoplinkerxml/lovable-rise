@@ -86,29 +86,44 @@ const LoadingSkeleton = () => (
   </TableRow>
 );
 
-function ProductStatusBadge({ available }: { available?: boolean }) {
+function ProductStatusBadge({ state }: { state?: string }) {
   const { t } = useI18n();
-  const isActive = available ?? false;
+  const s = state || 'new';
+  const labelKey =
+    s === 'stock' ? 'status_stock' :
+    s === 'used' ? 'status_used' :
+    s === 'refurbished' ? 'status_refurbished' : 'status_new';
+
+  const isPrimary = s === 'new' || s === 'refurbished';
   return (
     <Badge
-      variant={isActive ? "default" : "secondary"}
+      variant={isPrimary ? 'default' : 'secondary'}
       className={
-        isActive
-          ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/10"
-          : "bg-muted/50 text-muted-foreground border-muted hover:bg-muted/50"
+        isPrimary
+          ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/10'
+          : 'bg-muted/50 text-muted-foreground border-muted hover:bg-muted/50'
       }
     >
-      {isActive ? t("status_active") : t("status_inactive")}
+      {t(labelKey)}
     </Badge>
   );
 }
 
-function ProductActionsDropdown({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function ProductActionsDropdown({ onEdit, onDelete, onTrigger }: { onEdit: () => void; onDelete: () => void; onTrigger?: () => void }) {
   const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0" aria-label="Open row actions">
+        <Button
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          aria-label="Open row actions"
+          onClick={() => {
+            // При открытии меню действий считаем строку выбранной
+            onTrigger?.();
+          }}
+          data-testid="user_products_row_actions"
+        >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -237,18 +252,55 @@ export const ProductsTable = ({
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
-    status: false,
-    stock_quantity: false,
+    select: true,
     created_at: false,
-    article: false,
     vendor: false,
     available: false,
     docket_ua: false,
     description_ua: false,
   });
+  // Default column order: photo → article → category → name → price → quantity → status → actions
+  const [columnOrder, setColumnOrder] = useState<string[]>([
+    "select",
+    "photo",
+    "article",
+    "category",
+    "name_ua",
+    "price",
+    "stock_quantity",
+    "status",
+    "actions",
+  ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
+  // Динамическая ширина колонки названия: уменьшается по мере добавления видимых столбцов
+  const dynamicNameMaxVW = useMemo(() => {
+    // Список колонок, которые визуально отнимают место у названия
+    const spaceConsumers = [
+      "status",
+      "price",
+      "category",
+      "stock_quantity",
+      "created_at",
+      "article",
+      "vendor",
+      "docket_ua",
+      "description_ua",
+      "photo",
+      "select",
+      "actions",
+    ];
+    // Базовое значение vw для названия и шаг уменьшения
+    const baseVW = 28; // при минимуме столбцов
+    const stepVW = 2;  // уменьшаем на 2vw за каждый добавленный столбец
+    const minVW = 12;  // нижняя граница, чтобы название оставалось читаемым
+
+    const visibleCount = spaceConsumers.reduce((acc, id) => acc + (columnVisibility[id] ? 1 : 0), 0);
+    const computed = Math.max(minVW, baseVW - visibleCount * stepVW);
+    return computed;
+  }, [columnVisibility]);
 
   const columns = useMemo<ColumnDef<ProductRow>[]>(() => [
     {
@@ -316,8 +368,10 @@ export const ProductsTable = ({
         const product = row.original;
         const name = product.name_ua || product.name || "—";
         return (
-          <div className="min-w-0" data-testid="user_products_name">
-            <div className="font-medium truncate" title={name}>{name}</div>
+          <div className="min-w-0 max-w-full" data-testid="user_products_name">
+            <div className="font-medium break-words line-clamp-2 w-full" title={name}>
+              {name}
+            </div>
           </div>
         );
       },
@@ -326,7 +380,7 @@ export const ProductsTable = ({
       id: "status",
       header: t("table_status"),
       cell: ({ row }) => (
-        <ProductStatusBadge available={row.original.available} />
+        <ProductStatusBadge state={row.original.state} />
       ),
       enableHiding: true,
     },
@@ -384,13 +438,13 @@ export const ProductsTable = ({
     {
       accessorKey: "article",
       header: t("article"),
-      cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.article || ""}</span>,
+      cell: ({ row }) => <span className="text-sm text-foreground">{row.original.article || ""}</span>,
       enableHiding: true,
     },
     {
       accessorKey: "vendor",
       header: t("vendor"),
-      cell: ({ row }) => <span className="text-sm text-muted-foreground">{(row.original as any).vendor || ""}</span>,
+      cell: ({ row }) => <span className="text-sm text-foreground">{(row.original as any).vendor || ""}</span>,
       enableHiding: true,
     },
     {
@@ -400,7 +454,7 @@ export const ProductsTable = ({
         const shortName = (row.original as any).docket_ua || "";
         return (
           <div
-            className="text-sm text-muted-foreground max-w-[clamp(8rem,20vw,16rem)] truncate"
+            className="text-sm text-foreground max-w-[clamp(8rem,20vw,16rem)] truncate"
             title={shortName}
             data-testid="user_products_docketUa"
           >
@@ -417,7 +471,7 @@ export const ProductsTable = ({
         const desc = (row.original as any).description_ua || "";
         return (
           <div
-            className="text-sm text-muted-foreground max-w-[clamp(10rem,22vw,18rem)] line-clamp-2 break-words"
+            className="text-sm text-foreground max-w-[clamp(10rem,22vw,18rem)] line-clamp-2 break-words"
             title={desc}
             data-testid="user_products_descriptionUa"
           >
@@ -438,6 +492,7 @@ export const ProductsTable = ({
           <ProductActionsDropdown
             onEdit={() => onEdit?.(row.original)}
             onDelete={() => setDeleteDialog({ open: true, product: row.original })}
+            onTrigger={() => row.toggleSelected(true)}
           />
         </div>
       ),
@@ -447,7 +502,7 @@ export const ProductsTable = ({
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, columnVisibility, rowSelection, columnFilters, pagination },
+    state: { sorting, columnVisibility, rowSelection, columnFilters, pagination, columnOrder },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -457,6 +512,7 @@ export const ProductsTable = ({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnOrderChange: setColumnOrder,
     onPaginationChange: setPagination,
   });
 
@@ -475,19 +531,21 @@ export const ProductsTable = ({
 
   if (!loading && productsCount === 0) {
     return (
-      <div className="p-6 bg-background" data-testid="user_products_empty_wrap">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia className="text-primary">
-              <Package className="h-[1.5rem] w-[1.5rem]" />
-            </EmptyMedia>
-            <EmptyTitle>{t("no_products")}</EmptyTitle>
-            <EmptyDescription>{t("no_products_description")}</EmptyDescription>
-          </EmptyHeader>
-          <Button onClick={onCreateNew} className="mt-4" data-testid="user_products_create_btn">
-            {t("create_product")}
-          </Button>
-        </Empty>
+      <div className="p-6 bg-background flex justify-center" data-testid="user_products_empty_wrap">
+        <div className="w-full max-w-[clamp(18rem,50vw,32rem)]">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia className="text-primary">
+                <Package className="h-[1.5rem] w-[1.5rem]" />
+              </EmptyMedia>
+              <EmptyTitle>{t("no_products")}</EmptyTitle>
+              <EmptyDescription>{t("no_products_description")}</EmptyDescription>
+            </EmptyHeader>
+            <Button onClick={onCreateNew} className="mt-4" data-testid="user_products_create_btn">
+              {t("create_product")}
+            </Button>
+          </Empty>
+        </div>
       </div>
     );
   }

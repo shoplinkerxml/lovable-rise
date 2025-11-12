@@ -1114,9 +1114,9 @@ export function ProductFormTabs({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="new">{t('status_new')}</SelectItem>
-                        <SelectItem value="active">{t('status_active')}</SelectItem>
-                        <SelectItem value="inactive">{t('status_inactive')}</SelectItem>
-                        <SelectItem value="archived">{t('status_archived')}</SelectItem>
+                        <SelectItem value="stock">{t('status_stock')}</SelectItem>
+                        <SelectItem value="used">{t('status_used')}</SelectItem>
+                        <SelectItem value="refurbished">{t('status_refurbished')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

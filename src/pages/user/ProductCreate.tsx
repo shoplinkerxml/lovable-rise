@@ -68,7 +68,7 @@ export const ProductCreate = () => {
         price_promo: typeof formData.price_promo === 'number' ? formData.price_promo : null,
         description: formData.description || null,
         description_ua: formData.description_ua || null,
-        state: formData.state || 'active',
+        state: formData.state || 'new',
         params: parameters || [],
         images: (images || []).map((img: any, index: number) => ({
           url: img.url,

@@ -11,6 +11,7 @@ import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
 import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
+import { useI18n } from "@/providers/i18n-provider";
 
 interface ProductFormProps {
   product?: any | null;
@@ -32,6 +33,7 @@ interface ProductImage {
 }
 
 export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) => {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Основна інформація
@@ -60,7 +62,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     // Склад та статус
     stock_quantity: '',
     available: true,
-    state: 'active',
+    state: 'new',
     
   });
   
@@ -102,7 +104,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         price_promo: product.price_promo?.toString() || '',
         stock_quantity: product.stock_quantity?.toString() || '',
         available: product.available ?? true,
-        state: product.state || 'active'
+        state: product.state || 'new'
       });
 
       // Load product params
@@ -729,33 +731,34 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
           {/* Stock and Status */}
           <Card>
             <CardHeader>
-              <CardTitle>Склад та статус</CardTitle>
+              <CardTitle>{t('prices_stock')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="stock_quantity">Кількість на складі</Label>
+            <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
                 <Input
                   id="stock_quantity"
                   type="number"
                   value={formData.stock_quantity}
                   onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                  placeholder="0"
+                  placeholder={t('stock_quantity_placeholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="state">Статус товару</Label>
+                <Label htmlFor="state">{t('product_status')}</Label>
                 <Select
                   value={formData.state}
                   onValueChange={(value) => setFormData({ ...formData, state: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Оберіть статус" />
+                    <SelectValue placeholder={t('select_status')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Активний</SelectItem>
-                    <SelectItem value="inactive">Неактивний</SelectItem>
-                    <SelectItem value="draft">Чернетка</SelectItem>
+                    <SelectItem value="new">{t('status_new')}</SelectItem>
+                    <SelectItem value="stock">{t('status_stock')}</SelectItem>
+                    <SelectItem value="used">{t('status_used')}</SelectItem>
+                    <SelectItem value="refurbished">{t('status_refurbished')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -768,7 +771,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
                   onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
                   className="rounded border-gray-300"
                 />
-                <Label htmlFor="available">Товар доступний</Label>
+                <Label htmlFor="available">{t('product_available')}</Label>
               </div>
             </CardContent>
           </Card>

@@ -414,7 +414,7 @@ const dictionary: Dictionary = {
   // Product Table
   table_product: { uk: "Товар", en: "Product" },
   table_price: { uk: "Ціна", en: "Price" },
-  table_stock: { uk: "Запас", en: "Stock" },
+  table_stock: { uk: "Кількість", en: "Stock" },
   photo: { uk: "Фото", en: "Photo" },
   
   // User Status
@@ -1117,7 +1117,7 @@ const toastDictionary = {
   current_price: { uk: "Поточна ціна", en: "Current Price" },
   old_price: { uk: "Стара ціна", en: "Old Price" },
   promo_price: { uk: "Акційна ціна", en: "Promo Price" },
-  stock_quantity: { uk: "Кількість на складі", en: "Stock Quantity" },
+  stock_quantity: { uk: "Кількість", en: "Stock" },
   product_available: { uk: "Товар доступний", en: "Product Available" },
   product_images: { uk: "Зображення товару", en: "Product Images" },
   add_image_url: { uk: "Додати зображення по URL", en: "Add Image by URL" },
@@ -1183,6 +1183,9 @@ const toastDictionary = {
   product_status: { uk: "Статус", en: "Status" },
   select_status: { uk: "Оберіть статус", en: "Select Status" },
   status_new: { uk: "Новий", en: "New" },
+  status_stock: { uk: "Уцінений", en: "Stock" },
+  status_used: { uk: "Вживаний", en: "Used" },
+  status_refurbished: { uk: "Відновлений", en: "Refurbished" },
   status_active: { uk: "Активний", en: "Active" },
   status_inactive: { uk: "Неактивний", en: "Inactive" },
   status_archived: { uk: "Архівний", en: "Archived" },
@@ -1193,7 +1196,7 @@ const toastDictionary = {
   // Product form field translations
   product_name_ua: { uk: "Назва товару", en: "Product Name" },
   product_name_ua_placeholder: { uk: "Введіть назву товару українською", en: "Enter product name in Ukrainian" },
-  product_description_ua: { uk: "Опис товару (українською)", en: "Product Description (Ukrainian)" },
+  product_description_ua: { uk: "Опис товару", en: "Product Description" },
   product_description_ua_placeholder: { uk: "Введіть опис товару українською", en: "Enter product description in Ukrainian" },
   product_description_en: { uk: "Опис товару (англійською)", en: "Product Description (English)" },
   product_description_en_placeholder: { uk: "Введіть опис товару англійською", en: "Enter product description in English" },
