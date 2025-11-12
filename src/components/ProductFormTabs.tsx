@@ -438,6 +438,7 @@ export function ProductFormTabs({
   // Lookup data
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string>('');
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
 
@@ -478,7 +479,13 @@ export function ProductFormTabs({
         data: currenciesData
       } = await supabase.from('currencies').select('id,name,code,status').eq('status', true).order('name').returns<CurrencyOption[]>();
       setSuppliers(suppliersData || []);
-      setCategories(categoriesData || []);
+      setCategories((categoriesData || []).map((c: any) => ({
+        ...c,
+        id: String(c.id),
+        external_id: String(c.external_id ?? ''),
+        supplier_id: String(c.supplier_id ?? ''),
+        parent_external_id: c.parent_external_id === null || c.parent_external_id === undefined ? null : String(c.parent_external_id)
+      })));
       setCurrencies(currenciesData || []);
     } catch (error) {
       console.error('Error loading lookup data:', error);
@@ -489,21 +496,68 @@ export function ProductFormTabs({
   // Auto-select category by external_id when categories list is loaded
   useEffect(() => {
     if (!product) return;
-    if (!formData.supplier_id) return;
     if (formData.category_id) return; // already selected
     if (!formData.category_external_id) return;
     if (!categories || categories.length === 0) return;
     const matched = categories.find(
       (c) => String(c.external_id) === String(formData.category_external_id)
-        && String(c.supplier_id) === String(formData.supplier_id)
     );
     if (matched) {
       setFormData((prev) => ({
         ...prev,
         category_id: String(matched.id)
       }));
+      setSelectedCategoryName(matched.name || '');
     }
-  }, [categories, formData.category_external_id, formData.category_id, formData.supplier_id, product]);
+  }, [categories, formData.category_external_id, formData.category_id, product]);
+
+  // Fallback: directly fetch category by external_id + supplier_id to set category_id
+  useEffect(() => {
+    if (!product) return;
+    if (formData.category_id) return; // already selected
+    if (!formData.category_external_id) return;
+    if (!formData.supplier_id) return;
+
+    const resolveCategoryId = async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('store_categories')
+          .select('id,external_id,name,supplier_id,parent_external_id')
+          .in('external_id', [String(formData.category_external_id), Number(formData.category_external_id)])
+          .eq('supplier_id', Number(formData.supplier_id))
+          .limit(1);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const cat = data[0];
+          setFormData(prev => ({
+            ...prev,
+            category_id: String(cat.id)
+          }));
+          setSelectedCategoryName(cat.name || '');
+          // Ensure the fetched category exists in the categories list so Select shows label
+          setCategories(prev => {
+            const exists = prev?.some(c => String(c.id) === String(cat.id));
+            if (exists) return prev;
+            const next = [
+              ...(prev || []),
+              {
+                id: String(cat.id),
+                name: cat.name || '',
+                external_id: String(cat.external_id),
+                supplier_id: String(cat.supplier_id ?? formData.supplier_id),
+                parent_external_id: cat.parent_external_id ? String(cat.parent_external_id) : null
+              }
+            ];
+            return next;
+          });
+        }
+      } catch (e) {
+        // silently ignore; UI remains unchanged
+      }
+    };
+
+    resolveCategoryId();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product, formData.category_external_id, formData.supplier_id, formData.category_id]);
 
   // Track initial hydration to avoid clearing category on first population
   const isHydratingRef = useRef<boolean>(true);
@@ -516,6 +570,10 @@ export function ProductFormTabs({
     if (isHydratingRef.current) {
       return;
     }
+    // Also skip clearing if we have external_id from product and category not yet selected
+    if (product && formData.category_external_id && !formData.category_id) {
+      return;
+    }
     // Reset selected category only on user-initiated supplier change
     setFormData(prev => ({
       ...prev,
@@ -524,6 +582,17 @@ export function ProductFormTabs({
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.supplier_id]);
+
+  // Keep selectedCategoryName in sync when category_id or categories change
+  useEffect(() => {
+    if (!formData.category_id) {
+      return;
+    }
+    const selected = categories.find(c => String(c.id) === String(formData.category_id));
+    if (selected) {
+      setSelectedCategoryName(selected.name || '');
+    }
+  }, [formData.category_id, categories]);
   const loadProductData = async () => {
     if (!product) return;
     try {
@@ -540,10 +609,10 @@ export function ProductFormTabs({
         vendor: product.vendor || '',
         article: product.article || '',
         external_id: product.external_id || '',
-        supplier_id: (product as any).supplier_id || '',
-        category_id: product.category_id || '',
+        supplier_id: String((product as any).supplier_id ?? ''),
+        category_id: String(product.category_id ?? ''),
         // Use product.category_external_id directly; categories may not be loaded yet
-        category_external_id: (product as any).category_external_id || '',
+        category_external_id: String((product as any).category_external_id ?? ''),
         currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
         price: product.price || 0,
         price_old: product.price_old || 0,
@@ -1111,10 +1180,10 @@ export function ProductFormTabs({
                       });
                     }}>
                       <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
-                        <SelectValue placeholder={t('select_category')} />
+                        <SelectValue placeholder={selectedCategoryName || t('select_category')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(category => <SelectItem key={category.id} value={category.id}>
+                        {categories.map(category => <SelectItem key={category.id} value={String(category.id)}>
                             {category.name}
                           </SelectItem>)}
                       </SelectContent>

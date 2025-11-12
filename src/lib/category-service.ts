@@ -159,7 +159,7 @@ export const CategoryService = {
       .from('store_categories')
       .select('id,external_id,name,parent_external_id,supplier_id')
       .eq('supplier_id', normalized)
-      .eq('external_id', externalId)
+      .in('external_id', [externalId, Number(externalId)])
       .maybeSingle();
     if (error) handleError(error);
     if (!data) return null;
