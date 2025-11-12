@@ -486,16 +486,42 @@ export function ProductFormTabs({
     }
   };
 
+  // Auto-select category by external_id when categories list is loaded
+  useEffect(() => {
+    if (!product) return;
+    if (!formData.supplier_id) return;
+    if (formData.category_id) return; // already selected
+    if (!formData.category_external_id) return;
+    if (!categories || categories.length === 0) return;
+    const matched = categories.find(
+      (c) => String(c.external_id) === String(formData.category_external_id)
+        && String(c.supplier_id) === String(formData.supplier_id)
+    );
+    if (matched) {
+      setFormData((prev) => ({
+        ...prev,
+        category_id: String(matched.id)
+      }));
+    }
+  }, [categories, formData.category_external_id, formData.category_id, formData.supplier_id, product]);
+
+  // Track initial hydration to avoid clearing category on first population
+  const isHydratingRef = useRef<boolean>(true);
+
   // Refetch categories when supplier changes
   useEffect(() => {
-    // Reset selected category when supplier changes
+    // Reload lookup data to refresh categories for the selected supplier
+    loadLookupData();
+    // Skip clearing category during initial hydration from loaded product
+    if (isHydratingRef.current) {
+      return;
+    }
+    // Reset selected category only on user-initiated supplier change
     setFormData(prev => ({
       ...prev,
       category_id: '',
       category_external_id: ''
     }));
-    // Reload lookup data to refresh categories for the selected supplier
-    loadLookupData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.supplier_id]);
   const loadProductData = async () => {
@@ -504,7 +530,6 @@ export function ProductFormTabs({
       // Load product data
       // Try to resolve currency_code from loaded currencies
       const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
-      const matchedCategory = categories.find(c => String(c.id) === String(product.category_id));
       setFormData({
         name: product.name || '',
         name_ua: product.name_ua || '',
@@ -517,7 +542,8 @@ export function ProductFormTabs({
         external_id: product.external_id || '',
         supplier_id: (product as any).supplier_id || '',
         category_id: product.category_id || '',
-        category_external_id: matchedCategory?.external_id || (product as any).category_external_id || '',
+        // Use product.category_external_id directly; categories may not be loaded yet
+        category_external_id: (product as any).category_external_id || '',
         currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
         price: product.price || 0,
         price_old: product.price_old || 0,
@@ -527,6 +553,8 @@ export function ProductFormTabs({
         state: product.state || 'new',
         store_id: product.store_id || ''
       });
+      // Mark hydration complete so subsequent supplier changes are treated as user actions
+      isHydratingRef.current = false;
 
       // Load images
       const {

@@ -6,6 +6,7 @@ import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product } from '@/lib/product-service';
+import { CategoryService } from '@/lib/category-service';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ export const ProductEdit = () => {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [categoryName, setCategoryName] = useState<string>('');
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -32,6 +34,27 @@ export const ProductEdit = () => {
     };
     loadProduct();
   }, [id, t]);
+
+  useEffect(() => {
+    const loadCategoryName = async () => {
+      if (!product) return;
+      try {
+        // Prefer internal category_id, fallback to supplier_id + external_id
+        if (product.category_id) {
+          const cat = await CategoryService.getById(product.category_id);
+          setCategoryName(cat?.name || '');
+          return;
+        }
+        if (product.supplier_id && product.category_external_id) {
+          const cat = await CategoryService.getByExternalId(String(product.supplier_id), product.category_external_id);
+          setCategoryName(cat?.name || '');
+        }
+      } catch (e) {
+        setCategoryName('');
+      }
+    };
+    loadCategoryName();
+  }, [product]);
 
   const handleCancel = () => {
     navigate('/user/products');
@@ -73,8 +96,9 @@ export const ProductEdit = () => {
   };
 
   const pageBreadcrumbs = [
-    ...breadcrumbs,
-    { label: t('edit_product'), current: true }
+    { label: t('breadcrumb_home'), href: '/user', current: false },
+    { label: t('products_title'), href: '/user/products', current: false },
+    { label: categoryName || '—', current: true }
   ];
 
   return (

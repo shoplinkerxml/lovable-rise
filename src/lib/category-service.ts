@@ -34,6 +34,25 @@ function handleError(error: any): never {
 }
 
 export const CategoryService = {
+  // 0. Read specific category by internal id
+  async getById(id: string | number): Promise<StoreCategoryFull | null> {
+    const client = supabase as any;
+    const { data, error } = await client
+      .from('store_categories')
+      .select('id,external_id,name,parent_external_id,supplier_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) handleError(error);
+    if (!data) return null;
+    const r: any = data;
+    return {
+      id: String(r.id),
+      external_id: r.external_id,
+      name: r.name,
+      parent_external_id: r.parent_external_id,
+      supplier_id: String(r.supplier_id),
+    };
+  },
   // 4. Get all categories of supplier
   async listCategories(supplierId?: string | number): Promise<StoreCategory[]> {
     const client = supabase as any;
