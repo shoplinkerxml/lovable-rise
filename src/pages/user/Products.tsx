@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -79,16 +79,6 @@ export const Products = () => {
               <Package className="h-4 w-4" />
               <span>{limitInfo.current} / {limitInfo.max}</span>
             </Badge>
-            {productsCount > 0 && (
-              <Button 
-                onClick={handleCreateNew}
-                disabled={!limitInfo.canCreate}
-                size="icon"
-                title={t('add_product')}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            )}
           </div>
         }
       />

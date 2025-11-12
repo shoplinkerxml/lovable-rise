@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { ProductService, type Product } from "@/lib/product-service";
 import { supabase } from "@/integrations/supabase/client";
@@ -269,6 +269,10 @@ export const ProductsTable = ({
     "price",
     "stock_quantity",
     "status",
+    "created_at",
+    "vendor",
+    "docket_ua",
+    "description_ua",
     "actions",
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -512,7 +516,13 @@ export const ProductsTable = ({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onColumnOrderChange: setColumnOrder,
+    onColumnOrderChange: (updater) =>
+      setColumnOrder((prev) => {
+        const next = typeof updater === "function" ? (updater as (p: string[]) => string[])(prev) : (updater as string[]);
+        // Гарантируем, что столбец действий всегда последний
+        const withoutActions = next.filter((id) => id !== "actions");
+        return [...withoutActions, "actions"];
+      }),
     onPaginationChange: setPagination,
   });
 
@@ -562,16 +572,65 @@ export const ProductsTable = ({
             className="w-[clamp(12rem,40vw,24rem)]"
             data-testid="user_products_dataTable_filter"
           />
-          {table.getSelectedRowModel().rows.length > 0 && (
+          {productsCount > 0 && (
             <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => table.resetRowSelection()}
-              data-testid="user_products_dataTable_clearSelection"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={onCreateNew}
+              title={t("add_product")}
+              data-testid="user_products_dataTable_createNew"
             >
-              {t("btn_delete_selected")}
+              <Plus className="h-4 w-4" />
             </Button>
           )}
+          {/* Selection actions: one → edit + delete (icons, no fill); many → delete only */}
+          {(() => {
+            const selected = table.getSelectedRowModel().rows;
+            const count = selected.length;
+            if (count === 1) {
+              const selectedRow = selected[0];
+              return (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onEdit?.(selectedRow.original)}
+                    aria-label={t("edit")}
+                    data-testid="user_products_dataTable_editSelected"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setDeleteDialog({ open: true, product: selectedRow.original })}
+                    aria-label={t("delete")}
+                    data-testid="user_products_dataTable_clearSelection"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              );
+            }
+            if (count > 1) {
+              return (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setDeleteDialog({ open: true, product: null })}
+                  aria-label={t("delete_selected")}
+                  data-testid="user_products_dataTable_clearSelection"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              );
+            }
+            return null;
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
@@ -664,12 +723,21 @@ export const ProductsTable = ({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
-              if (!deleteDialog.product) return;
-              // Сначала закрываем диалог, чтобы не было ощущения "зависания"
+              // Закрываем диалог сразу
               setDeleteDialog({ open: false, product: null });
+
               try {
-                await onDelete?.(deleteDialog.product.id);
-                // Если внешний триггер не используется, обновим список локально
+                if (deleteDialog.product) {
+                  await onDelete?.(deleteDialog.product.id);
+                } else {
+                  const selected = table.getSelectedRowModel().rows;
+                  const ids = selected.map(r => r.original.id).filter(Boolean);
+                  for (const id of ids) {
+                    await onDelete?.(id);
+                  }
+                  table.resetRowSelection();
+                }
+
                 if (typeof refreshTrigger === 'undefined') {
                   await loadProducts();
                 }
