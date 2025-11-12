@@ -396,17 +396,35 @@ export const ProductsTable = ({
     {
       accessorKey: "docket_ua",
       header: t("short_name_ua"),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{(row.original as any).docket_ua || ""}</span>
-      ),
+      cell: ({ row }) => {
+        const shortName = (row.original as any).docket_ua || "";
+        return (
+          <div
+            className="text-sm text-muted-foreground max-w-[clamp(8rem,20vw,16rem)] truncate"
+            title={shortName}
+            data-testid="user_products_docketUa"
+          >
+            {shortName}
+          </div>
+        );
+      },
       enableHiding: true,
     },
     {
       accessorKey: "description_ua",
       header: t("product_description_ua"),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{(row.original as any).description_ua || ""}</span>
-      ),
+      cell: ({ row }) => {
+        const desc = (row.original as any).description_ua || "";
+        return (
+          <div
+            className="text-sm text-muted-foreground max-w-[clamp(10rem,22vw,18rem)] line-clamp-2 break-words"
+            title={desc}
+            data-testid="user_products_descriptionUa"
+          >
+            {desc}
+          </div>
+        );
+      },
       enableHiding: true,
     },
     {
