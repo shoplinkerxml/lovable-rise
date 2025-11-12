@@ -428,6 +428,71 @@ export class ProductService {
     return product;
   }
 
+  /** Дублирование продукта с новым ID и копированием параметров и изображений */
+  static async duplicateProduct(id: string): Promise<Product> {
+    // 1. Получаем оригинальный продукт
+    const original = await this.getProductById(id);
+    if (!original) {
+      throw new Error("Товар не найден");
+    }
+
+    // 2. Загружаем связанные параметры и изображения
+    const [params, images] = await Promise.all([
+      this.getProductParams(original.id),
+      this.getProductImages(original.id),
+    ]);
+
+    // 3. Формируем данные для создания нового товара (идентичные поля, новый id сгенерируется БД)
+    const duplicateData: CreateProductData = {
+      store_id: original.store_id,
+      supplier_id: original.supplier_id ?? null,
+      external_id: original.external_id,
+      name: original.name,
+      name_ua: original.name_ua ?? null,
+      docket: original.docket ?? null,
+      docket_ua: original.docket_ua ?? null,
+      description: original.description ?? null,
+      description_ua: original.description_ua ?? null,
+      vendor: original.vendor ?? null,
+      article: original.article ?? null,
+      category_id: original.category_id ?? null,
+      category_external_id: original.category_external_id ?? null,
+      currency_code: original.currency_code ?? null,
+      price: original.price ?? null,
+      price_old: original.price_old ?? null,
+      price_promo: original.price_promo ?? null,
+      stock_quantity: original.stock_quantity,
+      available: original.available,
+      state: original.state,
+      params: (params || []).map((p, idx) => ({
+        name: p.name,
+        value: p.value,
+        order_index: p.order_index ?? idx,
+        paramid: p.paramid ?? null,
+        valueid: p.valueid ?? null,
+      })),
+      images: (images || []).map((img, idx) => ({
+        url: img.url,
+        order_index: img.order_index ?? idx,
+      })),
+    };
+
+    try {
+      // 4. Создаем новый товар с теми же данными
+      const created = await this.createProduct(duplicateData);
+      return created;
+    } catch (error: any) {
+      // Если сработало уникальное ограничение, пробуем скорректировать external_id
+      const msg = String(error?.message || "");
+      if (msg.toLowerCase().includes("unique") || msg.toLowerCase().includes("constraint")) {
+        const fallback: CreateProductData = { ...duplicateData, external_id: `${original.external_id}-copy-${Math.floor(Math.random()*1000)}` };
+        const created = await this.createProduct(fallback);
+        return created;
+      }
+      throw error;
+    }
+  }
+
   /** Обновление товара */
   static async updateProduct(id: string, productData: UpdateProductData): Promise<Product> {
     const sessionValidation = await SessionValidator.ensureValidSession();

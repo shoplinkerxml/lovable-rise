@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { ProductService, type Product } from "@/lib/product-service";
 import { supabase } from "@/integrations/supabase/client";
@@ -109,7 +109,7 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function ProductActionsDropdown({ onEdit, onDelete, onTrigger }: { onEdit: () => void; onDelete: () => void; onTrigger?: () => void }) {
+function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger }: { onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void }) {
   const { t } = useI18n();
   return (
     <DropdownMenu>
@@ -128,12 +128,16 @@ function ProductActionsDropdown({ onEdit, onDelete, onTrigger }: { onEdit: () =>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
+        <DropdownMenuItem onClick={onEdit} className="cursor-pointer" data-testid="user_products_row_edit">
           <Edit className="mr-2 h-4 w-4" />
           {t("edit")}
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate">
+          <Copy className="mr-2 h-4 w-4" />
+          {t("duplicate")}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="cursor-pointer focus:text-destructive">
+        <DropdownMenuItem onClick={onDelete} className="cursor-pointer focus:text-destructive" data-testid="user_products_row_delete">
           <Trash2 className="mr-2 h-4 w-4" />
           {t("delete")}
         </DropdownMenuItem>
@@ -245,6 +249,16 @@ export const ProductsTable = ({
       console.error("Failed to load products", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Дублирование товара и обновление таблицы
+  const handleDuplicate = async (product: Product) => {
+    try {
+      await ProductService.duplicateProduct(product.id);
+      await loadProducts();
+    } catch (error) {
+      console.error("Duplicate product failed", error);
     }
   };
 
@@ -496,6 +510,7 @@ export const ProductsTable = ({
           <ProductActionsDropdown
             onEdit={() => onEdit?.(row.original)}
             onDelete={() => setDeleteDialog({ open: true, product: row.original })}
+            onDuplicate={() => handleDuplicate(row.original)}
             onTrigger={() => row.toggleSelected(true)}
           />
         </div>
@@ -584,7 +599,7 @@ export const ProductsTable = ({
               <Plus className="h-4 w-4" />
             </Button>
           )}
-          {/* Selection actions: one → edit + delete (icons, no fill); many → delete only */}
+          {/* Selection actions: one → duplicate + edit + delete; many → delete only */}
           {(() => {
             const selected = table.getSelectedRowModel().rows;
             const count = selected.length;
@@ -592,6 +607,17 @@ export const ProductsTable = ({
               const selectedRow = selected[0];
               return (
                 <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleDuplicate(selectedRow.original)}
+                    aria-label={t("duplicate")}
+                    title={t("duplicate")}
+                    data-testid="user_products_dataTable_duplicateSelected"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
