@@ -496,18 +496,37 @@ export function ProductFormTabs({
   // Auto-select category by external_id when categories list is loaded
   useEffect(() => {
     if (!product) return;
-    if (formData.category_id) return; // already selected
-    if (!formData.category_external_id) return;
-    if (!categories || categories.length === 0) return;
+    if (formData.category_id) {
+      console.log('[ProductFormTabs] Category already selected:', formData.category_id);
+      return; // already selected
+    }
+    if (!formData.category_external_id) {
+      console.log('[ProductFormTabs] No category_external_id to match');
+      return;
+    }
+    if (!categories || categories.length === 0) {
+      console.log('[ProductFormTabs] No categories loaded yet');
+      return;
+    }
+    
+    console.log('[ProductFormTabs] Searching for category:', {
+      category_external_id: formData.category_external_id,
+      total_categories: categories.length
+    });
+    
     const matched = categories.find(
       (c) => String(c.external_id) === String(formData.category_external_id)
     );
+    
     if (matched) {
+      console.log('[ProductFormTabs] Category matched:', matched);
       setFormData((prev) => ({
         ...prev,
         category_id: String(matched.id)
       }));
       setSelectedCategoryName(matched.name || '');
+    } else {
+      console.log('[ProductFormTabs] No category match found');
     }
   }, [categories, formData.category_external_id, formData.category_id, product]);
 
@@ -599,6 +618,18 @@ export function ProductFormTabs({
       // Load product data
       // Try to resolve currency_code from loaded currencies
       const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
+      
+      const supplierId = (product as any).supplier_id ?? null;
+      const categoryId = product.category_id ?? null;
+      const categoryExternalId = (product as any).category_external_id ?? null;
+      
+      console.log('[ProductFormTabs] Loading product data:', {
+        productId: product.id,
+        supplierId,
+        categoryId,
+        categoryExternalId
+      });
+      
       setFormData({
         name: product.name || '',
         name_ua: product.name_ua || '',
@@ -609,10 +640,10 @@ export function ProductFormTabs({
         vendor: product.vendor || '',
         article: product.article || '',
         external_id: product.external_id || '',
-        supplier_id: String((product as any).supplier_id ?? ''),
-        category_id: String(product.category_id ?? ''),
+        supplier_id: supplierId ? String(supplierId) : '',
+        category_id: categoryId ? String(categoryId) : '',
         // Use product.category_external_id directly; categories may not be loaded yet
-        category_external_id: String((product as any).category_external_id ?? ''),
+        category_external_id: categoryExternalId ? String(categoryExternalId) : '',
         currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
         price: product.price || 0,
         price_old: product.price_old || 0,
