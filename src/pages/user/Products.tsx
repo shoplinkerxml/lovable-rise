@@ -45,9 +45,7 @@ export const Products = () => {
   };
 
   const handleEdit = (product: Product) => {
-    // Для редактирования можно добавить отдельный маршрут позже
-    // Пока что можно использовать модальное окно или другой подход
-    console.log('Edit product:', product);
+    navigate(`/user/products/edit/${product.id}`);
   };
 
   const handleCreateNew = () => {
