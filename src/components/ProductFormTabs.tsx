@@ -584,6 +584,7 @@ export function ProductFormTabs({
 
   // Track initial hydration to avoid clearing category on first population
   const isHydratingRef = useRef<boolean>(true);
+  const initialSupplierIdRef = useRef<string | null>(null);
 
   // Refetch categories when supplier changes
   useEffect(() => {
@@ -591,10 +592,13 @@ export function ProductFormTabs({
     
     // Reload lookup data to refresh categories for the selected supplier
     loadLookupData();
-    
-    // Skip clearing category during initial hydration from loaded product
-    if (isHydratingRef.current) {
-      console.log('[ProductFormTabs] Skipping category clear - still hydrating');
+
+    const currentSupplier = String(formData.supplier_id || '');
+    const initialSupplier = String(initialSupplierIdRef.current || '');
+
+    // Skip clearing category during initial hydration or when supplier is the same as initial product supplier
+    if (isHydratingRef.current || (product && currentSupplier && initialSupplier && currentSupplier === initialSupplier)) {
+      console.log('[ProductFormTabs] Skipping category clear - hydration or same as initial supplier');
       return;
     }
     
@@ -665,7 +669,9 @@ export function ProductFormTabs({
         state: product.state || 'new',
         store_id: product.store_id || ''
       });
-      // DON'T mark hydration complete here - do it after category is resolved
+      // Set initial supplier id and mark hydration complete so supplier change doesn't clear category
+      initialSupplierIdRef.current = String((product as any).supplier_id ?? '');
+      isHydratingRef.current = false;
 
       // Load images
       const {
