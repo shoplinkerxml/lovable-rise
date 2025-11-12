@@ -498,6 +498,8 @@ export function ProductFormTabs({
     if (!product) return;
     if (formData.category_id) {
       console.log('[ProductFormTabs] Category already selected:', formData.category_id);
+      // Mark hydration complete after category is resolved
+      isHydratingRef.current = false;
       return; // already selected
     }
     if (!formData.category_external_id) {
@@ -525,6 +527,8 @@ export function ProductFormTabs({
         category_id: String(matched.id)
       }));
       setSelectedCategoryName(matched.name || '');
+      // Mark hydration complete after category is resolved
+      isHydratingRef.current = false;
     } else {
       console.log('[ProductFormTabs] No category match found');
     }
@@ -653,8 +657,7 @@ export function ProductFormTabs({
         state: product.state || 'new',
         store_id: product.store_id || ''
       });
-      // Mark hydration complete so subsequent supplier changes are treated as user actions
-      isHydratingRef.current = false;
+      // DON'T mark hydration complete here - do it after category is resolved
 
       // Load images
       const {
