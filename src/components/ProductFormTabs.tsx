@@ -498,8 +498,7 @@ export function ProductFormTabs({
     if (!product) return;
     if (formData.category_id) {
       console.log('[ProductFormTabs] Category already selected:', formData.category_id);
-      // Mark hydration complete after category is resolved
-      isHydratingRef.current = false;
+      // Keep hydration until categories are loaded and label synced
       return; // already selected
     }
     if (!formData.category_external_id) {
@@ -529,6 +528,8 @@ export function ProductFormTabs({
       setSelectedCategoryName(matched.name || '');
       // Mark hydration complete after category is resolved
       isHydratingRef.current = false;
+      // Clear loading guard
+      isLoadingProductRef.current = false;
     } else {
       console.log('[ProductFormTabs] No category match found');
     }
@@ -556,6 +557,9 @@ export function ProductFormTabs({
             category_id: String(cat.id)
           }));
           setSelectedCategoryName(cat.name || '');
+          // Hydration complete after fallback resolution
+          isHydratingRef.current = false;
+          isLoadingProductRef.current = false;
           // Ensure the fetched category exists in the categories list so Select shows label
           setCategories(prev => {
             const exists = prev?.some(c => String(c.id) === String(cat.id));
@@ -585,16 +589,24 @@ export function ProductFormTabs({
   // Track initial hydration to avoid clearing category on first population
   const isHydratingRef = useRef<boolean>(true);
   const initialSupplierIdRef = useRef<string | null>(null);
+  // Guard: while product data is loading/hydrating, skip supplier-driven clears
+  const isLoadingProductRef = useRef<boolean>(false);
 
   // Refetch categories when supplier changes
   useEffect(() => {
-    console.log('[ProductFormTabs] Supplier changed, isHydrating:', isHydratingRef.current, 'product exists:', !!product);
+    console.log('[ProductFormTabs] Supplier changed, isHydrating:', isHydratingRef.current, 'product exists:', !!product, 'isLoadingProduct:', isLoadingProductRef.current);
     
     // Reload lookup data to refresh categories for the selected supplier
     loadLookupData();
 
     const currentSupplier = String(formData.supplier_id || '');
     const initialSupplier = String(initialSupplierIdRef.current || '');
+
+    // Skip any clearing while product is loading/hydrating
+    if (isLoadingProductRef.current) {
+      console.log('[ProductFormTabs] Skipping category clear - product is loading');
+      return;
+    }
 
     // Skip clearing category during initial hydration or when supplier is the same as initial product supplier
     if (isHydratingRef.current || (product && currentSupplier && initialSupplier && currentSupplier === initialSupplier)) {
@@ -626,11 +638,16 @@ export function ProductFormTabs({
     const selected = categories.find(c => String(c.id) === String(formData.category_id));
     if (selected) {
       setSelectedCategoryName(selected.name || '');
+      // Once label is synced, hydration/loading can end
+      isHydratingRef.current = false;
+      isLoadingProductRef.current = false;
     }
   }, [formData.category_id, categories]);
   const loadProductData = async () => {
     if (!product) return;
     try {
+      // Mark loading to suppress supplier change side-effects during hydration
+      isLoadingProductRef.current = true;
       // Load product data
       // Try to resolve currency_code from loaded currencies
       const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
@@ -638,6 +655,9 @@ export function ProductFormTabs({
       const supplierId = (product as any).supplier_id ?? null;
       const categoryId = product.category_id ?? null;
       const categoryExternalId = (product as any).category_external_id ?? null;
+
+      // Set initial supplier BEFORE updating formData to avoid race with supplier change effect
+      initialSupplierIdRef.current = supplierId ? String(supplierId) : '';
       
       console.log('[ProductFormTabs] Loading product data:', {
         productId: product.id,
@@ -669,9 +689,7 @@ export function ProductFormTabs({
         state: product.state || 'new',
         store_id: product.store_id || ''
       });
-      // Set initial supplier id and mark hydration complete so supplier change doesn't clear category
-      initialSupplierIdRef.current = String((product as any).supplier_id ?? '');
-      isHydratingRef.current = false;
+      // Do not end hydration here; wait for category resolution/label sync
 
       // Load images
       const {
