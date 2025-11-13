@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Package } from 'lucide-react';
+import { Package, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -20,6 +20,7 @@ export const Products = () => {
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
+  const [tableLoading, setTableLoading] = useState<boolean>(true);
 
   useEffect(() => {
     loadMaxLimit();
@@ -93,14 +94,27 @@ export const Products = () => {
         }
       />
 
-      <ProductsTable
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreateNew={handleCreateNew}
-        onProductsLoaded={handleProductsLoaded}
-        refreshTrigger={refreshTrigger}
-        canCreate={limitInfo.canCreate}
-      />
+      <div className="relative" aria-busy={tableLoading}>
+        {/* Page-level preloader overlay while table loads */}
+        {tableLoading && (
+          <div
+            className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm"
+            data-testid="user_products_page_loader"
+          >
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        <ProductsTable
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onCreateNew={handleCreateNew}
+          onProductsLoaded={handleProductsLoaded}
+          onLoadingChange={setTableLoading}
+          refreshTrigger={refreshTrigger}
+          canCreate={limitInfo.canCreate}
+        />
+      </div>
 
       {/* Non-modal delete progress indicator */}
       <DialogNoOverlay modal={false} open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

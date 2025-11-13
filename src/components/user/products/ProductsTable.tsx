@@ -54,6 +54,7 @@ type ProductsTableProps = {
   onDelete?: (product: Product) => Promise<void> | void;
   onCreateNew?: () => void;
   onProductsLoaded?: (count: number) => void;
+  onLoadingChange?: (loading: boolean) => void;
   refreshTrigger?: number;
   canCreate?: boolean;
 };
@@ -158,6 +159,7 @@ export const ProductsTable = ({
   onDelete,
   onCreateNew,
   onProductsLoaded,
+  onLoadingChange,
   refreshTrigger,
   canCreate,
 }: ProductsTableProps) => {
@@ -182,6 +184,7 @@ export const ProductsTable = ({
 
   const loadProducts = async () => {
     setLoading(true);
+    onLoadingChange?.(true);
     try {
       const data = await ProductService.getProducts();
       onProductsLoaded?.(data.length);
@@ -278,6 +281,7 @@ export const ProductsTable = ({
       console.error("Failed to load products", error);
     } finally {
       setLoading(false);
+      onLoadingChange?.(false);
     }
   };
 
