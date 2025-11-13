@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2 } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -714,6 +714,28 @@ export const ProductsTable = ({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Page size selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8" data-testid="user_products_dataTable_pageSize">
+                {t("page_size")}: {table.getState().pagination.pageSize}
+                <ChevronDown className="ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              {[5, 10, 20, 50].map((size) => (
+                <DropdownMenuCheckboxItem
+                  key={size}
+                  checked={table.getState().pagination.pageSize === size}
+                  onCheckedChange={() => table.setPageSize(size)}
+                  data-testid={`user_products_dataTable_pageSize_${size}`}
+                >
+                  {size}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -857,16 +879,21 @@ export const ProductsTable = ({
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            data-testid="user_products_dataTable_prevPage"
           >
-            {t("prev")}
+            {"<"}
           </Button>
+          <span className="text-sm">
+            {table.getState().pagination.pageIndex + 1} / {table.getPageCount() || 1}
+          </span>
           <Button
             variant="outline"
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            data-testid="user_products_dataTable_nextPage"
           >
-            {t("next")}
+            {">"}
           </Button>
         </div>
       </div>
