@@ -189,6 +189,8 @@ const dictionary: Dictionary = {
   failed_delete_product: { uk: "Помилка видалення товару", en: "Failed to delete product" },
   failed_create_product: { uk: "Помилка створення товару", en: "Failed to create product" },
   delete_product_confirm: { uk: "Видалити товар?", en: "Delete Product?" },
+  deleting_product_title: { uk: "Видалення товару", en: "Deleting product" },
+  deleting_product: { uk: "Йде видалення", en: "Deleting" },
   products_limit: { uk: "Товари", en: "Products" },
   products_limit_reached: { uk: "Досягнуто ліміту товарів", en: "Product limit reached" },
   
@@ -1093,6 +1095,8 @@ const toastDictionary = {
   create_category: { uk: "Створити категорію", en: "Create Category" },
   category_created: { uk: "Категорію створено", en: "Category created" },
   category_deleted: { uk: "Категорію видалено", en: "Category deleted" },
+  deleting_category_title: { uk: "Видалення категорії", en: "Deleting category" },
+  deleting_category: { uk: "Йде видалення", en: "Deleting" },
   failed_create_category: { uk: "Не вдалося створити категорію", en: "Failed to create category" },
   failed_delete_category: { uk: "Не вдалося видалити категорію", en: "Failed to delete category" },
   external_id_exists: { uk: "Такий зовнішній ID вже існує для цього постачальника", en: "This external ID already exists for this supplier" },

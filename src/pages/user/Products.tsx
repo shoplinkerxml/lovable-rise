@@ -9,6 +9,7 @@ import { ProductsTable } from '@/components/user/products';
 import { ProductService, type Product, type ProductLimitInfo } from '@/lib/product-service';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from '@/components/ui/dialog-no-overlay';
 
 export const Products = () => {
   const { t } = useI18n();
@@ -17,6 +18,8 @@ export const Products = () => {
   const [productsCount, setProductsCount] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingName, setDeletingName] = useState<string | null>(null);
 
   useEffect(() => {
     loadMaxLimit();
@@ -56,14 +59,21 @@ export const Products = () => {
     navigate('/user/products/new-product');
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (product: Product) => {
     try {
-      await ProductService.deleteProduct(id);
+      const nameForUi = product.name_ua || product.name || product.external_id || product.id;
+      setDeletingName(nameForUi);
+      setIsDeleteOpen(true);
+      await ProductService.deleteProduct(product.id);
       toast.success(t('product_deleted'));
       setRefreshTrigger(prev => prev + 1);
     } catch (error: any) {
       console.error('Delete error:', error);
       toast.error(error?.message || t('failed_delete_product'));
+    }
+    finally {
+      setIsDeleteOpen(false);
+      setDeletingName(null);
     }
   };
 
@@ -91,6 +101,18 @@ export const Products = () => {
         refreshTrigger={refreshTrigger}
         canCreate={limitInfo.canCreate}
       />
+
+      {/* Non-modal delete progress indicator */}
+      <DialogNoOverlay modal={false} open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogNoOverlayContent position="top-right" className="p-[0.75rem] w-[min(22rem,90vw)]" data-testid="user_products_delete_progress">
+          <DialogNoOverlayHeader>
+            <DialogNoOverlayTitle>{t('deleting_product_title')}</DialogNoOverlayTitle>
+          </DialogNoOverlayHeader>
+          <div className="text-sm text-muted-foreground">
+            <span>{t('deleting_product')}{deletingName ? `: ${deletingName}` : ''}</span>
+          </div>
+        </DialogNoOverlayContent>
+      </DialogNoOverlay>
     </div>
   );
 };

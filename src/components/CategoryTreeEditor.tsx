@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from "@/components/ui/dialog-no-overlay";
 // AlertDialog не используется: удаление выполняется сразу без модалки
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/providers/i18n-provider";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
 type Supplier = {
   id: string;
   supplier_name: string;
@@ -76,6 +77,9 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const [createName, setCreateName] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [createExternalError, setCreateExternalError] = useState<string | null>(null);
+  // Немодальний прогрес видалення
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Fetch categories reactively
   const {
@@ -192,6 +196,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const handleDelete = async (externalId: string) => {
     if (!supplierId) return;
     try {
+      setDeletingId(externalId);
+      setIsDeleteOpen(true);
       await CategoryService.deleteCategoryCascade(supplierId, externalId);
       await queryClient.invalidateQueries({
         queryKey: ["categories", supplierId || "none"]
@@ -200,6 +206,9 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     } catch (err) {
       console.error(err);
       toast.error(t("failed_delete_category"));
+    } finally {
+      setIsDeleteOpen(false);
+      setDeletingId(null);
     }
   };
 
@@ -307,6 +316,18 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     return treeData.map(filterNode).filter(Boolean) as any[];
   }, [treeData, search]);
   return <Card className="border-0 shadow-none" data-testid="categoryTree_card">
+      {/* Немодальне невелике вікно прогресу без затемнення */}
+      <DialogNoOverlay modal={false} open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogNoOverlayContent position="top-right" className="p-[0.75rem] w-[min(22rem,90vw)]" data-testid="categoryTree_deleteProgress">
+          <DialogNoOverlayHeader>
+            <DialogNoOverlayTitle>{t("deleting_category_title")}</DialogNoOverlayTitle>
+          </DialogNoOverlayHeader>
+          <div className="flex items-center gap-2 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <span>{t("deleting_category")}{deletingId ? `: ${deletingId}` : ""}</span>
+          </div>
+        </DialogNoOverlayContent>
+      </DialogNoOverlay>
       <CardHeader className="flex flex-row items-center justify-between p-0 mb-2.5">
         <CardTitle className="text-base" data-testid="categoryTree_title">{t("categories_title")}</CardTitle>
         <Dialog open={isCreateOpen} onOpenChange={open => {

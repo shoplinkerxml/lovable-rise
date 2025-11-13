@@ -33,15 +33,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  DialogNoOverlay,
+  DialogNoOverlayContent,
+  DialogNoOverlayDescription,
+  DialogNoOverlayFooter,
+  DialogNoOverlayHeader,
+  DialogNoOverlayTitle,
+} from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
 import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy } from "lucide-react";
@@ -52,7 +50,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
-  onDelete?: (id: string) => Promise<void> | void;
+  onDelete?: (product: Product) => Promise<void> | void;
   onCreateNew?: () => void;
   onProductsLoaded?: (count: number) => void;
   refreshTrigger?: number;
@@ -750,43 +748,48 @@ export const ProductsTable = ({
         </Table>
       </div>
 
-      <AlertDialog
+      <DialogNoOverlay
         open={deleteDialog.open}
         onOpenChange={(open) =>
           setDeleteDialog((prev) => ({ open, product: open ? prev.product : null }))
         }
+        modal={false}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("delete_product_confirm")}</AlertDialogTitle>
-            <AlertDialogDescription>
+        <DialogNoOverlayContent
+          position="center"
+          className="p-6 w-[min(28rem,92vw)]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogNoOverlayHeader>
+            <DialogNoOverlayTitle>{t("delete_product_confirm")}</DialogNoOverlayTitle>
+            <DialogNoOverlayDescription>
               {deleteDialog.product?.name ? (
                 <span>
-                  {t("delete")}: "{deleteDialog.product?.name}". {t("cancel")}?
+                  {t("delete")}: "{deleteDialog.product?.name}". {t("cancel")}? 
                 </span>
               ) : (
                 <span>{t("delete_product_confirm")}</span>
               )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="user_products_delete_cancel">{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction
+            </DialogNoOverlayDescription>
+          </DialogNoOverlayHeader>
+          <DialogNoOverlayFooter>
+            <Button variant="outline" data-testid="user_products_delete_cancel" onClick={() => setDeleteDialog({ open: false, product: null })}>
+              {t("cancel")}
+            </Button>
+            <Button
               data-testid="user_products_delete_confirm"
               onClick={async () => {
-                // Фиксируем удаляемый товар до изменения состояния диалога
                 const productToDelete = deleteDialog.product;
-                // Закрываем диалог сразу
                 setDeleteDialog({ open: false, product: null });
 
                 try {
                   if (productToDelete) {
-                    await onDelete?.(productToDelete.id);
+                    await onDelete?.(productToDelete);
                   } else {
                     const selected = table.getSelectedRowModel().rows;
-                    const ids = selected.map((r) => r.original.id).filter(Boolean);
-                    for (const id of ids) {
-                      await onDelete?.(id);
+                    for (const r of selected) {
+                      await onDelete?.(r.original);
                     }
                     table.resetRowSelection();
                   }
@@ -801,10 +804,10 @@ export const ProductsTable = ({
               className="bg-destructive hover:bg-destructive/90"
             >
               {t("delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogNoOverlayFooter>
+        </DialogNoOverlayContent>
+      </DialogNoOverlay>
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-1" data-testid="user_products_dataTable_pagination">
