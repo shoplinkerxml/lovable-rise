@@ -252,7 +252,35 @@ export class ProductService {
         return [];
       }
 
-      return data || [];
+      const rows: any[] = data || [];
+      // Fallback: если колонок docket/docket_ua нет в таблице, читаем значения из store_product_params
+      const ids = rows.map((r: any) => r?.id).filter((v) => !!v);
+      if (ids.length > 0) {
+        const { data: paramRows, error: paramsErr } = await (supabase as any)
+          .from('store_product_params')
+          .select('product_id,name,value')
+          .in('product_id', ids)
+          .in('name', ['docket', 'docket_ua']);
+        if (!paramsErr && Array.isArray(paramRows)) {
+          const map: Record<string, Record<string, string>> = {};
+          for (const pr of paramRows) {
+            const pid = String(pr.product_id);
+            if (!map[pid]) map[pid] = {} as any;
+            map[pid][pr.name] = pr.value;
+          }
+          rows.forEach((r: any) => {
+            const pid = String(r.id);
+            if ((r.docket == null || r.docket === '') && map[pid]?.docket) {
+              r.docket = map[pid].docket;
+            }
+            if ((r.docket_ua == null || r.docket_ua === '') && map[pid]?.docket_ua) {
+              r.docket_ua = map[pid].docket_ua;
+            }
+          });
+        }
+      }
+
+      return rows as Product[];
     } catch (error) {
       console.error('Get products error (table may not exist):', error);
       // Возвращаем пустой массив если таблица не существует или нет доступа
@@ -323,7 +351,27 @@ export class ProductService {
       throw new Error(error.message);
     }
 
-    return data;
+    const product: any = data;
+    // Fallback: читаем возможные значения docket/docket_ua из параметров, если отсутствуют в основной таблице
+    try {
+      const { data: paramRows } = await (supabase as any)
+        .from('store_product_params')
+        .select('name,value')
+        .eq('product_id', product.id)
+        .in('name', ['docket', 'docket_ua']);
+      (paramRows || []).forEach((pr: any) => {
+        if (pr.name === 'docket' && (product.docket == null || product.docket === '')) {
+          product.docket = pr.value;
+        }
+        if (pr.name === 'docket_ua' && (product.docket_ua == null || product.docket_ua === '')) {
+          product.docket_ua = pr.value;
+        }
+      });
+    } catch (_) {
+      // ignore
+    }
+
+    return product as Product;
   }
 
   /** Получение одного продукта по ID - используем getProductById */
@@ -413,6 +461,24 @@ export class ProductService {
         console.error('Create product params error:', paramsError);
         // Не прерываем выполнение, просто логируем ошибку
       }
+    }
+
+    // Fallback-параметры для docket/docket_ua, если соответствующих колонок нет
+    try {
+      const fallbackParams: any[] = [];
+      if (productInsertData.docket_ua != null && String(productInsertData.docket_ua).trim() !== '') {
+        fallbackParams.push({ product_id: product.id, name: 'docket_ua', value: String(productInsertData.docket_ua), order_index: 0 });
+      }
+      if (productInsertData.docket != null && String(productInsertData.docket).trim() !== '') {
+        fallbackParams.push({ product_id: product.id, name: 'docket', value: String(productInsertData.docket), order_index: fallbackParams.length });
+      }
+      if (fallbackParams.length > 0) {
+        await (supabase as any)
+          .from('store_product_params')
+          .insert(fallbackParams);
+      }
+    } catch (e) {
+      console.warn('Fallback params insert failed:', e);
     }
 
     // Создаем изображения товара, если они есть
@@ -563,6 +629,30 @@ export class ProductService {
     if (productError) {
       console.error('Update product error:', productError);
       throw new Error(productError.message);
+    }
+
+    // Fallback: синхронизируем docket/docket_ua в store_product_params
+    try {
+      // Удаляем прежние значения для избежания дублей
+      await (supabase as any)
+        .from('store_product_params')
+        .delete()
+        .eq('product_id', id)
+        .in('name', ['docket', 'docket_ua']);
+      const inserts: any[] = [];
+      if (productUpdateData.docket_ua !== undefined && productUpdateData.docket_ua !== null && String(productUpdateData.docket_ua).trim() !== '') {
+        inserts.push({ product_id: id, name: 'docket_ua', value: String(productUpdateData.docket_ua), order_index: 0 });
+      }
+      if (productUpdateData.docket !== undefined && productUpdateData.docket !== null && String(productUpdateData.docket).trim() !== '') {
+        inserts.push({ product_id: id, name: 'docket', value: String(productUpdateData.docket), order_index: inserts.length });
+      }
+      if (inserts.length > 0) {
+        await (supabase as any)
+          .from('store_product_params')
+          .insert(inserts);
+      }
+    } catch (e) {
+      console.warn('Fallback params update failed:', e);
     }
 
     // Обновляем параметры товара, если они переданы

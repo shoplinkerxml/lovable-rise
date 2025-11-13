@@ -59,6 +59,8 @@ export const ProductCreate = () => {
         currency_code: formData.currency_code || null,
         name: formData.name,
         name_ua: formData.name_ua || null,
+        docket: formData.docket || null,
+        docket_ua: formData.docket_ua || null,
         vendor: formData.vendor || null,
         article: formData.article || null,
         available: !!formData.available,
