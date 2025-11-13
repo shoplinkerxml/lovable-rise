@@ -48,7 +48,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     t
   } = useI18n();
   const queryClient = useQueryClient();
-  const [supplierId, setSupplierId] = useState<string>(defaultSupplierId || "");
+  // Keep supplier id strictly as string to avoid mismatches with numeric IDs
+  const [supplierId, setSupplierId] = useState<string>(defaultSupplierId ? String(defaultSupplierId) : "");
   const [storeId, setStoreId] = useState<string>(defaultStoreId || "");
   const [search, setSearch] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -57,10 +58,10 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   // Keep internal supplierId in sync with parent-provided defaultSupplierId
   // This ensures the categories query runs when the user selects a supplier outside this component
   React.useEffect(() => {
-    const autoDefault = suppliers && suppliers.length > 0 ? suppliers[0].id : "";
-    const next = defaultSupplierId || autoDefault || "";
+    const autoDefault = suppliers && suppliers.length > 0 ? String(suppliers[0].id) : "";
+    const next = defaultSupplierId ? String(defaultSupplierId) : autoDefault;
     // Only update when it actually changes to avoid unnecessary re-renders
-    setSupplierId(prev => prev !== next ? next : prev);
+    setSupplierId(prev => (prev !== next ? next : prev));
     // Propagate default selection to parent to keep formData in sync
     if (next && next !== supplierId) {
       onSupplierChange?.(next);
@@ -329,7 +330,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
                     <SelectValue placeholder={t("select_supplier")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map(s => <SelectItem key={s.id} value={s.id}>
+                    {suppliers.map(s => <SelectItem key={s.id} value={String(s.id)}>
                         {s.supplier_name}
                       </SelectItem>)}
                   </SelectContent>
@@ -380,7 +381,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         onSupplierChange?.(val);
       }} className="w-full">
           <TabsList className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="categoryTree_supplierTabsList">
-            {suppliers.map(s => <TabsTrigger key={s.id} value={s.id} className="whitespace-nowrap py-1 font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow shrink-0 md:shrink snap-start md:snap-none w-auto truncate text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid={`categoryTree_supplierTab_${s.id}`} aria-label={s.supplier_name}>
+            {suppliers.map(s => <TabsTrigger key={s.id} value={String(s.id)} className="whitespace-nowrap py-1 font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow shrink-0 md:shrink snap-start md:snap-none w-auto truncate text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid={`categoryTree_supplierTab_${s.id}`} aria-label={s.supplier_name}>
                 <span className="truncate">{s.supplier_name}</span>
               </TabsTrigger>)}
           </TabsList>
