@@ -318,6 +318,8 @@ export const ProductsTable = ({
     available: false,
     docket_ua: false,
     description_ua: false,
+    price_old: false,
+    price_promo: false,
   };
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY);
   useEffect(() => {
@@ -355,6 +357,8 @@ export const ProductsTable = ({
     "docket_ua",
     "description_ua",
     "price",
+    "price_old",
+    "price_promo",
     "stock_quantity",
     "vendor",
     "status",
@@ -373,6 +377,8 @@ export const ProductsTable = ({
       "status",
       "supplier",
       "price",
+      "price_old",
+      "price_promo",
       "category",
       "stock_quantity",
       "created_at",
@@ -501,6 +507,34 @@ export const ProductsTable = ({
           <span className="text-muted-foreground">—</span>
         );
       },
+    },
+    {
+      id: "price_old",
+      header: t("old_price"),
+      cell: ({ row }) => {
+        const p = row.original as any;
+        const currency = p.currency_code || "";
+        return row.original.price_old != null ? (
+          <span className="tabular-nums" data-testid="user_products_priceOld">{row.original.price_old} {currency}</span>
+        ) : (
+          <span className="text-muted-foreground" data-testid="user_products_priceOld_empty">—</span>
+        );
+      },
+      enableHiding: true,
+    },
+    {
+      id: "price_promo",
+      header: t("promo_price"),
+      cell: ({ row }) => {
+        const p = row.original as any;
+        const currency = p.currency_code || "";
+        return row.original.price_promo != null ? (
+          <span className="tabular-nums" data-testid="user_products_pricePromo">{row.original.price_promo} {currency}</span>
+        ) : (
+          <span className="text-muted-foreground" data-testid="user_products_pricePromo_empty">—</span>
+        );
+      },
+      enableHiding: true,
     },
     {
       id: "category",
