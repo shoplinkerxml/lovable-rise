@@ -9,6 +9,8 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   useReactTable,
 } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,7 +44,8 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -376,6 +379,129 @@ export const ProductsTable = ({
   // Управляемое состояние открытия меню колонок: не закрывать по клику внутри
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
 
+  // Toggle sort control rendered as native button with inline SVG icon
+  function SortToggle({ column, table }: { column: any; table: any }) {
+    const { t } = useI18n();
+    const cur = column.getIsSorted?.(); // false | 'asc' | 'desc'
+    const isActive = cur === "asc" || cur === "desc";
+    return (
+      <button
+        type="button"
+        className={`h-8 w-4 p-0 inline-flex items-center justify-center rounded-md hover:bg-muted ${isActive ? "text-primary" : "text-foreground"}`}
+        aria-label={t("sort_asc")}
+        onClick={() => {
+          const next = cur === false ? "asc" : cur === "asc" ? "desc" : "asc";
+          table.setSorting([{ id: column.id, desc: next === "desc" }]);
+        }}
+        data-testid={`user_products_sort_${column.id}_toggle`}
+      >
+        {/* arrow-up-down icon (lucide) as inline SVG */}
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-up-down h-4 w-4">
+          <path d="m21 16-4 4-4-4"></path>
+          <path d="M17 20V4"></path>
+          <path d="m3 8 4-4 4 4"></path>
+          <path d="M7 4v16"></path>
+        </svg>
+      </button>
+    );
+  }
+
+  function ColumnFilterMenu({ column }: { column: any }) {
+    const { t } = useI18n();
+    const [query, setQuery] = useState("");
+    const faceted = column.getFacetedUniqueValues?.();
+    const values = faceted ? Array.from(faceted.keys()) : [];
+    // Normalize current filter to an array for multi-select
+    const currentFilter = column.getFilterValue?.();
+    const selectedValues: string[] = Array.isArray(currentFilter)
+      ? currentFilter.map((v: any) => (v == null ? "" : String(v)))
+      : currentFilter
+      ? [String(currentFilter)]
+      : [];
+    const filteredValues = values
+      .map((v) => (typeof v === "string" ? v : v == null ? "" : String(v)))
+      .filter((v) => (query ? v.toLowerCase().includes(query.toLowerCase()) : true))
+      .sort((a, b) => a.localeCompare(b));
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-4 p-0"
+            aria-label={t("filter")}
+            data-testid={`user_products_filter_trigger_${column.id}`}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[12rem] w-fit p-2"
+          data-testid={`user_products_filter_menu_${column.id}`}
+        >
+          <div className="mb-2">
+            <Input
+              placeholder={t("search_placeholder")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full"
+              data-testid={`user_products_filter_search_${column.id}`}
+            />
+          </div>
+          <ScrollArea className="max-h-[clamp(12rem,40vh,20rem)]">
+            <div className="flex flex-col">
+              {filteredValues.length === 0 ? (
+                <div className="text-xs text-muted-foreground px-2 py-1">{t("no_results")}</div>
+              ) : (
+                filteredValues.map((val) => {
+                  const isChecked = selectedValues.includes(val);
+                  return (
+                    <DropdownMenuItem
+                      key={val}
+                      className="cursor-pointer pr-2 pl-2"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        const next = isChecked
+                          ? selectedValues.filter((v) => v !== val)
+                          : Array.from(new Set([...selectedValues, val]));
+                        column.setFilterValue(next);
+                      }}
+                      data-testid={`user_products_filter_item_${column.id}_${val}`}
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={(checked) => {
+                          const next = checked
+                            ? Array.from(new Set([...selectedValues, val]))
+                            : selectedValues.filter((v) => v !== val);
+                          column.setFilterValue(next);
+                        }}
+                        className="mr-2"
+                        aria-label={t("select_row")}
+                        data-testid={`user_products_filter_checkbox_${column.id}_${val}`}
+                      />
+                      <span className="truncate">{val || "—"}</span>
+                    </DropdownMenuItem>
+                  );
+                })
+              )}
+          </div>
+        </ScrollArea>
+          <DropdownMenuSeparator />
+          <Button
+            variant="outline"
+            className="w-full h-8 mt-2"
+            onClick={() => column.setFilterValue(undefined)}
+            data-testid={`user_products_filter_clear_${column.id}`}
+          >
+            {t("clear")}
+          </Button>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   // Динамическая ширина колонки названия: уменьшается по мере добавления видимых столбцов
   const dynamicNameMaxVW = useMemo(() => {
     // Список колонок, которые визуально отнимают место у названия
@@ -441,6 +567,7 @@ export const ProductsTable = ({
       id: "photo",
       header: t("photo"),
       enableSorting: false,
+      enableColumnFilter: false,
       size: 56,
       cell: ({ row }) => {
         const product = row.original;
@@ -466,8 +593,23 @@ export const ProductsTable = ({
     },
     {
       id: "name_ua",
-      header: t("table_product"),
       accessorFn: (row) => row.name_ua ?? row.name ?? "",
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("table_product")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const product = row.original;
         const name = product.name_ua || product.name || "—";
@@ -482,7 +624,23 @@ export const ProductsTable = ({
     },
     {
       id: "status",
-      header: t("table_status"),
+      accessorFn: (row) => row.state ?? "",
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("table_status")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => (
         <ProductStatusBadge state={row.original.state} />
       ),
@@ -490,7 +648,23 @@ export const ProductsTable = ({
     },
     {
       id: "supplier",
-      header: t("supplier"),
+      accessorFn: (row) => row.supplierName ?? "",
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("supplier")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const name = (row.original as any).supplierName;
         return name ? (
@@ -503,7 +677,23 @@ export const ProductsTable = ({
     },
     {
       id: "price",
-      header: t("table_price"),
+      accessorFn: (row) => (typeof row.price === "number" ? row.price : Number.NEGATIVE_INFINITY),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("table_price")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const p = row.original as any;
         const currency = p.currency_code || "";
@@ -516,7 +706,23 @@ export const ProductsTable = ({
     },
     {
       id: "price_old",
-      header: t("old_price"),
+      accessorFn: (row) => (typeof row.price_old === "number" ? row.price_old : Number.NEGATIVE_INFINITY),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("old_price")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const p = row.original as any;
         const currency = p.currency_code || "";
@@ -530,7 +736,23 @@ export const ProductsTable = ({
     },
     {
       id: "price_promo",
-      header: t("promo_price"),
+      accessorFn: (row) => (typeof row.price_promo === "number" ? row.price_promo : Number.NEGATIVE_INFINITY),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("promo_price")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const p = row.original as any;
         const currency = p.currency_code || "";
@@ -544,7 +766,23 @@ export const ProductsTable = ({
     },
     {
       id: "category",
-      header: t("category"),
+      accessorFn: (row) => row.categoryName ?? "",
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("category")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const name = row.original.categoryName;
         return name ? <span className="text-sm">{name}</span> : <span className="text-muted-foreground">—</span>;
@@ -552,7 +790,23 @@ export const ProductsTable = ({
     },
     {
       id: "stock_quantity",
-      header: t("table_stock"),
+      accessorFn: (row) => (typeof row.stock_quantity === "number" ? row.stock_quantity : Number.NEGATIVE_INFINITY),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("table_stock")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => (
         row.original.stock_quantity != null ? (
           <span className="tabular-nums">{row.original.stock_quantity}</span>
@@ -564,7 +818,26 @@ export const ProductsTable = ({
     },
     {
       id: "created_at",
-      header: t("table_created"),
+      accessorFn: (row) => {
+        const v = row.created_at;
+        try { return v ? new Date(v).getTime() : 0; } catch { return 0; }
+      },
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("table_created")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => (
         row.original.created_at ? (
           <div className="flex flex-col">
@@ -582,19 +855,64 @@ export const ProductsTable = ({
     // Дополнительные колонки (видимы по опциям) — ставим их ДО действий
     {
       accessorKey: "article",
-      header: t("article"),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("article")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => <span className="text-sm text-foreground">{row.original.article || ""}</span>,
       enableHiding: true,
     },
     {
       accessorKey: "vendor",
-      header: t("vendor"),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("vendor")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => <span className="text-sm text-foreground">{(row.original as any).vendor || ""}</span>,
       enableHiding: true,
     },
     {
       accessorKey: "docket_ua",
-      header: t("short_name_ua"),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("short_name_ua")}</span>
+          <div className="flex items-center gap-0 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const shortName = (row.original as any).docket_ua || "";
         return (
@@ -611,7 +929,22 @@ export const ProductsTable = ({
     },
     {
       accessorKey: "description_ua",
-      header: t("product_description_ua"),
+      filterFn: (row, id, value) => {
+        const rv = row.getValue(id);
+        const str = rv == null ? "" : String(rv);
+        if (value == null) return true;
+        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        return str.toLowerCase().includes(String(value).toLowerCase());
+      },
+      header: ({ column, table }) => (
+        <div className="flex items-center gap-2">
+          <span className="truncate">{t("product_description_ua")}</span>
+          <div className="flex items-center gap-1 ml-auto">
+            <SortToggle column={column} table={table} />
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       cell: ({ row }) => {
         const desc = (row.original as any).description_ua || "";
         return (
@@ -652,6 +985,8 @@ export const ProductsTable = ({
     state: { sorting, columnVisibility, rowSelection, columnFilters, pagination, columnOrder },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     enableRowSelection: true,
@@ -851,18 +1186,37 @@ export const ProductsTable = ({
                       .filter((column) => column.id !== "select" && column.id !== "actions")
                       .map((column) => {
                         const isVisible = column.getIsVisible();
+                        // Человеко‑читаемая метка для пункта меню (переводы вместо техничних ID)
+                        const labelMap: Record<string, string> = {
+                          photo: t("photo"),
+                          name_ua: t("table_product"),
+                          status: t("table_status"),
+                          supplier: t("supplier"),
+                          price: t("table_price"),
+                          price_old: t("old_price"),
+                          price_promo: t("promo_price"),
+                          category: t("category"),
+                          stock_quantity: t("table_stock"),
+                          created_at: t("table_created"),
+                          article: t("article"),
+                          vendor: t("vendor"),
+                          docket_ua: t("short_name_ua"),
+                          description_ua: t("product_description_ua"),
+                        };
+                        const translatedLabel = labelMap[column.id] ?? (typeof column.columnDef.header === "string" ? column.columnDef.header : column.id);
                         return (
                           <DropdownMenuCheckboxItem
                             key={column.id}
                             className="capitalize"
                             checked={isVisible}
+                            data-testid={`user_products_columns_item_${column.id}`}
                             // Не закрывать меню при выборе пункта
                             onSelect={(e) => {
                               e.preventDefault();
                             }}
                             onCheckedChange={(value) => column.toggleVisibility(!!value)}
                           >
-                            {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
+                            {translatedLabel}
                           </DropdownMenuCheckboxItem>
                         );
                       })}

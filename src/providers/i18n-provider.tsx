@@ -417,7 +417,7 @@ const dictionary: Dictionary = {
   table_actions: { uk: "Дії", en: "Actions" },
   
   // Product Table
-  table_product: { uk: "Товар", en: "Product" },
+  table_product: { uk: "Назва товару", en: "Product Name" },
   table_price: { uk: "Ціна", en: "Price" },
   table_stock: { uk: "Кількість", en: "Stock" },
   photo: { uk: "Фото", en: "Photo" },
@@ -1160,11 +1160,15 @@ const toastDictionary = {
   actions: { uk: "Дії", en: "Actions" },
   select_all: { uk: "Вибрати все", en: "Select all" },
   select_row: { uk: "Вибрати рядок", en: "Select row" },
+  filter: { uk: "Фільтр", en: "Filter" },
   search_placeholder: { uk: "Пошук за назвою", en: "Search by name" },
   delete_selected: { uk: "Видалити вибране", en: "Delete selected" },
   customize_columns: { uk: "Налаштувати колонки", en: "Customize Columns" },
   columns_short: { uk: "Колонки", en: "Columns" },
   no_results: { uk: "Немає результатів", en: "No results" },
+  clear: { uk: "Очистити", en: "Clear" },
+  sort_asc: { uk: "Сортувати за зростанням", en: "Sort ascending" },
+  sort_desc: { uk: "Сортувати за спаданням", en: "Sort descending" },
   rows_selected: { uk: "Вибрано", en: "Selected" },
   // ParametersDataTable toolbar
   page_size: { uk: "Кількість рядків", en: "Rows per page" },
