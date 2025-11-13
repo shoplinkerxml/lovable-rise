@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -599,13 +599,13 @@ export const ProductsTable = ({
   return (
     <div className="flex flex-col gap-4 bg-background px-4 sm:px-6 py-4" data-testid="user_products_dataTable_root">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <Input
             placeholder={t("search_placeholder")}
             value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
             onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
-            className="w-[clamp(12rem,40vw,24rem)]"
+            className="flex-1 min-w-0 w-[clamp(10rem,40vw,24rem)] sm:w-[clamp(12rem,40vw,28rem)]"
             data-testid="user_products_dataTable_filter"
           />
           {productsCount > 0 && (
@@ -683,12 +683,18 @@ export const ProductsTable = ({
             return null;
           })()}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" data-testid="user_products_dataTable_viewOptions">
-                <ColumnsIcon className="mr-2 h-4 w-4" />
-                {t("view_options")}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2"
+                aria-label={t("view_options")}
+                data-testid="user_products_dataTable_viewOptions"
+              >
+                <ColumnsIcon className="h-4 w-4 mr-0 lg:mr-2" />
+                <span className="hidden lg:inline">{t("view_options")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -712,28 +718,6 @@ export const ProductsTable = ({
                     </DropdownMenuCheckboxItem>
                   );
                 })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Page size selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" data-testid="user_products_dataTable_pageSize">
-                {t("page_size")}: {table.getState().pagination.pageSize}
-                <ChevronDown className="ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              {[5, 10, 20, 50].map((size) => (
-                <DropdownMenuCheckboxItem
-                  key={size}
-                  checked={table.getState().pagination.pageSize === size}
-                  onCheckedChange={() => table.setPageSize(size)}
-                  data-testid={`user_products_dataTable_pageSize_${size}`}
-                >
-                  {size}
-                </DropdownMenuCheckboxItem>
-              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -868,33 +852,100 @@ export const ProductsTable = ({
         </DialogNoOverlayContent>
       </DialogNoOverlay>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between px-1" data-testid="user_products_dataTable_pagination">
-        <div className="text-xs text-muted-foreground">
-          {t("rows_selected")}: {table.getSelectedRowModel().rows.length}
+      {/* Pagination (dashboard-01 style) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1 pt-2 border-t" data-testid="user_products_dataTable_pagination">
+        {/* Selection status */}
+        <div className="text-xs text-muted-foreground" data-testid="user_products_dataTable_selectionStatus">
+          {/* Localized dynamic text without interpolation support */}
+          {(() => {
+            const selected = table.getSelectedRowModel().rows.length;
+            const total = table.getFilteredRowModel().rows.length || 0;
+            // Ukrainian vs English
+            return t("rows_selected") === "Вибрано"
+              ? `Вибрано ${selected} з ${total} рядків.`
+              : `${selected} of ${total} row(s) selected.`;
+          })()}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            data-testid="user_products_dataTable_prevPage"
-          >
-            {"<"}
-          </Button>
-          <span className="text-sm">
-            {table.getState().pagination.pageIndex + 1} / {table.getPageCount() || 1}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            data-testid="user_products_dataTable_nextPage"
-          >
-            {">"}
-          </Button>
+
+        {/* Rows per page (moved from toolbar) */}
+        <div className="flex items-center gap-2" data-testid="user_products_dataTable_rowsPerPage">
+          <div className="text-sm" data-testid="user_products_dataTable_rowsPerPageLabel">{t("page_size")}</div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2"
+                aria-label={t("page_size")}
+                data-testid="user_products_dataTable_pageSize"
+              >
+                <List className="h-4 w-4 mr-2" />
+                {table.getState().pagination.pageSize}
+                <ChevronDown className="ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              {[5, 10, 20, 50].map((size) => (
+                <DropdownMenuCheckboxItem
+                  key={size}
+                  checked={table.getState().pagination.pageSize === size}
+                  onCheckedChange={() => table.setPageSize(size)}
+                  data-testid={`user_products_dataTable_pageSize_${size}`}
+                >
+                  {size}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Page indicator + controls */}
+        <div className="flex items-center gap-2" data-testid="user_products_dataTable_pageControls">
+          <div className="text-sm whitespace-nowrap" data-testid="user_products_dataTable_pageIndicator">
+            {t("page_of")} {table.getState().pagination.pageIndex + 1} {t("page_of_connector")} {table.getPageCount() || 1}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+              aria-label={t("first_page")}
+              data-testid="user_products_dataTable_firstPage"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              aria-label={t("previous_page")}
+              data-testid="user_products_dataTable_prevPage"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              aria-label={t("next_page")}
+              data-testid="user_products_dataTable_nextPage"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))}
+              disabled={!table.getCanNextPage()}
+              aria-label={t("last_page")}
+              data-testid="user_products_dataTable_lastPage"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
