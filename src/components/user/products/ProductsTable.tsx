@@ -149,6 +149,7 @@ function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger, canC
 type ProductRow = Product & {
   mainImageUrl?: string;
   categoryName?: string;
+  supplierName?: string;
 };
 
 export const ProductsTable = ({
@@ -241,12 +242,33 @@ export const ProductsTable = ({
         });
       }
 
+      // Map supplier_id → supplier_name
+      const supplierIdsRaw = (data ?? [])
+        .map((p: any) => p.supplier_id)
+        .filter((v) => v !== null && v !== undefined);
+      const supplierIds = Array.from(new Set(supplierIdsRaw));
+      let supplierNameMap: Record<string | number, string> = {};
+      if (supplierIds.length > 0) {
+        const { data: supRows } = await (supabase as any)
+          .from('user_suppliers')
+          .select('id,supplier_name')
+          .in('id', supplierIds as any);
+        (supRows ?? []).forEach((r: any) => {
+          if (r.id != null && r.supplier_name) {
+            supplierNameMap[r.id] = r.supplier_name;
+          }
+        });
+      }
+
       const augmented = (data ?? []).map((p: any) => ({
         ...p,
         mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
         categoryName:
           (p.category_id && categoryNameMap[String(p.category_id)]) ||
           (p.category_external_id && categoryNameMap[String(p.category_external_id)]) ||
+          undefined,
+        supplierName:
+          (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
           undefined,
       }));
 
@@ -288,10 +310,11 @@ export const ProductsTable = ({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     select: true,
     created_at: false,
-    vendor: false,
+    supplier: true,
+    vendor: true,
     available: false,
-    docket_ua: false,
-    description_ua: false,
+    docket_ua: true,
+    description_ua: true,
   });
   // Default column order: photo → article → category → name → price → quantity → status → actions
   const [columnOrder, setColumnOrder] = useState<string[]>([
@@ -300,13 +323,14 @@ export const ProductsTable = ({
     "article",
     "category",
     "name_ua",
-    "price",
-    "stock_quantity",
-    "status",
-    "created_at",
-    "vendor",
     "docket_ua",
     "description_ua",
+    "price",
+    "stock_quantity",
+    "vendor",
+    "status",
+    "supplier",
+    "created_at",
     "actions",
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -318,6 +342,7 @@ export const ProductsTable = ({
     // Список колонок, которые визуально отнимают место у названия
     const spaceConsumers = [
       "status",
+      "supplier",
       "price",
       "category",
       "stock_quantity",
@@ -420,6 +445,19 @@ export const ProductsTable = ({
       cell: ({ row }) => (
         <ProductStatusBadge state={row.original.state} />
       ),
+      enableHiding: true,
+    },
+    {
+      id: "supplier",
+      header: t("supplier"),
+      cell: ({ row }) => {
+        const name = (row.original as any).supplierName;
+        return name ? (
+          <span className="text-sm" data-testid="user_products_supplier">{name}</span>
+        ) : (
+          <span className="text-muted-foreground" data-testid="user_products_supplier_empty">—</span>
+        );
+      },
       enableHiding: true,
     },
     {
