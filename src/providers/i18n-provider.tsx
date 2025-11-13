@@ -184,6 +184,9 @@ const dictionary: Dictionary = {
   product_created: { uk: "Товар створено", en: "Product created" },
   product_updated: { uk: "Товар оновлено", en: "Product updated" },
   product_deleted: { uk: "Товар видалено", en: "Product deleted" },
+  // Products duplication flow
+  product_copying: { uk: "Триває копіювання товару…", en: "Copying product…" },
+  failed_duplicate_product: { uk: "Не вдалося скопіювати товар", en: "Failed to duplicate product" },
   failed_save_product: { uk: "Помилка збереження товару", en: "Failed to save product" },
   failed_load_products: { uk: "Помилка завантаження товарів", en: "Failed to load products" },
   failed_delete_product: { uk: "Помилка видалення товару", en: "Failed to delete product" },

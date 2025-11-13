@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2 } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -167,6 +167,11 @@ export const ProductsTable = ({
     product: null,
   });
 
+  const [copyDialog, setCopyDialog] = useState<{ open: boolean; name: string | null }>({
+    open: false,
+    name: null,
+  });
+
   const productsCount = products.length;
 
   useEffect(() => {
@@ -260,6 +265,8 @@ export const ProductsTable = ({
         toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
         return;
       }
+      const nameForUi = product.name_ua || product.name || product.external_id || product.id;
+      setCopyDialog({ open: true, name: nameForUi });
       await ProductService.duplicateProduct(product.id);
       await loadProducts();
     } catch (error) {
@@ -270,6 +277,8 @@ export const ProductsTable = ({
       } else {
         toast.error(t('failed_duplicate_product'));
       }
+    } finally {
+      setCopyDialog({ open: false, name: null });
     }
   };
 
@@ -747,6 +756,34 @@ export const ProductsTable = ({
           </TableBody>
         </Table>
       </div>
+
+      {/* Copying progress - non-modal top-right */}
+      <DialogNoOverlay
+        open={copyDialog.open}
+        onOpenChange={(open) => setCopyDialog((prev) => ({ ...prev, open }))}
+        modal={false}
+      >
+        <DialogNoOverlayContent
+          position="top-right"
+          variant="info"
+          className="p-4 w-[min(24rem,92vw)]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          data-testid="user_products_copy_progress"
+        >
+          <DialogNoOverlayHeader>
+            <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
+              <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />
+              {t('product_copying')}
+            </DialogNoOverlayTitle>
+            {copyDialog.name ? (
+              <DialogNoOverlayDescription className="text-xs text-muted-foreground">
+                {copyDialog.name}
+              </DialogNoOverlayDescription>
+            ) : null}
+          </DialogNoOverlayHeader>
+        </DialogNoOverlayContent>
+      </DialogNoOverlay>
 
       <DialogNoOverlay
         open={deleteDialog.open}

@@ -104,7 +104,7 @@ export const Products = () => {
 
       {/* Non-modal delete progress indicator */}
       <DialogNoOverlay modal={false} open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogNoOverlayContent position="top-right" className="p-[0.75rem] w-[min(22rem,90vw)]" data-testid="user_products_delete_progress">
+        <DialogNoOverlayContent position="top-right" variant="info" className="p-[0.75rem] w-[min(22rem,90vw)]" data-testid="user_products_delete_progress">
           <DialogNoOverlayHeader>
             <DialogNoOverlayTitle>{t('deleting_product_title')}</DialogNoOverlayTitle>
           </DialogNoOverlayHeader>

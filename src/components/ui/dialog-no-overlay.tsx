@@ -15,12 +15,14 @@ const DialogNoOverlayClose = DialogPrimitive.Close
 type DialogNoOverlayContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   hideClose?: boolean;
   position?: "center" | "top-right";
+  /** Visual variant for border color on top-right notifications */
+  variant?: "default" | "info" | "warning";
 }
 
 const DialogNoOverlayContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogNoOverlayContentProps
->(({ className, children, hideClose = false, position = "top-right", ...props }, ref) => (
+>(({ className, children, hideClose = false, position = "top-right", variant = "default", ...props }, ref) => (
   <DialogNoOverlayPortal>
     {/* Без Overlay — немодальне вікно без затемнення */}
     <DialogPrimitive.Content
@@ -29,6 +31,8 @@ const DialogNoOverlayContent = React.forwardRef<
         position === "center"
           ? "fixed left-[50%] top-[50%] z-50 grid w-full max-w-sm translate-x-[-50%] translate-y-[-50%] gap-3 border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-lg"
           : "fixed top-[clamp(0.75rem,2vw,1rem)] right-[clamp(0.75rem,2vw,1rem)] z-50 grid w-full max-w-sm translate-x-0 translate-y-0 gap-3 border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-lg",
+        variant === "info" && "border-success",
+        variant === "warning" && "border-destructive",
         className
       )}
       {...props}
