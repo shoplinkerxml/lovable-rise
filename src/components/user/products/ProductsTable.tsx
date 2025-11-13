@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -598,7 +598,7 @@ export const ProductsTable = ({
 
   return (
     <div className="flex flex-col gap-4 bg-background px-4 sm:px-6 py-4" data-testid="user_products_dataTable_root">
-      {/* Toolbar */}
+      {/* Toolbar: search + actions inline */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <Input
@@ -608,119 +608,132 @@ export const ProductsTable = ({
             className="flex-1 min-w-0 w-[clamp(10rem,40vw,24rem)] sm:w-[clamp(12rem,40vw,28rem)]"
             data-testid="user_products_dataTable_filter"
           />
-          {productsCount > 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onCreateNew}
-              title={t("add_product")}
-              disabled={canCreate === false}
-              aria-disabled={canCreate === false}
-              data-testid="user_products_dataTable_createNew"
+        </div>
+
+        {(() => {
+          const selectedRows = table.getSelectedRowModel().rows;
+          const selectedCount = selectedRows.length;
+          const selectedRow = selectedRows[0]?.original;
+          const canDuplicate = selectedCount === 1 && canCreate !== false;
+          const canEditSelected = selectedCount === 1;
+          const canDeleteSelected = selectedCount >= 1;
+          const createDisabled = canCreate === false;
+
+          return (
+            <div
+              className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm"
+              data-testid="user_products_actions_block"
             >
-              <Plus className="h-4 w-4" />
-            </Button>
-          )}
-          {/* Selection actions: one → duplicate + edit + delete; many → delete only */}
-          {(() => {
-            const selected = table.getSelectedRowModel().rows;
-            const count = selected.length;
-            if (count === 1) {
-              const selectedRow = selected[0];
-              return (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => handleDuplicate(selectedRow.original)}
-                    aria-label={t("duplicate")}
-                    title={t("duplicate")}
-                    disabled={canCreate === false}
-                    aria-disabled={canCreate === false}
-                    data-testid="user_products_dataTable_duplicateSelected"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onEdit?.(selectedRow.original)}
-                    aria-label={t("edit")}
-                    data-testid="user_products_dataTable_editSelected"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setDeleteDialog({ open: true, product: selectedRow.original })}
-                    aria-label={t("delete")}
-                    data-testid="user_products_dataTable_clearSelection"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
-              );
-            }
-            if (count > 1) {
-              return (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setDeleteDialog({ open: true, product: null })}
-                  aria-label={t("delete_selected")}
-                  data-testid="user_products_dataTable_clearSelection"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              );
-            }
-            return null;
-          })()}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+              {/* Create new */}
               <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2"
-                aria-label={t("view_options")}
-                data-testid="user_products_dataTable_viewOptions"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onCreateNew}
+                title={t("add_product")}
+                disabled={createDisabled}
+                aria-disabled={createDisabled}
+                data-testid="user_products_dataTable_createNew"
               >
-                <ColumnsIcon className="h-4 w-4 mr-0 lg:mr-2" />
-                <span className="hidden lg:inline">{t("view_options")}</span>
+                <Plus className={`h-4 w-4 ${createDisabled ? "text-muted-foreground" : "text-foreground"}`} />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem disabled className="text-sm">
-                {t("toggle_columns")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {table
-                .getAllLeafColumns()
-                .filter((column) => column.id !== "select" && column.id !== "actions")
-                .map((column) => {
-                  const isVisible = column.getIsVisible();
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={isVisible}
-                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                    >
-                      {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+
+              {/* Duplicate selected */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => selectedRow && handleDuplicate(selectedRow)}
+                aria-label={t("duplicate")}
+                title={t("duplicate")}
+                disabled={!canDuplicate}
+                aria-disabled={!canDuplicate}
+                data-testid="user_products_dataTable_duplicateSelected"
+              >
+                <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : "text-foreground"}`} />
+              </Button>
+
+              {/* Edit selected */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => selectedRow && onEdit?.(selectedRow)}
+                aria-label={t("edit")}
+                disabled={!canEditSelected}
+                aria-disabled={!canEditSelected}
+                data-testid="user_products_dataTable_editSelected"
+              >
+                <Edit className={`h-4 w-4 ${!canEditSelected ? "text-muted-foreground" : "text-foreground"}`} />
+              </Button>
+
+              {/* Delete selected */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })}
+                aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")}
+                disabled={!canDeleteSelected}
+                aria-disabled={!canDeleteSelected}
+                data-testid="user_products_dataTable_clearSelection"
+              >
+                <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? "text-muted-foreground" : "text-foreground"}`} />
+              </Button>
+
+              {/* Columns toggle */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    aria-label={t("columns_short")}
+                    data-testid="user_products_dataTable_viewOptions"
+                    title={t("columns_short")}
+                  >
+                    <ColumnsIcon className="h-4 w-4 text-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem disabled className="text-sm">
+                    {t("toggle_columns")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {table
+                    .getAllLeafColumns()
+                    .filter((column) => column.id !== "select" && column.id !== "actions")
+                    .map((column) => {
+                      const isVisible = column.getIsVisible();
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.id}
+                          className="capitalize"
+                          checked={isVisible}
+                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                        >
+                          {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Refresh */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => loadProducts()}
+                aria-label={t("refresh")}
+                title={t("refresh")}
+                data-testid="user_products_dataTable_refresh"
+              >
+                <RefreshCw className="h-4 w-4 text-foreground" />
+              </Button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Table */}
@@ -737,7 +750,7 @@ export const ProductsTable = ({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+      <TableBody>
             {loading ? (
               <>
                 <LoadingSkeleton />
