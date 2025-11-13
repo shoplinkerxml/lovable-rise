@@ -369,6 +369,8 @@ export const ProductsTable = ({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  // Управляемое состояние открытия меню колонок: не закрывать по клику внутри
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
 
   // Динамическая ширина колонки названия: уменьшается по мере добавления видимых столбцов
   const dynamicNameMaxVW = useMemo(() => {
@@ -811,7 +813,7 @@ export const ProductsTable = ({
                 </Tooltip>
 
                 {/* Columns toggle */}
-                <DropdownMenu>
+                <DropdownMenu open={columnsMenuOpen} onOpenChange={setColumnsMenuOpen}>
                   <Tooltip>
                     <DropdownMenuTrigger asChild>
                       <TooltipTrigger asChild>
@@ -830,7 +832,12 @@ export const ProductsTable = ({
                       {t("columns_short")}
                     </TooltipContent>
                   </Tooltip>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-56"
+                    onPointerLeave={() => setColumnsMenuOpen(false)}
+                    data-testid="user_products_columns_menu"
+                  >
                     <DropdownMenuItem disabled className="text-sm">
                       {t("toggle_columns")}
                     </DropdownMenuItem>
@@ -845,6 +852,10 @@ export const ProductsTable = ({
                             key={column.id}
                             className="capitalize"
                             checked={isVisible}
+                            // Не закрывать меню при выборе пункта
+                            onSelect={(e) => {
+                              e.preventDefault();
+                            }}
                             onCheckedChange={(value) => column.toggleVisibility(!!value)}
                           >
                             {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
