@@ -45,6 +45,7 @@ export interface ProductImage {
   product_id?: string;
   url: string;
   order_index: number;
+  is_main?: boolean;
 }
 
 export interface CreateProductData {
@@ -416,11 +417,30 @@ export class ProductService {
 
     // Создаем изображения товара, если они есть
     if (productData.images && productData.images.length > 0) {
-      const imagesData = productData.images.map((image, index) => ({
-        product_id: product.id,
-        url: image.url,
-        order_index: image.order_index || index
-      }));
+      // Нормализуем флаг главного изображения: должно быть ровно одно is_main=true
+      const hasExplicitMain = productData.images.some(img => img.is_main === true);
+      let mainAssigned = false;
+
+      const imagesData = productData.images.map((image, index) => {
+        let isMain: boolean;
+        if (hasExplicitMain) {
+          if (image.is_main === true && !mainAssigned) {
+            isMain = true;
+            mainAssigned = true;
+          } else {
+            isMain = false;
+          }
+        } else {
+          isMain = index === 0;
+        }
+
+        return {
+          product_id: product.id,
+          url: image.url,
+          order_index: image.order_index || index,
+          is_main: isMain
+        };
+      });
 
       const { error: imagesError } = await (supabase as any)
         .from('store_product_images')
@@ -481,6 +501,7 @@ export class ProductService {
       images: (images || []).map((img, idx) => ({
         url: img.url,
         order_index: img.order_index ?? idx,
+        is_main: (img as any).is_main ?? (idx === 0)
       })),
     };
 
@@ -583,11 +604,30 @@ export class ProductService {
 
       // Добавляем новые изображения
       if (productData.images.length > 0) {
-        const imagesData = productData.images.map((image, index) => ({
-          product_id: id,
-          url: image.url,
-          order_index: image.order_index || index
-        }));
+        // Нормализуем флаг главного изображения: должно быть ровно одно is_main=true
+        const hasExplicitMain = productData.images.some(img => img.is_main === true);
+        let mainAssigned = false;
+
+        const imagesData = productData.images.map((image, index) => {
+          let isMain: boolean;
+          if (hasExplicitMain) {
+            if (image.is_main === true && !mainAssigned) {
+              isMain = true;
+              mainAssigned = true;
+            } else {
+              isMain = false;
+            }
+          } else {
+            isMain = index === 0;
+          }
+
+          return {
+            product_id: id,
+            url: image.url,
+            order_index: image.order_index || index,
+            is_main: isMain
+          };
+        });
 
         const { error: imagesError } = await (supabase as any)
           .from('store_product_images')
