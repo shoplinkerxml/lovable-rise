@@ -111,6 +111,20 @@ const dictionary: Dictionary = {
   menu_payment: { uk: "Платіжні системи", en: "Payment Systems" },
   menu_tariff_features: { uk: "Функції тарифів", en: "Tariff Features" },
   menu_stores: { uk: "Магазини", en: "Stores" },
+  stores: { uk: "Магазини", en: "Stores" },
+  add_to_stores: { uk: "Додати до магазинів", en: "Add to stores" },
+  select_stores: { uk: "Виберіть магазини", en: "Select stores" },
+  no_active_stores: { uk: "Немає активних магазинів", en: "No active stores" },
+  add_product_to_stores: { uk: "Додати товар", en: "Add product" },
+  product_added_to_stores: { uk: "Товар додано до вибраних магазинів", en: "Product added to selected stores" },
+  products_already_linked: { uk: "Товари вже прив'язані або додані", en: "Products are already linked or added" },
+  failed_add_product_to_stores: { uk: "Не вдалося додати товар до магазинів", en: "Failed to add product to stores" },
+  product_added_to_store: { uk: "Товар додано до магазину", en: "Product added to store" },
+  failed_add_to_store: { uk: "Помилка додавання", en: "Add failed" },
+  product_removed_from_store: { uk: "Товар видалено з магазину", en: "Product removed from store" },
+  failed_remove_from_store: { uk: "Помилка видалення", en: "Remove failed" },
+  operation_failed: { uk: "Збій операції", en: "Operation failed" },
+  loading: { uk: "Завантаження...", en: "Loading..." },
   menu_suppliers: { uk: "Постачальники", en: "Suppliers" },
   menu_store_templates: { uk: "Шаблони XML", en: "XML Templates" },
   
@@ -1304,5 +1318,3 @@ export const useUserTranslations = () => {
     },
   };
 };
-
-

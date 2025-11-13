@@ -22,6 +22,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
@@ -44,7 +47,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Store } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
@@ -114,8 +117,32 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger, canCreate }: { onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean }) {
+function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean }) {
   const { t } = useI18n();
+  const [stores, setStores] = useState<any[]>([]);
+  const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
+  const [loadingStores, setLoadingStores] = useState(false);
+
+  const loadStoresAndLinks = async () => {
+    if (loadingStores) return;
+    setLoadingStores(true);
+    try {
+      const data = await ProductService.getUserStores();
+      setStores(data || []);
+      const { data: links } = await (supabase as any)
+        .from('store_product_links')
+        .select('store_id')
+        .eq('product_id', product.id);
+      const ids = (links || []).map((r: any) => String(r.store_id));
+      setLinkedStoreIds(ids);
+    } catch (_) {
+      setStores([]);
+      setLinkedStoreIds([]);
+    } finally {
+      setLoadingStores(false);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -141,6 +168,75 @@ function ProductActionsDropdown({ onEdit, onDelete, onDuplicate, onTrigger, canC
           <Copy className="mr-2 h-4 w-4" />
           {t("duplicate")}
         </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
+            <Store className="h-4 w-4" />
+            {t("menu_stores")}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="p-1" data-testid={`user_products_row_stores_content_${product.id}`}>
+            {loadingStores ? (
+              <DropdownMenuItem disabled>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("loading")}
+              </DropdownMenuItem>
+            ) : (
+              (stores || []).length === 0 ? (
+                <DropdownMenuItem disabled>—</DropdownMenuItem>
+              ) : (
+                (stores || []).map((s: any) => {
+                  const id = String(s.id);
+                  const checked = linkedStoreIds.includes(id);
+                  return (
+                    <DropdownMenuItem
+                      key={id}
+                      className="cursor-pointer pr-2 pl-2"
+                      onSelect={(e) => e.preventDefault()}
+                      data-testid={`user_products_row_store_item_${product.id}_${id}`}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={async (v) => {
+                          try {
+                            if (v) {
+                              const { error } = await (supabase as any)
+                                .from('store_product_links')
+                                .upsert([{ product_id: product.id, store_id: id }], { onConflict: 'product_id,store_id' })
+                                .select('*');
+                              if (!error) {
+                                setLinkedStoreIds((prev) => Array.from(new Set([...prev, id])));
+                                toast.success(t('product_added_to_store'));
+                              } else {
+                                toast.error(t('failed_add_to_store'));
+                              }
+                            } else {
+                              const { error } = await (supabase as any)
+                                .from('store_product_links')
+                                .delete()
+                                .eq('product_id', product.id)
+                                .eq('store_id', id);
+                              if (!error) {
+                                setLinkedStoreIds((prev) => prev.filter((x) => x !== id));
+                                toast.success(t('product_removed_from_store'));
+                              } else {
+                                toast.error(t('failed_remove_from_store'));
+                              }
+                            }
+                          } catch (_) {
+                            toast.error(t('operation_failed'));
+                          }
+                        }}
+                        className="mr-2"
+                        aria-label={t('select_store')}
+                      />
+                      <span className="truncate">{s.store_name || s.store_url || id}</span>
+                    </DropdownMenuItem>
+                  );
+                })
+              )
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDelete} className="cursor-pointer focus:text-destructive" data-testid="user_products_row_delete">
           <Trash2 className="mr-2 h-4 w-4" />
@@ -378,6 +474,10 @@ export const ProductsTable = ({
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   // Управляемое состояние открытия меню колонок: не закрывать по клику внутри
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  const [storesMenuOpen, setStoresMenuOpen] = useState(false);
+  const [stores, setStores] = useState<any[]>([]);
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
+  const [addingStores, setAddingStores] = useState(false);
 
   // Toggle sort control rendered as native button with inline SVG icon
   function SortToggle({ column, table }: { column: any; table: any }) {
@@ -968,6 +1068,7 @@ export const ProductsTable = ({
       cell: ({ row }) => (
         <div className="flex justify-center">
           <ProductActionsDropdown
+            product={row.original}
             onEdit={() => onEdit?.(row.original)}
             onDelete={() => setDeleteDialog({ open: true, product: row.original })}
             onDuplicate={() => handleDuplicate(row.original)}
@@ -1220,6 +1321,135 @@ export const ProductsTable = ({
                           </DropdownMenuCheckboxItem>
                         );
                       })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Add to stores */}
+                <DropdownMenu open={storesMenuOpen} onOpenChange={async (open) => {
+                  setStoresMenuOpen(open);
+                  if (open) {
+                    try {
+                      const data = await ProductService.getUserStores();
+                      setStores(data || []);
+                    } catch (e) {
+                      setStores([]);
+                    }
+                  }
+                }}>
+                  <Tooltip>
+                    <DropdownMenuTrigger asChild>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={t("add_to_stores")}
+                          data-testid="user_products_dataTable_addToStores"
+                        >
+                          <Store className="h-4 w-4 text-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                    </DropdownMenuTrigger>
+                    <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_addToStores">
+                      {t("add_to_stores")}
+                    </TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="end" className="p-2" data-testid="user_products_addToStores_menu">
+                    <div className="text-sm mb-2">{t("select_stores")}</div>
+                    <ScrollArea className="max-h-[clamp(12rem,40vh,20rem)]">
+                      <div className="flex flex-col gap-1">
+                        {(stores || []).length === 0 ? (
+                          <div className="text-xs text-muted-foreground px-2 py-1">{t("no_active_stores")}</div>
+                        ) : (
+                          (stores || []).map((s: any) => {
+                            const id = String(s.id);
+                            const checked = selectedStoreIds.includes(id);
+                            return (
+                              <DropdownMenuItem
+                                key={id}
+                                className="cursor-pointer pr-2 pl-2"
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  const next = checked
+                                    ? selectedStoreIds.filter((v) => v !== id)
+                                    : Array.from(new Set([...selectedStoreIds, id]));
+                                  setSelectedStoreIds(next);
+                                }}
+                                data-testid={`user_products_addToStores_item_${id}`}
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onCheckedChange={(v) => {
+                                    const next = v
+                                      ? Array.from(new Set([...selectedStoreIds, id]))
+                                      : selectedStoreIds.filter((x) => x !== id);
+                                    setSelectedStoreIds(next);
+                                  }}
+                                  className="mr-2"
+                                  aria-label={t("select_store")}
+                                />
+                                <span className="truncate">{s.store_name || s.store_url || id}</span>
+                              </DropdownMenuItem>
+                            );
+                          })
+                        )}
+                      </div>
+                    </ScrollArea>
+                    <DropdownMenuSeparator />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 h-8"
+                        onClick={() => setSelectedStoreIds([])}
+                        data-testid="user_products_addToStores_clear"
+                      >
+                        {t("clear")}
+                      </Button>
+                      <Button
+                        className="flex-1 h-8"
+                        disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
+                        aria-disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
+                        onClick={async () => {
+                          const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                          const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter((v) => !!v)));
+                          const storeIds = Array.from(new Set(selectedStoreIds));
+                          if (productIds.length === 0 || storeIds.length === 0) return;
+                          setAddingStores(true);
+                          try {
+                            const payload: any[] = [];
+                            for (const pid of productIds) {
+                              for (const sid of storeIds) {
+                                payload.push({ product_id: pid, store_id: sid });
+                              }
+                            }
+                            const { error } = await (supabase as any)
+                              .from('store_product_links')
+                              .upsert(payload, { onConflict: 'product_id,store_id' })
+                              .select('*');
+                            if (error) {
+                              const msg = String(error.message || '');
+                              if (msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('unique')) {
+                                toast.success(t('products_already_linked'));
+                              } else {
+                                toast.error(t('failed_add_product_to_stores'));
+                              }
+                            } else {
+                              toast.success(t('product_added_to_stores'));
+                            }
+                          } catch (e) {
+                            toast.error(t('failed_add_product_to_stores'));
+                          } finally {
+                            setAddingStores(false);
+                            setStoresMenuOpen(false);
+                            setSelectedStoreIds([]);
+                          }
+                        }}
+                        data-testid="user_products_addToStores_confirm"
+                      >
+                        {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : t('add_product_to_stores')}
+                      </Button>
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
