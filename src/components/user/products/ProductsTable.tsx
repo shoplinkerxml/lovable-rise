@@ -47,6 +47,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
 import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -658,118 +659,159 @@ export const ProductsTable = ({
           const createDisabled = canCreate === false;
 
           return (
-            <div
-              className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm"
-              data-testid="user_products_actions_block"
-            >
-              {/* Create new */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onCreateNew}
-                title={t("add_product")}
-                disabled={createDisabled}
-                aria-disabled={createDisabled}
-                data-testid="user_products_dataTable_createNew"
+            <TooltipProvider delayDuration={200}>
+              <div
+                className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm"
+                data-testid="user_products_actions_block"
               >
-                <Plus className={`h-4 w-4 ${createDisabled ? "text-muted-foreground" : "text-foreground"}`} />
-              </Button>
+                {/* Create new */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={onCreateNew}
+                      aria-label={t("add_product")}
+                      disabled={createDisabled}
+                      aria-disabled={createDisabled}
+                      data-testid="user_products_dataTable_createNew"
+                    >
+                      <Plus className={`h-4 w-4 ${createDisabled ? "text-muted-foreground" : "text-foreground"}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_create">
+                    {t("add_product")}
+                  </TooltipContent>
+                </Tooltip>
 
-              {/* Duplicate selected */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => selectedRow && handleDuplicate(selectedRow)}
-                aria-label={t("duplicate")}
-                title={t("duplicate")}
-                disabled={!canDuplicate}
-                aria-disabled={!canDuplicate}
-                data-testid="user_products_dataTable_duplicateSelected"
-              >
-                <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : "text-foreground"}`} />
-              </Button>
+                {/* Duplicate selected */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => selectedRow && handleDuplicate(selectedRow)}
+                      aria-label={t("duplicate")}
+                      disabled={!canDuplicate}
+                      aria-disabled={!canDuplicate}
+                      data-testid="user_products_dataTable_duplicateSelected"
+                    >
+                      <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : "text-foreground"}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_duplicate">
+                    {t("duplicate")}
+                  </TooltipContent>
+                </Tooltip>
 
-              {/* Edit selected */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => selectedRow && onEdit?.(selectedRow)}
-                aria-label={t("edit")}
-                disabled={!canEditSelected}
-                aria-disabled={!canEditSelected}
-                data-testid="user_products_dataTable_editSelected"
-              >
-                <Edit className={`h-4 w-4 ${!canEditSelected ? "text-muted-foreground" : "text-foreground"}`} />
-              </Button>
+                {/* Edit selected */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => selectedRow && onEdit?.(selectedRow)}
+                      aria-label={t("edit")}
+                      disabled={!canEditSelected}
+                      aria-disabled={!canEditSelected}
+                      data-testid="user_products_dataTable_editSelected"
+                    >
+                      <Edit className={`h-4 w-4 ${!canEditSelected ? "text-muted-foreground" : "text-foreground"}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_edit">
+                    {t("edit")}
+                  </TooltipContent>
+                </Tooltip>
 
-              {/* Delete selected */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })}
-                aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")}
-                disabled={!canDeleteSelected}
-                aria-disabled={!canDeleteSelected}
-                data-testid="user_products_dataTable_clearSelection"
-              >
-                <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? "text-muted-foreground" : "text-foreground"}`} />
-              </Button>
+                {/* Delete selected */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })}
+                      aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")}
+                      disabled={!canDeleteSelected}
+                      aria-disabled={!canDeleteSelected}
+                      data-testid="user_products_dataTable_clearSelection"
+                    >
+                      <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? "text-muted-foreground" : "text-foreground"}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_delete">
+                    {selectedCount > 1 ? t("delete_selected") : t("delete")}
+                  </TooltipContent>
+                </Tooltip>
 
-              {/* Columns toggle */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label={t("columns_short")}
-                    data-testid="user_products_dataTable_viewOptions"
-                    title={t("columns_short")}
-                  >
-                    <ColumnsIcon className="h-4 w-4 text-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem disabled className="text-sm">
-                    {t("toggle_columns")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {table
-                    .getAllLeafColumns()
-                    .filter((column) => column.id !== "select" && column.id !== "actions")
-                    .map((column) => {
-                      const isVisible = column.getIsVisible();
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={column.id}
-                          className="capitalize"
-                          checked={isVisible}
-                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                {/* Columns toggle */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={t("columns_short")}
+                          data-testid="user_products_dataTable_viewOptions"
                         >
-                          {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
-                        </DropdownMenuCheckboxItem>
-                      );
-                    })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                          <ColumnsIcon className="h-4 w-4 text-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_columns">
+                        {t("columns_short")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem disabled className="text-sm">
+                      {t("toggle_columns")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {table
+                      .getAllLeafColumns()
+                      .filter((column) => column.id !== "select" && column.id !== "actions")
+                      .map((column) => {
+                        const isVisible = column.getIsVisible();
+                        return (
+                          <DropdownMenuCheckboxItem
+                            key={column.id}
+                            className="capitalize"
+                            checked={isVisible}
+                            onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                          >
+                            {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
+                          </DropdownMenuCheckboxItem>
+                        );
+                      })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              {/* Refresh */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => loadProducts()}
-                aria-label={t("refresh")}
-                title={t("refresh")}
-                data-testid="user_products_dataTable_refresh"
-              >
-                <RefreshCw className="h-4 w-4 text-foreground" />
-              </Button>
-            </div>
+                {/* Refresh */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => loadProducts()}
+                      aria-label={t("refresh")}
+                      data-testid="user_products_dataTable_refresh"
+                    >
+                      <RefreshCw className="h-4 w-4 text-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_refresh">
+                    {t("refresh")}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           );
         })()}
       </div>
