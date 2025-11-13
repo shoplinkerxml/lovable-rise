@@ -308,15 +308,43 @@ export const ProductsTable = ({
   const rows = useMemo(() => products, [products]);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+  // Persisted column visibility (hide vendor/short name/description by default)
+  const COLUMN_VIS_KEY = "user_products_columnVisibility";
+  const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
     select: true,
     created_at: false,
     supplier: true,
-    vendor: true,
+    vendor: false,
     available: false,
-    docket_ua: true,
-    description_ua: true,
-  });
+    docket_ua: false,
+    description_ua: false,
+  };
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY);
+  useEffect(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem(COLUMN_VIS_KEY) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge to ensure newly added defaults are respected
+        setColumnVisibility((prev) => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(parsed || {}) }));
+      } else {
+        // Ensure defaults applied when nothing persisted
+        setColumnVisibility(DEFAULT_COLUMN_VISIBILITY);
+      }
+    } catch (_) {
+      // If parsing fails, keep defaults
+      setColumnVisibility(DEFAULT_COLUMN_VISIBILITY);
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(COLUMN_VIS_KEY, JSON.stringify(columnVisibility));
+      }
+    } catch (_) {
+      // ignore write errors
+    }
+  }, [columnVisibility]);
   // Default column order: photo → article → category → name → price → quantity → status → actions
   const [columnOrder, setColumnOrder] = useState<string[]>([
     "select",
@@ -750,8 +778,8 @@ export const ProductsTable = ({
 
                 {/* Columns toggle */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Tooltip>
+                  <Tooltip>
+                    <DropdownMenuTrigger asChild>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
@@ -763,11 +791,11 @@ export const ProductsTable = ({
                           <ColumnsIcon className="h-4 w-4 text-foreground" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_columns">
-                        {t("columns_short")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </DropdownMenuTrigger>
+                    </DropdownMenuTrigger>
+                    <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_columns">
+                      {t("columns_short")}
+                    </TooltipContent>
+                  </Tooltip>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuItem disabled className="text-sm">
                       {t("toggle_columns")}
