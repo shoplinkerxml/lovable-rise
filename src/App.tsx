@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { R2Storage } from "@/lib/r2-storage";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
 import { I18nProvider } from "@/providers/i18n-provider";
 // Dev diagnostics removed per request
 
@@ -63,6 +63,68 @@ const App = () => {
     R2Storage.cleanupPendingUploads().catch(() => {});
   }, []);
 
+  const router = createBrowserRouter([
+    { path: "/", element: <Index /> },
+    { path: "/docs", element: <ApiDocs /> },
+    { path: "/admin-auth", element: <AdminAuth /> },
+    { path: "/admin-*", element: <NotFound /> },
+    {
+      path: "/admin",
+      element: <AdminRoute><AdminProtected /></AdminRoute>,
+      children: [
+        { path: "settings/currency", element: <AdminLayout><CurrencyManagement /></AdminLayout> },
+        { path: "settings/limits", element: <AdminLayout><LimitTemplates /></AdminLayout> },
+        { path: "storetemplates", element: <AdminLayout><StoreTemplates /></AdminLayout> },
+        { path: "tariff", element: <AdminLayout><AdminTariffManagement /></AdminLayout> },
+        { path: "tariff/new", element: <AdminLayout><AdminTariffNew /></AdminLayout> },
+        { path: "tariff/edit/:id", element: <AdminLayout><AdminTariffEdit /></AdminLayout> },
+        { path: "tariff/features", element: <AdminLayout><AdminTariffFeatures /></AdminLayout> },
+        { path: "users/:id", element: <AdminLayout><AdminUserDetails /></AdminLayout> },
+        { path: "*", element: <AdminLayout><Outlet /></AdminLayout> },
+      ],
+    },
+    { path: "/user-register", element: <UserRegister /> },
+    { path: "/user-auth", element: <UserAuth /> },
+    { path: "/user-forgot-password", element: <UserForgotPassword /> },
+    { path: "/user-reset-password", element: <UserResetPassword /> },
+    { path: "/auth/callback", element: <AuthCallback /> },
+    {
+      path: "/user",
+      element: <UserRoute><UserProtected /></UserRoute>,
+      children: [
+        {
+          element: <UserLayout />,
+          children: [
+            { index: true, element: <Navigate to="dashboard" replace /> },
+            { path: "dashboard", element: <UserDashboard /> },
+            { path: "profile", element: <UserProfile /> },
+            { path: "content/:id", element: <UserMenuContent /> },
+            { path: ":path/*", element: <UserMenuContentByPath /> },
+            { path: "tariff", element: <TariffPage /> },
+            { path: "suppliers", element: <Suppliers /> },
+            { path: "shops", element: <Shops /> },
+            { path: "shops/:id", element: <ShopDetail /> },
+            { path: "shops/:id/products", element: <StoreProducts /> },
+            { path: "shops/:id/products/edit/:productId", element: <StoreProductEdit /> },
+            { path: "products", element: <Products /> },
+            { path: "products/new-product", element: <ProductCreate /> },
+            { path: "products/edit/:id", element: <ProductEdit /> },
+          ],
+        },
+      ],
+    },
+    { path: "*", element: <NotFound /> },
+  ], {
+    future: {
+      v7_relativeSplatPath: true,
+      // Optional flags available in current router types
+      v7_fetcherPersist: true,
+      v7_normalizeFormMethod: true,
+      v7_partialHydration: false,
+      v7_skipActionErrorRevalidation: true,
+    },
+  });
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
@@ -75,68 +137,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <I18nProvider>
-          {/* Dev diagnostics removed. Ensure no dev components imports exist */}
-          <BrowserRouter>
-            <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/docs" element={<ApiDocs />} />
-            
-            {/* Admin Authentication Routes */}
-            <Route path="/admin-auth" element={<AdminAuth />} />
-            
-            {/* Catch-all for non-existent admin routes - redirect to admin auth */}
-            <Route path="/admin-*" element={<NotFound />} />
-            
-            {/* Admin Settings Routes */}
-            <Route path="/admin" element={<AdminRoute><AdminProtected /></AdminRoute>}>
-              <Route path="settings/currency" element={<AdminLayout><CurrencyManagement /></AdminLayout>} />
-              <Route path="settings/limits" element={<AdminLayout><LimitTemplates /></AdminLayout>} />
-              <Route path="storetemplates" element={<AdminLayout><StoreTemplates /></AdminLayout>} />
-              <Route path="tariff" element={<AdminLayout><AdminTariffManagement /></AdminLayout>} />
-              <Route path="tariff/new" element={<AdminLayout><AdminTariffNew /></AdminLayout>} />
-              <Route path="tariff/edit/:id" element={<AdminLayout><AdminTariffEdit /></AdminLayout>} />
-              <Route path="tariff/features" element={<AdminLayout><AdminTariffFeatures /></AdminLayout>} />
-              <Route path="users/:id" element={<AdminLayout><AdminUserDetails /></AdminLayout>} />
-              <Route path="*" element={<AdminLayout><Outlet /></AdminLayout>} />
-            </Route>
-            
-            {/* User Authentication Routes */}
-            <Route path="/user-register" element={<UserRegister />} />
-            <Route path="/user-auth" element={<UserAuth />} />
-            <Route path="/user-forgot-password" element={<UserForgotPassword />} />
-            <Route path="/user-reset-password" element={<UserResetPassword />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-
-            
-            {/* Protected User Routes */}
-            <Route path="/user" element={<UserRoute><UserProtected /></UserRoute>}>              
-              <Route element={<UserLayout />}>                
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={<UserDashboard />} />
-                <Route path="profile" element={<UserProfile />} />
-                <Route path="content/:id" element={<UserMenuContent />} />
-                <Route path=":path/*" element={<UserMenuContentByPath />} />
-                {/* Add the tariff page route */}
-                <Route path="tariff" element={<TariffPage />} />
-                {/* Suppliers route */}
-                <Route path="suppliers" element={<Suppliers />} />
-                {/* Shops routes */}
-                <Route path="shops" element={<Shops />} />
-                <Route path="shops/:id" element={<ShopDetail />} />
-                <Route path="shops/:id/products" element={<StoreProducts />} />
-                <Route path="shops/:id/products/edit/:productId" element={<StoreProductEdit />} />
-                {/* Products routes */}
-                <Route path="products" element={<Products />} />
-                <Route path="products/new-product" element={<ProductCreate />} />
-                <Route path="products/edit/:id" element={<ProductEdit />} />
-                {/* Removed /user/menu-management route as requested */}
-              </Route>
-            </Route>
-            
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+            <RouterProvider router={router} />
           </I18nProvider>
         </TooltipProvider>
       </ThemeProvider>

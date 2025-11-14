@@ -193,7 +193,7 @@ const dictionary: Dictionary = {
   add_product: { uk: "Створити товар", en: "Create Product" },
   back_to_products: { uk: "Назад до товарів", en: "Back to Products" },
   no_products: { uk: "Немає товарів", en: "No Products" },
-  no_products_description: { uk: "Створіть перший товар для початку роботи", en: "Create your first product to get started" },
+  no_products_description: { uk: "Перейдіть у розділ «Товари» і додайте товар до магазину", en: "Go to the products section and add a product to the store" },
   description_placeholder: { uk: "Введіть опис товару", en: "Enter product description" },
   product_created: { uk: "Товар створено", en: "Product created" },
   product_updated: { uk: "Товар оновлено", en: "Product updated" },

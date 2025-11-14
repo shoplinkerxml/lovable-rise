@@ -220,6 +220,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                       store_id: id,
                                       is_active: true,
                                       custom_price: (product as any).price ?? null,
+                                      custom_price_old: (product as any).price_old ?? null,
                                       custom_price_promo: (product as any).price_promo ?? null,
                                       custom_stock_quantity: (product as any).stock_quantity ?? null,
                                     },
@@ -1160,9 +1161,11 @@ export const ProductsTable = ({
               <EmptyTitle>{t("no_products")}</EmptyTitle>
               <EmptyDescription>{t("no_products_description")}</EmptyDescription>
             </EmptyHeader>
-            <Button onClick={onCreateNew} className="mt-4" data-testid="user_products_create_btn" disabled={canCreate === false} aria-disabled={canCreate === false}>
-              {t("create_product")}
-            </Button>
+            {storeId ? null : (
+              <Button onClick={onCreateNew} className="mt-4" data-testid="user_products_create_btn" disabled={canCreate === false} aria-disabled={canCreate === false}>
+                {t("create_product")}
+              </Button>
+            )}
           </Empty>
         </div>
       </div>
@@ -1199,25 +1202,27 @@ export const ProductsTable = ({
                 data-testid="user_products_actions_block"
               >
                 {/* Create new */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={onCreateNew}
-                      aria-label={t("add_product")}
-                      disabled={createDisabled}
-                      aria-disabled={createDisabled}
-                      data-testid="user_products_dataTable_createNew"
-                    >
-                      <Plus className={`h-4 w-4 ${createDisabled ? "text-muted-foreground" : "text-foreground"}`} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_create">
-                    {t("add_product")}
-                  </TooltipContent>
-                </Tooltip>
+                {storeId ? null : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={onCreateNew}
+                        aria-label={t("add_product")}
+                        disabled={createDisabled}
+                        aria-disabled={createDisabled}
+                        data-testid="user_products_dataTable_createNew"
+                      >
+                        <Plus className={`h-4 w-4 ${createDisabled ? "text-muted-foreground" : "text-foreground"}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_create">
+                      {t("add_product")}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
                 {/* Duplicate selected */}
                 {hideDuplicate ? null : (
@@ -1430,7 +1435,7 @@ export const ProductsTable = ({
                       </div>
                     </ScrollArea>
                     <DropdownMenuSeparator />
-                    <div className="flex gap-2">
+                    <div className="flex items-center justify-center gap-2 w-full">
                       <Button
                         variant="outline"
                         size="icon"
@@ -1669,22 +1674,16 @@ export const ProductsTable = ({
                     const selected = table.getSelectedRowModel().rows.map((r) => r.original);
                     if (storeId) {
                       didBatch = true;
-                      const productIds = Array.from(new Set(selected.map((p: any) => String((p as any).id)).filter((v) => !!v)));
-                      if (productIds.length > 0) {
-                        try {
-                          const { error } = await (supabase as any)
-                            .from('store_product_links')
-                            .delete()
-                            .in('product_id', productIds)
-                            .eq('store_id', storeId);
-                          if (error) {
-                            toast.error(t('failed_remove_from_store'));
-                          } else {
-                            toast.success(t('product_removed_from_store'));
-                          }
-                        } catch (_) {
-                          toast.error(t('failed_remove_from_store'));
-                        }
+                      try {
+                        await Promise.all(
+                          selected
+                            .map((p: any) => p?.id)
+                            .filter((id: any) => !!id)
+                            .map((id: string) => ProductService.removeStoreProductLink(String(id), storeId))
+                        );
+                        toast.success(t('product_removed_from_store'));
+                      } catch (_) {
+                        toast.error(t('failed_remove_from_store'));
                       }
                       table.resetRowSelection();
                     } else {

@@ -4,6 +4,8 @@ import { ProductsTable } from "@/components/user/products/ProductsTable";
 import { ProductService, type Product } from "@/lib/product-service";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
+import { ShopService } from "@/lib/shop-service";
 
 export const StoreProducts = () => {
   const { id } = useParams();
@@ -11,11 +13,20 @@ export const StoreProducts = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [shopName, setShopName] = useState("");
 
   useEffect(() => {
     if (!storeId) {
       toast.error(t("no_active_stores"));
     }
+    (async () => {
+      try {
+        const shop = await ShopService.getShop(storeId);
+        setShopName(shop?.store_name || "");
+      } catch (_) {
+        setShopName("");
+      }
+    })();
   }, [storeId, t]);
 
   const handleEdit = (product: Product) => {
@@ -33,7 +44,17 @@ export const StoreProducts = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-6 space-y-6">
+      <PageHeader
+        title={t("products_title")}
+        description={t("products_description")}
+        breadcrumbItems={[
+          { label: t("breadcrumb_home"), href: "/user/dashboard" },
+          { label: t("shops_title"), href: "/user/shops" },
+          { label: shopName || storeId, href: `/user/shops/${storeId}` },
+          { label: t("products_title"), current: true },
+        ]}
+      />
       <ProductsTable
         onEdit={handleEdit}
         onDelete={handleDelete}

@@ -9,6 +9,9 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ProductFormTabs } from "@/components/ProductFormTabs";
 import { type ProductParam, type ProductImage } from "@/lib/product-service";
+import { PageHeader } from "@/components/PageHeader";
+import { ShopService } from "@/lib/shop-service";
+import { CategoryService } from "@/lib/category-service";
 
 type StoreProductLinkForm = {
   is_active: boolean;
@@ -32,6 +35,8 @@ export const StoreProductEdit = () => {
   const pid = String(productId || "");
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [shopName, setShopName] = useState("");
+  const [categoryName, setCategoryName] = useState("");
 
   const [form, setForm] = useState<StoreProductLinkForm>({
     is_active: true,
@@ -49,11 +54,12 @@ export const StoreProductEdit = () => {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [productRes, linkRes, imagesRes, paramsRes] = await Promise.allSettled([
+      const [productRes, linkRes, imagesRes, paramsRes, shopRes] = await Promise.allSettled([
         ProductService.getProductById(pid),
         ProductService.getStoreProductLink(pid, storeId),
         ProductService.getProductImages(pid),
         ProductService.getProductParams(pid),
+        ShopService.getShop(storeId),
       ]);
 
       if (productRes.status === "fulfilled") {
@@ -96,9 +102,36 @@ export const StoreProductEdit = () => {
         setParams([]);
       }
 
+      if (shopRes.status === "fulfilled") {
+        const shop: any = shopRes.value;
+        setShopName(shop?.store_name || "");
+      } else {
+        setShopName("");
+      }
+
       setLoading(false);
     })();
   }, [pid, storeId, t]);
+
+  useEffect(() => {
+    const loadCategoryName = async () => {
+      if (!baseProduct) return;
+      try {
+        if (baseProduct.category_id) {
+          const cat = await CategoryService.getById(baseProduct.category_id);
+          setCategoryName(cat?.name || "");
+          return;
+        }
+        if (baseProduct.supplier_id && baseProduct.category_external_id) {
+          const cat = await CategoryService.getByExternalId(String(baseProduct.supplier_id), baseProduct.category_external_id);
+          setCategoryName(cat?.name || "");
+        }
+      } catch (_) {
+        setCategoryName("");
+      }
+    };
+    loadCategoryName();
+  }, [baseProduct]);
 
   const updateField = <K extends keyof StoreProductLinkForm>(key: K, value: StoreProductLinkForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -142,11 +175,28 @@ export const StoreProductEdit = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="mb-4">
-        <Link to={`/user/shops/${storeId}/products`} className="text-sm text-muted-foreground">{t("back_to_products")}</Link>
-      </div>
+      <PageHeader
+        title={t("edit_product")}
+        description={t("edit_product_description")}
+        breadcrumbItems={[
+          { label: t("breadcrumb_home"), href: "/user/dashboard" },
+          { label: t("shops_title"), href: "/user/shops" },
+          { label: shopName || storeId, href: `/user/shops/${storeId}` },
+          { label: t("products_title"), href: `/user/shops/${storeId}/products` },
+          { label: categoryName || "—", current: true },
+        ]}
+      />
       <Card className="p-6 space-y-6">
-        <div className="text-lg mb-2">{t("edit_product")}</div>
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-lg">{t("edit_product")}</div>
+          <Link
+            to={`/user/shops/${storeId}/products`}
+            className="text-sm text-muted-foreground"
+            data-testid="store_product_edit_back"
+          >
+            {t("back_to_products")}
+          </Link>
+        </div>
         {loading ? (
           <div className="text-sm">{t("loading")}</div>
         ) : (
