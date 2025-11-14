@@ -25,6 +25,10 @@ interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
   onCancel?: () => void;
+  readOnly?: boolean;
+  editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity'>;
+  overrides?: Partial<FormData>;
+  onChange?: (partial: Partial<FormData>) => void;
 }
 interface ProductParam {
   id?: string;
@@ -85,7 +89,11 @@ interface FormData {
 export function ProductFormTabs({
   product,
   onSubmit,
-  onCancel
+  onCancel,
+  readOnly,
+  editableKeys,
+  overrides,
+  onChange
 }: ProductFormTabsProps) {
   // 500px in rem (to avoid fixed px in CSS): 500 / 16 = 31.25
   const DEFAULT_PHOTO_SIZE_REM = 31.25;
@@ -245,6 +253,11 @@ export function ProductFormTabs({
     state: 'new',
     store_id: ''
   });
+  useEffect(() => {
+    if (overrides && Object.keys(overrides).length > 0) {
+      setFormData(prev => ({ ...prev, ...overrides }));
+    }
+  }, [overrides]);
 
   // Images state
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -583,7 +596,7 @@ export function ProductFormTabs({
     };
 
     resolveCategoryId();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [product, formData.category_external_id, formData.supplier_id, formData.category_id]);
 
   // Track initial hydration to avoid clearing category on first population
@@ -1262,7 +1275,7 @@ export function ProductFormTabs({
                     <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
                     ...formData,
                     vendor: e.target.value
-                  })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" />
+                  })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" disabled={!!readOnly} />
                   </div>
 
                   {/* Перенесено: статус товара */}
@@ -1272,7 +1285,7 @@ export function ProductFormTabs({
                     ...formData,
                     state: value
                   })}>
-                      <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect">
+                      <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect" disabled={!!readOnly}>
                         <SelectValue placeholder={t('select_status')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1287,10 +1300,14 @@ export function ProductFormTabs({
                   {/* Кількість на складі — перенесено справа от статуса */}
                   <div className="space-y-2">
                     <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-                    <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => setFormData({
-                    ...formData,
-                    stock_quantity: parseInt(e.target.value) || 0
-                  })} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" />
+                    <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => {
+                    const v = parseInt(e.target.value) || 0;
+                    setFormData({
+                      ...formData,
+                      stock_quantity: v
+                    });
+                    onChange?.({ stock_quantity: v });
+                  }} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" disabled={!!readOnly && !(editableKeys || []).includes('stock_quantity')} />
                   </div>
                 </div>
               </div>
@@ -1323,7 +1340,7 @@ export function ProductFormTabs({
                       <Input id="name_ua" name="name_ua" autoComplete="off" value={formData.name_ua} onChange={e => setFormData({
                       ...formData,
                       name_ua: e.target.value
-                    })} placeholder={t('product_name_placeholder')} data-testid="productFormTabs_nameUaInput" />
+                    })} placeholder={t('product_name_placeholder')} data-testid="productFormTabs_nameUaInput" disabled={!!readOnly} />
                     </div>
 
                     <div className="space-y-2">
@@ -1331,7 +1348,7 @@ export function ProductFormTabs({
                       <Input id="docket_ua" name="docket_ua" autoComplete="off" value={formData.docket_ua} onChange={e => setFormData({
                       ...formData,
                       docket_ua: e.target.value
-                    })} placeholder={t('short_name_placeholder')} data-testid="productFormTabs_docketUaInput" />
+                    })} placeholder={t('short_name_placeholder')} data-testid="productFormTabs_docketUaInput" disabled={!!readOnly} />
                     </div>
 
                     <div className="space-y-2">
@@ -1339,7 +1356,7 @@ export function ProductFormTabs({
                       <Textarea id="description_ua" name="description_ua" autoComplete="off" value={formData.description_ua} onChange={e => setFormData({
                       ...formData,
                       description_ua: e.target.value
-                    })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" />
+                    })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" disabled={!!readOnly} />
                     </div>
                   </TabsContent>
                   
@@ -1349,7 +1366,7 @@ export function ProductFormTabs({
                       <Input id="name" name="name" autoComplete="off" value={formData.name} onChange={e => setFormData({
                       ...formData,
                       name: e.target.value
-                    })} placeholder={t('product_name_placeholder')} data-testid="productFormTabs_nameInput" />
+                    })} placeholder={t('product_name_placeholder')} data-testid="productFormTabs_nameInput" disabled={!!readOnly} />
                     </div>
 
                     <div className="space-y-2">
@@ -1357,7 +1374,7 @@ export function ProductFormTabs({
                       <Input id="docket" name="docket" autoComplete="off" value={formData.docket} onChange={e => setFormData({
                       ...formData,
                       docket: e.target.value
-                    })} placeholder={t('short_name_placeholder')} data-testid="productFormTabs_docketInput" />
+                    })} placeholder={t('short_name_placeholder')} data-testid="productFormTabs_docketInput" disabled={!!readOnly} />
                     </div>
 
                     <div className="space-y-2">
@@ -1365,7 +1382,7 @@ export function ProductFormTabs({
                       <Textarea id="description" name="description" autoComplete="off" value={formData.description} onChange={e => setFormData({
                       ...formData,
                       description: e.target.value
-                    })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" />
+                    })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" disabled={!!readOnly} />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -1386,7 +1403,7 @@ export function ProductFormTabs({
                     ...formData,
                     currency_code: value
                   })}>
-                      <SelectTrigger aria-labelledby="currency_label" data-testid="productFormTabs_currencySelect">
+                      <SelectTrigger aria-labelledby="currency_label" data-testid="productFormTabs_currencySelect" disabled={!!readOnly}>
                         <SelectValue placeholder={t('select_currency')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1399,26 +1416,34 @@ export function ProductFormTabs({
 
                   <div className="space-y-2">
                     <Label htmlFor="price">{t('price')} *</Label>
-                    <Input id="price" name="price" autoComplete="off" type="number" step="0.01" value={formData.price} onChange={e => setFormData({
-                    ...formData,
-                    price: parseFloat(e.target.value) || 0
-                  })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" />
+                    <Input id="price" name="price" autoComplete="off" type="number" step="0.01" value={formData.price} onChange={e => {
+                    const v = parseFloat(e.target.value) || 0;
+                    setFormData({
+                      ...formData,
+                      price: v
+                    });
+                    onChange?.({ price: v });
+                  }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" disabled={!!readOnly && !(editableKeys || []).includes('price')} />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="price_old">{t('old_price')}</Label>
-                    <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => setFormData({
+                    <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => { const v = parseFloat(e.target.value) || 0; setFormData({
                     ...formData,
-                    price_old: parseFloat(e.target.value) || 0
-                  })} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" />
+                    price_old: v
+                  }); onChange?.({ price_old: v }); }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" disabled={!!readOnly && !(editableKeys || []).includes('price_old')} />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="price_promo">{t('promo_price')}</Label>
-                    <Input id="price_promo" name="price_promo" autoComplete="off" type="number" step="0.01" value={formData.price_promo} onChange={e => setFormData({
-                    ...formData,
-                    price_promo: parseFloat(e.target.value) || 0
-                  })} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" />
+                    <Input id="price_promo" name="price_promo" autoComplete="off" type="number" step="0.01" value={formData.price_promo} onChange={e => {
+                    const v = parseFloat(e.target.value) || 0;
+                    setFormData({
+                      ...formData,
+                      price_promo: v
+                    });
+                    onChange?.({ price_promo: v });
+                  }} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" disabled={!!readOnly && !(editableKeys || []).includes('price_promo')} />
                   </div>
                 </div>
               </div>
@@ -1429,60 +1454,70 @@ export function ProductFormTabs({
               <div className="space-y-3 md:space-y-4">
                 <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
                   <div className="flex-1">
-                    <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
-                    <div className="flex gap-2 mt-2">
-                      <Input id="imageUrl" name="imageUrl" autoComplete="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
-                      <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
-                        <Link className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {readOnly ? null : (
+                      <>
+                        <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
+                        <div className="flex gap-2 mt-2">
+                          <Input id="imageUrl" name="imageUrl" autoComplete="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
+                          <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
+                            <Link className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* Hidden file input retained for drop zone click */}
-                <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
+                {readOnly ? null : (
+                  <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
+                )}
 
                 <Separator />
 
                 <div className="flex flex-wrap gap-3 md:gap-4">
                   {/* Always visible drag-and-drop zone */}
-                  <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
-                    <CardContent className="p-1 md:p-2">
-                      <div className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${isDragOver ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'} hover:scale-[1.01]`} style={{
-                      width: '100%',
-                      maxWidth: '100%',
-                      height: 'auto',
-                      minHeight: 'clamp(12rem, 30vh, 24rem)'
-                    }} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => document.getElementById('fileUpload')?.click()} role="button" tabIndex={0} onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        document.getElementById('fileUpload')?.click();
-                      }
-                    }}>
-                        <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${isDragOver ? 'text-emerald-600' : 'text-emerald-500'}`} />
-                        <p className={`text-sm text-center px-2 transition-colors ${isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'}`}>
-                          {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
-                        </p>
-                        <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
-                          {t('image_types_and_limit')}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {readOnly ? null : (
+                    <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
+                      <CardContent className="p-1 md:p-2">
+                        <div className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${isDragOver ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'} hover:scale-[1.01]`} style={{
+                        width: '100%',
+                        maxWidth: '100%',
+                        height: 'auto',
+                        minHeight: 'clamp(12rem, 30vh, 24rem)'
+                      }} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => document.getElementById('fileUpload')?.click()} role="button" tabIndex={0} onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          document.getElementById('fileUpload')?.click();
+                        }
+                      }}>
+                          <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${isDragOver ? 'text-emerald-600' : 'text-emerald-500'}`} />
+                          <p className={`text-sm text-center px-2 transition-colors ${isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'}`}>
+                            {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
+                          </p>
+                          <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
+                            {t('image_types_and_limit')}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Existing images */}
                   {images.map((image, index) => <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
                       <CardContent className="p-2">
                         <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={getGalleryAdaptiveImageStyle(index)}>
                           <img src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={e => handleGalleryImageLoad(e, index)} />
-                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                            <Button size="icon" variant="ghost" onClick={() => setMainImage(index)} aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')} data-testid={`productFormTabs_setMainButton_${index}`} className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}>
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {readOnly ? null : (
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                              <Button size="icon" variant="ghost" onClick={() => setMainImage(index)} aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')} data-testid={`productFormTabs_setMainButton_${index}`} className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                         {image.is_main && <Badge className="absolute top-2 left-2" variant="default">
                             {t('main_photo')}
@@ -1499,67 +1534,83 @@ export function ProductFormTabs({
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>{t('product_characteristics')}</span>
-                    <Button type="button" onClick={openAddParamModal} size="sm" variant="outline" data-testid="productForm_addCharacteristic" aria-label={t('add_characteristic')} className="max-[550px]:ml-auto">
-                      <Plus className="h-4 w-4 mr-2 max-[550px]:mr-0" />
-                      <span className="max-[550px]:hidden">{t('add_characteristic')}</span>
-                    </Button>
+                    {readOnly ? null : (
+                      <Button type="button" onClick={openAddParamModal} size="sm" variant="outline" data-testid="productForm_addCharacteristic" aria-label={t('add_characteristic')} className="max-[550px]:ml-auto">
+                        <Plus className="h-4 w-4 mr-2 max-[550px]:mr-0" />
+                        <span className="max-[550px]:hidden">{t('add_characteristic')}</span>
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {parameters.length === 0 ? <div className="text-center py-12 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                  {parameters.length === 0 ? (
+                    <div className="text-center py-12 border-2 border-dashed border-muted-foreground/25 rounded-lg">
                       <Settings className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                       <p className="text-muted-foreground">{t('no_characteristics_added')}</p>
-                      <p className="text-sm text-muted-foreground mt-2">{t('add_characteristics_instruction')}</p>
-                    </div> : <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} />}
+                      {readOnly ? null : <p className="text-sm text-muted-foreground mt-2">{t('add_characteristics_instruction')}</p>}
+                    </div>
+                  ) : readOnly ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {parameters.map((p) => (
+                        <div key={`${p.name}_${p.order_index}`} className="border rounded-md p-2">
+                          <div className="text-xs text-muted-foreground">{p.name}</div>
+                          <div className="text-sm break-words">{p.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} />
+                  )}
 
-                  {/* Add/Edit characteristic modal */}
-                  <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
-                    <DialogContent data-testid="productForm_paramModal">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {editingParamIndex === null ? t('add_characteristic') : t('edit_characteristic')}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="param-name-modal">{t('characteristic_name')}</Label>
-                          <Input id="param-name-modal" value={paramForm.name} onChange={e => setParamForm({
-                          ...paramForm,
-                          name: e.target.value
-                        })} placeholder={t('characteristic_name_placeholder')} data-testid="productForm_modal_paramName" />
+                  {readOnly ? null : (
+                    <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
+                      <DialogContent data-testid="productForm_paramModal">
+                        <DialogHeader>
+                          <DialogTitle>
+                            {editingParamIndex === null ? t('add_characteristic') : t('edit_characteristic')}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="param-name-modal">{t('characteristic_name')}</Label>
+                            <Input id="param-name-modal" value={paramForm.name} onChange={e => setParamForm({
+                            ...paramForm,
+                            name: e.target.value
+                          })} placeholder={t('characteristic_name_placeholder')} data-testid="productForm_modal_paramName" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="param-value-modal">{t('value')}</Label>
+                            <Input id="param-value-modal" value={paramForm.value} onChange={e => setParamForm({
+                            ...paramForm,
+                            value: e.target.value
+                          })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="param-paramid-modal">{t('param_id_optional')}</Label>
+                            <Input id="param-paramid-modal" value={paramForm.paramid || ''} onChange={e => setParamForm({
+                            ...paramForm,
+                            paramid: e.target.value
+                          })} placeholder={t('param_id_placeholder')} data-testid="productForm_modal_paramId" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="param-valueid-modal">{t('value_id_optional')}</Label>
+                            <Input id="param-valueid-modal" value={paramForm.valueid || ''} onChange={e => setParamForm({
+                            ...paramForm,
+                            valueid: e.target.value
+                          })} placeholder={t('value_id_placeholder')} data-testid="productForm_modal_valueId" />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="param-value-modal">{t('value')}</Label>
-                          <Input id="param-value-modal" value={paramForm.value} onChange={e => setParamForm({
-                          ...paramForm,
-                          value: e.target.value
-                        })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="param-paramid-modal">{t('param_id_optional')}</Label>
-                          <Input id="param-paramid-modal" value={paramForm.paramid || ''} onChange={e => setParamForm({
-                          ...paramForm,
-                          paramid: e.target.value
-                        })} placeholder={t('param_id_placeholder')} data-testid="productForm_modal_paramId" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="param-valueid-modal">{t('value_id_optional')}</Label>
-                          <Input id="param-valueid-modal" value={paramForm.valueid || ''} onChange={e => setParamForm({
-                          ...paramForm,
-                          valueid: e.target.value
-                        })} placeholder={t('value_id_placeholder')} data-testid="productForm_modal_valueId" />
-                        </div>
-                      </div>
-                      <DialogFooter className="gap-2">
-                        <Button type="button" variant="outline" onClick={() => setIsParamModalOpen(false)} data-testid="productForm_modal_cancel">
-                          {t('btn_cancel')}
-                        </Button>
-                        <Button type="button" onClick={saveParamModal} data-testid="productForm_modal_save">
-                          {editingParamIndex === null ? t('btn_create') : t('btn_update')}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                        <DialogFooter className="gap-2">
+                          <Button type="button" variant="outline" onClick={() => setIsParamModalOpen(false)} data-testid="productForm_modal_cancel">
+                            {t('btn_cancel')}
+                          </Button>
+                          <Button type="button" onClick={saveParamModal} data-testid="productForm_modal_save">
+                            {editingParamIndex === null ? t('btn_create') : t('btn_update')}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1571,9 +1622,11 @@ export function ProductFormTabs({
             <Button variant="outline" onClick={handleCancel} data-testid="productFormTabs_cancelButton">
               {t('btn_cancel')}
             </Button>
-  <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
-              {loading ? product ? t('loading_updating') : t('loading_creating') : product ? t('btn_update') : t('btn_create')}
-            </Button>
+            {readOnly ? null : (
+              <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
+                {loading ? product ? t('loading_updating') : t('loading_creating') : product ? t('btn_update') : t('btn_create')}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

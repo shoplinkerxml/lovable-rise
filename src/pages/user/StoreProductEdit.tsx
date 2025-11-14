@@ -3,27 +3,25 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { ProductService, type Product } from "@/lib/product-service";
 import { useI18n } from "@/providers/i18n-provider";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ProductFormTabs } from "@/components/ProductFormTabs";
+import { type ProductParam, type ProductImage } from "@/lib/product-service";
 
 type StoreProductLinkForm = {
   is_active: boolean;
-  custom_name: string;
-  custom_description: string;
   custom_price: string;
+  custom_price_old: string;
   custom_price_promo: string;
   custom_stock_quantity: string;
 };
 
 type StoreProductLinkPatch = {
   is_active: boolean;
-  custom_name: string | null;
-  custom_description: string | null;
   custom_price: number | null;
+  custom_price_old: number | null;
   custom_price_promo: number | null;
   custom_stock_quantity: number | null;
 };
@@ -37,22 +35,25 @@ export const StoreProductEdit = () => {
 
   const [form, setForm] = useState<StoreProductLinkForm>({
     is_active: true,
-    custom_name: "",
-    custom_description: "",
     custom_price: "",
+    custom_price_old: "",
     custom_price_promo: "",
     custom_stock_quantity: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [baseProduct, setBaseProduct] = useState<Product | null>(null);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [params, setParams] = useState<ProductParam[]>([]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [productRes, linkRes] = await Promise.allSettled([
+      const [productRes, linkRes, imagesRes, paramsRes] = await Promise.allSettled([
         ProductService.getProductById(pid),
         ProductService.getStoreProductLink(pid, storeId),
+        ProductService.getProductImages(pid),
+        ProductService.getProductParams(pid),
       ]);
 
       if (productRes.status === "fulfilled") {
@@ -64,9 +65,8 @@ export const StoreProductEdit = () => {
       if (linkRes.status === "fulfilled") {
         type StoreProductLinkDb = {
           is_active?: boolean;
-          custom_name?: string | null;
-          custom_description?: string | null;
           custom_price?: string | number | null;
+          custom_price_old?: string | number | null;
           custom_price_promo?: string | number | null;
           custom_stock_quantity?: string | number | null;
         };
@@ -74,15 +74,26 @@ export const StoreProductEdit = () => {
         if (link) {
           setForm({
             is_active: !!link.is_active,
-            custom_name: link.custom_name ?? "",
-            custom_description: link.custom_description ?? "",
             custom_price: link.custom_price == null ? "" : String(link.custom_price),
+            custom_price_old: link.custom_price_old == null ? "" : String(link.custom_price_old),
             custom_price_promo: link.custom_price_promo == null ? "" : String(link.custom_price_promo),
             custom_stock_quantity: link.custom_stock_quantity == null ? "" : String(link.custom_stock_quantity),
           });
         }
       } else {
         toast.error(t("failed_load_products"));
+      }
+
+      if (imagesRes.status === "fulfilled") {
+        setImages(imagesRes.value || []);
+      } else {
+        setImages([]);
+      }
+
+      if (paramsRes.status === "fulfilled") {
+        setParams(paramsRes.value || []);
+      } else {
+        setParams([]);
       }
 
       setLoading(false);
@@ -97,22 +108,19 @@ export const StoreProductEdit = () => {
     try {
       const patch: StoreProductLinkPatch = {
         is_active: !!form.is_active,
-        custom_name: null,
-        custom_description: null,
         custom_price: null,
+        custom_price_old: null,
         custom_price_promo: null,
         custom_stock_quantity: null,
       };
 
-      const name = form.custom_name.trim();
-      patch.custom_name = name ? name : null;
-
-      const desc = form.custom_description.trim();
-      patch.custom_description = desc ? desc : null;
-
       const priceStr = form.custom_price.trim();
       const priceNum = Number(priceStr);
       patch.custom_price = priceStr ? (Number.isFinite(priceNum) ? priceNum : null) : null;
+
+      const priceOldStr = form.custom_price_old.trim();
+      const priceOldNum = Number(priceOldStr);
+      patch.custom_price_old = priceOldStr ? (Number.isFinite(priceOldNum) ? priceOldNum : null) : null;
 
       const promoStr = form.custom_price_promo.trim();
       const promoNum = Number(promoStr);
@@ -133,24 +141,36 @@ export const StoreProductEdit = () => {
   };
 
   return (
-    <div className="p-4 max-w-2xl">
+    <div className="p-6 space-y-6">
       <div className="mb-4">
         <Link to={`/user/shops/${storeId}/products`} className="text-sm text-muted-foreground">{t("back_to_products")}</Link>
       </div>
-      <Card className="p-4 space-y-6">
+      <Card className="p-6 space-y-6">
         <div className="text-lg mb-2">{t("edit_product")}</div>
         {loading ? (
           <div className="text-sm">{t("loading")}</div>
         ) : (
           <div className="space-y-6">
-            {/* Full product card (read-only) with tabs */}
             {baseProduct ? (
-              <div aria-disabled className="pointer-events-none opacity-90">
-                <ProductFormTabs product={baseProduct} />
-              </div>
+              <ProductFormTabs
+                product={baseProduct}
+                readOnly
+                editableKeys={["price", "price_old", "price_promo", "stock_quantity"]}
+                overrides={{
+                  price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
+                  price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
+                  price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
+                  stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
+                }}
+                onChange={(partial) => {
+                  if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
+                  if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
+                  if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
+                  if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
+                }}
+              />
             ) : null}
 
-            {/* Store-specific editable fields */}
             <div className="space-y-3">
               <div>
                 <Checkbox
@@ -160,31 +180,8 @@ export const StoreProductEdit = () => {
                 />
                 <span className="ml-2 text-sm">{t("table_status")}</span>
               </div>
-              <div>
-                <label className="text-sm">{t("product_name")}</label>
-                <Input value={form.custom_name} onChange={(e) => updateField("custom_name", e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm">{t("product_description_ua")}</label>
-                <Textarea value={form.custom_description} onChange={(e) => updateField("custom_description", e.target.value)} />
-              </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-sm">{t("table_price")}</label>
-                <Input type="number" value={form.custom_price} onChange={(e) => updateField("custom_price", e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm">{t("promo_price")}</label>
-                <Input type="number" value={form.custom_price_promo} onChange={(e) => updateField("custom_price_promo", e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">{t("table_stock")}</label>
-                <Input type="number" value={form.custom_stock_quantity} onChange={(e) => updateField("custom_stock_quantity", e.target.value)} />
-              </div>
-            </div>
-              <div className="flex gap-2">
+              <div />
+              <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
                 <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
               </div>

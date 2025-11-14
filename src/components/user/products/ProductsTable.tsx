@@ -119,7 +119,7 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean }) {
+function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string }) {
   const { t } = useI18n();
   const [stores, setStores] = useState<any[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
@@ -172,6 +172,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
             {t("duplicate")}
           </DropdownMenuItem>
         )}
+        {storeId ? null : (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
             <Store className="h-4 w-4" />
@@ -260,6 +261,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
             )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDelete} className="cursor-pointer focus:text-destructive" data-testid="user_products_row_delete">
           <Trash2 className="mr-2 h-4 w-4" />
@@ -318,8 +320,8 @@ export const ProductsTable = ({
         .map((p: any) => p.category_id)
         .filter((v) => !!v);
 
-      let mainImageMap: Record<string, string> = {};
-      let categoryNameMap: Record<string, string> = {};
+      const mainImageMap: Record<string, string> = {};
+      const categoryNameMap: Record<string, string> = {};
 
       if (ids.length > 0) {
         // Загружаем все изображения товаров и выбираем главное:
@@ -375,7 +377,7 @@ export const ProductsTable = ({
         .map((p: any) => p.supplier_id)
         .filter((v) => v !== null && v !== undefined);
       const supplierIds = Array.from(new Set(supplierIdsRaw));
-      let supplierNameMap: Record<string | number, string> = {};
+      const supplierNameMap: Record<string | number, string> = {};
       if (supplierIds.length > 0) {
         const { data: supRows } = await (supabase as any)
           .from('user_suppliers')
@@ -1101,11 +1103,12 @@ export const ProductsTable = ({
             onTrigger={() => row.toggleSelected(true)}
             canCreate={canCreate}
             hideDuplicate={hideDuplicate}
+            storeId={storeId}
           />
         </div>
       ),
     },
-  ], [onEdit, t]);
+  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate]);
 
   const table = useReactTable({
     data: rows,
@@ -1354,6 +1357,7 @@ export const ProductsTable = ({
                 </DropdownMenu>
 
                 {/* Add to stores */}
+                {storeId ? null : (
                 <DropdownMenu open={storesMenuOpen} onOpenChange={async (open) => {
                   setStoresMenuOpen(open);
                   if (open) {
@@ -1483,6 +1487,7 @@ export const ProductsTable = ({
                                   store_id: sid,
                                   is_active: true,
                                   custom_price: p.price ?? null,
+                                  custom_price_old: p.price_old ?? null,
                                   custom_price_promo: p.price_promo ?? null,
                                   custom_stock_quantity: p.stock_quantity ?? null,
                                 });
@@ -1527,6 +1532,7 @@ export const ProductsTable = ({
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                )}
 
                 {/* Refresh */}
                 <Tooltip>
@@ -1656,17 +1662,40 @@ export const ProductsTable = ({
                 setDeleteDialog({ open: false, product: null });
 
                 try {
+                  let didBatch = false;
                   if (productToDelete) {
                     await onDelete?.(productToDelete);
                   } else {
-                    const selected = table.getSelectedRowModel().rows;
-                    for (const r of selected) {
-                      await onDelete?.(r.original);
+                    const selected = table.getSelectedRowModel().rows.map((r) => r.original);
+                    if (storeId) {
+                      didBatch = true;
+                      const productIds = Array.from(new Set(selected.map((p: any) => String((p as any).id)).filter((v) => !!v)));
+                      if (productIds.length > 0) {
+                        try {
+                          const { error } = await (supabase as any)
+                            .from('store_product_links')
+                            .delete()
+                            .in('product_id', productIds)
+                            .eq('store_id', storeId);
+                          if (error) {
+                            toast.error(t('failed_remove_from_store'));
+                          } else {
+                            toast.success(t('product_removed_from_store'));
+                          }
+                        } catch (_) {
+                          toast.error(t('failed_remove_from_store'));
+                        }
+                      }
+                      table.resetRowSelection();
+                    } else {
+                      for (const p of selected) {
+                        await onDelete?.(p);
+                      }
+                      table.resetRowSelection();
                     }
-                    table.resetRowSelection();
                   }
 
-                  if (typeof refreshTrigger === 'undefined') {
+                  if (didBatch || typeof refreshTrigger === 'undefined') {
                     await loadProducts();
                   }
                 } catch (error) {
