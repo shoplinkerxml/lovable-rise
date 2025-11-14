@@ -210,6 +210,7 @@ const dictionary: Dictionary = {
   deleting_product: { uk: "Йде видалення", en: "Deleting" },
   products_limit: { uk: "Товари", en: "Products" },
   products_limit_reached: { uk: "Досягнуто ліміту товарів", en: "Product limit reached" },
+  table_active: { uk: "Активний", en: "Active" },
   
   // Limits
   limits_title: { uk: "Обмеження тарифів", en: "Tariff Limits" },

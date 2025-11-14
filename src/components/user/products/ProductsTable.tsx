@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   DialogNoOverlay,
   DialogNoOverlayContent,
@@ -508,6 +509,17 @@ export const ProductsTable = ({
   const [addingStores, setAddingStores] = useState(false);
   const [removingStores, setRemovingStores] = useState(false);
 
+  useEffect(() => {
+    setColumnOrder((prev) => {
+      const withoutActive = prev.filter((id) => id !== "active");
+      const withoutActions = withoutActive.filter((id) => id !== "actions");
+      if (storeId) {
+        return [...withoutActions, "active", "actions"];
+      }
+      return [...withoutActions, "actions"];
+    });
+  }, [storeId]);
+
   // Toggle sort control rendered as native button with inline SVG icon
   function SortToggle({ column, table }: { column: any; table: any }) {
     const { t } = useI18n();
@@ -649,6 +661,7 @@ export const ProductsTable = ({
       "description_ua",
       "photo",
       "select",
+      "active",
       "actions",
     ];
     // Базовое значение vw для названия и шаг уменьшения
@@ -1109,6 +1122,31 @@ export const ProductsTable = ({
         </div>
       ),
     },
+    ...(storeId ? [{
+      id: "active",
+      header: t("table_active"),
+      enableSorting: false,
+      enableHiding: false,
+      size: 80,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center">
+          <Switch
+            checked={!!(row.original as any).is_active}
+            onCheckedChange={async (checked) => {
+              try {
+                setProducts((prev) => prev.map((p) => p.id === row.original.id ? { ...p, is_active: checked } : p));
+                await ProductService.updateStoreProductLink(row.original.id, String(storeId), { is_active: checked });
+              } catch (_) {
+                setProducts((prev) => prev.map((p) => p.id === row.original.id ? { ...p, is_active: !checked } : p));
+                toast.error(t("operation_failed"));
+              }
+            }}
+            aria-label={t("table_active")}
+            data-testid={`user_store_products_active_${row.original.id}`}
+          />
+        </div>
+      ),
+    }] : []),
   ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate]);
 
   const table = useReactTable({

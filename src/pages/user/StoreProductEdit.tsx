@@ -222,15 +222,6 @@ export const StoreProductEdit = () => {
             ) : null}
 
             <div className="space-y-3">
-              <div>
-                <Checkbox
-                  checked={!!form.is_active}
-                  onCheckedChange={(v) => updateField("is_active", !!v)}
-                  aria-label={t("status")}
-                />
-                <span className="ml-2 text-sm">{t("table_status")}</span>
-              </div>
-              <div />
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
                 <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>

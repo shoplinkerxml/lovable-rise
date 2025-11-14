@@ -28,6 +28,7 @@ export interface Product {
   state: string;
   created_at: string;
   updated_at: string;
+  is_active?: boolean;
 }
 
 export interface ProductParam {
@@ -198,6 +199,7 @@ export class ProductService {
         state: base.state ?? 'new',
         created_at: base.created_at ?? new Date().toISOString(),
         updated_at: base.updated_at ?? new Date().toISOString(),
+        is_active: r.is_active === true,
       };
     });
 
