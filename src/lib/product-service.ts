@@ -233,6 +233,18 @@ export class ProductService {
     return data;
   }
 
+  static async removeStoreProductLink(productId: string, storeId: string): Promise<void> {
+    const { error } = await (supabase as any)
+      .from('store_product_links')
+      .delete()
+      .eq('product_id', productId)
+      .eq('store_id', storeId);
+    if (error) {
+      console.error('Delete store product link error:', error);
+      throw new Error(error.message);
+    }
+  }
+
   /** Получение только максимального лимита продуктов (без подсчета текущих) */
   static async getProductLimitOnly(): Promise<number> {
     const sessionValidation = await SessionValidator.ensureValidSession();
