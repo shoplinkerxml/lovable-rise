@@ -63,6 +63,8 @@ type ProductsTableProps = {
   onLoadingChange?: (loading: boolean) => void;
   refreshTrigger?: number;
   canCreate?: boolean;
+  storeId?: string;
+  hideDuplicate?: boolean;
 };
 
 const LoadingSkeleton = () => (
@@ -117,7 +119,7 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean }) {
+function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean }) {
   const { t } = useI18n();
   const [stores, setStores] = useState<any[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
@@ -164,10 +166,12 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
           <Edit className="mr-2 h-4 w-4" />
           {t("edit")}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false}>
-          <Copy className="mr-2 h-4 w-4" />
-          {t("duplicate")}
-        </DropdownMenuItem>
+        {hideDuplicate ? null : (
+          <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false}>
+            <Copy className="mr-2 h-4 w-4" />
+            {t("duplicate")}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
             <Store className="h-4 w-4" />
@@ -199,10 +203,29 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                         onCheckedChange={async (v) => {
                           try {
                             if (v) {
-                              const { error } = await (supabase as any)
+                              const { data: existing } = await (supabase as any)
                                 .from('store_product_links')
-                                .upsert([{ product_id: product.id, store_id: id }], { onConflict: 'product_id,store_id' })
-                                .select('*');
+                                .select('product_id,store_id')
+                                .eq('product_id', product.id)
+                                .eq('store_id', id)
+                                .maybeSingle();
+                              let error: any = null;
+                              if (!existing) {
+                                const res = await (supabase as any)
+                                  .from('store_product_links')
+                                  .insert([
+                                    {
+                                      product_id: product.id,
+                                      store_id: id,
+                                      is_active: true,
+                                      custom_price: (product as any).price ?? null,
+                                      custom_price_promo: (product as any).price_promo ?? null,
+                                      custom_stock_quantity: (product as any).stock_quantity ?? null,
+                                    },
+                                  ])
+                                  .select('*');
+                                error = res.error;
+                              }
                               if (!error) {
                                 setLinkedStoreIds((prev) => Array.from(new Set([...prev, id])));
                                 toast.success(t('product_added_to_store'));
@@ -261,6 +284,8 @@ export const ProductsTable = ({
   onLoadingChange,
   refreshTrigger,
   canCreate,
+  storeId,
+  hideDuplicate,
 }: ProductsTableProps) => {
   const { t } = useI18n();
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -285,7 +310,7 @@ export const ProductsTable = ({
     setLoading(true);
     onLoadingChange?.(true);
     try {
-      const data = await ProductService.getProducts();
+      const data = storeId ? await ProductService.getProductsForStore(storeId) : await ProductService.getProducts();
       onProductsLoaded?.(data.length);
 
       const ids = (data ?? []).map((p) => p.id).filter(Boolean) as string[];
@@ -478,6 +503,7 @@ export const ProductsTable = ({
   const [stores, setStores] = useState<any[]>([]);
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const [addingStores, setAddingStores] = useState(false);
+  const [removingStores, setRemovingStores] = useState(false);
 
   // Toggle sort control rendered as native button with inline SVG icon
   function SortToggle({ column, table }: { column: any; table: any }) {
@@ -1074,6 +1100,7 @@ export const ProductsTable = ({
             onDuplicate={() => handleDuplicate(row.original)}
             onTrigger={() => row.toggleSelected(true)}
             canCreate={canCreate}
+            hideDuplicate={hideDuplicate}
           />
         </div>
       ),
@@ -1157,7 +1184,7 @@ export const ProductsTable = ({
           const selectedRows = table.getSelectedRowModel().rows;
           const selectedCount = selectedRows.length;
           const selectedRow = selectedRows[0]?.original;
-          const canDuplicate = selectedCount === 1 && canCreate !== false;
+          const canDuplicate = selectedCount === 1 && canCreate !== false && hideDuplicate !== true;
           const canEditSelected = selectedCount === 1;
           const canDeleteSelected = selectedCount >= 1;
           const createDisabled = canCreate === false;
@@ -1190,6 +1217,7 @@ export const ProductsTable = ({
                 </Tooltip>
 
                 {/* Duplicate selected */}
+                {hideDuplicate ? null : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -1209,6 +1237,7 @@ export const ProductsTable = ({
                     {t("duplicate")}
                   </TooltipContent>
                 </Tooltip>
+                )}
 
                 {/* Edit selected */}
                 <Tooltip>
@@ -1400,42 +1429,88 @@ export const ProductsTable = ({
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        className="flex-1 h-8"
-                        onClick={() => setSelectedStoreIds([])}
-                        data-testid="user_products_addToStores_clear"
-                      >
-                        {t("clear")}
-                      </Button>
-                      <Button
-                        className="flex-1 h-8"
-                        disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
-                        aria-disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={removingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
+                        aria-disabled={removingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
                         onClick={async () => {
                           const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
                           const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter((v) => !!v)));
                           const storeIds = Array.from(new Set(selectedStoreIds));
                           if (productIds.length === 0 || storeIds.length === 0) return;
+                          setRemovingStores(true);
+                          try {
+                            const { error } = await (supabase as any)
+                              .from('store_product_links')
+                              .delete()
+                              .in('product_id', productIds)
+                              .in('store_id', storeIds);
+                            if (error) {
+                              toast.error(t('failed_remove_from_store'));
+                            } else {
+                              toast.success(t('product_removed_from_store'));
+                            }
+                          } catch (e) {
+                            toast.error(t('failed_remove_from_store'));
+                          } finally {
+                            setRemovingStores(false);
+                            setStoresMenuOpen(false);
+                            setSelectedStoreIds([]);
+                          }
+                        }}
+                        data-testid="user_products_addToStores_delete"
+                      >
+                        {removingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
+                        aria-disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
+                        onClick={async () => {
+                          const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                          const storeIds = Array.from(new Set(selectedStoreIds));
+                          const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter((v) => !!v)));
+                          if (productIds.length === 0 || storeIds.length === 0) return;
                           setAddingStores(true);
                           try {
                             const payload: any[] = [];
-                            for (const pid of productIds) {
+                            for (const p of selected) {
+                              const pid = String(p.id);
                               for (const sid of storeIds) {
-                                payload.push({ product_id: pid, store_id: sid });
+                                payload.push({
+                                  product_id: pid,
+                                  store_id: sid,
+                                  is_active: true,
+                                  custom_price: p.price ?? null,
+                                  custom_price_promo: p.price_promo ?? null,
+                                  custom_stock_quantity: p.stock_quantity ?? null,
+                                });
                               }
                             }
-                            const { error } = await (supabase as any)
+                            const { data: existing, error: selErr } = await (supabase as any)
                               .from('store_product_links')
-                              .upsert(payload, { onConflict: 'product_id,store_id' })
-                              .select('*');
-                            if (error) {
-                              const msg = String(error.message || '');
-                              if (msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('unique')) {
-                                toast.success(t('products_already_linked'));
-                              } else {
-                                toast.error(t('failed_add_product_to_stores'));
-                              }
+                              .select('product_id,store_id')
+                              .in('product_id', productIds)
+                              .in('store_id', storeIds);
+                            if (selErr) {
+                              toast.error(t('failed_add_product_to_stores'));
+                              return;
+                            }
+                            const existingSet = new Set((existing || []).map((r: any) => `${r.product_id}__${r.store_id}`));
+                            const toInsert = payload.filter((r) => !existingSet.has(`${r.product_id}__${r.store_id}`));
+                            if (toInsert.length === 0) {
+                              toast.success(t('products_already_linked'));
                             } else {
-                              toast.success(t('product_added_to_stores'));
+                              const { error: insErr } = await (supabase as any)
+                                .from('store_product_links')
+                                .insert(toInsert)
+                                .select('*');
+                              if (insErr) {
+                                toast.error(t('failed_add_product_to_stores'));
+                              } else {
+                                toast.success(t('product_added_to_stores'));
+                              }
                             }
                           } catch (e) {
                             toast.error(t('failed_add_product_to_stores'));
@@ -1447,7 +1522,7 @@ export const ProductsTable = ({
                         }}
                         data-testid="user_products_addToStores_confirm"
                       >
-                        {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : t('add_product_to_stores')}
+                        {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                       </Button>
                     </div>
                   </DropdownMenuContent>

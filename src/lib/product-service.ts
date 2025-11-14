@@ -153,6 +153,86 @@ export class ProductService {
     return data || [];
   }
 
+  /** Получение продуктов для конкретного магазина с учётом переопределений из store_product_links */
+  static async getProductsForStore(storeId: string): Promise<Product[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('store_product_links')
+      .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,store_products(*)')
+      .eq('store_id', storeId);
+
+    if (error) {
+      console.error('Get products for store error:', error);
+      return [];
+    }
+
+    const rows = (data || []) as any[];
+    const mapped: Product[] = rows.map((r: any) => {
+      const base = r.store_products || {};
+      return {
+        id: String(base.id),
+        store_id: String(r.store_id || base.store_id),
+        supplier_id: base.supplier_id ?? null,
+        external_id: base.external_id,
+        name: r.custom_name ?? base.name,
+        name_ua: base.name_ua ?? null,
+        docket: base.docket ?? null,
+        docket_ua: base.docket_ua ?? null,
+        description: r.custom_description ?? base.description ?? null,
+        description_ua: base.description_ua ?? null,
+        vendor: base.vendor ?? null,
+        article: base.article ?? null,
+        category_id: base.category_id ?? null,
+        category_external_id: base.category_external_id ?? null,
+        currency_id: base.currency_id ?? null,
+        currency_code: base.currency_code ?? null,
+        price: r.custom_price ?? base.price ?? null,
+        price_old: base.price_old ?? null,
+        price_promo: r.custom_price_promo ?? base.price_promo ?? null,
+        stock_quantity: (r.custom_stock_quantity ?? base.stock_quantity ?? 0) as number,
+        available: (base.available ?? true) as boolean,
+        state: base.state ?? 'new',
+        created_at: base.created_at ?? new Date().toISOString(),
+        updated_at: base.updated_at ?? new Date().toISOString(),
+      };
+    });
+
+    return mapped;
+  }
+
+  /** Получить и обновить переопределения для пары (product_id, store_id) */
+  static async getStoreProductLink(productId: string, storeId: string): Promise<any | null> {
+    const { data, error } = await (supabase as any)
+      .from('store_product_links')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('store_id', storeId)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') {
+      console.error('Get store product link error:', error);
+    }
+    return data || null;
+  }
+
+  static async updateStoreProductLink(productId: string, storeId: string, patch: any): Promise<any> {
+    const { data, error } = await (supabase as any)
+      .from('store_product_links')
+      .update(patch)
+      .eq('product_id', productId)
+      .eq('store_id', storeId)
+      .select('*')
+      .maybeSingle();
+    if (error) {
+      console.error('Update store product link error:', error);
+      throw new Error(error.message);
+    }
+    return data;
+  }
+
   /** Получение только максимального лимита продуктов (без подсчета текущих) */
   static async getProductLimitOnly(): Promise<number> {
     const sessionValidation = await SessionValidator.ensureValidSession();

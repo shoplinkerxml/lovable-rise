@@ -43,6 +43,8 @@ import { ShopDetail } from "@/pages/user/ShopDetail";
 import { Products } from "./pages/user/Products";
 import { ProductCreate } from "./pages/user/ProductCreate";
 import { ProductEdit } from "./pages/user/ProductEdit";
+import { StoreProducts } from "./pages/user/StoreProducts";
+import { StoreProductEdit } from "./pages/user/StoreProductEdit";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +123,8 @@ const App = () => {
                 {/* Shops routes */}
                 <Route path="shops" element={<Shops />} />
                 <Route path="shops/:id" element={<ShopDetail />} />
+                <Route path="shops/:id/products" element={<StoreProducts />} />
+                <Route path="shops/:id/products/edit/:productId" element={<StoreProductEdit />} />
                 {/* Products routes */}
                 <Route path="products" element={<Products />} />
                 <Route path="products/new-product" element={<ProductCreate />} />

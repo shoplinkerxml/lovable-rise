@@ -10,6 +10,8 @@ import { EditShopDialog, ShopStructureEditor } from '@/components/user/shops';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
+import { ProductsTable } from '@/components/user/products/ProductsTable';
+import { ProductService, type Product } from '@/lib/product-service';
 
 export const ShopDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,9 @@ export const ShopDetail = () => {
   const [loading, setLoading] = useState(true);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showStructureEditor, setShowStructureEditor] = useState(false);
+  const [productsCount, setProductsCount] = useState(0);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!id) {
@@ -106,23 +111,29 @@ export const ShopDetail = () => {
         }
       />
 
-      {/* Empty state */}
-      <div className="flex justify-center">
-        <Empty className="border max-w-md">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Store />
-            </EmptyMedia>
-            <EmptyTitle>Товарів ще немає</EmptyTitle>
-            <EmptyDescription>
-              Почніть додавати товари до вашого магазину
-            </EmptyDescription>
-          </EmptyHeader>
-          <Button onClick={() => toast.info('Функціонал додавання товарів буде реалізовано')} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Додати товар
-          </Button>
-        </Empty>
+      {/* Products table for this store */}
+      <div className="bg-background border rounded-md">
+        <ProductsTable
+          storeId={id!}
+          onEdit={(product: Product) => navigate(`/user/shops/${id}/products/edit/${product.id}`)}
+          onDelete={async (product: Product) => {
+            try {
+              await (supabase as any)
+                .from('store_product_links')
+                .delete()
+                .eq('product_id', product.id)
+                .eq('store_id', id!);
+              setRefreshTrigger((p) => p + 1);
+            } catch (e) {
+              toast.error(t('failed_remove_from_store'));
+            }
+          }}
+          onProductsLoaded={(count: number) => setProductsCount(count)}
+          onLoadingChange={(loading: boolean) => setTableLoading(loading)}
+          refreshTrigger={refreshTrigger}
+          canCreate={true}
+          hideDuplicate={true}
+        />
       </div>
 
       {/* Edit Shop Dialog */}
