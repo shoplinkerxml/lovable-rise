@@ -163,7 +163,7 @@ export class ProductService {
 
     const { data, error } = await (supabase as any)
       .from('store_product_links')
-      .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,store_products(*)')
+      .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)')
       .eq('store_id', storeId);
 
     if (error) {
@@ -195,7 +195,7 @@ export class ProductService {
         price_old: base.price_old ?? null,
         price_promo: r.custom_price_promo ?? base.price_promo ?? null,
         stock_quantity: (r.custom_stock_quantity ?? base.stock_quantity ?? 0) as number,
-        available: (base.available ?? true) as boolean,
+        available: (r.custom_available ?? base.available ?? true) as boolean,
         state: base.state ?? 'new',
         created_at: base.created_at ?? new Date().toISOString(),
         updated_at: base.updated_at ?? new Date().toISOString(),
