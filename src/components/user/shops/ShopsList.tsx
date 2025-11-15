@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
-import { Store, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Store, Edit, Trash2, Loader2, Package, List } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop } from '@/lib/shop-service';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,31 +53,49 @@ export const ShopsList = ({
     try {
       setLoading(true);
       const data = await ShopService.getShops();
-      
-      // Load marketplace for each shop
-      const shopsWithMarketplace = await Promise.all(
-        data.map(async (shop) => {
-          if (shop.template_id) {
-            const { data: template } = await (supabase as any)
-              .from('store_templates')
-              .select('marketplace')
-              .eq('id', shop.template_id)
-              .single();
-            
-            return {
-              ...shop,
-              marketplace: template?.marketplace || 'Не вказано'
-            };
-          }
-          return {
-            ...shop,
-            marketplace: 'Не вказано'
-          };
-        })
-      );
-      
-      setShops(shopsWithMarketplace);
-      onShopsLoaded?.(shopsWithMarketplace.length);
+      const storeIds = data.map((s) => s.id);
+      const templateIds = Array.from(new Set(data.map((s) => s.template_id).filter((v) => !!v))) as string[];
+
+      const templatesMap: Record<string, string> = {};
+      if (templateIds.length > 0) {
+        const { data: templates } = await (supabase as any)
+          .from('store_templates')
+          .select('id,marketplace')
+          .in('id', templateIds);
+        (templates || []).forEach((r: any) => {
+          if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
+        });
+      }
+
+      const productsRes = storeIds.length > 0
+        ? await (supabase as any)
+            .from('store_product_links')
+            .select('store_id,store_products(category_id,category_external_id)')
+            .in('store_id', storeIds)
+        : { data: [] };
+
+      const rows = (productsRes.data || []) as any[];
+      const productsCountMap: Record<string, number> = {};
+      const categoriesMap: Record<string, Set<string>> = {};
+      rows.forEach((row: any) => {
+        const sid = String(row.store_id);
+        productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
+        const catId = row?.store_products?.category_id;
+        const catExt = row?.store_products?.category_external_id;
+        const key = (catId != null && String(catId).trim() !== '') ? String(catId) : (catExt != null ? String(catExt) : '');
+        if (!categoriesMap[sid]) categoriesMap[sid] = new Set<string>();
+        if (key) categoriesMap[sid].add(key);
+      });
+
+      const result = data.map((shop) => ({
+        ...shop,
+        marketplace: templatesMap[String(shop.template_id)] || 'Не вказано',
+        productsCount: productsCountMap[shop.id] || 0,
+        categoriesCount: (categoriesMap[shop.id]?.size) || 0,
+      }) as any);
+
+      setShops(result);
+      onShopsLoaded?.(result.length);
     } catch (error: any) {
       console.error('Load shops error:', error);
       toast.error(error?.message || t('failed_load_shops'));
@@ -162,6 +180,18 @@ export const ShopsList = ({
                 <span className={shop.is_active ? "text-green-600" : "text-gray-400"}>
                   {shop.is_active ? 'Активний' : 'Неактивний'}
                 </span>
+              </div>
+              <div className="flex items-center gap-4 text-sm" data-testid={`user_shop_item_stats_${shop.id}`}>
+                <div className="flex items-center gap-1" data-testid={`user_shop_item_products_${shop.id}`}>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{t('shop_products')}:</span>
+                  <span className="font-medium">{(shop as any).productsCount ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1" data-testid={`user_shop_item_categories_${shop.id}`}>
+                  <List className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{t('shop_categories')}:</span>
+                  <span className="font-medium">{(shop as any).categoriesCount ?? 0}</span>
+                </div>
               </div>
             </CardContent>
           </Card>

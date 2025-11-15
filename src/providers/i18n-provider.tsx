@@ -169,6 +169,8 @@ const dictionary: Dictionary = {
   back_to_shops: { uk: "Назад до магазинів", en: "Back to Shops" },
   no_shops: { uk: "Немає магазинів", en: "No Shops" },
   no_shops_description: { uk: "Створіть перший магазин для початку роботи", en: "Create your first shop to get started" },
+  shop_products: { uk: "Товарів", en: "Products" },
+  shop_categories: { uk: "Категорій", en: "Categories" },
   shop_name: { uk: "Назва магазину", en: "Shop Name" },
   shop_name_placeholder: { uk: "Введіть назву магазину", en: "Enter shop name" },
   shop_created: { uk: "Магазин створено", en: "Shop created" },
