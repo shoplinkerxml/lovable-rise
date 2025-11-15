@@ -11,7 +11,7 @@ type GenerateBody = { store_id: string; format: 'xml' | 'csv' };
 
 type XMLFieldConfig = { path: string };
 type XMLConfig = { root?: string; fields?: XMLFieldConfig[] };
-type StoreRow = { id: string; store_name?: string; store_url?: string; xml_config?: XMLConfig };
+type StoreRow = { id: string; user_id?: string; store_name?: string; store_url?: string; xml_config?: XMLConfig };
 type Product = {
   id: string;
   external_id?: string;
@@ -24,6 +24,8 @@ type Product = {
   category_external_id?: string;
   currency_code?: string;
   price?: number;
+  price_old?: number;
+  price_promo?: number;
   stock_quantity?: number;
   available?: boolean;
   slug?: string;
@@ -93,7 +95,7 @@ Deno.serve(async (req) => {
 
     const { data: storeRow, error: storeErr } = await supabase
       .from('user_stores')
-      .select('id,store_name,store_url,xml_config')
+      .select('id,user_id,store_name,store_url,xml_config')
       .eq('id', body.store_id)
       .maybeSingle();
     if (storeErr) return new Response(JSON.stringify({ error: 'store_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -102,6 +104,47 @@ Deno.serve(async (req) => {
     const fieldPaths: string[] = rawFields.map((x) => String(x?.path || '')).filter((p) => p.length > 0);
     const cfgRoot = typeof xmlConfig?.root === 'string' ? String(xmlConfig.root).trim() : '';
     const rootTag = /^[A-Za-z_][\w.-]*$/.test(cfgRoot) ? cfgRoot : 'yml_catalog';
+
+    let currenciesXml = '';
+    let categoriesXml = '';
+    const needCurrencies = fieldPaths.some((p) => p.toLowerCase().includes('shop.currencies') || p.toLowerCase().includes('currenc'));
+    const needCategories = fieldPaths.some((p) => p.toLowerCase().includes('shop.categories') || p.toLowerCase().includes('categor'));
+
+    if (needCurrencies && storeRow?.user_id) {
+      const { data: curRows } = await supabase
+        .from('store_currencies')
+        .select('code,rate,is_base,is_active')
+        .eq('user_id', storeRow.user_id)
+        .eq('is_active', true);
+      const items = ((curRows || []) as Array<{ code: string; rate: number; is_base: boolean | null; is_active: boolean | null }>).
+        map((c) => {
+          const id = String(c.code || '').toUpperCase();
+          const rate = c.is_base ? 1 : Number(c.rate || 1);
+          return `<currency id="${xmlEscape(id)}" rate="${xmlEscape(String(rate))}"/>`;
+        }).join('');
+      currenciesXml = items ? `<currencies>${items}</currencies>` : '';
+    }
+
+    if (needCategories && storeRow?.user_id) {
+      const { data: catRows } = await supabase
+        .from('store_categories')
+        .select('id,external_id,name,parent_id,is_active')
+        .eq('user_id', storeRow.user_id)
+        .eq('is_active', true);
+      const idToExternal: Record<string, string> = {};
+      ((catRows || []) as Array<{ id: string; external_id: string; name: string; parent_id: string | null; is_active: boolean | null }>).
+        forEach((r) => {
+          if (r.id && r.external_id != null) idToExternal[String(r.id)] = String(r.external_id);
+        });
+      const items = ((catRows || []) as Array<{ id: string; external_id: string; name: string; parent_id: string | null; is_active: boolean | null }>).
+        map((c) => {
+          const id = String(c.external_id || c.id || '');
+          const parentExt = c.parent_id ? idToExternal[String(c.parent_id)] : '';
+          const parentAttr = parentExt ? ` parentId="${xmlEscape(parentExt)}"` : '';
+          return `<category id="${xmlEscape(id)}"${parentAttr}>${xmlEscape(String(c.name || ''))}</category>`;
+        }).join('');
+      categoriesXml = items ? `<categories>${items}</categories>` : '';
+    }
 
     const { data: linksData, error: lpErr } = await supabase
       .from('store_product_links')
@@ -125,13 +168,19 @@ Deno.serve(async (req) => {
       const base: Product = row.store_products || ({} as Product);
       const imgs: ImageRow[] = ((imagesData || []) as ImageRow[]).filter((i) => i.product_id === String(base.id));
       const prms: ParamRow[] = ((paramsData || []) as ParamRow[]).filter((p) => p.product_id === String(base.id));
+      const docketUaVal = String((prms.find((p) => p.name === 'docket_ua')?.value) || '');
+      const docketVal = String((prms.find((p) => p.name === 'docket')?.value) || '');
 
       const getVal = (name: string): string => {
         if (name === 'id') return row.custom_external_id ?? base.external_id ?? base.id;
         if (name === 'price') return String(row.custom_price ?? base.price ?? '');
+        if (name === 'price_old') return String(base.price_old ?? '');
+        if (name === 'price_promo') return String(base.price_promo ?? '');
         if (name === 'currencyId') return String(base.currency_code ?? '');
-        if (name === 'name') return String(row.custom_name ?? base.name ?? base.name_ua ?? '');
+        if (name === 'name') return String(row.custom_name ?? base.name ?? base.name_ua ?? docketUaVal ?? '');
+        if (name === 'name_ua') return String(base.name_ua ?? '');
         if (name === 'description') return String(row.custom_description ?? base.description ?? base.description_ua ?? '');
+        if (name === 'description_ua') return String(base.description_ua ?? '');
         if (name === 'url') {
           const su = String(storeRow?.store_url || '').replace(/\/$/, '');
           const slug = base.slug || base.external_id || base.id;
@@ -141,12 +190,14 @@ Deno.serve(async (req) => {
         if (name === 'categoryId') return String(row.custom_category_id ?? base.category_external_id ?? base.category_id ?? '');
         if (name === 'available') return (row.custom_available ?? base.available ?? true) ? 'true' : 'false';
         if (name === 'stock_quantity') return String(row.custom_stock_quantity ?? base.stock_quantity ?? '');
+        if (name === 'docket_ua') return docketUaVal;
+        if (name === 'docket') return docketVal;
         const bv = (base as Record<string, unknown>)[name];
         const lv = (row as Record<string, unknown>)[`custom_${name}`];
         return String(bv ?? lv ?? '');
       };
 
-      const simpleFields = ['id','price','currencyId','name','description','url','vendor','categoryId','available','stock_quantity'];
+      const simpleFields = ['id','price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','url','vendor','categoryId','available','stock_quantity','docket','docket_ua'];
       const simpleXml = simpleFields
         .filter((sf) => fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)))
         .map((sf) => `<${sf}>${xmlEscape(getVal(sf))}</${sf}>`).join('');
@@ -160,7 +211,8 @@ Deno.serve(async (req) => {
       const paramsXml = (() => {
         const paramPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.param\[\d+\]/));
         if (paramPaths.length === 0) return '';
-        return prms.map((pm) => {
+        const prmsFiltered = prms.filter((pm) => pm.name !== 'docket_ua' && pm.name !== 'docket');
+        return prmsFiltered.map((pm: ParamRow) => {
           const attrs: string[] = [];
           if (pm.name) attrs.push(`name="${xmlEscape(String(pm.name))}"`);
           if (pm.paramid) attrs.push(`paramid="${xmlEscape(String(pm.paramid))}"`);
@@ -176,7 +228,7 @@ Deno.serve(async (req) => {
 
     const shopName = String((storeRow as StoreRow)?.store_name || '');
     const shopUrl = String((storeRow as StoreRow)?.store_url || '');
-    const xmlContentRaw = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootTag}><shop>${shopName ? `<name>${xmlEscape(shopName)}</name>` : ''}${shopUrl ? `<url>${xmlEscape(shopUrl)}</url>` : ''}<offers>${offersXml}</offers></shop></${rootTag}>`;
+    const xmlContentRaw = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootTag}><shop>${shopName ? `<name>${xmlEscape(shopName)}</name>` : ''}${shopUrl ? `<url>${xmlEscape(shopUrl)}</url>` : ''}${currenciesXml}${categoriesXml}<offers>${offersXml}</offers></shop></${rootTag}>`;
     const xmlContent = sanitizeXmlStart(xmlContentRaw);
 
     const content = body.format === 'xml' ? xmlContent : toCSV([], []);
