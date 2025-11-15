@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
         return String(bv ?? lv ?? '');
       };
 
-      const simpleFields = ['id','price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','url','vendor','categoryId','available','stock_quantity','docket','docket_ua'];
+      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','url','vendor','article','state','categoryId','stock_quantity','docket','docket_ua'];
       const simpleXml = simpleFields
         .filter((sf) => fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)))
         .map((sf) => `<${sf}>${xmlEscape(getVal(sf))}</${sf}>`).join('');
@@ -222,7 +222,13 @@ Deno.serve(async (req) => {
         }).join('');
       })();
 
-      return `<offer>${simpleXml}${picturesXml}${paramsXml}</offer>`;
+      const offerAttrsList: string[] = [];
+      const idAttr = xmlEscape(getVal('id'));
+      if (idAttr) offerAttrsList.push(`id="${idAttr}"`);
+      const availableAttr = getVal('available') === 'true' ? 'true' : 'false';
+      offerAttrsList.push(`available="${availableAttr}"`);
+      const offerAttrs = offerAttrsList.length ? ' ' + offerAttrsList.join(' ') : '';
+      return `<offer${offerAttrs}>${simpleXml}${picturesXml}${paramsXml}</offer>`;
     }).join('');
 
     const shopName = String((storeRow as StoreRow)?.store_name || '');
