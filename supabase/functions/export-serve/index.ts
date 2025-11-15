@@ -53,9 +53,27 @@ serve(async (req) => {
     const s3 = new S3Client({ region: 'auto', endpoint: `https://${accountId}.r2.cloudflarestorage.com`, credentials: { accessKeyId, secretAccessKey } });
     const cmd = new GetObjectCommand({ Bucket: bucket, Key: String(link.object_key) });
     const obj = await s3.send(cmd);
-    const body = obj.Body as ReadableStream<any>;
-    const contentType = format === 'xml' ? 'application/xml' : 'text/csv';
-    return new Response(body as any, {
+    
+    // Read full content to ensure XML declaration is preserved
+    const chunks: Uint8Array[] = [];
+    const reader = obj.Body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+    
+    // Combine all chunks
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const fullContent = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      fullContent.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    const contentType = format === 'xml' ? 'application/xml; charset=UTF-8' : 'text/csv; charset=UTF-8';
+    return new Response(fullContent, {
       status: 200,
       headers: {
         ...corsHeaders,
