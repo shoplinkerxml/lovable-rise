@@ -21,9 +21,7 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
   const [links, setLinks] = useState<ExportLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [progressValue, setProgressValue] = useState(20);
-  const [autoEnabled, setAutoEnabled] = useState(false);
-  const [intervalMinutes, setIntervalMinutes] = useState<number>(5);
-  const [timerId, setTimerId] = useState<number | null>(null);
+  
 
   const loadLinks = async () => {
     try {
@@ -57,41 +55,7 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
     };
   }, [loading]);
 
-  useEffect(() => {
-    if (!open) {
-      if (timerId) {
-        clearInterval(timerId);
-        setTimerId(null);
-      }
-      return;
-    }
-    if (!autoEnabled) {
-      if (timerId) {
-        clearInterval(timerId);
-        setTimerId(null);
-      }
-      return;
-    }
-    if (links.length === 0) return;
-    const id = window.setInterval(async () => {
-      const active = links.filter((l) => l.is_active);
-      if (active.length === 0) return;
-      try {
-        setLoading(true);
-        await Promise.all(active.map((l) => ExportService.regenerate(l.store_id, l.format)));
-        await loadLinks();
-        toast.success(t('auto_export_generated') || 'Автоматично згенеровано');
-      } catch {
-        toast.error(t('auto_export_failed') || 'Помилка автоматичної генерації');
-      } finally {
-        setLoading(false);
-      }
-    }, intervalMinutes * 60 * 1000);
-    setTimerId(id);
-    return () => {
-      clearInterval(id);
-    };
-  }, [autoEnabled, intervalMinutes, open, links]);
+  
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,31 +65,7 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex items-center gap-4" data-testid="user_shop_export_controls_top">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{t('auto_generate') || 'Автоматична генерація'}</span>
-              <Switch
-                checked={autoEnabled}
-                onCheckedChange={setAutoEnabled}
-                data-testid="user_shop_export_auto_toggle"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{t('interval') || 'Інтервал'}</span>
-              <Select
-                value={String(intervalMinutes)}
-                onValueChange={(v) => setIntervalMinutes(Number(v))}
-              >
-                <SelectTrigger className="w-[10rem]" data-testid="user_shop_export_auto_interval">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 хв</SelectItem>
-                  <SelectItem value="60">1 год</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          
 
           {loading && (
             <div className="space-y-2" data-testid="user_shop_export_progress">
@@ -200,6 +140,24 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
                     <Input readOnly value={publicUrl} className="text-xs w-full" />
                     <span className="text-xs text-muted-foreground">{t('last_generated_at') || 'Оновлено'}: {link.last_generated_at ? new Date(link.last_generated_at).toLocaleString() : '—'}</span>
                     <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mr-auto">
+                        <span className="text-sm">{t('auto_generate') || 'Автоматична генерація'}</span>
+                        <Switch
+                          checked={!!link.auto_generate}
+                          onCheckedChange={async (checked) => {
+                            try {
+                              setLoading(true);
+                              const ok = await ExportService.updateAutoGenerate(link.id, checked);
+                              if (ok) {
+                                await loadLinks();
+                              }
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          data-testid={`user_shop_export_item_auto_${link.id}`}
+                        />
+                      </div>
                       <Button size="sm" variant="outline" onClick={() => {
                         try { navigator.clipboard.writeText(publicUrl); toast.success(t('link_copied') || 'Посилання скопійовано'); } catch {}
                       }} data-testid={`user_shop_export_item_copy_${link.id}`}>

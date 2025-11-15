@@ -10,6 +10,7 @@ export type ExportLink = {
   token: string;
   object_key: string;
   is_active: boolean;
+  auto_generate?: boolean;
   last_generated_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -19,7 +20,7 @@ export const ExportService = {
   async listForStore(storeId: string): Promise<ExportLink[]> {
     const { data, error } = await (supabase as any)
       .from('store_export_links')
-      .select('id,store_id,format,token,object_key,is_active,last_generated_at,created_at,updated_at')
+      .select('id,store_id,format,token,object_key,is_active,auto_generate,last_generated_at,created_at,updated_at')
       .eq('store_id', storeId)
       .order('format');
     if (error) return [];
@@ -55,6 +56,17 @@ export const ExportService = {
     } catch {
       return false;
     }
+  },
+
+  async updateAutoGenerate(linkId: string, auto: boolean): Promise<boolean> {
+    const { data, error } = await (supabase as any)
+      .from('store_export_links')
+      .update({ auto_generate: auto })
+      .eq('id', linkId)
+      .select('id')
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
   },
 
   async generateAndUpload(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {

@@ -178,6 +178,7 @@ const dictionary: Dictionary = {
   last_generated_at: { uk: "Оновлено", en: "Last generated" },
   no_export_links: { uk: "Немає налаштованих посилань експорту", en: "No export links configured" },
   generate_now: { uk: "Згенерувати зараз", en: "Generate now" },
+  export_updating: { uk: "Оновлення експорту", en: "Updating export" },
   auto_generate: { uk: "Автоматична генерація", en: "Auto generate" },
   interval: { uk: "Інтервал", en: "Interval" },
   close: { uk: "Закрити", en: "Close" },

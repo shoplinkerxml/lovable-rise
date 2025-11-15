@@ -77,14 +77,40 @@ export const ShopsList = ({
       const rows = (productsRes.data || []) as any[];
       const productsCountMap: Record<string, number> = {};
       const categoriesMap: Record<string, Set<string>> = {};
+
+      // Build mapping from category_id → external_id to avoid double-counting
+      const categoryIdsRaw = rows
+        .map((row: any) => row?.store_products?.category_id)
+        .filter((v: any) => v != null && String(v).trim() !== '');
+      const uniqueCategoryIds = Array.from(new Set(categoryIdsRaw.map((v: any) => String(v))));
+      const idToExternal: Record<string, string> = {};
+      if (uniqueCategoryIds.length > 0) {
+        const { data: catMapRows } = await (supabase as any)
+          .from('store_categories')
+          .select('id,external_id')
+          .in('id', uniqueCategoryIds);
+        (catMapRows ?? []).forEach((r: any) => {
+          if (r?.id && r?.external_id != null) {
+            idToExternal[String(r.id)] = String(r.external_id);
+          }
+        });
+      }
+
       rows.forEach((row: any) => {
         const sid = String(row.store_id);
         productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
         const catId = row?.store_products?.category_id;
         const catExt = row?.store_products?.category_external_id;
-        const key = (catId != null && String(catId).trim() !== '') ? String(catId) : (catExt != null ? String(catExt) : '');
+        const canonical = (() => {
+          const idStr = catId != null ? String(catId).trim() : '';
+          if (idStr) {
+            const mapped = idToExternal[idStr];
+            if (mapped) return mapped;
+          }
+          return catExt != null ? String(catExt) : '';
+        })();
         if (!categoriesMap[sid]) categoriesMap[sid] = new Set<string>();
-        if (key) categoriesMap[sid].add(key);
+        if (canonical) categoriesMap[sid].add(canonical);
       });
 
       const result = data.map((shop) => ({
