@@ -60,8 +60,10 @@ function cleanText(text: string): string {
 }
 
 function sanitizeXmlStart(xml: string): string {
+  // Remove BOM if present but keep XML declaration
   const noBom = xml.replace(/^\uFEFF/, '');
-  return noBom.replace(/^[\r\n\t ]+/, '');
+  // Remove only whitespace before XML declaration, not the declaration itself
+  return noBom.replace(/^[\r\n\t ]+(?=<\?xml)/, '');
 }
 
 function toCSV(records: Array<Record<string, unknown>>, fields: string[]): string {
