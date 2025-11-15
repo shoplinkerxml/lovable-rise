@@ -31,6 +31,8 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [storeName, setStoreName] = useState(shop.store_name);
+  const [storeCompany, setStoreCompany] = useState<string>(shop.store_company ?? '');
+  const [storeUrl, setStoreUrl] = useState<string>(shop.store_url ?? '');
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [productsCount, setProductsCount] = useState(0);
   const { marketplaces, isLoading: marketplacesLoading } = useMarketplaces();
@@ -218,7 +220,9 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
       setLoading(true);
       
       const updateData: UpdateShopData = {
-        store_name: storeName.trim()
+        store_name: storeName.trim(),
+        store_company: storeCompany,
+        store_url: storeUrl
       };
       
       await ShopService.updateShop(shop.id, updateData);
@@ -254,6 +258,28 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
               onChange={(e) => setStoreName(e.target.value)}
               disabled={loading}
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="store_company">{t('company')}</Label>
+            <Input
+              id="store_company"
+              placeholder={t('company_placeholder')}
+              value={storeCompany}
+              onChange={(e) => setStoreCompany(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="store_url">{t('store_url')}</Label>
+            <Input
+              id="store_url"
+              placeholder={t('store_url_placeholder')}
+              value={storeUrl}
+              onChange={(e) => setStoreUrl(e.target.value)}
+              disabled={loading}
             />
           </div>
 

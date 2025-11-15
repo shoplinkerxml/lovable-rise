@@ -11,7 +11,7 @@ type GenerateBody = { store_id: string; format: 'xml' | 'csv' };
 
 type XMLFieldConfig = { path: string };
 type XMLConfig = { root?: string; fields?: XMLFieldConfig[] };
-type StoreRow = { id: string; user_id?: string; store_name?: string; store_url?: string; xml_config?: XMLConfig };
+type StoreRow = { id: string; user_id?: string; store_name?: string; store_company?: string | null; store_url?: string | null; xml_config?: XMLConfig };
 type Product = {
   id: string;
   external_id?: string;
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
 
     const { data: storeRow, error: storeErr } = await supabase
       .from('user_stores')
-      .select('id,user_id,store_name,store_url,xml_config')
+      .select('id,user_id,store_name,store_company,store_url,xml_config')
       .eq('id', body.store_id)
       .maybeSingle();
     if (storeErr) return new Response(JSON.stringify({ error: 'store_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -232,8 +232,15 @@ Deno.serve(async (req) => {
     }).join('');
 
     const shopName = String((storeRow as StoreRow)?.store_name || '');
+    const shopCompany = String((storeRow as StoreRow)?.store_company || '');
     const shopUrl = String((storeRow as StoreRow)?.store_url || '');
-    const xmlContentRaw = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootTag}><shop>${shopName ? `<name>${xmlEscape(shopName)}</name>` : ''}${shopUrl ? `<url>${xmlEscape(shopUrl)}</url>` : ''}${currenciesXml}${categoriesXml}<offers>${offersXml}</offers></shop></${rootTag}>`;
+
+    const two = (n: number) => (n < 10 ? `0${n}` : String(n));
+    const now = new Date();
+    const dateAttr = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}:${two(now.getMinutes())}`;
+
+    const header = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    const xmlContentRaw = `${header}<${rootTag} date="${xmlEscape(dateAttr)}"><shop><name>${xmlEscape(shopName)}</name><company>${xmlEscape(shopCompany)}</company><url>${xmlEscape(shopUrl)}</url>${currenciesXml}${categoriesXml}<offers>${offersXml}</offers></shop></${rootTag}>`;
     const xmlContent = sanitizeXmlStart(xmlContentRaw);
 
     const content = body.format === 'xml' ? xmlContent : toCSV([], []);

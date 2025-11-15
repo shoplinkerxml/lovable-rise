@@ -5,6 +5,8 @@ export interface Shop {
   id: string; // UUID
   user_id: string;
   store_name: string;
+  store_company?: string | null;
+  store_url?: string | null;
   template_id?: string | null;
   xml_config?: any;
   custom_mapping?: any;
@@ -15,6 +17,8 @@ export interface Shop {
 
 export interface CreateShopData {
   store_name: string;
+  store_company?: string | null;
+  store_url?: string | null;
   template_id?: string | null;
   xml_config?: any;
   custom_mapping?: any;
@@ -22,6 +26,8 @@ export interface CreateShopData {
 
 export interface UpdateShopData {
   store_name?: string;
+  store_company?: string | null;
+  store_url?: string | null;
   template_id?: string | null;
   xml_config?: any;
   custom_mapping?: any;
@@ -234,6 +240,12 @@ export class ShopService {
         throw new Error("Назва магазину обов'язкова");
       }
       cleanData.store_name = shopData.store_name.trim();
+    }
+    if (shopData.store_company !== undefined) {
+      cleanData.store_company = shopData.store_company ?? null;
+    }
+    if (shopData.store_url !== undefined) {
+      cleanData.store_url = shopData.store_url ?? null;
     }
     if (shopData.template_id !== undefined) {
       cleanData.template_id = shopData.template_id || null;
