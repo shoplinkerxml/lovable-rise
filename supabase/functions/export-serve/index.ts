@@ -55,7 +55,16 @@ serve(async (req) => {
     const obj = await s3.send(cmd);
     const body = obj.Body as ReadableStream<any>;
     const contentType = format === 'xml' ? 'application/xml' : 'text/csv';
-    return new Response(body as any, { status: 200, headers: { ...corsHeaders, 'Content-Type': contentType } });
+    return new Response(body as any, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': contentType,
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (e) {
     return new Response(JSON.stringify({ error: 'serve_failed', message: e?.message || 'failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
