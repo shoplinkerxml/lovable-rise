@@ -52,18 +52,9 @@ function xmlEscape(text: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function cleanText(text: string): string {
-  return String(text || '')
-    .replace(/`/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function sanitizeXmlStart(xml: string): string {
-  // Remove BOM if present but keep XML declaration
   const noBom = xml.replace(/^\uFEFF/, '');
-  // Remove only whitespace before XML declaration, not the declaration itself
-  return noBom.replace(/^[\r\n\t ]+(?=<\?xml)/, '');
+  return noBom.replace(/^[\r\n\t ]+/, '');
 }
 
 function toCSV(records: Array<Record<string, unknown>>, fields: string[]): string {
@@ -176,8 +167,8 @@ Deno.serve(async (req) => {
       const base: Product = row.store_products || ({} as Product);
       const imgs: ImageRow[] = ((imagesData || []) as ImageRow[]).filter((i) => i.product_id === String(base.id));
       const prms: ParamRow[] = ((paramsData || []) as ParamRow[]).filter((p) => p.product_id === String(base.id));
-      const docketUaVal = cleanText(String((prms.find((p) => p.name === 'docket_ua')?.value) || ''));
-      const docketVal = cleanText(String((prms.find((p) => p.name === 'docket')?.value) || ''));
+      const docketUaVal = String((prms.find((p) => p.name === 'docket_ua')?.value) || '');
+      const docketVal = String((prms.find((p) => p.name === 'docket')?.value) || '');
 
       const getVal = (name: string): string => {
         if (name === 'id') return row.custom_external_id ?? base.external_id ?? base.id;
@@ -190,7 +181,7 @@ Deno.serve(async (req) => {
         if (name === 'description') return String(row.custom_description ?? base.description ?? base.description_ua ?? '');
         if (name === 'description_ua') return String(base.description_ua ?? '');
         if (name === 'url') {
-          const su = cleanText(String(storeRow?.store_url || '')).replace(/\/$/, '');
+          const su = String(storeRow?.store_url || '').replace(/\/$/, '');
           const slug = base.slug || base.external_id || base.id;
           return `${su}/product/${slug}`;
         }
@@ -205,7 +196,7 @@ Deno.serve(async (req) => {
         return String(bv ?? lv ?? '');
       };
 
-      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','vendor','article','state','categoryId','stock_quantity','docket','docket_ua'];
+      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','url','vendor','article','state','categoryId','stock_quantity','docket','docket_ua'];
       const simpleXml = simpleFields
         .filter((sf) => fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)))
         .map((sf) => `<${sf}>${xmlEscape(getVal(sf))}</${sf}>`).join('');
@@ -242,7 +233,7 @@ Deno.serve(async (req) => {
 
     const shopName = String((storeRow as StoreRow)?.store_name || '');
     const shopCompany = String((storeRow as StoreRow)?.store_company || '');
-    const shopUrl = cleanText(String((storeRow as StoreRow)?.store_url || ''));
+    const shopUrl = String((storeRow as StoreRow)?.store_url || '');
 
     const two = (n: number) => (n < 10 ? `0${n}` : String(n));
     const now = new Date();
@@ -250,8 +241,7 @@ Deno.serve(async (req) => {
 
     const header = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     const xmlContentRaw = `${header}<${rootTag} date="${xmlEscape(dateAttr)}"><shop><name>${xmlEscape(shopName)}</name><company>${xmlEscape(shopCompany)}</company><url>${xmlEscape(shopUrl)}</url>${currenciesXml}${categoriesXml}<offers>${offersXml}</offers></shop></${rootTag}>`;
-    // Keep XML declaration - only remove BOM if present
-    const xmlContent = xmlContentRaw.replace(/^\uFEFF/, '');
+    const xmlContent = sanitizeXmlStart(xmlContentRaw);
 
     const content = body.format === 'xml' ? xmlContent : toCSV([], []);
     const contentType = body.format === 'xml' ? 'application/xml' : 'text/csv';

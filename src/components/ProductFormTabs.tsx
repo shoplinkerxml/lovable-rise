@@ -741,7 +741,7 @@ export function ProductFormTabs({
       } = await supabase.from('store_product_params').select('*').eq('product_id', product.id).order('order_index');
       if (paramsData) {
         setParameters(paramsData.map(param => ({
-          id: String(param.id),
+          id: param.id,
           name: param.name,
           value: param.value,
           order_index: param.order_index,

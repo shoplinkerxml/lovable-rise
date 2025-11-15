@@ -235,25 +235,25 @@ export class RLSMonitor {
       }
     ));
     
-    // Test 3: User permissions access (DISABLED - table removed)
-    // tests.push(await this.testRLSOperation(
-    //   'user-permissions-access',
-    //   async () => {
-    //     const validation = await SessionValidator.validateSession();
-    //     if (!validation.isValid || !validation.user) {
-    //       throw new Error('No valid session for test');
-    //     }
-    //     
-    //     const { data, error } = await supabase
-    //       .from('user_permissions')
-    //       .select('id, can_view, can_edit')
-    //       .eq('user_id', validation.user.id)
-    //       .limit(5);
-    //       
-    //     if (error) throw error;
-    //     return data;
-    //   }
-    // ));
+    // Test 3: User permissions access
+    tests.push(await this.testRLSOperation(
+      'user-permissions-access',
+      async () => {
+        const validation = await SessionValidator.validateSession();
+        if (!validation.isValid || !validation.user) {
+          throw new Error('No valid session for test');
+        }
+        
+        const { data, error } = await supabase
+          .from('user_permissions')
+          .select('id, can_view, can_edit')
+          .eq('user_id', validation.user.id)
+          .limit(5);
+          
+        if (error) throw error;
+        return data;
+      }
+    ));
     
     return tests;
   }

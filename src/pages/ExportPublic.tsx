@@ -8,25 +8,19 @@ export default function ExportPublic() {
   useEffect(() => {
     const run = async () => {
       if (!format || !token) return;
-      const url = `${SUPABASE_URL}/functions/v1/export-serve/export/${format}/${token}?ts=${Date.now()}`;
+      const url = `${SUPABASE_URL}/functions/v1/export-serve/export/${format}/${token}`;
       try {
         const res = await fetch(url, {
           headers: {
             apikey: SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
           },
-          cache: 'no-store',
         });
-        if (!res.ok) {
-          window.location.href = url;
-          return;
-        }
+        if (!res.ok) return;
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
         window.location.href = objectUrl;
-      } catch {
-        window.location.href = url;
-      }
+      } catch {}
     };
     run();
   }, [format, token]);
