@@ -28,6 +28,7 @@ export const ExportService = {
 
   async createLink(storeId: string, format: 'xml' | 'csv'): Promise<ExportLink | null> {
     const token = crypto.randomUUID();
+    const objectKey = `exports/stores/${storeId}/${format}/${token}.${format}`;
     const { data, error } = await (supabase as any)
       .from('store_export_links')
       .insert({
@@ -35,7 +36,7 @@ export const ExportService = {
         store_id: storeId,
         format,
         token,
-        object_key: '',
+        object_key: objectKey,
         is_active: true,
       })
       .select('id,store_id,format,token,object_key,is_active,last_generated_at,created_at,updated_at')
@@ -46,37 +47,22 @@ export const ExportService = {
 
   async regenerate(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     try {
-      const ok = await this.generateAndUpload(storeId, format);
-      return ok;
+      const { data, error } = await supabase.functions.invoke('export-generate', {
+        body: { store_id: storeId, format },
+      });
+      if (error) return false;
+      return !!(data?.success);
     } catch {
-      try {
-        const { data, error } = await supabase.functions.invoke('export-generate', {
-          body: { store_id: storeId, format },
-        });
-        if (error) return false;
-        return !!(data?.success);
-      } catch {
-        return false;
-      }
+      return false;
     }
   },
 
   async generateAndUpload(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
-    const products = await ProductService.getProductsForStore(storeId);
-    const content = format === 'xml' ? this.buildXml(products) : this.buildCsv(products);
-    const fileName = format === 'xml' ? `export_${storeId}.xml` : `export_${storeId}.csv`;
-    const file = new File([content], fileName, { type: format === 'xml' ? 'application/xml' : 'text/csv' });
-    const upload = await R2Storage.uploadFile(file);
-    if (!upload?.success) return false;
-    const { data, error } = await (supabase as any)
-      .from('store_export_links')
-      .update({ object_key: upload.objectKey, last_generated_at: new Date().toISOString() })
-      .eq('store_id', storeId)
-      .eq('format', format)
-      .select('id,store_id,format,token,object_key,is_active,last_generated_at,created_at,updated_at')
-      .maybeSingle();
+    const { data, error } = await supabase.functions.invoke('export-generate', {
+      body: { store_id: storeId, format },
+    });
     if (error) return false;
-    return true;
+    return !!(data?.success);
   },
 
   buildPublicUrl(origin: string, format: 'xml' | 'csv', token: string): string {

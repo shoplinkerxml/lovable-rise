@@ -59,21 +59,28 @@ export class XMLTemplateService {
       allowBooleanAttributes: true,
       removeNSPrefix: true, // Убираем namespace префиксы (g: для Google Shopping)
       isArray: (name, jpath) => {
-        // Универсальное определение массивов
-        // YML формат
-        if (['currencies.currency', 'categories.category', 'offers.offer', 'offer.picture', 'offer.param'].includes(jpath)) {
+        // Универсальное определение массивов (учёт полного пути от корня)
+        const p = String(jpath || '');
+        // YML: массивы на концах путей
+        if (
+          p.endsWith('currencies.currency') ||
+          p.endsWith('categories.category') ||
+          p.endsWith('offers.offer') ||
+          p.endsWith('offer.picture') ||
+          p.endsWith('offer.param')
+        ) {
           return true;
         }
         // Google Shopping RSS
-        if (jpath === 'rss.channel.item' || jpath === 'channel.item') {
+        if (p.endsWith('rss.channel.item') || p.endsWith('channel.item')) {
           return true;
         }
         // Shop-items формат
-        if (jpath.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
+        if (p.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
           return true;
         }
-        // Общие паттерны
-        if (jpath.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
+        // Общие паттерны: массивы типовых повторяющихся тегов в самом конце пути
+        if (p.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
           return true;
         }
         return false;

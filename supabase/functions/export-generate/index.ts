@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.1';
+import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
 
 const corsHeaders = {
@@ -10,28 +9,56 @@ const corsHeaders = {
 
 type GenerateBody = { store_id: string; format: 'xml' | 'csv' };
 
-function buildRecord(base: any, link: any, fields: string[]): Record<string, any> {
-  const out: Record<string, any> = {};
-  for (const f of fields) {
-    const cf = f.startsWith('category_id') ? 'custom_category_id' : `custom_${f}`;
-    const v = (link?.[cf] !== null && link?.[cf] !== undefined) ? link[cf] : base?.[f];
-    out[f] = v;
-  }
-  return out;
+type XMLFieldConfig = { path: string };
+type XMLConfig = { root?: string; fields?: XMLFieldConfig[] };
+type StoreRow = { id: string; store_name?: string; store_url?: string; xml_config?: XMLConfig };
+type Product = {
+  id: string;
+  external_id?: string;
+  name?: string;
+  name_ua?: string;
+  description?: string;
+  description_ua?: string;
+  vendor?: string;
+  category_id?: string;
+  category_external_id?: string;
+  currency_code?: string;
+  price?: number;
+  stock_quantity?: number;
+  available?: boolean;
+  slug?: string;
+};
+type LinkRow = {
+  store_products?: Product;
+  custom_external_id?: string;
+  custom_price?: number;
+  custom_name?: string;
+  custom_description?: string;
+  custom_category_id?: string;
+  custom_available?: boolean;
+  custom_stock_quantity?: number;
+};
+type ImageRow = { product_id: string; url?: string; order_index: number };
+type ParamRow = { product_id: string; name?: string; value?: string; order_index: number; paramid?: string; valueid?: string };
+
+function xmlEscape(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
-function toXML(records: Record<string, any>[], fields: string[]): string {
-  const items = records.map((r) => {
-    const inner = fields.map((f) => `<${f}>${r[f] ?? ''}</${f}>`).join('');
-    return `<offer>${inner}</offer>`;
-  }).join('');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<catalog>${items}</catalog>`;
+function sanitizeXmlStart(xml: string): string {
+  const noBom = xml.replace(/^\uFEFF/, '');
+  return noBom.replace(/^[\r\n\t ]+/, '');
 }
 
-function toCSV(records: Record<string, any>[], fields: string[]): string {
+function toCSV(records: Array<Record<string, unknown>>, fields: string[]): string {
   const header = fields.join(',');
   const rows = records.map((r) => fields.map((f) => {
-    const v = r[f];
+    const v = (r as Record<string, unknown>)[f];
     if (v == null) return '';
     const s = String(v).replace(/"/g, '""');
     return /[",\n]/.test(s) ? `"${s}"` : s;
@@ -39,12 +66,14 @@ function toCSV(records: Record<string, any>[], fields: string[]): string {
   return `${header}\n${rows}`;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
-    const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.replace(/^Bearer\s+/i, '') : Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', apiKey, { global: { headers: authHeader ? { Authorization: authHeader } : {} } });
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, serviceKey || anonKey, { global: { headers: authHeader ? { Authorization: authHeader } : {} } });
 
     const body = await req.json() as GenerateBody;
     if (!body?.store_id || !body?.format) {
@@ -53,25 +82,26 @@ serve(async (req) => {
 
     const { data: linkRow, error: linkErr } = await supabase
       .from('store_export_links')
-      .select('id,store_id,format,object_key,is_active')
+      .select('id,store_id,format,token,object_key,is_active')
       .eq('store_id', body.store_id)
       .eq('format', body.format)
       .maybeSingle();
     if (linkErr) return new Response(JSON.stringify({ error: 'link_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    if (!linkRow || !linkRow.object_key || linkRow.is_active !== true) {
+    if (!linkRow || linkRow.is_active !== true) {
       return new Response(JSON.stringify({ error: 'link_not_active' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const { data: storeRow, error: storeErr } = await supabase
       .from('user_stores')
-      .select('id,xml_config')
+      .select('id,store_name,store_url,xml_config')
       .eq('id', body.store_id)
       .maybeSingle();
     if (storeErr) return new Response(JSON.stringify({ error: 'store_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     const xmlConfig = storeRow?.xml_config ?? {};
-    const fieldsCfg: string[] = Array.isArray(xmlConfig?.fields) && xmlConfig.fields.length ? xmlConfig.fields : [
-      'id','supplier_id','external_id','category_external_id','currency_code','name','name_ua','vendor','article','available','stock_quantity','price','price_old','price_promo','description','description_ua','docket','docket_ua','state','category_id'
-    ];
+    const rawFields: XMLFieldConfig[] = Array.isArray(xmlConfig?.fields) ? (xmlConfig.fields as XMLFieldConfig[]) : [];
+    const fieldPaths: string[] = rawFields.map((x) => String(x?.path || '')).filter((p) => p.length > 0);
+    const cfgRoot = typeof xmlConfig?.root === 'string' ? String(xmlConfig.root).trim() : '';
+    const rootTag = /^[A-Za-z_][\w.-]*$/.test(cfgRoot) ? cfgRoot : 'yml_catalog';
 
     const { data: linksData, error: lpErr } = await supabase
       .from('store_product_links')
@@ -79,9 +109,77 @@ serve(async (req) => {
       .eq('store_id', body.store_id);
     if (lpErr) return new Response(JSON.stringify({ error: 'links_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    const records: Record<string, any>[] = (linksData || []).map((row: any) => buildRecord(row.store_products || {}, row, fieldsCfg));
+    const productIds: string[] = (linksData || []).map((row: LinkRow) => String(row.store_products?.id || '')).filter((id: string) => id.length > 0);
+    const { data: imagesData } = await supabase
+      .from('store_product_images')
+      .select('*')
+      .in('product_id', productIds)
+      .order('order_index');
+    const { data: paramsData } = await supabase
+      .from('store_product_params')
+      .select('*')
+      .in('product_id', productIds)
+      .order('order_index');
 
-    const content = body.format === 'xml' ? toXML(records, fieldsCfg) : toCSV(records, fieldsCfg);
+    const offersXml = (linksData || []).map((row: LinkRow) => {
+      const base: Product = row.store_products || ({} as Product);
+      const imgs: ImageRow[] = ((imagesData || []) as ImageRow[]).filter((i) => i.product_id === String(base.id));
+      const prms: ParamRow[] = ((paramsData || []) as ParamRow[]).filter((p) => p.product_id === String(base.id));
+
+      const getVal = (name: string): string => {
+        if (name === 'id') return row.custom_external_id ?? base.external_id ?? base.id;
+        if (name === 'price') return String(row.custom_price ?? base.price ?? '');
+        if (name === 'currencyId') return String(base.currency_code ?? '');
+        if (name === 'name') return String(row.custom_name ?? base.name ?? base.name_ua ?? '');
+        if (name === 'description') return String(row.custom_description ?? base.description ?? base.description_ua ?? '');
+        if (name === 'url') {
+          const su = String(storeRow?.store_url || '').replace(/\/$/, '');
+          const slug = base.slug || base.external_id || base.id;
+          return `${su}/product/${slug}`;
+        }
+        if (name === 'vendor') return String(base.vendor ?? '');
+        if (name === 'categoryId') return String(row.custom_category_id ?? base.category_external_id ?? base.category_id ?? '');
+        if (name === 'available') return (row.custom_available ?? base.available ?? true) ? 'true' : 'false';
+        if (name === 'stock_quantity') return String(row.custom_stock_quantity ?? base.stock_quantity ?? '');
+        const bv = (base as Record<string, unknown>)[name];
+        const lv = (row as Record<string, unknown>)[`custom_${name}`];
+        return String(bv ?? lv ?? '');
+      };
+
+      const simpleFields = ['id','price','currencyId','name','description','url','vendor','categoryId','available','stock_quantity'];
+      const simpleXml = simpleFields
+        .filter((sf) => fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)))
+        .map((sf) => `<${sf}>${xmlEscape(getVal(sf))}</${sf}>`).join('');
+
+      const picturesXml = (() => {
+        const picPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.picture\[\d+\]$/));
+        if (picPaths.length === 0) return '';
+        return imgs.map((img) => `<picture>${xmlEscape(String(img.url || ''))}</picture>`).join('');
+      })();
+
+      const paramsXml = (() => {
+        const paramPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.param\[\d+\]/));
+        if (paramPaths.length === 0) return '';
+        return prms.map((pm) => {
+          const attrs: string[] = [];
+          if (pm.name) attrs.push(`name="${xmlEscape(String(pm.name))}"`);
+          if (pm.paramid) attrs.push(`paramid="${xmlEscape(String(pm.paramid))}"`);
+          if (pm.valueid) attrs.push(`valueid="${xmlEscape(String(pm.valueid))}"`);
+          const val = xmlEscape(String(pm.value ?? ''));
+          const attrsStr = attrs.length ? ' ' + attrs.join(' ') : '';
+          return `<param${attrsStr}>${val}</param>`;
+        }).join('');
+      })();
+
+      return `<offer>${simpleXml}${picturesXml}${paramsXml}</offer>`;
+    }).join('');
+
+    const shopName = String((storeRow as StoreRow)?.store_name || '');
+    const shopUrl = String((storeRow as StoreRow)?.store_url || '');
+    const xmlContentRaw = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootTag}><shop>${shopName ? `<name>${xmlEscape(shopName)}</name>` : ''}${shopUrl ? `<url>${xmlEscape(shopUrl)}</url>` : ''}<offers>${offersXml}</offers></shop></${rootTag}>`;
+    const xmlContent = sanitizeXmlStart(xmlContentRaw);
+
+    const content = body.format === 'xml' ? xmlContent : toCSV([], []);
     const contentType = body.format === 'xml' ? 'application/xml' : 'text/csv';
 
     const accountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID') ?? '';
@@ -92,16 +190,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'server_misconfig' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     const s3 = new S3Client({ region: 'auto', endpoint: `https://${accountId}.r2.cloudflarestorage.com`, credentials: { accessKeyId, secretAccessKey } });
-    const put = new PutObjectCommand({ Bucket: bucket, Key: String(linkRow.object_key), Body: new TextEncoder().encode(content), ContentType: contentType });
+    let objectKey = String(linkRow.object_key || '')
+    if (!objectKey) {
+      objectKey = `exports/stores/${body.store_id}/${body.format}/${String(linkRow.token)}.${body.format}`
+    }
+    const put = new PutObjectCommand({ Bucket: bucket, Key: objectKey, Body: new TextEncoder().encode(content), ContentType: `${contentType}; charset=UTF-8` });
     await s3.send(put);
 
     await supabase
       .from('store_export_links')
-      .update({ last_generated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ object_key: objectKey, last_generated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', linkRow.id);
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'generate_failed', message: e?.message || 'failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  } catch (e: unknown) {
+    const msg = (e && typeof e === 'object' && 'message' in e) ? String((e as { message?: string }).message || '') : '';
+    return new Response(JSON.stringify({ error: 'generate_failed', message: msg || 'failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { R2Storage } from '@/lib/r2-storage';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client';
 
 export default function ExportPublic() {
   const { format, token } = useParams();
@@ -9,17 +8,19 @@ export default function ExportPublic() {
   useEffect(() => {
     const run = async () => {
       if (!format || !token) return;
-      const { data, error } = await (supabase as any)
-        .from('store_export_links')
-        .select('object_key,is_active')
-        .eq('token', token)
-        .eq('format', format)
-        .maybeSingle();
-      if (error || !data || !data.is_active) return;
-      const url = await R2Storage.getViewUrl(String(data.object_key), 3600);
-      if (url) {
-        window.location.href = url;
-      }
+      const url = `${SUPABASE_URL}/functions/v1/export-serve/export/${format}/${token}`;
+      try {
+        const res = await fetch(url, {
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        window.location.href = objectUrl;
+      } catch {}
     };
     run();
   }, [format, token]);
