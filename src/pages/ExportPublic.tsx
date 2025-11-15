@@ -8,19 +8,39 @@ export default function ExportPublic() {
   useEffect(() => {
     const run = async () => {
       if (!format || !token) return;
-      const url = `${SUPABASE_URL}/functions/v1/export-serve/export/${format}/${token}`;
+      const url = `${SUPABASE_URL}/functions/v1/export-serve/export/${format}/${token}?ts=${Date.now()}`;
       try {
         const res = await fetch(url, {
           headers: {
             apikey: SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
           },
+          cache: 'no-store',
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          window.location.href = url;
+          return;
+        }
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
-        window.location.href = objectUrl;
-      } catch {}
+        const openLink = document.createElement('a');
+        openLink.href = objectUrl;
+        openLink.target = '_blank';
+        document.body.appendChild(openLink);
+        openLink.click();
+        openLink.remove();
+
+        const downloadLink = document.createElement('a');
+        downloadLink.href = objectUrl;
+        downloadLink.download = format === 'xml' ? 'export.xml' : 'export.csv';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+
+        URL.revokeObjectURL(objectUrl);
+      } catch {
+        window.location.href = url;
+      }
     };
     run();
   }, [format, token]);

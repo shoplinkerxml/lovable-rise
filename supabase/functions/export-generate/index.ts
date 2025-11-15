@@ -57,6 +57,13 @@ function sanitizeXmlStart(xml: string): string {
   return noBom.replace(/^[\r\n\t ]+/, '');
 }
 
+function cleanText(text: string): string {
+  return String(text || '')
+    .replace(/`/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function toCSV(records: Array<Record<string, unknown>>, fields: string[]): string {
   const header = fields.join(',');
   const rows = records.map((r) => fields.map((f) => {
@@ -196,15 +203,15 @@ Deno.serve(async (req) => {
         return String(bv ?? lv ?? '');
       };
 
-      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','url','vendor','article','state','categoryId','stock_quantity','docket','docket_ua'];
+      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','vendor','article','state','categoryId','stock_quantity','docket','docket_ua'];
       const simpleXml = simpleFields
         .filter((sf) => fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)))
-        .map((sf) => `<${sf}>${xmlEscape(getVal(sf))}</${sf}>`).join('');
+        .map((sf) => `<${sf}>${xmlEscape(cleanText(getVal(sf)))}</${sf}>`).join('');
 
       const picturesXml = (() => {
         const picPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.picture\[\d+\]$/));
         if (picPaths.length === 0) return '';
-        return imgs.map((img) => `<picture>${xmlEscape(String(img.url || ''))}</picture>`).join('');
+        return imgs.map((img) => `<picture>${xmlEscape(cleanText(String(img.url || '')))}</picture>`).join('');
       })();
 
       const paramsXml = (() => {
@@ -216,7 +223,7 @@ Deno.serve(async (req) => {
           if (pm.name) attrs.push(`name="${xmlEscape(String(pm.name))}"`);
           if (pm.paramid) attrs.push(`paramid="${xmlEscape(String(pm.paramid))}"`);
           if (pm.valueid) attrs.push(`valueid="${xmlEscape(String(pm.valueid))}"`);
-          const val = xmlEscape(String(pm.value ?? ''));
+          const val = xmlEscape(cleanText(String(pm.value ?? '')));
           const attrsStr = attrs.length ? ' ' + attrs.join(' ') : '';
           return `<param${attrsStr}>${val}</param>`;
         }).join('');
@@ -231,9 +238,9 @@ Deno.serve(async (req) => {
       return `<offer${offerAttrs}>${simpleXml}${picturesXml}${paramsXml}</offer>`;
     }).join('');
 
-    const shopName = String((storeRow as StoreRow)?.store_name || '');
-    const shopCompany = String((storeRow as StoreRow)?.store_company || '');
-    const shopUrl = String((storeRow as StoreRow)?.store_url || '');
+    const shopName = cleanText(String((storeRow as StoreRow)?.store_name || ''));
+    const shopCompany = cleanText(String((storeRow as StoreRow)?.store_company || ''));
+    const shopUrl = cleanText(String((storeRow as StoreRow)?.store_url || ''));
 
     const two = (n: number) => (n < 10 ? `0${n}` : String(n));
     const now = new Date();
