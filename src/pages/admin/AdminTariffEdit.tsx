@@ -568,7 +568,10 @@ const AdminTariffEdit = () => {
       limit_name: newLimit.limit_name,
       template_id: newLimit.template_id,
       value: newLimit.value,
-      is_active: newLimit.is_active
+      is_active: true,
+      code: null,
+      description: null,
+      path: null
     };
     setLimits([...limits, limit]);
     setNewLimit({
@@ -666,21 +669,30 @@ const AdminTariffEdit = () => {
       limit_name: t('store_count_limit'),
       template_id: null,
       value: 3,
-      is_active: true
+      is_active: true,
+      code: null,
+      description: null,
+      path: null
     }, {
       id: Date.now() + 2,
       tariff_id: 0,
       limit_name: t('supplier_count_limit'),
       template_id: null,
       value: 5,
-      is_active: true
+      is_active: true,
+      code: null,
+      description: null,
+      path: null
     }, {
       id: Date.now() + 3,
       tariff_id: 0,
       limit_name: t('product_count_limit'),
       template_id: null,
       value: 100,
-      is_active: true
+      is_active: true,
+      code: null,
+      description: null,
+      path: null
     }];
     setLimits(sampleLimits);
   };
