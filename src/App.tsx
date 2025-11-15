@@ -74,6 +74,7 @@ const App = () => {
       path: "/admin",
       element: <AdminRoute><AdminProtected /></AdminRoute>,
       children: [
+        { index: true, element: <Navigate to="dashboard" replace /> },
         { path: "settings/currency", element: <AdminLayout><CurrencyManagement /></AdminLayout> },
         { path: "settings/limits", element: <AdminLayout><LimitTemplates /></AdminLayout> },
         { path: "storetemplates", element: <AdminLayout><StoreTemplates /></AdminLayout> },
