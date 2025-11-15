@@ -250,7 +250,8 @@ Deno.serve(async (req) => {
 
     const header = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     const xmlContentRaw = `${header}<${rootTag} date="${xmlEscape(dateAttr)}"><shop><name>${xmlEscape(shopName)}</name><company>${xmlEscape(shopCompany)}</company><url>${xmlEscape(shopUrl)}</url>${currenciesXml}${categoriesXml}<offers>${offersXml}</offers></shop></${rootTag}>`;
-    const xmlContent = sanitizeXmlStart(xmlContentRaw);
+    // Keep XML declaration - only remove BOM if present
+    const xmlContent = xmlContentRaw.replace(/^\uFEFF/, '');
 
     const content = body.format === 'xml' ? xmlContent : toCSV([], []);
     const contentType = body.format === 'xml' ? 'application/xml' : 'text/csv';
