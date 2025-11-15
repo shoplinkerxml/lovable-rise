@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Edit, Settings, Plus, Store } from 'lucide-react';
+import { Edit, Settings, Share2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop } from '@/lib/shop-service';
 import { EditShopDialog, ShopStructureEditor } from '@/components/user/shops';
+import { ExportDialog } from '@/components/user/shops/ExportDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { ProductsTable } from '@/components/user/products/ProductsTable';
+ 
 import { ProductService, type Product } from '@/lib/product-service';
 
 export const ShopDetail = () => {
@@ -26,6 +28,8 @@ export const ShopDetail = () => {
   const [productsCount, setProductsCount] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  
 
   useEffect(() => {
     if (!id) {
@@ -50,10 +54,12 @@ export const ShopDetail = () => {
           .eq('id', shopData.template_id)
           .single();
         
-        if (data?.marketplace) {
-          setMarketplace(data.marketplace);
-        }
+      if (data?.marketplace) {
+        setMarketplace(data.marketplace);
       }
+    }
+
+    
     } catch (error: any) {
       console.error('Load shop error:', error);
       toast.error(error?.message || 'Failed to load shop');
@@ -107,6 +113,15 @@ export const ShopDetail = () => {
             >
               <Settings className="h-4 w-4" />
             </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowExportDialog(true)}
+              title={t('export_section')}
+              data-testid="user_shop_export_open"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
           </div>
         }
       />
@@ -136,6 +151,8 @@ export const ShopDetail = () => {
         />
       </div>
 
+      
+
       {/* Edit Shop Dialog */}
       {shop && (
         <EditShopDialog
@@ -153,6 +170,15 @@ export const ShopDetail = () => {
           open={showStructureEditor}
           onOpenChange={setShowStructureEditor}
           onSuccess={loadShop}
+        />
+      )}
+
+      {/* Export Dialog */}
+      {shop && (
+        <ExportDialog
+          storeId={id!}
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
         />
       )}
     </div>

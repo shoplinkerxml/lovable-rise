@@ -169,6 +169,22 @@ const dictionary: Dictionary = {
   back_to_shops: { uk: "Назад до магазинів", en: "Back to Shops" },
   no_shops: { uk: "Немає магазинів", en: "No Shops" },
   no_shops_description: { uk: "Створіть перший магазин для початку роботи", en: "Create your first shop to get started" },
+  export_section: { uk: "Експорт", en: "Export" },
+  export_updated: { uk: "Експорт оновлено", en: "Export updated" },
+  export_update_failed: { uk: "Не вдалося оновити експорт", en: "Failed to update export" },
+  link_copied: { uk: "Посилання скопійовано", en: "Link copied" },
+  copy_link: { uk: "Копіювати", en: "Copy" },
+  refresh_export: { uk: "Оновити", en: "Refresh" },
+  last_generated_at: { uk: "Оновлено", en: "Last generated" },
+  no_export_links: { uk: "Немає налаштованих посилань експорту", en: "No export links configured" },
+  generate_now: { uk: "Згенерувати зараз", en: "Generate now" },
+  auto_generate: { uk: "Автоматична генерація", en: "Auto generate" },
+  interval: { uk: "Інтервал", en: "Interval" },
+  close: { uk: "Закрити", en: "Close" },
+  export_link_created: { uk: "Створено посилання експорту", en: "Export link created" },
+  export_link_create_failed: { uk: "Не вдалося створити посилання", en: "Failed to create link" },
+  auto_export_generated: { uk: "Автоматично згенеровано", en: "Generated automatically" },
+  auto_export_failed: { uk: "Помилка автоматичної генерації", en: "Auto generation failed" },
   shop_products: { uk: "Товарів", en: "Products" },
   shop_categories: { uk: "Категорій", en: "Categories" },
   shop_name: { uk: "Назва магазину", en: "Shop Name" },
@@ -1293,8 +1309,16 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
 
 export const useI18n = () => {
   const ctx = useContext(I18nContext);
-  if (!ctx) throw new Error("useI18n must be used within I18nProvider");
-  return ctx;
+  if (ctx) return ctx;
+  return {
+    lang: "uk" as const,
+    t: (key: keyof typeof dictionary) => {
+      const entry = dictionary[key];
+      if (!entry) return `[${key}]`;
+      return entry.uk || `[${key}]`;
+    },
+    setLang: () => {},
+  };
 };
 
 // Helper hook for user management translations

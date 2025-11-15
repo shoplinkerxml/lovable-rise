@@ -10,6 +10,7 @@ import { I18nProvider } from "@/providers/i18n-provider";
 // Dev diagnostics removed per request
 
 import Index from "./pages/Index";
+import ExportPublic from "./pages/ExportPublic";
 import ApiDocs from "./pages/ApiDocs";
 import NotFound from "./pages/NotFound";
 import AdminAuth from "./pages/AdminAuth";
@@ -66,6 +67,7 @@ const App = () => {
   const router = createBrowserRouter([
     { path: "/", element: <Index /> },
     { path: "/docs", element: <ApiDocs /> },
+    { path: "/export/:format/:token", element: <ExportPublic /> },
     { path: "/admin-auth", element: <AdminAuth /> },
     { path: "/admin-*", element: <NotFound /> },
     {
