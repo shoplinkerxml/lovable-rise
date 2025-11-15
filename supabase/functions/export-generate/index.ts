@@ -110,13 +110,12 @@ Deno.serve(async (req) => {
     const needCurrencies = fieldPaths.some((p) => p.toLowerCase().includes('shop.currencies') || p.toLowerCase().includes('currenc'));
     const needCategories = fieldPaths.some((p) => p.toLowerCase().includes('shop.categories') || p.toLowerCase().includes('categor'));
 
-    if (needCurrencies && storeRow?.user_id) {
+    if (needCurrencies) {
       const { data: curRows } = await supabase
         .from('store_currencies')
-        .select('code,rate,is_base,is_active')
-        .eq('user_id', storeRow.user_id)
-        .eq('is_active', true);
-      const items = ((curRows || []) as Array<{ code: string; rate: number; is_base: boolean | null; is_active: boolean | null }>).
+        .select('code,rate,is_base')
+        .eq('store_id', body.store_id);
+      const items = ((curRows || []) as Array<{ code: string; rate: number; is_base: boolean | null }>).
         map((c) => {
           const id = String(c.code || '').toUpperCase();
           const rate = c.is_base ? 1 : Number(c.rate || 1);

@@ -198,6 +198,7 @@ const dictionary: Dictionary = {
   failed_delete_shop: { uk: "Помилка видалення магазину", en: "Failed to delete shop" },
   delete_shop_confirm: { uk: "Видалити магазин?", en: "Delete Shop?" },
   shops_limit: { uk: "Магазини", en: "Shops" },
+  shop_currencies: { uk: "Валюти магазину", en: "Store Currencies" },
   shops_limit_reached: { uk: "Досягнуто ліміту магазинів", en: "Shop limit reached" },
   upgrade_plan: { uk: "Оновіть тарифний план для створення додаткових магазинів", en: "Upgrade plan to create more shops" },
   create: { uk: "Створити", en: "Create" },
