@@ -283,10 +283,57 @@ export default function ShopSettings() {
             </TabsContent>
 
             <TabsContent value="categories" className="space-y-4">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>{t('shop_categories')}</span>
-                <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm" data-testid="shop_settings_actions_block">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{t('shop_categories')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Input
+                  placeholder={t('search_placeholder')}
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
+                  className="w-[clamp(12rem,40vw,24rem)]"
+                  data-testid="shop_settings_filter"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={selectedRowIds.length !== 1}
+                    onClick={() => {
+                      const cat = rows.find(r => r.store_category_id === selectedRowIds[0]);
+                      if (cat) {
+                        setEditRow(cat);
+                        setEditExternalId(String(cat.store_external_id ?? cat.base_external_id ?? ''));
+                        setEditRzIdValue(String(cat.store_rz_id_value ?? ''));
+                        setEditActive(!!cat.is_active);
+                      }
+                    }}
+                    data-testid="shop_settings_edit_btn"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={selectedRowIds.length === 0}
+                    onClick={async () => {
+                      for (const catId of selectedRowIds) {
+                        const cat = rows.find(r => r.store_category_id === catId);
+                        if (cat) {
+                          await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
+                        }
+                      }
+                      const cats = await ShopService.getStoreCategories(id!);
+                      setRows(cats);
+                      setSelectedRowIds([]);
+                    }}
+                    data-testid="shop_settings_delete_btn"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={t('view_options')} data-testid="shop_settings_viewOptions">
@@ -294,7 +341,6 @@ export default function ShopSettings() {
                       </Button>
                     </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem disabled className="text-sm">{t('toggle_columns') || 'Налаштувати колонки'}</DropdownMenuItem>
                     <DropdownMenuCheckboxItem checked={showNameCol} onCheckedChange={(v)=>setShowNameCol(!!v)}>{t('category_name')}</DropdownMenuCheckboxItem>
                     <DropdownMenuCheckboxItem checked={showCodeCol} onCheckedChange={(v)=>setShowCodeCol(!!v)}>{t('code')}</DropdownMenuCheckboxItem>
                     <DropdownMenuCheckboxItem checked={showRozetkaCol} onCheckedChange={(v)=>setShowRozetkaCol(!!v)}>{t('rozetka_category')}</DropdownMenuCheckboxItem>
@@ -302,21 +348,8 @@ export default function ShopSettings() {
                     <DropdownMenuCheckboxItem checked={showActionsCol} onCheckedChange={(v)=>setShowActionsCol(!!v)}>{t('actions')}</DropdownMenuCheckboxItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder={t('search_placeholder')}
-                    value={search}
-                onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
-                className="w-[clamp(12rem,40vw,24rem)]"
-                data-testid="shop_settings_filter"
-              />
-            </div>
-          </div>
 
           <div className="overflow-hidden rounded-lg border">
             <div className="relative w-full overflow-auto">
@@ -372,12 +405,11 @@ export default function ShopSettings() {
                         {showActionsCol && (<td className="p-2 align-middle">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="icon" className="h-9 w-9" data-testid={`shop_settings_rowActions_${cat.store_category_id}`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`shop_settings_rowActions_${cat.store_category_id}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuItem disabled>{t('actions')}</DropdownMenuItem>
+                            <DropdownMenuContent align="end" className="w-40">
                               <DropdownMenuItem onClick={() => { setEditRow(cat); setEditExternalId(String(cat.store_external_id ?? cat.base_external_id ?? '')); setEditRzIdValue(String(cat.store_rz_id_value ?? '')); setEditActive(!!cat.is_active); }}>
                                 <Pencil className="mr-2 h-4 w-4" />{t('edit') || 'Редагувати'}
                               </DropdownMenuItem>
@@ -399,23 +431,24 @@ export default function ShopSettings() {
           <Dialog open={!!editRow} onOpenChange={(open)=>{ if (!open) setEditRow(null); }}>
             <DialogContent className="max-w-[clamp(22rem,60vw,32rem)]">
               <DialogHeader>
-                <DialogTitle>{t('edit') || 'Редагувати категорію'}</DialogTitle>
+                <DialogTitle>{t('edit') || 'Редагувати'}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-3 pt-2">
+              <div className="space-y-4 pt-2">
                 <div className="space-y-2">
-                  <Label>{t('category_name')}</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">{editRow?.name}</span>
-                    <Badge variant="outline" className="px-1.5 py-0 text-xs">{editExternalId || '-'}</Badge>
-                  </div>
+                  <Label htmlFor="edit-category-name">{t('category_name')}</Label>
+                  <div className="text-sm">{editRow?.name} <Badge variant="outline" className="ml-2 px-1.5 py-0 text-xs">{editExternalId || '-'}</Badge></div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Категорія Rozetka</Label>
-                  <Input value={editRzIdValue} onChange={(e)=>setEditRzIdValue(e.target.value)} />
+                  <Label htmlFor="edit-category-code">Код категорії</Label>
+                  <div className="text-sm text-muted-foreground">{editExternalId || '-'}</div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label>{t('active')}</Label>
-                  <Switch checked={editActive} onCheckedChange={setEditActive} />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-rozetka-category">Категорія Rozetka</Label>
+                  <Input id="edit-rozetka-category" value={editRzIdValue} onChange={(e)=>setEditRzIdValue(e.target.value)} placeholder="Введіть ID категорії Rozetka" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="edit-active">{t('active')}</Label>
+                  <Switch id="edit-active" checked={editActive} onCheckedChange={setEditActive} />
                 </div>
               </div>
               <DialogFooter className="gap-2">
