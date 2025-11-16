@@ -54,6 +54,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
 import { supabase } from "@/integrations/supabase/client";
+import { R2Storage } from "@/lib/r2-storage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ProductsTableProps = {
@@ -338,12 +339,22 @@ export const ProductsTable = ({
           if (!grouped[pid]) grouped[pid] = [];
           grouped[pid].push(r);
         });
-        Object.entries(grouped).forEach(([pid, rows]) => {
+        for (const [pid, rows] of Object.entries(grouped)) {
           const main = rows.find((x) => x.is_main) || rows.sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0];
           if (main?.url) {
-            mainImageMap[pid] = main.url;
+            let url = main.url as string;
+            if (typeof url === "string" && (url.includes("r2.dev") || url.includes("cloudflarestorage.com"))) {
+              const objectKey = R2Storage.extractObjectKeyFromUrl(url);
+              if (objectKey) {
+                try {
+                  const signed = await R2Storage.getViewUrl(objectKey);
+                  if (signed) url = signed;
+                } catch {}
+              }
+            }
+            mainImageMap[pid] = url;
           }
-        });
+        }
       }
 
       if (categoryIds.length > 0) {

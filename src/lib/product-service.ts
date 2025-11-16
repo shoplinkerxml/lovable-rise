@@ -557,23 +557,7 @@ export class ProductService {
       }
     }
 
-    // Fallback-параметры для docket/docket_ua, если соответствующих колонок нет
-    try {
-      const fallbackParams: any[] = [];
-      if (productInsertData.docket_ua != null && String(productInsertData.docket_ua).trim() !== '') {
-        fallbackParams.push({ product_id: product.id, name: 'docket_ua', value: String(productInsertData.docket_ua), order_index: 0 });
-      }
-      if (productInsertData.docket != null && String(productInsertData.docket).trim() !== '') {
-        fallbackParams.push({ product_id: product.id, name: 'docket', value: String(productInsertData.docket), order_index: fallbackParams.length });
-      }
-      if (fallbackParams.length > 0) {
-        await (supabase as any)
-          .from('store_product_params')
-          .insert(fallbackParams);
-      }
-    } catch (e) {
-      console.warn('Fallback params insert failed:', e);
-    }
+    
 
     // Создаем изображения товара, если они есть
     if (productData.images && productData.images.length > 0) {
@@ -602,9 +586,19 @@ export class ProductService {
         };
       });
 
+      const mainIdx = imagesData.findIndex((i) => i.is_main === true);
+      const orderedImages = (() => {
+        const arr = imagesData.slice();
+        if (mainIdx > 0) {
+          const [main] = arr.splice(mainIdx, 1);
+          arr.unshift(main);
+        }
+        return arr.map((i, idx) => ({ ...i, order_index: idx }));
+      })();
+
       const { error: imagesError } = await (supabase as any)
         .from('store_product_images')
-        .insert(imagesData);
+        .insert(orderedImages);
 
       if (imagesError) {
         console.error('Create product images error:', imagesError);
@@ -658,16 +652,76 @@ export class ProductService {
         paramid: p.paramid ?? null,
         valueid: p.valueid ?? null,
       })),
-      images: (images || []).map((img, idx) => ({
-        url: img.url,
-        order_index: img.order_index ?? idx,
-        is_main: (img as any).is_main ?? (idx === 0)
-      })),
     };
 
     try {
-      // 4. Создаем новый товар с теми же данными
       const created = await this.createProduct(duplicateData);
+      const { data: authData } = await (supabase as any).auth.getSession();
+      const accessToken: string | null = authData?.session?.access_token || null;
+      const originalImages = images || [];
+      if (originalImages.length > 0) {
+        const uploaded: ProductImage[] = [];
+        for (let idx = 0; idx < originalImages.length; idx++) {
+          const img = originalImages[idx];
+          let src = typeof img?.url === 'string' ? img.url : '';
+          const key = typeof img?.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          if (key && accessToken) {
+            try {
+              const { data, error } = await (supabase as any).functions.invoke('r2-copy', { body: { sourceObjectKey: key, productId: created.id }, headers: { Authorization: `Bearer ${accessToken}` } });
+              if (!error && data?.publicUrl) {
+                uploaded.push({ url: data.publicUrl, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
+                continue;
+              }
+            } catch {}
+          }
+          try {
+            const res = await fetch(src);
+            if (!res.ok) throw new Error(String(res.status));
+            const blob = await res.blob();
+            let name = '';
+            try {
+              const u = new URL(typeof img?.url === 'string' ? img.url : src);
+              const parts = u.pathname.split('/').filter(Boolean);
+              name = parts[parts.length - 1] || '';
+            } catch {}
+            if (!name) {
+              const mt = res.headers.get('content-type') || blob.type || '';
+              const ext = mt.includes('png') ? 'png' : mt.includes('webp') ? 'webp' : mt.includes('gif') ? 'gif' : 'jpg';
+              name = `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            }
+            const file = new File([blob], name, { type: res.headers.get('content-type') || blob.type || 'application/octet-stream' });
+            const up = await R2Storage.uploadFile(file, created.id);
+            uploaded.push({ url: up.publicUrl || img.url, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
+          } catch {
+            uploaded.push({ url: typeof img?.url === 'string' ? img.url : src, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
+          }
+        }
+        if (uploaded.length > 0) {
+          const hasMain = uploaded.some((i) => i.is_main === true);
+          let assigned = false;
+          const normalized = uploaded.map((i, index) => {
+            let m = i.is_main === true && !assigned;
+            if (hasMain) {
+              if (i.is_main === true && !assigned) assigned = true; else m = false;
+            } else {
+              m = index === 0;
+            }
+            return { product_id: created.id, url: i.url, order_index: typeof i.order_index === 'number' ? i.order_index : index, is_main: m } as any;
+          });
+
+          const mainIdx = normalized.findIndex((i) => i.is_main === true);
+          const ordered = (() => {
+            const arr = normalized.slice();
+            if (mainIdx > 0) {
+              const [main] = arr.splice(mainIdx, 1);
+              arr.unshift(main);
+            }
+            return arr.map((i, idx) => ({ ...i, order_index: idx }));
+          })();
+
+          await (supabase as any).from('store_product_images').insert(ordered);
+        }
+      }
       return created;
     } catch (error: any) {
       // Если сработало уникальное ограничение, пробуем скорректировать external_id
@@ -675,6 +729,72 @@ export class ProductService {
       if (msg.toLowerCase().includes("unique") || msg.toLowerCase().includes("constraint")) {
         const fallback: CreateProductData = { ...duplicateData, external_id: `${original.external_id}-copy-${Math.floor(Math.random()*1000)}` };
         const created = await this.createProduct(fallback);
+        const { data: authData } = await (supabase as any).auth.getSession();
+        const accessToken: string | null = authData?.session?.access_token || null;
+        const originalImages = images || [];
+        if (originalImages.length > 0) {
+          const uploaded: ProductImage[] = [];
+          for (let idx = 0; idx < originalImages.length; idx++) {
+            const img = originalImages[idx];
+            let src = typeof img?.url === 'string' ? img.url : '';
+            const key = typeof img?.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+            if (key && accessToken) {
+              try {
+                const { data, error } = await (supabase as any).functions.invoke('r2-copy', { body: { sourceObjectKey: key, productId: created.id }, headers: { Authorization: `Bearer ${accessToken}` } });
+                if (!error && data?.publicUrl) {
+                  uploaded.push({ url: data.publicUrl, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
+                  continue;
+                }
+              } catch {}
+            }
+            try {
+              const res = await fetch(src);
+              if (!res.ok) throw new Error(String(res.status));
+              const blob = await res.blob();
+              let name = '';
+              try {
+                const u = new URL(typeof img?.url === 'string' ? img.url : src);
+                const parts = u.pathname.split('/').filter(Boolean);
+                name = parts[parts.length - 1] || '';
+              } catch {}
+              if (!name) {
+                const mt = res.headers.get('content-type') || blob.type || '';
+                const ext = mt.includes('png') ? 'png' : mt.includes('webp') ? 'webp' : mt.includes('gif') ? 'gif' : 'jpg';
+                name = `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+              }
+              const file = new File([blob], name, { type: res.headers.get('content-type') || blob.type || 'application/octet-stream' });
+              const up = await R2Storage.uploadFile(file, created.id);
+              uploaded.push({ url: up.publicUrl || img.url, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
+            } catch {
+              uploaded.push({ url: typeof img?.url === 'string' ? img.url : src, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
+            }
+          }
+          if (uploaded.length > 0) {
+            const hasMain = uploaded.some((i) => i.is_main === true);
+            let assigned = false;
+            const normalized = uploaded.map((i, index) => {
+              let m = i.is_main === true && !assigned;
+              if (hasMain) {
+                if (i.is_main === true && !assigned) assigned = true; else m = false;
+              } else {
+                m = index === 0;
+              }
+              return { product_id: created.id, url: i.url, order_index: typeof i.order_index === 'number' ? i.order_index : index, is_main: m } as any;
+            });
+
+            const mainIdx = normalized.findIndex((i) => i.is_main === true);
+            const ordered = (() => {
+              const arr = normalized.slice();
+              if (mainIdx > 0) {
+                const [main] = arr.splice(mainIdx, 1);
+                arr.unshift(main);
+              }
+              return arr.map((i, idx) => ({ ...i, order_index: idx }));
+            })();
+
+            await (supabase as any).from('store_product_images').insert(ordered);
+          }
+        }
         return created;
       }
       throw error;
@@ -725,29 +845,7 @@ export class ProductService {
       throw new Error(productError.message);
     }
 
-    // Fallback: синхронизируем docket/docket_ua в store_product_params
-    try {
-      // Удаляем прежние значения для избежания дублей
-      await (supabase as any)
-        .from('store_product_params')
-        .delete()
-        .eq('product_id', id)
-        .in('name', ['docket', 'docket_ua']);
-      const inserts: any[] = [];
-      if (productUpdateData.docket_ua !== undefined && productUpdateData.docket_ua !== null && String(productUpdateData.docket_ua).trim() !== '') {
-        inserts.push({ product_id: id, name: 'docket_ua', value: String(productUpdateData.docket_ua), order_index: 0 });
-      }
-      if (productUpdateData.docket !== undefined && productUpdateData.docket !== null && String(productUpdateData.docket).trim() !== '') {
-        inserts.push({ product_id: id, name: 'docket', value: String(productUpdateData.docket), order_index: inserts.length });
-      }
-      if (inserts.length > 0) {
-        await (supabase as any)
-          .from('store_product_params')
-          .insert(inserts);
-      }
-    } catch (e) {
-      console.warn('Fallback params update failed:', e);
-    }
+    
 
     // Обновляем параметры товара, если они переданы
     if (productData.params !== undefined) {
@@ -813,9 +911,19 @@ export class ProductService {
           };
         });
 
+        const mainIdx = imagesData.findIndex((i) => i.is_main === true);
+        const orderedImages = (() => {
+          const arr = imagesData.slice();
+          if (mainIdx > 0) {
+            const [main] = arr.splice(mainIdx, 1);
+            arr.unshift(main);
+          }
+          return arr.map((i, idx) => ({ ...i, order_index: idx }));
+        })();
+
         const { error: imagesError } = await (supabase as any)
           .from('store_product_images')
-          .insert(imagesData);
+          .insert(orderedImages);
 
         if (imagesError) {
           console.error('Update product images error:', imagesError);

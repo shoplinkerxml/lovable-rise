@@ -137,7 +137,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => onDeleteRow(row.index)} data-testid="parametersDataTable_rowAction_delete">
-              <Trash2 className="h-4 w-4 mr-2" /> {t("btn_delete")}
+              <Trash2 className="h-4 w-4 mr-2" /> {t("delete_characteristic")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
