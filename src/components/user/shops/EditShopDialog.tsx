@@ -12,13 +12,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Star } from 'lucide-react';
 import { Save, X } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop, type UpdateShopData } from '@/lib/shop-service';
 import { useMarketplaces } from '@/hooks/useMarketplaces';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface EditShopDialogProps {
   shop: Shop;
@@ -346,53 +348,76 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
           <Card>
             <CardContent className="space-y-4 pt-4">
               <div className="text-sm font-medium">{t('shop_currencies')}</div>
-              <div className="flex items-center gap-2">
-                <Select value={addCurrencyCode} onValueChange={setAddCurrencyCode}>
-                  <SelectTrigger className="w-[12rem]" data-testid="shop_currencies_add_select">
-                    <SelectValue placeholder={t('select_currency')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCurrencies
-                      .filter(c => !storeCurrencies.some(sc => sc.code === c.code))
-                      .map(c => (
-                        <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Button type="button" onClick={handleAddCurrency} disabled={!addCurrencyCode} data-testid="shop_currencies_add_btn">
-                  <Plus className="h-4 w-4 mr-2" />{t('add_currency')}
-                </Button>
-              </div>
+              <TooltipProvider>
+                <div className="flex items-center justify-between gap-2">
+                  <Select value={addCurrencyCode} onValueChange={setAddCurrencyCode}>
+                    <SelectTrigger className="w-[clamp(10rem,30vw,12rem)]" data-testid="shop_currencies_add_select">
+                      <SelectValue placeholder={t('select_currency')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCurrencies
+                        .filter(c => !storeCurrencies.some(sc => sc.code === c.code))
+                        .map(c => (
+                          <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button type="button" onClick={handleAddCurrency} disabled={!addCurrencyCode} data-testid="shop_currencies_add_btn" variant="ghost" size="icon" className="h-8 w-8" aria-label={t('add_currency')}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('add_currency')}</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              </TooltipProvider>
 
               {storeCurrencies.length === 0 ? (
                 <div className="text-xs text-muted-foreground">{t('no_currencies_found')}</div>
               ) : (
                 <div className="space-y-2">
                   {storeCurrencies.map(cur => (
-                    <div key={cur.code} className="flex items-center gap-3" data-testid={`shop_currency_${cur.code}`}>
-                      <div className="w-[6rem] text-sm font-medium">{cur.code}</div>
+                    <div key={cur.code} className="flex items-center gap-3 h-9" data-testid={`shop_currency_${cur.code}`}>
+                      <Badge variant="outline" className="px-2 py-0.5 text-sm">{cur.code}</Badge>
                       <div className="flex items-center gap-2">
-                        <Label htmlFor={`rate_${cur.code}`} className="text-xs">{t('currency_rate')}</Label>
                         <Input
                           id={`rate_${cur.code}`}
+                          aria-label={t('currency_rate')}
                           type="number"
                           step="0.0001"
                           defaultValue={cur.rate}
                           onBlur={(e) => handleUpdateRate(cur.code, parseFloat(e.target.value) || 0)}
-                          className="w-[8rem]"
+                          className="h-8 w-[clamp(5rem,10vw,6rem)] text-sm"
                           data-testid={`shop_currency_rate_${cur.code}`}
                         />
                       </div>
                       <div className="flex items-center gap-2 ml-auto">
-                        <span className="text-xs text-muted-foreground">{t('base_currency')}</span>
-                        <Switch
-                          checked={cur.is_base}
-                          onCheckedChange={(checked) => checked ? handleSetBase(cur.code) : null}
-                          data-testid={`shop_currency_base_${cur.code}`}
-                        />
-                        <Button type="button" variant="outline" size="icon" onClick={() => handleDeleteCurrency(cur.code)} data-testid={`shop_currency_del_${cur.code}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">{t('base_currency')}</span>
+                                <Switch
+                                  checked={cur.is_base}
+                                  onCheckedChange={(checked) => checked ? handleSetBase(cur.code) : null}
+                                  data-testid={`shop_currency_base_${cur.code}`}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>{t('base_currency')}</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} data-testid={`shop_currency_del_${cur.code}`} aria-label={t('delete')} className="h-8 w-8">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{t('delete')}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </div>
                   ))}
