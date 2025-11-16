@@ -293,6 +293,8 @@ export function ProductFormTabs({
   const [galleryLoaded, setGalleryLoaded] = useState(false);
   const [galleryLoadCount, setGalleryLoadCount] = useState(0);
   const galleryImgRefs = useRef<Array<HTMLImageElement | null>>([]);
+  const [mainImageLoaded, setMainImageLoaded] = useState<boolean>(true);
+  const mainImgRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     setGalleryLoadCount(0);
     setGalleryLoaded(images.length === 0);
@@ -342,6 +344,10 @@ export function ProductFormTabs({
     });
     // После загрузки изображения обновляем высоту фото-блока
     updatePhotoHeight();
+    setMainImageLoaded(true);
+  };
+  const handleMainImageError = (_event: React.SyntheticEvent<HTMLImageElement>) => {
+    setMainImageLoaded(true);
   };
 
   // Handle gallery image load to get dimensions
@@ -1191,8 +1197,13 @@ export function ProductFormTabs({
                         <div className="relative flex justify-center">
                           <Card className="relative group">
                             <CardContent className="p-2 sm:p-3 md:p-4">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
-                                <img src={images[activeImageIndex]?.url} alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`} className="w-full h-full object-contain select-none" data-testid={`productFormTabs_mainImage`} onLoad={handleImageLoad} />
+                              <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain" aria-busy={!mainImageLoaded && images.length > 0}>
+                                {!mainImageLoaded && images.length > 0 && (
+                                  <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="productFormTabs_info_mainImage_loader">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                  </div>
+                                )}
+                                <img ref={mainImgRef} src={images[activeImageIndex]?.url} alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`} className="w-full h-full object-contain select-none" data-testid={`productFormTabs_mainImage`} onLoad={handleImageLoad} onError={handleMainImageError} />
                               </div>
                               {images[activeImageIndex]?.is_main && <Badge className="absolute top-2 left-2" variant="default" data-testid="productFormTabs_mainBadge">
                                   {t('main_image')}
