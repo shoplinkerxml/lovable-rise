@@ -56,6 +56,18 @@ export default function ShopSettings() {
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [selectedRowIds, setSelectedRowIds] = useState<number[]>([]);
   const [editRow, setEditRow] = useState<StoreCategoryRow | null>(null);
+  const [editOpen, setEditOpen] = useState<boolean>(false);
+  const cleanupDialogArtifacts = () => {
+    try {
+      document.querySelectorAll('[inert]').forEach(el => {
+        el.removeAttribute('inert');
+        el.removeAttribute('aria-hidden');
+      });
+      document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
+        el.removeAttribute('aria-hidden');
+      });
+    } catch {}
+  };
   const [editExternalId, setEditExternalId] = useState<string>("");
   const [editRzIdValue, setEditRzIdValue] = useState<string>("");
   const [editActive, setEditActive] = useState<boolean>(true);
@@ -307,6 +319,7 @@ export default function ShopSettings() {
                       setEditExternalId(String(cat.store_external_id ?? cat.base_external_id ?? ''));
                       setEditRzIdValue(String(cat.store_rz_id_value ?? ''));
                       setEditActive(!!cat.is_active);
+                      setEditOpen(true);
                     }
                   }} data-testid="shop_settings_edit_btn">
                     <Pencil className="h-4 w-4" />
@@ -372,9 +385,9 @@ export default function ShopSettings() {
                           </div>
                         </td>
                         {showNameCol && <td className="p-2 align-middle"><span className="text-sm font-medium truncate block max-w-[30rem]">{cat.name}</span></td>}
-                        {showCodeCol && <td className="p-2 align-middle"><Badge variant="outline" className="px-1.5 py-0 text-xs">{(cat.store_external_id ?? cat.base_external_id) || '-'}</Badge></td>}
+                        {showCodeCol && <td className="p-2 align-middle"><Badge variant="outline" className="px-1.5 py-0 text-xs border-0">{(cat.store_external_id ?? cat.base_external_id) || '-'}</Badge></td>}
                         {showRozetkaCol && <td className="p-2 align-middle">
-                          <Input id={`rzv_${cat.store_category_id}`} defaultValue={cat.store_rz_id_value || ''} className="h-8 w-[10rem]" onBlur={e => updateCategoryField(cat.store_category_id, {
+                          <Input id={`rzv_${cat.store_category_id}`} defaultValue={cat.store_rz_id_value || ''} className="h-8 w-[10rem] border-0 focus-visible:ring-0 focus-visible:outline-none shadow-none" onBlur={e => updateCategoryField(cat.store_category_id, {
                             rz_id_value: e.target.value || null
                           })} data-testid={`shop_settings_rzid_${cat.store_category_id}`} />
                         </td>}
@@ -396,6 +409,7 @@ export default function ShopSettings() {
                                 setEditExternalId(String(cat.store_external_id ?? cat.base_external_id ?? ''));
                                 setEditRzIdValue(String(cat.store_rz_id_value ?? ''));
                                 setEditActive(!!cat.is_active);
+                                setEditOpen(true);
                               }}>
                                 <Pencil className="mr-2 h-4 w-4" />{t('edit') || 'Редагувати'}
                               </DropdownMenuItem>
@@ -417,8 +431,12 @@ export default function ShopSettings() {
           </div>
 
           {/* Edit modal */}
-          <Dialog open={!!editRow} onOpenChange={open => {
-                if (!open) setEditRow(null);
+          <Dialog open={editOpen} onOpenChange={open => {
+                setEditOpen(open);
+                if (!open) {
+                  setEditRow(null);
+                  cleanupDialogArtifacts();
+                }
               }}>
             <DialogContent className="max-w-[clamp(22rem,60vw,32rem)]">
               <DialogHeader>
@@ -435,7 +453,7 @@ export default function ShopSettings() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-rozetka-category">Категорія Rozetka</Label>
-                  <Input id="edit-rozetka-category" value={editRzIdValue} onChange={e => setEditRzIdValue(e.target.value)} placeholder="Введіть ID категорії Rozetka" />
+                  <Input id="edit-rozetka-category" value={editRzIdValue} onChange={e => setEditRzIdValue(e.target.value)} placeholder="Введіть ID категорії Rozetka" className="border-0 focus-visible:ring-0 focus-visible:outline-none shadow-none" />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="edit-active">{t('active')}</Label>
@@ -443,7 +461,7 @@ export default function ShopSettings() {
                 </div>
               </div>
               <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setEditRow(null)}>{t('btn_cancel') || 'Скасувати'}</Button>
+                <Button variant="outline" onClick={() => { setEditOpen(false); setEditRow(null); cleanupDialogArtifacts(); }}>{t('btn_cancel') || 'Скасувати'}</Button>
                 <Button onClick={async () => {
                       if (editRow) {
                         await ShopService.updateStoreCategory({
@@ -453,7 +471,9 @@ export default function ShopSettings() {
                         });
                         const cats = await ShopService.getStoreCategories(id!);
                         setRows(cats);
+                        setEditOpen(false);
                         setEditRow(null);
+                        cleanupDialogArtifacts();
                       }
                     }}>{t('save_changes') || 'Зберегти зміни'}</Button>
               </DialogFooter>
