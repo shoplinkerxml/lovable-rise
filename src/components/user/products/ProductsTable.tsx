@@ -56,6 +56,9 @@ import { ProductService, type Product } from "@/lib/product-service";
 import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -118,6 +121,36 @@ function ProductStatusBadge({ state }: { state?: string }) {
     >
       {t(labelKey)}
     </Badge>
+  );
+}
+
+function SortableHeader({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center justify-between">
+      <div className="min-w-0 flex-1">{children}</div>
+      <button
+        type="button"
+        className="h-6 w-4 inline-flex items-center justify-center ml-1 rounded hover:bg-muted"
+        {...listeners}
+        {...attributes}
+        data-testid={`user_products_header_drag_${id}`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-grip-vertical h-4 w-4 text-muted-foreground">
+          <circle cx="9" cy="5" r="1"></circle>
+          <circle cx="9" cy="12" r="1"></circle>
+          <circle cx="9" cy="19" r="1"></circle>
+          <circle cx="15" cy="5" r="1"></circle>
+          <circle cx="15" cy="12" r="1"></circle>
+          <circle cx="15" cy="19" r="1"></circle>
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -1249,6 +1282,21 @@ export const ProductsTable = ({
     onPaginationChange: setPagination,
   });
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setColumnOrder((prev) => {
+      const withoutActions = prev.filter((id) => id !== "actions");
+      const fromIndex = withoutActions.indexOf(String(active.id));
+      const toIndex = withoutActions.indexOf(String(over.id));
+      if (fromIndex === -1 || toIndex === -1) return [...withoutActions, "actions"];
+      const moved = arrayMove(withoutActions, fromIndex, toIndex);
+      return [...moved, "actions"];
+    });
+  }
+
   // При изменении набора строк корректируем пагинацию,
   // чтобы не оставаться на несуществующей странице и не показывать пустоту.
   useEffect(() => {
@@ -1692,15 +1740,30 @@ export const ProductsTable = ({
       <div className="bg-background" data-testid="user_products_table">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className={header.column.id === "actions" ? "text-center" : "text-left"}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
+            {table.getHeaderGroups().map((headerGroup) => {
+              const ids = headerGroup.headers.map((h) => h.column.id).filter((id) => id !== "actions");
+              return (
+                <DndContext key={headerGroup.id} sensors={sensors} onDragEnd={handleDragEnd}>
+                  <SortableContext items={ids}>
+                    <TableRow>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id} className={header.column.id === "actions" ? "text-center" : "text-left"}>
+                          {header.isPlaceholder ? null : (
+                            header.column.id === "actions" ? (
+                              flexRender(header.column.columnDef.header, header.getContext())
+                            ) : (
+                              <SortableHeader id={header.column.id}>
+                                {flexRender(header.column.columnDef.header, header.getContext())}
+                              </SortableHeader>
+                            )
+                          )}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </SortableContext>
+                </DndContext>
+              );
+            })}
           </TableHeader>
       <TableBody>
             {loading ? (
