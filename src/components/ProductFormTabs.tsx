@@ -257,7 +257,10 @@ export function ProductFormTabs({
   });
   useEffect(() => {
     if (overrides && Object.keys(overrides).length > 0) {
-      setFormData(prev => ({ ...prev, ...overrides }));
+      setFormData(prev => ({
+        ...prev,
+        ...overrides
+      }));
     }
   }, [overrides]);
 
@@ -379,7 +382,6 @@ export function ProductFormTabs({
       return next;
     });
   };
-
   useEffect(() => {
     if (activeTab === 'images') {
       notifyImagesLoading(images.length > 0 && !galleryLoaded);
@@ -387,7 +389,6 @@ export function ProductFormTabs({
       notifyImagesLoading(false);
     }
   }, [activeTab, galleryLoaded, images.length]);
-
   useEffect(() => {
     if (activeTab !== 'images') return;
     const total = images.length;
@@ -582,19 +583,14 @@ export function ProductFormTabs({
       console.log('[ProductFormTabs] No categories loaded yet');
       return;
     }
-    
     console.log('[ProductFormTabs] Searching for category:', {
       category_external_id: formData.category_external_id,
       total_categories: categories.length
     });
-    
-    const matched = categories.find(
-      (c) => String(c.external_id) === String(formData.category_external_id)
-    );
-    
+    const matched = categories.find(c => String(c.external_id) === String(formData.category_external_id));
     if (matched) {
       console.log('[ProductFormTabs] Category matched:', matched);
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         category_id: String(matched.id)
       }));
@@ -614,15 +610,12 @@ export function ProductFormTabs({
     if (formData.category_id) return; // already selected
     if (!formData.category_external_id) return;
     if (!formData.supplier_id) return;
-
     const resolveCategoryId = async () => {
       try {
-        const { data, error } = await (supabase as any)
-          .from('store_categories')
-          .select('id,external_id,name,supplier_id,parent_external_id')
-          .in('external_id', [String(formData.category_external_id), Number(formData.category_external_id)])
-          .eq('supplier_id', Number(formData.supplier_id))
-          .limit(1);
+        const {
+          data,
+          error
+        } = await (supabase as any).from('store_categories').select('id,external_id,name,supplier_id,parent_external_id').in('external_id', [String(formData.category_external_id), Number(formData.category_external_id)]).eq('supplier_id', Number(formData.supplier_id)).limit(1);
         if (!error && Array.isArray(data) && data.length > 0) {
           const cat = data[0];
           setFormData(prev => ({
@@ -637,16 +630,13 @@ export function ProductFormTabs({
           setCategories(prev => {
             const exists = prev?.some(c => String(c.id) === String(cat.id));
             if (exists) return prev;
-            const next = [
-              ...(prev || []),
-              {
-                id: String(cat.id),
-                name: cat.name || '',
-                external_id: String(cat.external_id),
-                supplier_id: String(cat.supplier_id ?? formData.supplier_id),
-                parent_external_id: cat.parent_external_id ? String(cat.parent_external_id) : null
-              }
-            ];
+            const next = [...(prev || []), {
+              id: String(cat.id),
+              name: cat.name || '',
+              external_id: String(cat.external_id),
+              supplier_id: String(cat.supplier_id ?? formData.supplier_id),
+              parent_external_id: cat.parent_external_id ? String(cat.parent_external_id) : null
+            }];
             return next;
           });
         }
@@ -654,9 +644,7 @@ export function ProductFormTabs({
         // silently ignore; UI remains unchanged
       }
     };
-
     resolveCategoryId();
-     
   }, [product, formData.category_external_id, formData.supplier_id, formData.category_id]);
 
   // Track initial hydration to avoid clearing category on first population
@@ -668,10 +656,9 @@ export function ProductFormTabs({
   // Refetch categories when supplier changes
   useEffect(() => {
     console.log('[ProductFormTabs] Supplier changed, isHydrating:', isHydratingRef.current, 'product exists:', !!product, 'isLoadingProduct:', isLoadingProductRef.current);
-    
+
     // Reload lookup data to refresh categories for the selected supplier
     loadLookupData();
-
     const currentSupplier = String(formData.supplier_id || '');
     const initialSupplier = String(initialSupplierIdRef.current || '');
 
@@ -682,17 +669,17 @@ export function ProductFormTabs({
     }
 
     // Skip clearing category during initial hydration or when supplier is the same as initial product supplier
-    if (isHydratingRef.current || (product && currentSupplier && initialSupplier && currentSupplier === initialSupplier)) {
+    if (isHydratingRef.current || product && currentSupplier && initialSupplier && currentSupplier === initialSupplier) {
       console.log('[ProductFormTabs] Skipping category clear - hydration or same as initial supplier');
       return;
     }
-    
+
     // Also skip clearing if we have external_id from product and category not yet selected
     if (product && formData.category_external_id && !formData.category_id) {
       console.log('[ProductFormTabs] Skipping category clear - waiting for category resolution');
       return;
     }
-    
+
     // Reset selected category only on user-initiated supplier change
     console.log('[ProductFormTabs] Clearing category due to supplier change');
     setFormData(prev => ({
@@ -724,21 +711,18 @@ export function ProductFormTabs({
       // Load product data
       // Try to resolve currency_code from loaded currencies
       const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
-      
       const supplierId = (product as any).supplier_id ?? null;
       const categoryId = product.category_id ?? null;
       const categoryExternalId = (product as any).category_external_id ?? null;
 
       // Set initial supplier BEFORE updating formData to avoid race with supplier change effect
       initialSupplierIdRef.current = supplierId ? String(supplierId) : '';
-      
       console.log('[ProductFormTabs] Loading product data:', {
         productId: product.id,
         supplierId,
         categoryId,
         categoryExternalId
       });
-      
       setFormData({
         name: product.name || '',
         name_ua: product.name_ua || '',
@@ -1147,7 +1131,10 @@ export function ProductFormTabs({
   const [selectedParamRows, setSelectedParamRows] = useState<number[]>([]);
   const deleteSelectedParams = (indexes: number[]) => {
     if (!indexes || indexes.length === 0) return;
-    const keep = parameters.filter((_, i) => !indexes.includes(i)).map((p, i) => ({ ...p, order_index: i }));
+    const keep = parameters.filter((_, i) => !indexes.includes(i)).map((p, i) => ({
+      ...p,
+      order_index: i
+    }));
     setParameters(keep);
   };
   return <div className="container mx-auto px-2 sm:px-6 py-3 sm:py-6 max-w-7xl" data-testid="productFormTabs_container">
@@ -1317,13 +1304,13 @@ export function ProductFormTabs({
                   <div className="space-y-2">
                     <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
                     <Select value={formData.category_id} onValueChange={value => {
-                      const cat = categories.find(c => String(c.id) === String(value));
-                      setFormData({
-                        ...formData,
-                        category_id: value,
-                        category_external_id: cat?.external_id || ''
-                      });
-                    }}>
+                    const cat = categories.find(c => String(c.id) === String(value));
+                    setFormData({
+                      ...formData,
+                      category_id: value,
+                      category_external_id: cat?.external_id || ''
+                    });
+                  }}>
                       <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
                         <SelectValue placeholder={selectedCategoryName || t('select_category')} />
                       </SelectTrigger>
@@ -1372,7 +1359,9 @@ export function ProductFormTabs({
                       ...formData,
                       stock_quantity: v
                     });
-                    onChange?.({ stock_quantity: v });
+                    onChange?.({
+                      stock_quantity: v
+                    });
                   }} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" disabled={!!readOnly && !(editableKeys || []).includes('stock_quantity')} />
                   </div>
                 </div>
@@ -1488,16 +1477,24 @@ export function ProductFormTabs({
                       ...formData,
                       price: v
                     });
-                    onChange?.({ price: v });
+                    onChange?.({
+                      price: v
+                    });
                   }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" disabled={!!readOnly && !(editableKeys || []).includes('price')} />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="price_old">{t('old_price')}</Label>
-                    <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => { const v = parseFloat(e.target.value) || 0; setFormData({
-                    ...formData,
-                    price_old: v
-                  }); onChange?.({ price_old: v }); }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" disabled={!!readOnly && !(editableKeys || []).includes('price_old')} />
+                    <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => {
+                    const v = parseFloat(e.target.value) || 0;
+                    setFormData({
+                      ...formData,
+                      price_old: v
+                    });
+                    onChange?.({
+                      price_old: v
+                    });
+                  }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" disabled={!!readOnly && !(editableKeys || []).includes('price_old')} />
                   </div>
 
                   <div className="space-y-2">
@@ -1508,7 +1505,9 @@ export function ProductFormTabs({
                       ...formData,
                       price_promo: v
                     });
-                    onChange?.({ price_promo: v });
+                    onChange?.({
+                      price_promo: v
+                    });
                   }} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" disabled={!!readOnly && !(editableKeys || []).includes('price_promo')} />
                   </div>
                 </div>
@@ -1521,64 +1520,42 @@ export function ProductFormTabs({
 
                 {/* Existing images */}
                 <div className="flex flex-wrap gap-3 md:gap-4">
-                  {images.map((image, index) => (
-                    <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
+                  {images.map((image, index) => <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
                       <CardContent className="p-2">
                         <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={getGalleryAdaptiveImageStyle(index)}>
-                          <img ref={(el) => (galleryImgRefs.current[index] = el)} src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={e => handleGalleryImageLoad(e, index)} onError={e => handleGalleryImageError(e, index)} />
-                          {readOnly ? null : (
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                          <img ref={el => galleryImgRefs.current[index] = el} src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={e => handleGalleryImageLoad(e, index)} onError={e => handleGalleryImageError(e, index)} />
+                          {readOnly ? null : <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
                               <Button size="icon" variant="ghost" onClick={() => setMainImage(index)} aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')} data-testid={`productFormTabs_setMainButton_${index}`} className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}>
                                 <Check className="h-4 w-4" />
                               </Button>
                               <Button size="icon" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
                                 <X className="h-4 w-4" />
                               </Button>
-                            </div>
-                          )}
+                            </div>}
                         </div>
-                        {image.is_main && (
-                          <Badge className="absolute top-2 left-2" variant="default">
+                        {image.is_main && <Badge className="absolute top-2 left-2" variant="default">
                             {t('main_photo')}
-                          </Badge>
-                        )}
+                          </Badge>}
                       </CardContent>
-                    </Card>
-                  ))}
+                    </Card>)}
                 </div>
 
                 <Separator />
 
                 {/* Drop zone under photos */}
-                {readOnly ? null : (
-                  <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
+                {readOnly ? null : <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
                     <CardContent className="p-1 md:p-2">
-                      <div
-                        className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
-                          isDragOver
-                            ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm'
-                            : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'
-                        } hover:scale-[1.01]`}
-                        style={{
-                          width: '100%',
-                          maxWidth: '100%',
-                          height: 'auto',
-                          minHeight: 'clamp(12rem, 30vh, 24rem)'
-                        }}
-                        onDragEnter={handleDragEnter}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        onClick={() => document.getElementById('fileUpload')?.click()}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            document.getElementById('fileUpload')?.click();
-                          }
-                        }}
-                      >
+                      <div className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${isDragOver ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'} hover:scale-[1.01]`} style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    height: 'auto',
+                    minHeight: 'clamp(12rem, 30vh, 24rem)'
+                  }} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => document.getElementById('fileUpload')?.click()} role="button" tabIndex={0} onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      document.getElementById('fileUpload')?.click();
+                    }
+                  }}>
                         <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${isDragOver ? 'text-emerald-600' : 'text-emerald-500'}`} />
                         <p className={`text-sm text-center px-2 transition-colors ${isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'}`}>
                           {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
@@ -1588,43 +1565,23 @@ export function ProductFormTabs({
                         </p>
                       </div>
                     </CardContent>
-                  </Card>
-                )}
+                  </Card>}
 
                 {/* Hidden file input retained for drop zone click */}
-                {readOnly ? null : (
-                  <input
-                    type="file"
-                    accept="image/*,.avif,image/avif"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="fileUpload"
-                    data-testid="productFormTabs_fileInput"
-                  />
-                )}
+                {readOnly ? null : <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />}
 
                 {/* Add by URL under photos */}
                 <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
                   <div className="flex-1">
-                    {readOnly ? null : (
-                      <>
+                    {readOnly ? null : <>
                         <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
                         <div className="flex gap-2 mt-2">
-                          <Input
-                            id="imageUrl"
-                            name="imageUrl"
-                            autoComplete="url"
-                            value={imageUrl}
-                            onChange={e => setImageUrl(e.target.value)}
-                            placeholder={t('image_url_placeholder')}
-                            data-testid="productFormTabs_imageUrlInput"
-                          />
+                          <Input id="imageUrl" name="imageUrl" autoComplete="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
                           <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
                             <Link className="h-4 w-4" />
                           </Button>
                         </div>
-                      </>
-                    )}
+                      </>}
                   </div>
                 </div>
               </div>
@@ -1639,27 +1596,18 @@ export function ProductFormTabs({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {parameters.length === 0 ? (
-                    <div className="text-center py-12 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                  {parameters.length === 0 ? <div className="text-center py-12 border-2 border-dashed border-muted-foreground/25 rounded-lg">
                       <Settings className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                       <p className="text-muted-foreground">{t('no_characteristics_added')}</p>
                       {readOnly ? null : <p className="text-sm text-muted-foreground mt-2">{t('add_characteristics_instruction')}</p>}
-                    </div>
-                  ) : readOnly ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {parameters.map((p) => (
-                        <div key={`${p.name}_${p.order_index}`} className="border rounded-md p-2">
+                    </div> : readOnly ? <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {parameters.map(p => <div key={`${p.name}_${p.order_index}`} className="border rounded-md p-2">
                           <div className="text-xs text-muted-foreground">{p.name}</div>
                           <div className="text-sm break-words">{p.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} onAddParam={openAddParamModal} />
-                  )}
+                        </div>)}
+                    </div> : <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} onAddParam={openAddParamModal} />}
 
-                  {readOnly ? null : (
-                    <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
+                  {readOnly ? null : <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
                       <DialogContent data-testid="productForm_paramModal">
                         <DialogHeader>
                           <DialogTitle>
@@ -1670,30 +1618,30 @@ export function ProductFormTabs({
                           <div className="space-y-2">
                             <Label htmlFor="param-name-modal">{t('characteristic_name')}</Label>
                             <Input id="param-name-modal" value={paramForm.name} onChange={e => setParamForm({
-                            ...paramForm,
-                            name: e.target.value
-                          })} placeholder={t('characteristic_name_placeholder')} data-testid="productForm_modal_paramName" />
+                          ...paramForm,
+                          name: e.target.value
+                        })} placeholder={t('characteristic_name_placeholder')} data-testid="productForm_modal_paramName" />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="param-value-modal">{t('value')}</Label>
                             <Input id="param-value-modal" value={paramForm.value} onChange={e => setParamForm({
-                            ...paramForm,
-                            value: e.target.value
-                          })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
+                          ...paramForm,
+                          value: e.target.value
+                        })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="param-paramid-modal">{t('param_id_optional')}</Label>
                             <Input id="param-paramid-modal" value={paramForm.paramid || ''} onChange={e => setParamForm({
-                            ...paramForm,
-                            paramid: e.target.value
-                          })} placeholder={t('param_id_placeholder')} data-testid="productForm_modal_paramId" />
+                          ...paramForm,
+                          paramid: e.target.value
+                        })} placeholder={t('param_id_placeholder')} data-testid="productForm_modal_paramId" />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="param-valueid-modal">{t('value_id_optional')}</Label>
                             <Input id="param-valueid-modal" value={paramForm.valueid || ''} onChange={e => setParamForm({
-                            ...paramForm,
-                            valueid: e.target.value
-                          })} placeholder={t('value_id_placeholder')} data-testid="productForm_modal_valueId" />
+                          ...paramForm,
+                          valueid: e.target.value
+                        })} placeholder={t('value_id_placeholder')} data-testid="productForm_modal_valueId" />
                           </div>
                         </div>
                         <DialogFooter className="gap-2">
@@ -1705,8 +1653,7 @@ export function ProductFormTabs({
                           </Button>
                         </DialogFooter>
                       </DialogContent>
-                    </Dialog>
-                  )}
+                    </Dialog>}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1715,14 +1662,10 @@ export function ProductFormTabs({
           <Separator className="my-6" />
 
           <div className="flex flex-col sm:flex-row gap-4 justify-end">
-            <Button variant="outline" onClick={handleCancel} data-testid="productFormTabs_cancelButton">
-              {t('btn_cancel')}
-            </Button>
-            {readOnly ? null : (
-              <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
+            
+            {readOnly ? null : <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
                 {loading ? product ? t('loading_updating') : t('loading_creating') : product ? t('btn_update') : t('btn_create')}
-              </Button>
-            )}
+              </Button>}
           </div>
         </CardContent>
       </Card>
