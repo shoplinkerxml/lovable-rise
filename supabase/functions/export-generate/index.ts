@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+// @ts-ignore
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
 
 const corsHeaders = {
@@ -134,14 +135,14 @@ Deno.serve(async (req) => {
     if (needCategories) {
       const { data: catRows } = await supabase
         .from('store_store_categories')
-        .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
+        .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
         .eq('store_id', body.store_id)
         .eq('is_active', true);
       const items = ((catRows || []) as Array<any>).map((row) => {
         const sc = row.store_categories || {};
         const id = String(row.external_id ?? sc.external_id ?? '');
         const name = String(row.custom_name ?? sc.name ?? '');
-        const rz = row.rz_id ? ` rz_id="${xmlEscape(String(row.rz_id))}"` : '';
+        const rz = row.rz_id_value ? ` rz_id="${xmlEscape(String(row.rz_id_value))}"` : '';
         return `<category id="${xmlEscape(id)}"${rz}>${xmlEscape(name)}</category>`;
       }).join('');
       categoriesXml = items ? `<categories>${items}</categories>` : '';

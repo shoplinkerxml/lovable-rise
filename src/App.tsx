@@ -45,6 +45,7 @@ import { Products } from "./pages/user/Products";
 import { ProductCreate } from "./pages/user/ProductCreate";
 import { ProductEdit } from "./pages/user/ProductEdit";
 import { StoreProducts } from "./pages/user/StoreProducts";
+import ShopSettings from "./pages/user/ShopSettings";
 import { StoreProductEdit } from "./pages/user/StoreProductEdit";
 
 const queryClient = new QueryClient({
@@ -107,6 +108,7 @@ const App = () => {
             { path: "suppliers", element: <Suppliers /> },
             { path: "shops", element: <Shops /> },
             { path: "shops/:id", element: <ShopDetail /> },
+            { path: "shops/:id/settings", element: <ShopSettings /> },
             { path: "shops/:id/products", element: <StoreProducts /> },
             { path: "shops/:id/products/edit/:productId", element: <StoreProductEdit /> },
             { path: "products", element: <Products /> },

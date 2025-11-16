@@ -295,13 +295,16 @@ export function ProductFormTabs({
   const galleryImgRefs = useRef<Array<HTMLImageElement | null>>([]);
   const [mainImageLoaded, setMainImageLoaded] = useState<boolean>(true);
   const mainImgRef = useRef<HTMLImageElement | null>(null);
+  const notifyImagesLoading = (flag: boolean) => {
+    setTimeout(() => onImagesLoadingChange?.(flag), 0);
+  };
   useEffect(() => {
     setGalleryLoadCount(0);
     setGalleryLoaded(images.length === 0);
     if (activeTab === 'images') {
-      onImagesLoadingChange?.(images.length > 0 && !galleryLoaded);
+      notifyImagesLoading(images.length > 0 && !galleryLoaded);
     } else {
-      onImagesLoadingChange?.(false);
+      notifyImagesLoading(false);
     }
   }, [images, activeTab]);
 
@@ -364,7 +367,7 @@ export function ProductFormTabs({
     setGalleryLoadCount(prev => {
       const next = prev + 1;
       if (next >= images.length) setGalleryLoaded(true);
-      if (next >= images.length) onImagesLoadingChange?.(false);
+      if (next >= images.length) notifyImagesLoading(false);
       return next;
     });
   };
@@ -372,16 +375,16 @@ export function ProductFormTabs({
     setGalleryLoadCount(prev => {
       const next = prev + 1;
       if (next >= images.length) setGalleryLoaded(true);
-      if (next >= images.length) onImagesLoadingChange?.(false);
+      if (next >= images.length) notifyImagesLoading(false);
       return next;
     });
   };
 
   useEffect(() => {
     if (activeTab === 'images') {
-      onImagesLoadingChange?.(images.length > 0 && !galleryLoaded);
+      notifyImagesLoading(images.length > 0 && !galleryLoaded);
     } else {
-      onImagesLoadingChange?.(false);
+      notifyImagesLoading(false);
     }
   }, [activeTab, galleryLoaded, images.length]);
 
@@ -390,13 +393,13 @@ export function ProductFormTabs({
     const total = images.length;
     if (total === 0) {
       setGalleryLoaded(true);
-      onImagesLoadingChange?.(false);
+      notifyImagesLoading(false);
       return;
     }
     const done = galleryImgRefs.current.slice(0, total).reduce((acc, img) => acc + (img && img.complete ? 1 : 0), 0);
     if (done >= total) {
       setGalleryLoaded(true);
-      onImagesLoadingChange?.(false);
+      notifyImagesLoading(false);
     }
   }, [activeTab, images]);
 

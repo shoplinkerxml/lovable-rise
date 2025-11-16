@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface EditShopDialogProps {
   shop: Shop;
@@ -54,6 +55,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     store_rz_id_value: string | null;
     is_active: boolean;
   }>>([]);
+  const [activeTab, setActiveTab] = useState<'info' | 'currencies' | 'categories'>('info');
 
   useEffect(() => {
     if (shop?.template_id) {
@@ -276,7 +278,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[clamp(30rem,70vw,46rem)]">
+      <DialogContent className="max-w-[clamp(30rem,70vw,46rem)] max-h-[80vh] overflow-y-auto py-6 sm:py-8">
         <DialogHeader>
           <DialogTitle>Редагувати магазин</DialogTitle>
           <DialogDescription>
@@ -284,69 +286,77 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="store_name">{t('shop_name')}</Label>
-            <Input
-              id="store_name"
-              placeholder={t('shop_name_placeholder')}
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full" data-testid="editShopDialog_tabs">
+            <TabsList className="flex w-full gap-2 h-9 overflow-x-auto whitespace-nowrap scroll-smooth no-scrollbar bg-transparent p-0 text-foreground rounded-none border-b border-border justify-start" data-testid="editShopDialog_tabsList">
+              <TabsTrigger value="info" className="px-3 text-sm rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-primary" data-testid="editShopDialog_tab_info">Основна інформація</TabsTrigger>
+              <TabsTrigger value="currencies" className="px-3 text-sm rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-primary" data-testid="editShopDialog_tab_currencies">Валюти</TabsTrigger>
+              <TabsTrigger value="categories" className="px-3 text-sm rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-primary" data-testid="editShopDialog_tab_categories">Категорії</TabsTrigger>
+            </TabsList>
 
-          <div className="space-y-2">
-            <Label htmlFor="store_company">{t('company')}</Label>
-            <Input
-              id="store_company"
-              placeholder={t('company_placeholder')}
-              value={storeCompany}
-              onChange={(e) => setStoreCompany(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+            <TabsContent value="info" className="space-y-4" data-testid="editShopDialog_infoContent">
+              <div className="space-y-2">
+                <Label htmlFor="store_name">{t('shop_name')}</Label>
+                <Input
+                  id="store_name"
+                  placeholder={t('shop_name_placeholder')}
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="store_url">{t('store_url')}</Label>
-            <Input
-              id="store_url"
-              placeholder={t('store_url_placeholder')}
-              value={storeUrl}
-              onChange={(e) => setStoreUrl(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="store_company">{t('company')}</Label>
+                <Input
+                  id="store_company"
+                  placeholder={t('company_placeholder')}
+                  value={storeCompany}
+                  onChange={(e) => setStoreCompany(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="marketplace">Формат магазина</Label>
-            <Select
-              value={selectedMarketplace}
-              onValueChange={handleMarketplaceChange}
-              disabled={loading || marketplacesLoading || !canChangeFormat}
-            >
-              <SelectTrigger id="marketplace">
-                <SelectValue placeholder="Оберіть формат магазину" />
-              </SelectTrigger>
-              <SelectContent>
-                {marketplaces.map((marketplace) => (
-                  <SelectItem key={marketplace.value} value={marketplace.value}>
-                    {marketplace.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              {!canChangeFormat 
-                ? 'Формат можна змінити тільки якщо не додано жодного товару' 
-                : 'Зміна формату скопіює новий шаблон'
-              }
-            </p>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="store_url">{t('store_url')}</Label>
+                <Input
+                  id="store_url"
+                  placeholder={t('store_url_placeholder')}
+                  value={storeUrl}
+                  onChange={(e) => setStoreUrl(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
 
-          {/* Валюти магазину */}
-          <Card>
-            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="marketplace">Формат магазина</Label>
+                <Select
+                  value={selectedMarketplace}
+                  onValueChange={handleMarketplaceChange}
+                  disabled={loading || marketplacesLoading || !canChangeFormat}
+                >
+                  <SelectTrigger id="marketplace">
+                    <SelectValue placeholder="Оберіть формат магазину" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {marketplaces.map((marketplace) => (
+                      <SelectItem key={marketplace.value} value={marketplace.value}>
+                        {marketplace.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  {!canChangeFormat 
+                    ? 'Формат можна змінити тільки якщо не додано жодного товару' 
+                    : 'Зміна формату скопіює новий шаблон'
+                  }
+                </p>
+              </div>
+            </TabsContent>
+
+            {/* Валюти магазину */}
+            <TabsContent value="currencies" className="space-y-4" data-testid="editShopDialog_currenciesContent">
               <div className="text-sm font-medium">{t('shop_currencies')}</div>
               <TooltipProvider>
                 <div className="flex items-center justify-between gap-2">
@@ -423,24 +433,22 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {/* Категории магазина */}
-          <Card>
-            <CardContent className="space-y-4 pt-4">
+            {/* Категории магазина */}
+            <TabsContent value="categories" className="space-y-4" data-testid="editShopDialog_categoriesContent">
               <div className="text-sm font-medium">{t('shop_categories')}</div>
               {storeCategories.length === 0 ? (
                 <div className="text-xs text-muted-foreground">{t('no_categories_found')}</div>
               ) : (
                 <div className="space-y-2">
                   {storeCategories.map((cat) => (
-                    <div key={cat.store_category_id} className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3" data-testid={`shop_category_${cat.store_category_id}`}>
-                      <div className="w-[clamp(6rem,12vw,10rem)] text-xs text-muted-foreground">{t('base_external_id')}</div>
-                      <div className="text-sm font-medium truncate">{cat.name}</div>
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`rz_${cat.store_category_id}`} className="text-xs">rz_id</Label>
-                        <Input id={`rz_${cat.store_category_id}`} defaultValue={cat.store_rz_id || ''} className="h-8 w-[10rem]" onBlur={(e) => updateCategoryField(cat.store_category_id, { rz_id: e.target.value || null })} />
+                    <div key={cat.store_category_id} className="grid grid-cols-[1fr_auto_auto] items-center gap-3" data-testid={`shop_category_${cat.store_category_id}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium truncate">{cat.name}</span>
+                        <Badge variant="outline" className="px-1.5 py-0 text-xs">
+                          {(cat.store_external_id ?? cat.base_external_id) || '-'}
+                        </Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         <Label htmlFor={`rzv_${cat.store_category_id}`} className="text-xs">rz_id_value</Label>
@@ -454,8 +462,8 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex gap-2 justify-end">
             <Button

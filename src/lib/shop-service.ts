@@ -313,7 +313,6 @@ export class ShopService {
     parent_external_id: string | null;
     base_rz_id: string | null;
     store_external_id: string | null;
-    store_rz_id: string | null;
     store_rz_id_value: string | null;
     is_active: boolean;
   }>> {
@@ -321,9 +320,23 @@ export class ShopService {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) throw new Error("Invalid session");
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data: storeOwner, error: storeOwnerErr } = await (supabase as any)
+      .from('user_stores')
+      .select('id,user_id')
+      .eq('id', storeId)
+      .maybeSingle();
+    if (storeOwnerErr) throw new Error(storeOwnerErr.message);
+    if (!storeOwner) throw new Error("Store not found");
+    if (String(storeOwner.user_id) !== String(user.id)) {
+      throw new Error("store_not_owned_by_user");
+    }
+
     const { data, error } = await (supabase as any)
       .from('store_store_categories')
-      .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
+      .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
       .eq('store_id', storeId)
       .order('id', { ascending: true });
 
@@ -341,7 +354,6 @@ export class ShopService {
         parent_external_id: sc.parent_external_id ?? null,
         base_rz_id: sc.rz_id ?? null,
         store_external_id: r.external_id ?? null,
-        store_rz_id: r.rz_id ?? null,
         store_rz_id_value: r.rz_id_value ?? null,
         is_active: !!r.is_active,
       };
@@ -351,7 +363,6 @@ export class ShopService {
   /** Обновление полей категории магазина */
   static async updateStoreCategory(payload: {
     id: number;
-    rz_id?: string | null;
     rz_id_value?: string | null;
     is_active?: boolean;
     custom_name?: string | null;
@@ -359,7 +370,6 @@ export class ShopService {
   }): Promise<void> {
     if (!payload?.id) throw new Error('Category row id is required');
     const clean: any = {};
-    if (payload.rz_id !== undefined) clean.rz_id = payload.rz_id;
     if (payload.rz_id_value !== undefined) clean.rz_id_value = payload.rz_id_value;
     if (payload.is_active !== undefined) clean.is_active = !!payload.is_active;
     if (payload.custom_name !== undefined) clean.custom_name = payload.custom_name ?? null;
@@ -370,5 +380,42 @@ export class ShopService {
       .update(clean)
       .eq('id', payload.id);
     if (error) throw new Error(error.message);
+  }
+
+  /** Удаление категории магазина и всех её товаров в магазине */
+  static async deleteStoreCategoryWithProducts(storeId: string, categoryId: number): Promise<void> {
+    if (!storeId || !categoryId) throw new Error('storeId and categoryId required');
+    const { error: prodErr } = await (supabase as any)
+      .from('store_products')
+      .delete()
+      .eq('store_id', storeId)
+      .eq('category_id', categoryId);
+    if (prodErr) throw new Error(prodErr.message);
+
+    const { error: catErr } = await (supabase as any)
+      .from('store_store_categories')
+      .delete()
+      .eq('store_id', storeId)
+      .eq('category_id', categoryId);
+    if (catErr) throw new Error(catErr.message);
+  }
+
+  /** Массовое удаление категорий магазина и их товаров */
+  static async deleteStoreCategoriesWithProducts(storeId: string, categoryIds: number[]): Promise<void> {
+    if (!storeId || !Array.isArray(categoryIds) || categoryIds.length === 0) return;
+    const ids = categoryIds;
+    const { error: prodErr } = await (supabase as any)
+      .from('store_products')
+      .delete()
+      .eq('store_id', storeId)
+      .in('category_id', ids);
+    if (prodErr) throw new Error(prodErr.message);
+
+    const { error: catErr } = await (supabase as any)
+      .from('store_store_categories')
+      .delete()
+      .eq('store_id', storeId)
+      .in('category_id', ids);
+    if (catErr) throw new Error(catErr.message);
   }
 }

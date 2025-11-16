@@ -100,8 +100,8 @@ export const ShopDetail = () => {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setShowEditDialog(true)}
-              title="Редагувати магазин"
+              onClick={() => navigate(`/user/shops/${id}/settings`)}
+              title={t('breadcrumb_settings')}
             >
               <Edit className="h-4 w-4" />
             </Button>
