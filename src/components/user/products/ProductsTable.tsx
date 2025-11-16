@@ -121,7 +121,7 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string }) {
+function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[]) => void }) {
   const { t } = useI18n();
   const [stores, setStores] = useState<any[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
@@ -231,7 +231,11 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                 error = res.error;
                               }
                               if (!error) {
-                                setLinkedStoreIds((prev) => Array.from(new Set([...prev, id])));
+                                setLinkedStoreIds((prev) => {
+                                  const next = Array.from(new Set([...prev, id]));
+                                  onStoresUpdate?.(product.id, next);
+                                  return next;
+                                });
                                 toast.success(t('product_added_to_store'));
                               } else {
                                 toast.error(t('failed_add_to_store'));
@@ -243,7 +247,11 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                 .eq('product_id', product.id)
                                 .eq('store_id', id);
                               if (!error) {
-                                setLinkedStoreIds((prev) => prev.filter((x) => x !== id));
+                                setLinkedStoreIds((prev) => {
+                                  const next = prev.filter((x) => x !== id);
+                                  onStoresUpdate?.(product.id, next);
+                                  return next;
+                                });
                                 toast.success(t('product_removed_from_store'));
                               } else {
                                 toast.error(t('failed_remove_from_store'));
@@ -279,6 +287,7 @@ type ProductRow = Product & {
   mainImageUrl?: string;
   categoryName?: string;
   supplierName?: string;
+  linkedStoreIds?: string[];
 };
 
 export const ProductsTable = ({
@@ -403,6 +412,22 @@ export const ProductsTable = ({
         });
       }
 
+      // Map product_id → active store_ids
+      const storeLinksByProduct: Record<string, string[]> = {};
+      if (ids.length > 0) {
+        const { data: linkRows } = await (supabase as any)
+          .from('store_product_links')
+          .select('product_id,store_id,is_active')
+          .in('product_id', ids);
+        (linkRows ?? []).forEach((r: any) => {
+          const pid = String(r.product_id);
+          const sid = r?.store_id != null ? String(r.store_id) : '';
+          const active = r?.is_active !== false;
+          if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = [];
+          if (sid && active) storeLinksByProduct[pid].push(sid);
+        });
+      }
+
       const augmented = (data ?? []).map((p: any) => ({
         ...p,
         mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
@@ -413,6 +438,7 @@ export const ProductsTable = ({
         supplierName:
           (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
           undefined,
+        linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
       }));
 
       setProducts(augmented as ProductRow[]);
@@ -507,6 +533,7 @@ export const ProductsTable = ({
     "status",
     "supplier",
     "created_at",
+    "stores",
     "actions",
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -672,6 +699,7 @@ export const ProductsTable = ({
       "description_ua",
       "photo",
       "select",
+      "stores",
       "active",
       "actions",
     ];
@@ -1113,6 +1141,39 @@ export const ProductsTable = ({
       enableHiding: true,
     },
     {
+      id: "stores",
+      header: t("stores"),
+      enableSorting: false,
+      enableHiding: false,
+      size: 72,
+      cell: ({ row }) => {
+        const ids = (row.original as any).linkedStoreIds || [];
+        const count = Array.isArray(ids) ? ids.length : 0;
+        const has = count > 0;
+        return (
+          <div className="flex items-center justify-center" data-testid={`user_products_stores_${row.original.id}`}>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="inline-flex items-center gap-[0.25rem]">
+                    <Store className={has ? "h-4 w-4 text-primary" : "h-4 w-4 text-muted-foreground"} />
+                    {has ? (
+                      <Badge variant="secondary" className="h-[clamp(1rem,2.5vw,1.125rem)] px-[0.25rem] text-[0.75rem] leading-none">
+                        {count}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-sm">
+                  {has ? (count === 1 ? t("product_added_to_store") : t("product_added_to_stores")) : t("no_active_stores")}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        );
+      },
+    },
+    {
       id: "actions",
       header: t("table_actions"),
       enableSorting: false,
@@ -1129,6 +1190,9 @@ export const ProductsTable = ({
             canCreate={canCreate}
             hideDuplicate={hideDuplicate}
             storeId={storeId}
+            onStoresUpdate={(productId, ids) => {
+              setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
+            }}
           />
         </div>
       ),
@@ -1507,6 +1571,12 @@ export const ProductsTable = ({
                               toast.error(t('failed_remove_from_store'));
                             } else {
                               toast.success(t('product_removed_from_store'));
+                              setProducts((prev) => prev.map((p) => {
+                                const pid = String(p.id);
+                                if (!productIds.includes(pid)) return p;
+                                const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.includes(String(sid)));
+                                return { ...p, linkedStoreIds: nextIds };
+                              }));
                             }
                           } catch (e) {
                             toast.error(t('failed_remove_from_store'));
@@ -1569,6 +1639,12 @@ export const ProductsTable = ({
                                 toast.error(t('failed_add_product_to_stores'));
                               } else {
                                 toast.success(t('product_added_to_stores'));
+                                setProducts((prev) => prev.map((p) => {
+                                  const pid = String(p.id);
+                                  if (!productIds.includes(pid)) return p;
+                                  const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));
+                                  return { ...p, linkedStoreIds: merged };
+                                }));
                               }
                             }
                           } catch (e) {
