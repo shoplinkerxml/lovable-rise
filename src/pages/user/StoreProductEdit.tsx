@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ProductFormTabs } from "@/components/ProductFormTabs";
 import { type ProductParam, type ProductImage } from "@/lib/product-service";
 import { PageHeader } from "@/components/PageHeader";
+import { Loader2 } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
 import { CategoryService } from "@/lib/category-service";
 
@@ -197,38 +198,43 @@ export const StoreProductEdit = () => {
             {t("back_to_products")}
           </Link>
         </div>
-        {loading ? (
-          <div className="text-sm">{t("loading")}</div>
-        ) : (
-          <div className="space-y-6">
-            {baseProduct ? (
-              <ProductFormTabs
-                product={baseProduct}
-                readOnly
-                editableKeys={["price", "price_old", "price_promo", "stock_quantity"]}
-                overrides={{
-                  price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
-                  price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
-                  price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
-                  stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
-                }}
-                onChange={(partial) => {
-                  if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
-                  if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
-                  if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
-                  if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
-                }}
-              />
-            ) : null}
+        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
+          {loading && (
+            <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="store_product_edit_loader">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
+          {!loading && (
+            <div className="space-y-6">
+              {baseProduct ? (
+                <ProductFormTabs
+                  product={baseProduct}
+                  readOnly
+                  editableKeys={["price", "price_old", "price_promo", "stock_quantity"]}
+                  overrides={{
+                    price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
+                    price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
+                    price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
+                    stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
+                  }}
+                  onChange={(partial) => {
+                    if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
+                    if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
+                    if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
+                    if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
+                  }}
+                />
+              ) : null}
 
-            <div className="space-y-3">
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
-                <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
+              <div className="space-y-3">
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
+                  <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </Card>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
@@ -127,13 +127,20 @@ export const ProductEdit = () => {
         }
       />
 
-      {!loading && (
-        <ProductFormTabs
-          product={product || undefined}
-          onSubmit={handleFormSubmit}
-          onCancel={handleCancel}
-        />
-      )}
+      <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
+        {loading && (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="product_edit_loader">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        {!loading && (
+          <ProductFormTabs
+            product={product || undefined}
+            onSubmit={handleFormSubmit}
+            onCancel={handleCancel}
+          />
+        )}
+      </div>
     </div>
   );
 };

@@ -109,16 +109,17 @@ function ProductStatusBadge({ state }: { state?: string }) {
     s === 'used' ? 'status_used' :
     s === 'refurbished' ? 'status_refurbished' : 'status_new';
 
-  const isPrimary = s === 'new' || s === 'refurbished';
+  const cls =
+    s === 'new'
+      ? 'bg-emerald-200/60 text-emerald-700 border-emerald-300 shadow-sm'
+      : s === 'refurbished'
+      ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow'
+      : s === 'used'
+      ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+      : 'bg-emerald-50 text-emerald-500 border-neutral-300';
+
   return (
-    <Badge
-      variant={isPrimary ? 'default' : 'secondary'}
-      className={
-        isPrimary
-          ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/10'
-          : 'bg-muted/50 text-muted-foreground border-muted hover:bg-muted/50'
-      }
-    >
+    <Badge variant="outline" className={cls} data-testid="user_products_statusBadge">
       {t(labelKey)}
     </Badge>
   );
@@ -447,7 +448,7 @@ export const ProductsTable = ({
 
       // Map product_id → active store_ids
       const storeLinksByProduct: Record<string, string[]> = {};
-      if (ids.length > 0) {
+      if (!storeId && ids.length > 0) {
         const { data: linkRows } = await (supabase as any)
           .from('store_product_links')
           .select('product_id,store_id,is_active')
@@ -566,7 +567,6 @@ export const ProductsTable = ({
     "status",
     "supplier",
     "created_at",
-    "stores",
     "actions",
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -582,12 +582,11 @@ export const ProductsTable = ({
 
   useEffect(() => {
     setColumnOrder((prev) => {
-      const withoutActive = prev.filter((id) => id !== "active");
-      const withoutActions = withoutActive.filter((id) => id !== "actions");
+      const filtered = prev.filter((id) => id !== "active" && id !== "actions" && id !== "stores");
       if (storeId) {
-        return [...withoutActions, "active", "actions"];
+        return [...filtered, "active", "actions"];
       }
-      return [...withoutActions, "actions"];
+      return [...filtered, "stores", "actions"];
     });
   }, [storeId]);
 
@@ -911,8 +910,9 @@ export const ProductsTable = ({
       cell: ({ row }) => {
         const p = row.original as any;
         const currency = p.currency_code || "";
+        const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
         return row.original.price != null ? (
-          <span className="tabular-nums">{row.original.price} {currency}</span>
+          <span className="tabular-nums">{row.original.price} {symbol}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
@@ -940,8 +940,9 @@ export const ProductsTable = ({
       cell: ({ row }) => {
         const p = row.original as any;
         const currency = p.currency_code || "";
+        const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
         return row.original.price_old != null ? (
-          <span className="tabular-nums" data-testid="user_products_priceOld">{row.original.price_old} {currency}</span>
+          <span className="tabular-nums" data-testid="user_products_priceOld">{row.original.price_old} {symbol}</span>
         ) : (
           <span className="text-muted-foreground" data-testid="user_products_priceOld_empty">—</span>
         );
@@ -970,8 +971,9 @@ export const ProductsTable = ({
       cell: ({ row }) => {
         const p = row.original as any;
         const currency = p.currency_code || "";
+        const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
         return row.original.price_promo != null ? (
-          <span className="tabular-nums" data-testid="user_products_pricePromo">{row.original.price_promo} {currency}</span>
+          <span className="tabular-nums" data-testid="user_products_pricePromo">{row.original.price_promo} {symbol}</span>
         ) : (
           <span className="text-muted-foreground" data-testid="user_products_pricePromo_empty">—</span>
         );
@@ -1022,11 +1024,13 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => (
-        row.original.stock_quantity != null ? (
-          <span className="tabular-nums">{row.original.stock_quantity}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )
+        <div className="flex items-center justify-center">
+          {row.original.stock_quantity != null ? (
+            <span className="tabular-nums">{row.original.stock_quantity}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </div>
       ),
       enableHiding: true,
     },
@@ -1173,7 +1177,7 @@ export const ProductsTable = ({
       },
       enableHiding: true,
     },
-    {
+    ...(!storeId ? [{
       id: "stores",
       header: t("stores"),
       enableSorting: false,
@@ -1205,7 +1209,7 @@ export const ProductsTable = ({
           </div>
         );
       },
-    },
+    }] : []),
     {
       id: "actions",
       header: t("table_actions"),
