@@ -18,6 +18,7 @@ export const ProductEdit = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryName, setCategoryName] = useState<string>('');
+  const [imagesLoading, setImagesLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -127,8 +128,8 @@ export const ProductEdit = () => {
         }
       />
 
-      <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
-        {loading && (
+      <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading || imagesLoading}>
+        {(loading || imagesLoading) && (
           <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="product_edit_loader">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
@@ -138,6 +139,7 @@ export const ProductEdit = () => {
             product={product || undefined}
             onSubmit={handleFormSubmit}
             onCancel={handleCancel}
+            onImagesLoadingChange={setImagesLoading}
           />
         )}
       </div>

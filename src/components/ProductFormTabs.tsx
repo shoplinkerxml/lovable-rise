@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check, MoreHorizontal, Pencil, Trash, Globe } from 'lucide-react';
+import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, Check, MoreHorizontal, Pencil, Trash, Trash2, Globe, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { type Product } from '@/lib/product-service';
@@ -29,6 +29,7 @@ interface ProductFormTabsProps {
   editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity'>;
   overrides?: Partial<FormData>;
   onChange?: (partial: Partial<FormData>) => void;
+  onImagesLoadingChange?: (loading: boolean) => void;
 }
 interface ProductParam {
   id?: string;
@@ -93,7 +94,8 @@ export function ProductFormTabs({
   readOnly,
   editableKeys,
   overrides,
-  onChange
+  onChange,
+  onImagesLoadingChange
 }: ProductFormTabsProps) {
   // 500px in rem (to avoid fixed px in CSS): 500 / 16 = 31.25
   const DEFAULT_PHOTO_SIZE_REM = 31.25;
@@ -288,6 +290,18 @@ export function ProductFormTabs({
 
   // Drag and drop state
   const [isDragOver, setIsDragOver] = useState(false);
+  const [galleryLoaded, setGalleryLoaded] = useState(false);
+  const [galleryLoadCount, setGalleryLoadCount] = useState(0);
+  const galleryImgRefs = useRef<Array<HTMLImageElement | null>>([]);
+  useEffect(() => {
+    setGalleryLoadCount(0);
+    setGalleryLoaded(images.length === 0);
+    if (activeTab === 'images') {
+      onImagesLoadingChange?.(images.length > 0 && !galleryLoaded);
+    } else {
+      onImagesLoadingChange?.(false);
+    }
+  }, [images, activeTab]);
 
   // Navigation functions for main image carousel
   const goToPrevious = () => {
@@ -341,7 +355,44 @@ export function ProductFormTabs({
       });
       return newMap;
     });
+    setGalleryLoadCount(prev => {
+      const next = prev + 1;
+      if (next >= images.length) setGalleryLoaded(true);
+      if (next >= images.length) onImagesLoadingChange?.(false);
+      return next;
+    });
   };
+  const handleGalleryImageError = (_event: React.SyntheticEvent<HTMLImageElement>, _index: number) => {
+    setGalleryLoadCount(prev => {
+      const next = prev + 1;
+      if (next >= images.length) setGalleryLoaded(true);
+      if (next >= images.length) onImagesLoadingChange?.(false);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (activeTab === 'images') {
+      onImagesLoadingChange?.(images.length > 0 && !galleryLoaded);
+    } else {
+      onImagesLoadingChange?.(false);
+    }
+  }, [activeTab, galleryLoaded, images.length]);
+
+  useEffect(() => {
+    if (activeTab !== 'images') return;
+    const total = images.length;
+    if (total === 0) {
+      setGalleryLoaded(true);
+      onImagesLoadingChange?.(false);
+      return;
+    }
+    const done = galleryImgRefs.current.slice(0, total).reduce((acc, img) => acc + (img && img.complete ? 1 : 0), 0);
+    if (done >= total) {
+      setGalleryLoaded(true);
+      onImagesLoadingChange?.(false);
+    }
+  }, [activeTab, images]);
 
   // Calculate adaptive container style
   const getAdaptiveImageStyle = () => {
@@ -1084,6 +1135,12 @@ export function ProductFormTabs({
     }));
     setParameters(newParams);
   };
+  const [selectedParamRows, setSelectedParamRows] = useState<number[]>([]);
+  const deleteSelectedParams = (indexes: number[]) => {
+    if (!indexes || indexes.length === 0) return;
+    const keep = parameters.filter((_, i) => !indexes.includes(i)).map((p, i) => ({ ...p, order_index: i }));
+    setParameters(keep);
+  };
   return <div className="container mx-auto px-2 sm:px-6 py-3 sm:py-6 max-w-7xl" data-testid="productFormTabs_container">
       <Card>
         <CardHeader>
@@ -1451,63 +1508,20 @@ export function ProductFormTabs({
 
             {/* Tab 2: Images */}
             <TabsContent value="images" className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
-              <div className="space-y-3 md:space-y-4">
-                <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
-                  <div className="flex-1">
-                    {readOnly ? null : (
-                      <>
-                        <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
-                        <div className="flex gap-2 mt-2">
-                          <Input id="imageUrl" name="imageUrl" autoComplete="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
-                          <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
-                            <Link className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
+              <div className="relative space-y-3 md:space-y-4" aria-busy={!galleryLoaded}>
+                {!galleryLoaded && images.length > 0 && (
+                  <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="productFormTabs_images_loader">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                </div>
-
-                {/* Hidden file input retained for drop zone click */}
-                {readOnly ? null : (
-                  <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
                 )}
 
-                <Separator />
-
+                {/* Existing images */}
                 <div className="flex flex-wrap gap-3 md:gap-4">
-                  {/* Always visible drag-and-drop zone */}
-                  {readOnly ? null : (
-                    <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
-                      <CardContent className="p-1 md:p-2">
-                        <div className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${isDragOver ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'} hover:scale-[1.01]`} style={{
-                        width: '100%',
-                        maxWidth: '100%',
-                        height: 'auto',
-                        minHeight: 'clamp(12rem, 30vh, 24rem)'
-                      }} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => document.getElementById('fileUpload')?.click()} role="button" tabIndex={0} onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          document.getElementById('fileUpload')?.click();
-                        }
-                      }}>
-                          <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${isDragOver ? 'text-emerald-600' : 'text-emerald-500'}`} />
-                          <p className={`text-sm text-center px-2 transition-colors ${isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'}`}>
-                            {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
-                          </p>
-                          <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
-                            {t('image_types_and_limit')}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Existing images */}
-                  {images.map((image, index) => <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
+                  {images.map((image, index) => (
+                    <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
                       <CardContent className="p-2">
                         <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={getGalleryAdaptiveImageStyle(index)}>
-                          <img src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={e => handleGalleryImageLoad(e, index)} />
+                          <img ref={(el) => (galleryImgRefs.current[index] = el)} src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={e => handleGalleryImageLoad(e, index)} onError={e => handleGalleryImageError(e, index)} />
                           {readOnly ? null : (
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
                               <Button size="icon" variant="ghost" onClick={() => setMainImage(index)} aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')} data-testid={`productFormTabs_setMainButton_${index}`} className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}>
@@ -1519,11 +1533,95 @@ export function ProductFormTabs({
                             </div>
                           )}
                         </div>
-                        {image.is_main && <Badge className="absolute top-2 left-2" variant="default">
+                        {image.is_main && (
+                          <Badge className="absolute top-2 left-2" variant="default">
                             {t('main_photo')}
-                          </Badge>}
+                          </Badge>
+                        )}
                       </CardContent>
-                    </Card>)}
+                    </Card>
+                  ))}
+                </div>
+
+                <Separator />
+
+                {/* Drop zone under photos */}
+                {readOnly ? null : (
+                  <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
+                    <CardContent className="p-1 md:p-2">
+                      <div
+                        className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
+                          isDragOver
+                            ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm'
+                            : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'
+                        } hover:scale-[1.01]`}
+                        style={{
+                          width: '100%',
+                          maxWidth: '100%',
+                          height: 'auto',
+                          minHeight: 'clamp(12rem, 30vh, 24rem)'
+                        }}
+                        onDragEnter={handleDragEnter}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => document.getElementById('fileUpload')?.click()}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            document.getElementById('fileUpload')?.click();
+                          }
+                        }}
+                      >
+                        <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${isDragOver ? 'text-emerald-600' : 'text-emerald-500'}`} />
+                        <p className={`text-sm text-center px-2 transition-colors ${isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'}`}>
+                          {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
+                        </p>
+                        <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
+                          {t('image_types_and_limit')}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Hidden file input retained for drop zone click */}
+                {readOnly ? null : (
+                  <input
+                    type="file"
+                    accept="image/*,.avif,image/avif"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="fileUpload"
+                    data-testid="productFormTabs_fileInput"
+                  />
+                )}
+
+                {/* Add by URL under photos */}
+                <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
+                  <div className="flex-1">
+                    {readOnly ? null : (
+                      <>
+                        <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
+                        <div className="flex gap-2 mt-2">
+                          <Input
+                            id="imageUrl"
+                            name="imageUrl"
+                            autoComplete="url"
+                            value={imageUrl}
+                            onChange={e => setImageUrl(e.target.value)}
+                            placeholder={t('image_url_placeholder')}
+                            data-testid="productFormTabs_imageUrlInput"
+                          />
+                          <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
+                            <Link className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </TabsContent>
@@ -1535,10 +1633,37 @@ export function ProductFormTabs({
                   <CardTitle className="flex items-center justify-between">
                     <span>{t('product_characteristics')}</span>
                     {readOnly ? null : (
-                      <Button type="button" onClick={openAddParamModal} size="sm" variant="outline" data-testid="productForm_addCharacteristic" aria-label={t('add_characteristic')} className="max-[550px]:ml-auto">
-                        <Plus className="h-4 w-4 mr-2 max-[550px]:mr-0" />
-                        <span className="max-[550px]:hidden">{t('add_characteristic')}</span>
-                      </Button>
+                      <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm" data-testid="productForm_params_actions_block">
+                        <Button
+                          type="button"
+                          onClick={openAddParamModal}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          data-testid="productForm_addCharacteristic"
+                          aria-label={t('add_characteristic')}
+                        >
+                          <Plus className="h-4 w-4 text-foreground" />
+                        </Button>
+                        {(() => {
+                          const canDeleteSelected = selectedParamRows.length > 0;
+                          return (
+                            <Button
+                              type="button"
+                              onClick={() => deleteSelectedParams(selectedParamRows)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={!canDeleteSelected}
+                              aria-disabled={!canDeleteSelected}
+                              data-testid="productForm_deleteSelected"
+                              aria-label={t('btn_delete_selected')}
+                            >
+                              <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? 'text-muted-foreground' : 'text-foreground'}`} />
+                            </Button>
+                          );
+                        })()}
+                      </div>
                     )}
                   </CardTitle>
                 </CardHeader>
@@ -1559,7 +1684,7 @@ export function ProductFormTabs({
                       ))}
                     </div>
                   ) : (
-                    <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} />
+                    <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} />
                   )}
 
                   {readOnly ? null : (

@@ -51,6 +51,7 @@ export const StoreProductEdit = () => {
   const [baseProduct, setBaseProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [params, setParams] = useState<ProductParam[]>([]);
+  const [imagesLoading, setImagesLoading] = useState<boolean>(false);
 
   useEffect(() => {
     (async () => {
@@ -198,8 +199,8 @@ export const StoreProductEdit = () => {
             {t("back_to_products")}
           </Link>
         </div>
-        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
-          {loading && (
+        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading || imagesLoading}>
+          {(loading || imagesLoading) && (
             <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="store_product_edit_loader">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
@@ -223,6 +224,7 @@ export const StoreProductEdit = () => {
                     if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
                     if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
                   }}
+                  onImagesLoadingChange={setImagesLoading}
                 />
               ) : null}
 

@@ -48,9 +48,10 @@ type Props = {
   onEditRow: (rowIndex: number) => void;
   onDeleteRow: (rowIndex: number) => void;
   onDeleteSelected?: (rowIndexes: number[]) => void;
+  onSelectionChange?: (rowIndexes: number[]) => void;
 };
 
-export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSelected }: Props) {
+export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSelected, onSelectionChange }: Props) {
   const { t } = useI18n();
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
@@ -165,7 +166,15 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
     return table
       .getSelectedRowModel()
       .flatRows.map((r) => r.index);
-  }, [table]);
+  }, [rowSelection, table]);
+
+  React.useEffect(() => {
+    onSelectionChange?.(selectedIndices);
+  }, [selectedIndices, onSelectionChange]);
+
+  React.useEffect(() => {
+    setRowSelection({});
+  }, [data]);
 
   return (
     <div className="flex flex-col gap-3" data-testid="parametersDataTable_root">
@@ -179,19 +188,6 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
             className="w-[clamp(12rem,40vw,24rem)]"
             data-testid="parametersDataTable_filter"
           />
-          {selectedIndices.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                onDeleteSelected?.(selectedIndices);
-                table.resetRowSelection();
-              }}
-              data-testid="parametersDataTable_deleteSelected"
-            >
-              {t("btn_delete_selected")}
-            </Button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
