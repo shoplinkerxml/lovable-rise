@@ -39,6 +39,19 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
   const [availableCurrencies, setAvailableCurrencies] = useState<Array<{ code: string; rate?: number }>>([]);
   const [storeCurrencies, setStoreCurrencies] = useState<Array<{ code: string; rate: number; is_base: boolean }>>([]);
   const [addCurrencyCode, setAddCurrencyCode] = useState<string>('');
+  const [storeCategories, setStoreCategories] = useState<Array<{
+    store_category_id: number;
+    store_id: string;
+    category_id: number;
+    name: string;
+    base_external_id: string | null;
+    parent_external_id: string | null;
+    base_rz_id: string | null;
+    store_external_id: string | null;
+    store_rz_id: string | null;
+    store_rz_id_value: string | null;
+    is_active: boolean;
+  }>>([]);
 
   useEffect(() => {
     if (shop?.template_id) {
@@ -62,20 +75,16 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     }
   }, [shop?.template_id]);
 
-  // Check if shop has products
+  // Проверка наличия товаров в магазине (store_products)
   useEffect(() => {
     const checkProducts = async () => {
       try {
-        // TODO: заменить на реальную проверку когда будет таблица products
-        // @ts-ignore
         const { count } = await (supabase as any)
-          .from('products')
+          .from('store_products')
           .select('*', { count: 'exact', head: true })
-          .eq('shop_id', shop.id);
-        
+          .eq('store_id', shop.id);
         setProductsCount(count || 0);
       } catch (err) {
-        // Table doesn't exist yet
         setProductsCount(0);
       }
     };
@@ -102,6 +111,18 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
       }
     };
     if (open) loadCurrencyData();
+  }, [open, shop.id]);
+
+  useEffect(() => {
+    const loadStoreCategories = async () => {
+      try {
+        const rows = await ShopService.getStoreCategories(shop.id);
+        setStoreCategories(rows);
+      } catch (err) {
+        console.error('Load store categories error:', err);
+      }
+    };
+    if (open) loadStoreCategories();
   }, [open, shop.id]);
 
   const refreshStoreCurrencies = async () => {
@@ -171,6 +192,18 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     } catch (err) {
       console.error('Delete currency error:', err);
       toast.error('Не вдалося видалити валюту');
+    }
+  };
+
+  const updateCategoryField = async (rowId: number, patch: Partial<{ rz_id: string | null; rz_id_value: string | null; is_active: boolean; custom_name: string | null; external_id: string | null }>) => {
+    try {
+      await ShopService.updateStoreCategory({ id: rowId, ...patch });
+      const rows = await ShopService.getStoreCategories(shop.id);
+      setStoreCategories(rows);
+      toast.success(t('saved'));
+    } catch (err) {
+      console.error('Update store category error:', err);
+      toast.error(t('failed_save'));
     }
   };
 
@@ -360,6 +393,37 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
                         <Button type="button" variant="outline" size="icon" onClick={() => handleDeleteCurrency(cur.code)} data-testid={`shop_currency_del_${cur.code}`}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Категории магазина */}
+          <Card>
+            <CardContent className="space-y-4 pt-4">
+              <div className="text-sm font-medium">{t('shop_categories')}</div>
+              {storeCategories.length === 0 ? (
+                <div className="text-xs text-muted-foreground">{t('no_categories_found')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {storeCategories.map((cat) => (
+                    <div key={cat.store_category_id} className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3" data-testid={`shop_category_${cat.store_category_id}`}>
+                      <div className="w-[clamp(6rem,12vw,10rem)] text-xs text-muted-foreground">{t('base_external_id')}</div>
+                      <div className="text-sm font-medium truncate">{cat.name}</div>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`rz_${cat.store_category_id}`} className="text-xs">rz_id</Label>
+                        <Input id={`rz_${cat.store_category_id}`} defaultValue={cat.store_rz_id || ''} className="h-8 w-[10rem]" onBlur={(e) => updateCategoryField(cat.store_category_id, { rz_id: e.target.value || null })} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`rzv_${cat.store_category_id}`} className="text-xs">rz_id_value</Label>
+                        <Input id={`rzv_${cat.store_category_id}`} defaultValue={cat.store_rz_id_value || ''} className="h-8 w-[10rem]" onBlur={(e) => updateCategoryField(cat.store_category_id, { rz_id_value: e.target.value || null })} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">{t('active')}</Label>
+                        <Switch checked={cat.is_active} onCheckedChange={(checked) => updateCategoryField(cat.store_category_id, { is_active: checked })} />
                       </div>
                     </div>
                   ))}

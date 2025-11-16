@@ -1197,12 +1197,7 @@ export function ProductFormTabs({
                         <div className="relative flex justify-center">
                           <Card className="relative group">
                             <CardContent className="p-2 sm:p-3 md:p-4">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain" aria-busy={!mainImageLoaded && images.length > 0}>
-                                {!mainImageLoaded && images.length > 0 && (
-                                  <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="productFormTabs_info_mainImage_loader">
-                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                  </div>
-                                )}
+                              <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
                                 <img ref={mainImgRef} src={images[activeImageIndex]?.url} alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`} className="w-full h-full object-contain select-none" data-testid={`productFormTabs_mainImage`} onLoad={handleImageLoad} onError={handleMainImageError} />
                               </div>
                               {images[activeImageIndex]?.is_main && <Badge className="absolute top-2 left-2" variant="default" data-testid="productFormTabs_mainBadge">
@@ -1519,12 +1514,7 @@ export function ProductFormTabs({
 
             {/* Tab 2: Images */}
             <TabsContent value="images" className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
-              <div className="relative space-y-3 md:space-y-4" aria-busy={!galleryLoaded}>
-                {!galleryLoaded && images.length > 0 && (
-                  <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="productFormTabs_images_loader">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                )}
+              <div className="relative space-y-3 md:space-y-4">
 
                 {/* Existing images */}
                 <div className="flex flex-wrap gap-3 md:gap-4">
@@ -1643,39 +1633,6 @@ export function ProductFormTabs({
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>{t('product_characteristics')}</span>
-                    {readOnly ? null : (
-                      <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm" data-testid="productForm_params_actions_block">
-                        <Button
-                          type="button"
-                          onClick={openAddParamModal}
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          data-testid="productForm_addCharacteristic"
-                          aria-label={t('add_characteristic')}
-                        >
-                          <Plus className="h-4 w-4 text-foreground" />
-                        </Button>
-                        {(() => {
-                          const canDeleteSelected = selectedParamRows.length > 0;
-                          return (
-                            <Button
-                              type="button"
-                              onClick={() => deleteSelectedParams(selectedParamRows)}
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              disabled={!canDeleteSelected}
-                              aria-disabled={!canDeleteSelected}
-                              data-testid="productForm_deleteSelected"
-                              aria-label={t('btn_delete_selected')}
-                            >
-                              <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? 'text-muted-foreground' : 'text-foreground'}`} />
-                            </Button>
-                          );
-                        })()}
-                      </div>
-                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1695,7 +1652,7 @@ export function ProductFormTabs({
                       ))}
                     </div>
                   ) : (
-                    <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} />
+                    <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} onAddParam={openAddParamModal} />
                   )}
 
                   {readOnly ? null : (

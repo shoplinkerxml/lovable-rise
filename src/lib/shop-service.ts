@@ -302,4 +302,73 @@ export class ShopService {
       throw new Error(error.message);
     }
   }
+
+  /** Категории магазина: объединённые данные ssc + sc */
+  static async getStoreCategories(storeId: string): Promise<Array<{
+    store_category_id: number;
+    store_id: string;
+    category_id: number;
+    name: string;
+    base_external_id: string | null;
+    parent_external_id: string | null;
+    base_rz_id: string | null;
+    store_external_id: string | null;
+    store_rz_id: string | null;
+    store_rz_id_value: string | null;
+    is_active: boolean;
+  }>> {
+    if (!storeId) throw new Error("Store ID is required");
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) throw new Error("Invalid session");
+
+    const { data, error } = await (supabase as any)
+      .from('store_store_categories')
+      .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
+      .eq('store_id', storeId)
+      .order('id', { ascending: true });
+
+    if (error) throw new Error(error.message);
+
+    const rows = (data || []) as Array<any>;
+    return rows.map((r) => {
+      const sc = r.store_categories || {};
+      return {
+        store_category_id: Number(r.id),
+        store_id: String(r.store_id),
+        category_id: Number(r.category_id),
+        name: String(r.custom_name ?? sc.name ?? ''),
+        base_external_id: sc.external_id ?? null,
+        parent_external_id: sc.parent_external_id ?? null,
+        base_rz_id: sc.rz_id ?? null,
+        store_external_id: r.external_id ?? null,
+        store_rz_id: r.rz_id ?? null,
+        store_rz_id_value: r.rz_id_value ?? null,
+        is_active: !!r.is_active,
+      };
+    });
+  }
+
+  /** Обновление полей категории магазина */
+  static async updateStoreCategory(payload: {
+    id: number;
+    rz_id?: string | null;
+    rz_id_value?: string | null;
+    is_active?: boolean;
+    custom_name?: string | null;
+    external_id?: string | null;
+  }): Promise<void> {
+    if (!payload?.id) throw new Error('Category row id is required');
+    const clean: any = {};
+    if (payload.rz_id !== undefined) clean.rz_id = payload.rz_id;
+    if (payload.rz_id_value !== undefined) clean.rz_id_value = payload.rz_id_value;
+    if (payload.is_active !== undefined) clean.is_active = !!payload.is_active;
+    if (payload.custom_name !== undefined) clean.custom_name = payload.custom_name ?? null;
+    if (payload.external_id !== undefined) clean.external_id = payload.external_id ?? null;
+
+    const { error } = await (supabase as any)
+      .from('store_store_categories')
+      .update(clean)
+      .eq('id', payload.id);
+    if (error) throw new Error(error.message);
+  }
 }

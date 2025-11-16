@@ -131,24 +131,19 @@ Deno.serve(async (req) => {
       currenciesXml = items ? `<currencies>${items}</currencies>` : '';
     }
 
-    if (needCategories && storeRow?.user_id) {
+    if (needCategories) {
       const { data: catRows } = await supabase
-        .from('store_categories')
-        .select('id,external_id,name,parent_id,is_active')
-        .eq('user_id', storeRow.user_id)
+        .from('store_store_categories')
+        .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
+        .eq('store_id', body.store_id)
         .eq('is_active', true);
-      const idToExternal: Record<string, string> = {};
-      ((catRows || []) as Array<{ id: string; external_id: string; name: string; parent_id: string | null; is_active: boolean | null }>).
-        forEach((r) => {
-          if (r.id && r.external_id != null) idToExternal[String(r.id)] = String(r.external_id);
-        });
-      const items = ((catRows || []) as Array<{ id: string; external_id: string; name: string; parent_id: string | null; is_active: boolean | null }>).
-        map((c) => {
-          const id = String(c.external_id || c.id || '');
-          const parentExt = c.parent_id ? idToExternal[String(c.parent_id)] : '';
-          const parentAttr = parentExt ? ` parentId="${xmlEscape(parentExt)}"` : '';
-          return `<category id="${xmlEscape(id)}"${parentAttr}>${xmlEscape(String(c.name || ''))}</category>`;
-        }).join('');
+      const items = ((catRows || []) as Array<any>).map((row) => {
+        const sc = row.store_categories || {};
+        const id = String(row.external_id ?? sc.external_id ?? '');
+        const name = String(row.custom_name ?? sc.name ?? '');
+        const rz = row.rz_id ? ` rz_id="${xmlEscape(String(row.rz_id))}"` : '';
+        return `<category id="${xmlEscape(id)}"${rz}>${xmlEscape(name)}</category>`;
+      }).join('');
       categoriesXml = items ? `<categories>${items}</categories>` : '';
     }
 
@@ -157,6 +152,13 @@ Deno.serve(async (req) => {
       .select('*,store_products(*)')
       .eq('store_id', body.store_id);
     if (lpErr) return new Response(JSON.stringify({ error: 'links_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+    const { data: activeCats } = await supabase
+      .from('store_store_categories')
+      .select('category_id')
+      .eq('store_id', body.store_id)
+      .eq('is_active', true);
+    const activeCategoryIds = new Set(((activeCats || []) as Array<{ category_id: number }>).map((r) => String(r.category_id)));
 
     const productIds: string[] = (linksData || []).map((row: LinkRow) => String(row.store_products?.id || '')).filter((id: string) => id.length > 0);
     const { data: imagesData } = await supabase
@@ -170,7 +172,13 @@ Deno.serve(async (req) => {
       .in('product_id', productIds)
       .order('order_index');
 
-    const offersXml = (linksData || []).map((row: LinkRow) => {
+    const offersXml = (linksData || [])
+      .filter((row: LinkRow) => {
+        const base: Product = row.store_products || ({} as Product);
+        const catId = String(base.category_id || '');
+        return !catId || activeCategoryIds.has(catId);
+      })
+      .map((row: LinkRow) => {
       const base: Product = row.store_products || ({} as Product);
       const imgs: ImageRow[] = ((imagesData || []) as ImageRow[]).filter((i) => i.product_id === String(base.id));
       const prms: ParamRow[] = ((paramsData || []) as ParamRow[]).filter((p) => p.product_id === String(base.id));

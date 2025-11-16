@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil } from "lucide-react";
+import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil, Plus } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 
 // Keep local type consistent with ProductFormTabs
@@ -49,9 +49,10 @@ type Props = {
   onDeleteRow: (rowIndex: number) => void;
   onDeleteSelected?: (rowIndexes: number[]) => void;
   onSelectionChange?: (rowIndexes: number[]) => void;
+  onAddParam?: () => void;
 };
 
-export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSelected, onSelectionChange }: Props) {
+export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSelected, onSelectionChange, onAddParam }: Props) {
   const { t } = useI18n();
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
@@ -189,12 +190,48 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
             data-testid="parametersDataTable_filter"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm" data-testid="parametersDataTable_actions_block">
+          {onAddParam && (
+            <Button
+              type="button"
+              onClick={onAddParam}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              data-testid="parametersDataTable_addParam"
+              aria-label={t('add_characteristic')}
+            >
+              <Plus className="h-4 w-4 text-foreground" />
+            </Button>
+          )}
+          {(() => {
+            const canDeleteSelected = selectedIndices.length > 0;
+            return (
+              <Button
+                type="button"
+                onClick={() => {
+                  if (selectedIndices.length > 0) {
+                    onDeleteSelected?.(selectedIndices);
+                    table.resetRowSelection();
+                  }
+                }}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={!canDeleteSelected}
+                aria-disabled={!canDeleteSelected}
+                data-testid="parametersDataTable_deleteSelected"
+                aria-label={t('btn_delete_selected')}
+              >
+                <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? 'text-muted-foreground' : 'text-foreground'}`} />
+              </Button>
+            );
+          })()}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" data-testid="parametersDataTable_viewOptions">
+              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="parametersDataTable_viewOptions" aria-label={t('view_options')}>
                 <ColumnsIcon className="mr-2 h-4 w-4" />
-                {t("view_options")}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -222,29 +259,10 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" data-testid="parametersDataTable_pageSize">
-                {t("page_size")}: {table.getState().pagination.pageSize}
-                <ChevronDown className="ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              {[5, 10, 20, 50].map((size) => (
-                <DropdownMenuCheckboxItem
-                  key={size}
-                  checked={table.getState().pagination.pageSize === size}
-                  onCheckedChange={() => table.setPageSize(size)}
-                  data-testid={`parametersDataTable_pageSize_${size}`}
-                >
-                  {size}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
+
+      
 
       {/* Table */}
       <div className="overflow-hidden rounded-lg border">
@@ -284,12 +302,41 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
         </Table>
       </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between px-1" data-testid="parametersDataTable_pagination">
-        <div className="text-xs text-muted-foreground">
-          {t("rows_selected")}: {selectedIndices.length}
+      {/* Footer: selection status + rows per page + pagination (single row) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1 pt-2" data-testid="parametersDataTable_footer">
+        <div className="text-xs text-muted-foreground" data-testid="parametersDataTable_selectionStatus">
+          {(() => {
+            const selected = table.getSelectedRowModel().rows.length;
+            const total = table.getFilteredRowModel().rows.length || 0;
+            return t("rows_selected") === "Вибрано"
+              ? `Вибрано ${selected} з ${total} рядків.`
+              : `${selected} of ${total} row(s) selected.`;
+          })()}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-testid="parametersDataTable_rowsPerPage">
+          <div className="text-sm" data-testid="parametersDataTable_rowsPerPageLabel">{t("page_size")}</div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8" data-testid="parametersDataTable_pageSize">
+                {table.getState().pagination.pageSize}
+                <ChevronDown className="ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              {[5, 10, 20, 50].map((size) => (
+                <DropdownMenuCheckboxItem
+                  key={size}
+                  checked={table.getState().pagination.pageSize === size}
+                  onCheckedChange={() => table.setPageSize(size)}
+                  data-testid={`parametersDataTable_pageSize_${size}`}
+                >
+                  {size}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="flex items-center gap-2" data-testid="parametersDataTable_pagination">
           <Button
             variant="outline"
             size="sm"
