@@ -74,7 +74,8 @@ export const ProductCreate = () => {
         params: parameters || [],
         images: (images || []).map((img: any, index: number) => ({
           url: img.url,
-          order_index: typeof img.order_index === 'number' ? img.order_index : index
+          order_index: typeof img.order_index === 'number' ? img.order_index : index,
+          is_main: !!img.is_main
         }))
       });
       toast.success(t('product_created'));
