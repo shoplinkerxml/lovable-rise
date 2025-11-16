@@ -292,9 +292,7 @@ export default function ShopSettings() {
             </TabsContent>
 
             <TabsContent value="categories" className="space-y-4">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{t('shop_categories')}</CardTitle>
-            </CardHeader>
+            
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <Input placeholder={t('search_placeholder')} value={search} onChange={e => {
