@@ -10,6 +10,7 @@ import { ProductService, type Product, type ProductLimitInfo } from '@/lib/produ
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from '@/components/ui/dialog-no-overlay';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const Products = () => {
   const { t } = useI18n();
@@ -22,22 +23,23 @@ export const Products = () => {
   const [deletingName, setDeletingName] = useState<string | null>(null);
   const [tableLoading, setTableLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    loadMaxLimit();
-  }, []);
-
-  const loadMaxLimit = async () => {
-    try {
+  const queryClient = useQueryClient();
+  const { data: maxLimitData } = useQuery<number>({
+    queryKey: ['productsMaxLimit'],
+    queryFn: async () => {
       const maxLimit = await ProductService.getProductLimitOnly();
-      setLimitInfo(prev => ({
-        ...prev,
-        max: maxLimit,
-        canCreate: prev.current < maxLimit
-      }));
-    } catch (error: any) {
-      console.error('Load max limit error:', error);
+      return maxLimit;
+    },
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as number | undefined,
+  });
+  useEffect(() => {
+    if (maxLimitData != null) {
+      setLimitInfo(prev => ({ ...prev, max: maxLimitData, canCreate: prev.current < maxLimitData }));
     }
-  };
+  }, [maxLimitData]);
 
   const handleProductsLoaded = (count: number) => {
     setProductsCount(count);
@@ -68,6 +70,7 @@ export const Products = () => {
       await ProductService.deleteProduct(product.id);
       toast.success(t('product_deleted'));
       setRefreshTrigger(prev => prev + 1);
+      queryClient.invalidateQueries({ queryKey: ['products', 'all'] });
     } catch (error: any) {
       console.error('Delete error:', error);
       toast.error(error?.message || t('failed_delete_product'));

@@ -9,6 +9,7 @@ import { SuppliersList } from '@/components/user/suppliers';
 import { SupplierForm } from '@/components/user/suppliers';
 import { SupplierService, type Supplier, type SupplierLimitInfo } from '@/lib/supplier-service';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 
 type ViewMode = 'list' | 'create' | 'edit';
 
@@ -21,22 +22,22 @@ export const Suppliers = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<SupplierLimitInfo>({ current: 0, max: 0, canCreate: false });
 
-  useEffect(() => {
-    loadMaxLimit();
-  }, []);
-
-  const loadMaxLimit = async () => {
-    try {
+  const { data: supMaxLimit } = useQuery<number>({
+    queryKey: ['suppliersMaxLimit'],
+    queryFn: async () => {
       const maxLimit = await SupplierService.getSupplierLimitOnly();
-      setLimitInfo(prev => ({
-        ...prev,
-        max: maxLimit,
-        canCreate: prev.current < maxLimit
-      }));
-    } catch (error: any) {
-      console.error('Load max limit error:', error);
+      return maxLimit;
+    },
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as number | undefined,
+  });
+  useEffect(() => {
+    if (supMaxLimit != null) {
+      setLimitInfo(prev => ({ ...prev, max: supMaxLimit, canCreate: prev.current < supMaxLimit }));
     }
-  };
+  }, [supMaxLimit]);
 
   const handleSuppliersLoaded = (count: number) => {
     setSuppliersCount(count);

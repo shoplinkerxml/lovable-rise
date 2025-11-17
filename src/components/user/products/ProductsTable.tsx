@@ -59,6 +59,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -336,7 +337,7 @@ export const ProductsTable = ({
   hideDuplicate,
 }: ProductsTableProps) => {
   const { t } = useI18n();
-  const [products, setProducts] = useState<ProductRow[]>([]);
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
     open: false,
@@ -348,11 +349,143 @@ export const ProductsTable = ({
     name: null,
   });
 
-  const productsCount = products.length;
+  let productsCount = 0;
 
+  const { data: productsData, isLoading } = useQuery<ProductRow[]>({
+    queryKey: ['products', storeId ?? 'all'],
+    queryFn: async () => {
+      const data = storeId ? await ProductService.getProductsForStore(storeId) : await ProductService.getProducts();
+      onProductsLoaded?.(data.length);
+      const ids = (data ?? []).map((p) => p.id).filter(Boolean) as string[];
+      const categoryIds = (data ?? []).map((p: any) => p.category_id).filter((v) => !!v);
+      const mainImageMap: Record<string, string> = {};
+      const categoryNameMap: Record<string, string> = {};
+      if (ids.length > 0) {
+        const { data: imgRows } = await (supabase as any)
+          .from('store_product_images')
+          .select('product_id,url,is_main,order_index')
+          .in('product_id', ids);
+        const grouped: Record<string, any[]> = {};
+        (imgRows ?? []).forEach((r: any) => {
+          const pid = String(r.product_id);
+          if (!grouped[pid]) grouped[pid] = [];
+          grouped[pid].push(r);
+        });
+        for (const [pid, rows] of Object.entries(grouped)) {
+          const main = rows.find((x) => x.is_main) || rows.sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0];
+          if (main?.url) {
+            let url = main.url as string;
+            if (typeof url === "string" && (url.includes("r2.dev") || url.includes("cloudflarestorage.com"))) {
+              const objectKey = R2Storage.extractObjectKeyFromUrl(url);
+              if (objectKey) {
+                try {
+                  const signed = await R2Storage.getViewUrl(objectKey);
+                  if (signed) url = signed;
+                } catch {}
+              }
+            }
+            mainImageMap[pid] = url;
+          }
+        }
+      }
+      if (categoryIds.length > 0) {
+        const { data: catRows } = await (supabase as any)
+          .from('store_categories')
+          .select('id,name')
+          .in('id', categoryIds);
+        (catRows ?? []).forEach((r: any) => {
+          if (r.id && r.name) {
+            categoryNameMap[String(r.id)] = r.name;
+          }
+        });
+      }
+      const externalCategoryIds = (data ?? []).map((p: any) => p.category_external_id).filter((v) => !!v);
+      if (externalCategoryIds.length > 0) {
+        const { data: extCatRows } = await (supabase as any)
+          .from('store_categories')
+          .select('external_id,name')
+          .in('external_id', externalCategoryIds);
+        (extCatRows ?? []).forEach((r: any) => {
+          if (r.external_id && r.name) {
+            categoryNameMap[String(r.external_id)] = r.name;
+          }
+        });
+      }
+      const supplierIdsRaw = (data ?? []).map((p: any) => p.supplier_id).filter((v) => v !== null && v !== undefined);
+      const supplierIds = Array.from(new Set(supplierIdsRaw));
+      const supplierNameMap: Record<string | number, string> = {};
+      if (supplierIds.length > 0) {
+        const { data: supRows } = await (supabase as any)
+          .from('user_suppliers')
+          .select('id,supplier_name')
+          .in('id', supplierIds as any);
+        (supRows ?? []).forEach((r: any) => {
+          if (r.id != null && r.supplier_name) {
+            supplierNameMap[r.id] = r.supplier_name;
+          }
+        });
+      }
+      const storeLinksByProduct: Record<string, string[]> = {};
+      if (!storeId && ids.length > 0) {
+        const { data: linkRows } = await (supabase as any)
+          .from('store_product_links')
+          .select('product_id,store_id,is_active')
+          .in('product_id', ids);
+        (linkRows ?? []).forEach((r: any) => {
+          const pid = String(r.product_id);
+          const sid = r?.store_id != null ? String(r.store_id) : '';
+          const active = r?.is_active !== false;
+          if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = [];
+          if (sid && active) storeLinksByProduct[pid].push(sid);
+        });
+      }
+      const augmented = (data ?? []).map((p: any) => ({
+        ...p,
+        mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
+        categoryName:
+          (p.category_id && categoryNameMap[String(p.category_id)]) ||
+          (p.category_external_id && categoryNameMap[String(p.category_external_id)]) ||
+          undefined,
+        supplierName:
+          (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
+          undefined,
+        linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
+      }));
+      return augmented as ProductRow[];
+    },
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as ProductRow[] | undefined,
+  });
+  const products: ProductRow[] = productsData ?? [];
+  productsCount = products.length;
+  useEffect(() => { onProductsLoaded?.(products.length); }, [products.length]);
+  useEffect(() => { onLoadingChange?.(isLoading); setLoading(isLoading); }, [isLoading]);
+  useEffect(() => { queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] }); }, [refreshTrigger]);
   useEffect(() => {
-    loadProducts();
-  }, [refreshTrigger]);
+    const channels: any[] = [];
+    try {
+      channels.push((supabase as any).channel('products_images').on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_product_images' },
+        () => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })
+      ).subscribe());
+      channels.push((supabase as any).channel('products_links').on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_product_links' },
+        () => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })
+      ).subscribe());
+      channels.push((supabase as any).channel('products_main').on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_products' },
+        () => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })
+      ).subscribe());
+    } catch {}
+    return () => {
+      try { channels.forEach((ch) => (supabase as any).removeChannel(ch)); } catch {}
+    };
+  }, [queryClient, storeId]);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -494,7 +627,7 @@ export const ProductsTable = ({
       const nameForUi = product.name_ua || product.name || product.external_id || product.id;
       setCopyDialog({ open: true, name: nameForUi });
       await ProductService.duplicateProduct(product.id);
-      await loadProducts();
+      queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
     } catch (error) {
       console.error("Duplicate product failed", error);
       const msg = String((error as any)?.message || '');
@@ -1723,7 +1856,7 @@ export const ProductsTable = ({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => loadProducts()}
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })}
                       aria-label={t("refresh")}
                       data-testid="user_products_dataTable_refresh"
                     >
@@ -1887,7 +2020,7 @@ export const ProductsTable = ({
                   }
 
                   if (didBatch || typeof refreshTrigger === 'undefined') {
-                    await loadProducts();
+                    queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
                   }
                 } catch (error) {
                   console.error("Delete error:", error);

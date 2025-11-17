@@ -20,6 +20,7 @@ export const ShopDetail = () => {
   const navigate = useNavigate();
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
+  const queryClient = useQueryClient();
   const [shop, setShop] = useState<Shop | null>(null);
   const [marketplace, setMarketplace] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -31,43 +32,49 @@ export const ShopDetail = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   
 
+  const { data: shopData, isLoading } = useQuery<Shop | null>({
+    queryKey: ['shopDetail', id!],
+    queryFn: async () => {
+      if (!id) return null;
+      const s = await ShopService.getShop(id!);
+      return s;
+    },
+    enabled: !!id,
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as Shop | null | undefined,
+  });
   useEffect(() => {
     if (!id) {
       navigate('/user/shops');
       return;
     }
-
-    loadShop();
-  }, [id]);
-
-  const loadShop = async () => {
-    try {
-      setLoading(true);
-      const shopData = await ShopService.getShop(id!);
+    setLoading(isLoading);
+    if (shopData) {
       setShop(shopData);
-      
-      // Load marketplace name from template
-      if (shopData.template_id) {
-        const { data } = await (supabase as any)
-          .from('store_templates')
-          .select('marketplace')
-          .eq('id', shopData.template_id)
-          .single();
-        
-      if (data?.marketplace) {
-        setMarketplace(data.marketplace);
-      }
     }
-
-    
-    } catch (error: any) {
-      console.error('Load shop error:', error);
-      toast.error(error?.message || 'Failed to load shop');
-      navigate('/user/shops');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [id, isLoading, shopData, navigate]);
+  useEffect(() => {
+    const applyMarketplace = async () => {
+      if (!shopData?.template_id) return;
+      const { data } = await (supabase as any)
+        .from('store_templates')
+        .select('marketplace')
+        .eq('id', shopData.template_id)
+        .single();
+      if (data?.marketplace) setMarketplace(data.marketplace);
+    };
+    applyMarketplace();
+  }, [shopData]);
+  useEffect(() => {
+    const channel = (supabase as any).channel('shop_detail_realtime').on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'stores', filter: `id=eq.${id}` },
+      () => queryClient.invalidateQueries({ queryKey: ['shopDetail', id!] })
+    ).subscribe();
+    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+  }, [id, queryClient]);
 
   // Add marketplace type to breadcrumbs
   const shopBreadcrumbs = [
@@ -159,7 +166,7 @@ export const ShopDetail = () => {
           shop={shop}
           open={showEditDialog}
           onOpenChange={setShowEditDialog}
-          onSuccess={loadShop}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['shopDetail', id!] })}
         />
       )}
 
@@ -169,7 +176,7 @@ export const ShopDetail = () => {
           shop={shop}
           open={showStructureEditor}
           onOpenChange={setShowStructureEditor}
-          onSuccess={loadShop}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['shopDetail', id!] })}
         />
       )}
 
@@ -184,3 +191,4 @@ export const ShopDetail = () => {
     </div>
   );
 };
+import { useQuery, useQueryClient } from '@tanstack/react-query';

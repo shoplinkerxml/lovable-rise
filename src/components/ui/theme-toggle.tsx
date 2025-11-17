@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button"
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
+  const toggleTheme = React.useCallback(() => {
+    setTheme(theme === "light" ? "dark" : "light")
+  }, [theme, setTheme])
 
   return (
     <Button
       variant="ghost"
       size="sm"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+      onClick={toggleTheme}
+      data-testid="common_themeToggle_button"
       className="h-9 w-9 hover:bg-transparent cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
     >
       <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

@@ -3,49 +3,49 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo, Suspense, lazy } from "react";
 import { R2Storage } from "@/lib/r2-storage";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
 import { I18nProvider } from "@/providers/i18n-provider";
 // Dev diagnostics removed per request
 
-import Index from "./pages/Index";
-import ExportPublic from "./pages/ExportPublic";
-import ApiDocs from "./pages/ApiDocs";
-import NotFound from "./pages/NotFound";
-import AdminAuth from "./pages/AdminAuth";
-import AdminProtected from "./pages/AdminProtected";
-import AdminLayout from "@/components/AdminLayout";
+const Index = lazy(() => import("./pages/Index"));
+const ExportPublic = lazy(() => import("./pages/ExportPublic"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminAuth = lazy(() => import("./pages/AdminAuth"));
+const AdminProtected = lazy(() => import("./pages/AdminProtected"));
+const AdminLayout = lazy(() => import("@/components/AdminLayout"));
 import { AdminRoute, UserRoute } from "@/components/ProtectedRoutes";
 
-import AuthCallback from "./pages/AuthCallback";
-import UserAuth from "./pages/UserAuth";
-import UserRegister from "./pages/UserRegister";
-import UserForgotPassword from "./pages/UserForgotPassword";
-import UserResetPassword from "./pages/UserResetPassword";
-import UserProtected from "./pages/UserProtected";
-import UserLayout from "@/components/UserLayout";
-import UserDashboard from "./pages/UserDashboard";
-import UserProfile from "./pages/UserProfile";
-import UserMenuContent from "./pages/UserMenuContent";
-import UserMenuContentByPath from "./pages/UserMenuContentByPath";
-import CurrencyManagement from "./pages/admin/settings/CurrencyManagement";
-import AdminTariffManagement from "./pages/admin/AdminTariffManagement";
-import AdminTariffFeatures from "./pages/admin/AdminTariffFeatures";
-import AdminTariffNew from "./pages/admin/AdminTariffNew";
-import AdminTariffEdit from "./pages/admin/AdminTariffEdit";
-import { StoreTemplates } from "./pages/admin/StoreTemplates";
-import { LimitTemplates } from "./pages/admin/LimitTemplates";
-import AdminUserDetails from "./pages/admin/AdminUserDetails";
-import TariffPage from "./pages/TariffPage";
-import { Suppliers } from "./pages/user/Suppliers";
-import { Shops } from "./pages/user/Shops";
-import { ShopDetail } from "@/pages/user/ShopDetail";
-import { Products } from "./pages/user/Products";
-import { ProductCreate } from "./pages/user/ProductCreate";
-import { ProductEdit } from "./pages/user/ProductEdit";
-import { StoreProducts } from "./pages/user/StoreProducts";
-import ShopSettings from "./pages/user/ShopSettings";
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const UserAuth = lazy(() => import("./pages/UserAuth"));
+const UserRegister = lazy(() => import("./pages/UserRegister"));
+const UserForgotPassword = lazy(() => import("./pages/UserForgotPassword"));
+const UserResetPassword = lazy(() => import("./pages/UserResetPassword"));
+const UserProtected = lazy(() => import("./pages/UserProtected"));
+const UserLayout = lazy(() => import("@/components/UserLayout"));
+const UserDashboard = lazy(() => import("./pages/UserDashboard"));
+const UserProfile = lazy(() => import("./pages/UserProfile"));
+const UserMenuContent = lazy(() => import("./pages/UserMenuContent"));
+const UserMenuContentByPath = lazy(() => import("./pages/UserMenuContentByPath"));
+const CurrencyManagement = lazy(() => import("./pages/admin/settings/CurrencyManagement"));
+const AdminTariffManagement = lazy(() => import("./pages/admin/AdminTariffManagement"));
+const AdminTariffFeatures = lazy(() => import("./pages/admin/AdminTariffFeatures"));
+const AdminTariffNew = lazy(() => import("./pages/admin/AdminTariffNew"));
+const AdminTariffEdit = lazy(() => import("./pages/admin/AdminTariffEdit"));
+const StoreTemplates = lazy(() => import("./pages/admin/StoreTemplates").then(m => ({ default: m.StoreTemplates })));
+const LimitTemplates = lazy(() => import("./pages/admin/LimitTemplates").then(m => ({ default: m.LimitTemplates })));
+const AdminUserDetails = lazy(() => import("./pages/admin/AdminUserDetails"));
+const TariffPage = lazy(() => import("./pages/TariffPage"));
+const Suppliers = lazy(() => import("./pages/user/Suppliers").then(m => ({ default: m.Suppliers })));
+const Shops = lazy(() => import("./pages/user/Shops").then(m => ({ default: m.Shops })));
+const ShopDetail = lazy(() => import("@/pages/user/ShopDetail").then(m => ({ default: m.ShopDetail })));
+const Products = lazy(() => import("./pages/user/Products").then(m => ({ default: m.Products })));
+const ProductCreate = lazy(() => import("./pages/user/ProductCreate").then(m => ({ default: m.ProductCreate })));
+const ProductEdit = lazy(() => import("./pages/user/ProductEdit").then(m => ({ default: m.ProductEdit })));
+const StoreProducts = lazy(() => import("./pages/user/StoreProducts").then(m => ({ default: m.StoreProducts })));
+const ShopSettings = lazy(() => import("./pages/user/ShopSettings"));
 import { StoreProductEdit } from "./pages/user/StoreProductEdit";
 
 const queryClient = new QueryClient({
@@ -65,7 +65,7 @@ const App = () => {
     R2Storage.cleanupPendingUploads().catch(() => {});
   }, []);
 
-  const router = createBrowserRouter([
+  const router = useMemo(() => createBrowserRouter([
     { path: "/", element: <Index /> },
     { path: "/docs", element: <ApiDocs /> },
     { path: "/export/:format/:token", element: <ExportPublic /> },
@@ -128,7 +128,7 @@ const App = () => {
       v7_partialHydration: false,
       v7_skipActionErrorRevalidation: true,
     },
-  });
+  }), []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -142,7 +142,9 @@ const App = () => {
           <Toaster />
           <Sonner />
           <I18nProvider>
-            <RouterProvider router={router} />
+            <Suspense fallback={<div data-testid="router_skeleton" className="min-h-screen flex items-center justify-center text-muted-foreground">Завантаження...</div>}>
+              <RouterProvider router={router} />
+            </Suspense>
           </I18nProvider>
         </TooltipProvider>
       </ThemeProvider>

@@ -18,6 +18,7 @@ import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop } from '@/lib/shop-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface ShopWithMarketplace extends Shop {
   marketplace?: string;
@@ -38,24 +39,19 @@ export const ShopsList = ({
 }: ShopsListProps) => {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [shops, setShops] = useState<ShopWithMarketplace[]>([]);
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; shop: ShopWithMarketplace | null }>({
     open: false,
     shop: null
   });
 
-  useEffect(() => {
-    loadShops();
-  }, [refreshTrigger]);
-
-  const loadShops = async () => {
-    try {
-      setLoading(true);
+  const { data: shopsData, isLoading } = useQuery<ShopWithMarketplace[]>({
+    queryKey: ['shopsList'],
+    queryFn: async () => {
       const data = await ShopService.getShops();
       const storeIds = data.map((s) => s.id);
       const templateIds = Array.from(new Set(data.map((s) => s.template_id).filter((v) => !!v))) as string[];
-
       const templatesMap: Record<string, string> = {};
       if (templateIds.length > 0) {
         const { data: templates } = await (supabase as any)
@@ -66,19 +62,15 @@ export const ShopsList = ({
           if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
         });
       }
-
       const productsRes = storeIds.length > 0
         ? await (supabase as any)
             .from('store_product_links')
             .select('store_id,store_products(category_id,category_external_id)')
             .in('store_id', storeIds)
         : { data: [] };
-
       const rows = (productsRes.data || []) as any[];
       const productsCountMap: Record<string, number> = {};
       const categoriesMap: Record<string, Set<string>> = {};
-
-      // Build mapping from category_id → external_id to avoid double-counting
       const categoryIdsRaw = rows
         .map((row: any) => row?.store_products?.category_id)
         .filter((v: any) => v != null && String(v).trim() !== '');
@@ -95,7 +87,6 @@ export const ShopsList = ({
           }
         });
       }
-
       rows.forEach((row: any) => {
         const sid = String(row.store_id);
         productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
@@ -112,23 +103,30 @@ export const ShopsList = ({
         if (!categoriesMap[sid]) categoriesMap[sid] = new Set<string>();
         if (canonical) categoriesMap[sid].add(canonical);
       });
-
       const result = data.map((shop) => ({
         ...shop,
         marketplace: templatesMap[String(shop.template_id)] || 'Не вказано',
         productsCount: productsCountMap[shop.id] || 0,
         categoriesCount: (categoriesMap[shop.id]?.size) || 0,
       }) as any);
-
-      setShops(result);
-      onShopsLoaded?.(result.length);
-    } catch (error: any) {
-      console.error('Load shops error:', error);
-      toast.error(error?.message || t('failed_load_shops'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return result;
+    },
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as ShopWithMarketplace[] | undefined,
+  });
+  const shops: ShopWithMarketplace[] = shopsData ?? [];
+  useEffect(() => { onShopsLoaded?.(shops.length); }, [shops.length]);
+  useEffect(() => { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); }, [refreshTrigger]);
+  useEffect(() => {
+    const channel = (supabase as any).channel('shops_realtime').on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'stores' },
+      () => { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); }
+    ).subscribe();
+    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+  }, [queryClient]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.shop) return;
@@ -136,14 +134,14 @@ export const ShopsList = ({
     try {
       await onDelete?.(deleteDialog.shop.id);
       setDeleteDialog({ open: false, shop: null });
-      loadShops();
+      queryClient.invalidateQueries({ queryKey: ['shopsList'] });
     } catch (error: any) {
       console.error('Delete error:', error);
       toast.error(error?.message || t('failed_delete_shop'));
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />

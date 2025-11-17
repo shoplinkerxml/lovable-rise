@@ -1,34 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const useUserRole = () => {
-  const [role, setRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: role, isLoading: loading } = useQuery({
+    queryKey: ['userRole'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (error) throw error;
+      return data?.role ?? null;
+    },
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
-    const fetchRole = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
-          
-          if (!error && data) {
-            setRole(data.role);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching user role:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchRole();
-  }, []);
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      queryClient.invalidateQueries({ queryKey: ['userRole'] });
+    });
+    return () => subscription?.subscription?.unsubscribe();
+  }, [queryClient]);
 
-  return { role, loading };
+  return { role: role ?? null, loading };
 };

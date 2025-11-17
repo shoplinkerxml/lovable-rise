@@ -16,6 +16,8 @@ import { Building2, Edit, Trash2, Loader2, Globe, Link, Phone } from 'lucide-rea
 import { useI18n } from '@/providers/i18n-provider';
 import { SupplierService, type Supplier } from '@/lib/supplier-service';
 import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SuppliersListProps {
   onEdit?: (supplier: Supplier) => void;
@@ -33,30 +35,38 @@ export const SuppliersList = ({
   refreshTrigger 
 }: SuppliersListProps) => {
   const { t } = useI18n();
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: suppliersData, isLoading: loading } = useQuery<Supplier[]>({
+    queryKey: ['suppliersList'],
+    queryFn: async () => {
+      const data = await SupplierService.getSuppliers();
+      return data;
+    },
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as Supplier[] | undefined,
+  });
+  const suppliers: Supplier[] = suppliersData ?? [];
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; supplier: Supplier | null }>({
     open: false,
     supplier: null
   });
 
-  useEffect(() => {
-    loadSuppliers();
-  }, [refreshTrigger]);
+  useEffect(() => { onSuppliersLoaded?.(suppliers.length); }, [suppliers.length]);
+  useEffect(() => { queryClient.invalidateQueries({ queryKey: ['suppliersList'] }); }, [refreshTrigger]);
 
-  const loadSuppliers = async () => {
+  useEffect(() => {
+    // Optionally add realtime invalidation when suppliers change
     try {
-      setLoading(true);
-      const data = await SupplierService.getSuppliers();
-      setSuppliers(data);
-      onSuppliersLoaded?.(data.length);
-    } catch (error: any) {
-      console.error('Load suppliers error:', error);
-      toast.error(error?.message || t('failed_load_suppliers'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      const channel = (supabase as any).channel('suppliers_realtime').on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_suppliers' },
+        () => queryClient.invalidateQueries({ queryKey: ['suppliersList'] })
+      ).subscribe();
+      return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+    } catch {}
+  }, [queryClient]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.supplier) return;
@@ -64,7 +74,7 @@ export const SuppliersList = ({
     try {
       await onDelete?.(deleteDialog.supplier.id);
       setDeleteDialog({ open: false, supplier: null });
-      loadSuppliers();
+      queryClient.invalidateQueries({ queryKey: ['suppliersList'] });
     } catch (error: any) {
       console.error('Delete error:', error);
       toast.error(error?.message || t('failed_delete_supplier'));

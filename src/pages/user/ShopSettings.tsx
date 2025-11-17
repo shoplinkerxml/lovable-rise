@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMarketplaces } from "@/hooks/useMarketplaces";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 type StoreCategoryRow = {
   store_category_id: number;
   store_id: string;
@@ -49,8 +50,7 @@ export default function ShopSettings() {
     isLoading: marketplacesLoading
   } = useMarketplaces();
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
-  const [rows, setRows] = useState<StoreCategoryRow[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState<string>("");
   const [pageSize, setPageSize] = useState<number>(10);
   const [pageIndex, setPageIndex] = useState<number>(0);
@@ -71,39 +71,67 @@ export default function ShopSettings() {
   const [editExternalId, setEditExternalId] = useState<string>("");
   const [editRzIdValue, setEditRzIdValue] = useState<string>("");
   const [editActive, setEditActive] = useState<boolean>(true);
+  const { data: shopData } = useQuery({
+    queryKey: ['shop', id],
+    queryFn: async () => {
+      const shop = await ShopService.getShop(id!);
+      return shop;
+    },
+    enabled: !!id,
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const shop = await ShopService.getShop(id!);
-        setShopName(shop.store_name);
-        setStoreCompany(String(shop.store_company || ''));
-        setStoreUrl(String(shop.store_url || ''));
-        if ((shop as any).template_id) {
-          const {
-            data: tpl
-          } = await (supabase as any).from('store_templates').select('marketplace').eq('id', (shop as any).template_id).maybeSingle();
-          if (tpl?.marketplace) setSelectedMarketplace(String(tpl.marketplace));
-        }
-        const cats = await ShopService.getStoreCategories(id!);
-        setRows(cats);
-      } finally {
-        setLoading(false);
-      }
+    if (!id) {
+      navigate('/user/shops');
+      return;
+    }
+    if (shopData) {
+      setShopName(shopData.store_name);
+      setStoreCompany(String((shopData as any).store_company || ''));
+      setStoreUrl(String((shopData as any).store_url || ''));
+    }
+  }, [id, shopData, navigate]);
+  useEffect(() => {
+    const applyMarketplace = async () => {
+      if (!shopData || !(shopData as any).template_id) return;
+      const { data: tpl } = await (supabase as any).from('store_templates').select('marketplace').eq('id', (shopData as any).template_id).maybeSingle();
+      if (tpl?.marketplace) setSelectedMarketplace(String(tpl.marketplace));
     };
-    if (id) load();else navigate('/user/shops');
-  }, [id]);
+    applyMarketplace();
+  }, [shopData]);
+  const { data: rowsData, isLoading: loading } = useQuery<StoreCategoryRow[]>({
+    queryKey: ['storeCategories', id!],
+    queryFn: async () => {
+      const cats = await ShopService.getStoreCategories(id!);
+      return cats;
+    },
+    enabled: !!id,
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as StoreCategoryRow[] | undefined,
+  });
+  const rows: StoreCategoryRow[] = rowsData ?? [];
   useEffect(() => {
     const checkProducts = async () => {
-      const {
-        count
-      } = await (supabase as any).from('store_products').select('*', {
-        count: 'exact'
-      }).eq('store_id', id!).limit(1);
+      const { count } = await (supabase as any).from('store_products').select('*', { count: 'exact' }).eq('store_id', id!).limit(1);
       setProductsCount(count || 0);
     };
     if (id) checkProducts();
   }, [id]);
+  useEffect(() => {
+    if (!id) return;
+    const channel = (supabase as any).channel(`store_categories_${id}`).on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'store_categories', filter: `store_id=eq.${id}` },
+      () => {
+        queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
+      }
+    ).subscribe();
+    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+  }, [id, queryClient]);
   const filtered = useMemo(() => rows.filter(r => r.name.toLowerCase().includes(search.toLowerCase())), [rows, search]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize);
@@ -133,8 +161,7 @@ export default function ShopSettings() {
       id: rowId,
       ...patch
     });
-    const cats = await ShopService.getStoreCategories(id!);
-    setRows(cats);
+    queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
   };
   const [availableCurrencies, setAvailableCurrencies] = useState<Array<{
     code: string;
@@ -331,8 +358,7 @@ export default function ShopSettings() {
                         await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
                       }
                     }
-                    const cats = await ShopService.getStoreCategories(id!);
-                    setRows(cats);
+                    queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
                     setSelectedRowIds([]);
                   }} data-testid="shop_settings_delete_btn">
                     <Trash2 className="h-4 w-4" />
@@ -415,8 +441,7 @@ export default function ShopSettings() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={async () => {
                                 await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
-                                const cats = await ShopService.getStoreCategories(id!);
-                                setRows(cats);
+                                queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
                                 setSelectedRowIds(prev => prev.filter(pid => pid !== cat.store_category_id));
                               }}>
                                 <Trash2 className="mr-2 h-4 w-4" />{t('delete') || 'Видалити'}
@@ -469,8 +494,7 @@ export default function ShopSettings() {
                           rz_id_value: editRzIdValue || null,
                           is_active: editActive
                         });
-                        const cats = await ShopService.getStoreCategories(id!);
-                        setRows(cats);
+                        queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
                         setEditOpen(false);
                         setEditRow(null);
                         cleanupDialogArtifacts();

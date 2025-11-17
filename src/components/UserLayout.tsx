@@ -1,4 +1,5 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, createContext, useContext, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -6,6 +7,7 @@ import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOve
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sun, Moon, AlignJustify, LogOut, MoreHorizontal } from "lucide-react";
+import { useTheme } from "next-themes";
 import { ProfileTrigger } from "@/components/ui/profile-trigger";
 import { ProfileSheetContent } from "@/components/ui/profile-sheet-content";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
@@ -86,39 +88,29 @@ const UserMenuProvider: React.FC<{
   userId,
   hasAccess
 }) => {
-  const [menuItems, setMenuItems] = useState<UserMenuItem[]>([]);
+  const queryClient = useQueryClient();
   const [activeMenuItem, setActiveMenuItemState] = useState<UserMenuItem | null>(null);
-  const [menuLoading, setMenuLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Load menu items on mount
-  const loadMenuItems = async () => {
-    setMenuLoading(true);
-    try {
-      // Get all menu items as a flat list, not hierarchical
-      const items = await UserMenuService.getUserMenuItems(userId, true);
-      setMenuItems(items);
-    } catch (error) {
-      console.error("Failed to load user menu items:", error);
-      toast.error("Failed to load menu items");
-    } finally {
-      setMenuLoading(false);
-    }
-  };
-
-  // Refresh menu items
-  const refreshMenuItems = async () => {
-    await loadMenuItems();
-  };
-
-  // Initialize menu items on mount
-  useEffect(() => {
-    loadMenuItems();
-  }, [userId]);
+  const { data: menuItemsData, isLoading: menuLoading } = useQuery<UserMenuItem[]>({
+    queryKey: ['userMenu', userId],
+    queryFn: async () => {
+      return await UserMenuService.getUserMenuItems(userId, true);
+    },
+    enabled: !!userId,
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as UserMenuItem[] | undefined,
+  });
+  const menuItems: UserMenuItem[] = menuItemsData ?? [];
+  const refreshMenuItems = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['userMenu', userId] });
+  }, [queryClient, userId]);
 
   // Find active menu item based on current path with static route fallback
-  const findActiveMenuItem = (currentPath: string, items: UserMenuItem[]) => {
+  const findActiveMenuItem = useCallback((currentPath: string, items: UserMenuItem[]) => {
     const userPath = currentPath.replace('/user', '');
 
     // First try to find in loaded menu items from database
@@ -151,15 +143,15 @@ const UserMenuProvider: React.FC<{
       } as UserMenuItem;
     }
     return null;
-  };
+  }, []);
 
   // Set active menu item
-  const setActiveMenuItem = (item: UserMenuItem | null) => {
+  const setActiveMenuItem = useCallback((item: UserMenuItem | null) => {
     setActiveMenuItemState(item);
-  };
+  }, []);
 
   // Navigate to menu item
-  const navigateToMenuItem = (item: UserMenuItem) => {
+  const navigateToMenuItem = useCallback((item: UserMenuItem) => {
     setActiveMenuItem(item);
     // Handle static routes (negative IDs) differently from database routes
     if (item.id < 0) {
@@ -174,7 +166,7 @@ const UserMenuProvider: React.FC<{
         replace: false
       });
     }
-  };
+  }, [navigate]);
 
   // Subscription access is provided via props; reactive updates handled higher up
 
@@ -200,7 +192,7 @@ const UserMenuProvider: React.FC<{
       }
     }
   }, [location.pathname, menuItems, activeMenuItem?.id, findActiveMenuItem, setActiveMenuItem]);
-  const contextValue: UserMenuContextState = {
+  const contextValue: UserMenuContextState = useMemo(() => ({
     menuItems,
     activeMenuItem,
     menuLoading,
@@ -208,9 +200,9 @@ const UserMenuProvider: React.FC<{
     navigateToMenuItem,
     refreshMenuItems,
     hasAccess
-  };
+  }), [menuItems, activeMenuItem, menuLoading, hasAccess, navigateToMenuItem, refreshMenuItems, setActiveMenuItem]);
   return <UserMenuContext.Provider value={contextValue}>
-      {children}
+      <div data-testid="userMenu_provider_root">{children}</div>
     </UserMenuContext.Provider>;
 };
 const UserLayout = () => {
@@ -227,7 +219,13 @@ const UserLayout = () => {
   const [loading, setLoading] = useState(true);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   useEffect(() => {
-    loadUserData();
+    let cancelled = false;
+    const run = async () => {
+      await loadUserData();
+      if (cancelled) return;
+    };
+    run();
+    return () => { cancelled = true; };
   }, []);
   const loadUserData = async () => {
     try {
@@ -241,6 +239,7 @@ const UserLayout = () => {
       } = await UserAuthService.getCurrentUser();
       if (error || !currentUser || !session) {
         toast.error(t("please_log_in"));
+        navigate('/user-auth');
         return;
       }
 
@@ -269,8 +268,8 @@ const UserLayout = () => {
           avatarUrl: finalAvatarUrl
         });
       } else {
-        console.error('Failed to ensure user profile');
         toast.error(t("failed_load_user_profile"));
+        navigate('/user-auth');
         return;
       }
     } catch (error) {
@@ -292,9 +291,10 @@ const UserLayout = () => {
     setProfileSheetOpen(false);
     signOut();
   };
-  const toggleTheme = () => {
-    document.documentElement.classList.toggle("dark");
-  };
+  const { theme, setTheme } = useTheme();
+  const toggleTheme = useCallback(() => {
+    setTheme(theme === "light" ? "dark" : "light");
+  }, [theme, setTheme]);
   // Read hasAccess from UserProtected Outlet context early to keep hook order stable
   const { hasAccess } = useOutletContext<{ hasAccess: boolean }>();
   if (loading) {
