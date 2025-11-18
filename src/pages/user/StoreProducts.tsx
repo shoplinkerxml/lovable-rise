@@ -6,6 +6,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";
+import { Loader2 } from "lucide-react";
 
 export const StoreProducts = () => {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export const StoreProducts = () => {
   const navigate = useNavigate();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [shopName, setShopName] = useState("");
+  const [tableLoading, setTableLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (!storeId) {
@@ -55,16 +57,23 @@ export const StoreProducts = () => {
           { label: t("products_title"), current: true },
         ]}
       />
-      <ProductsTable
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onProductsLoaded={() => {}}
-        onLoadingChange={() => {}}
-        refreshTrigger={refreshTrigger}
-        canCreate={true}
-        storeId={storeId}
-        hideDuplicate={true}
-      />
+      <div className="relative" aria-busy={tableLoading}>
+        {tableLoading && (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        <ProductsTable
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onProductsLoaded={() => {}}
+          onLoadingChange={setTableLoading}
+          refreshTrigger={refreshTrigger}
+          canCreate={true}
+          storeId={storeId}
+          hideDuplicate={true}
+        />
+      </div>
     </div>
   );
 };

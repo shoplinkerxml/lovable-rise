@@ -82,7 +82,8 @@ export const ProductCreate = () => {
       navigate('/user/products');
     } catch (error: any) {
       console.error('Error creating product:', error);
-      toast.error(t('failed_create_product'));
+      const key = (error?.message as string) || 'failed_create_product';
+      toast.error(t(key as any));
     }
   };
 

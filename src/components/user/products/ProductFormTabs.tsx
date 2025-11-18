@@ -208,14 +208,18 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           const resolved = await Promise.all(productImages.map(async (img) => {
             let previewUrl = img.url;
             const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-            if (typeof previewUrl === 'string' && (previewUrl.includes('r2.dev') || previewUrl.includes('cloudflarestorage.com'))) {
-              const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
-              if (objectKey) {
-                try {
-                  const signed = await R2Storage.getViewUrl(objectKey);
-                  if (signed) previewUrl = signed;
-                } catch (e) {
-                  console.warn('Failed to sign view URL for image:', e);
+            if (typeof previewUrl === 'string') {
+              let host = '';
+              try { host = new URL(previewUrl).host; } catch {}
+              const isR2Dev = previewUrl.includes('r2.dev');
+              const isOurBucket = host === 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com';
+              if (isR2Dev || isOurBucket) {
+                const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
+                if (objectKey) {
+                  try {
+                    const signed = await R2Storage.getViewUrl(objectKey);
+                    if (signed) previewUrl = signed;
+                  } catch (e) {}
                 }
               }
             }

@@ -26,10 +26,12 @@ interface ProductFormTabsProps {
   onSubmit?: (data: any) => void;
   onCancel?: () => void;
   readOnly?: boolean;
-  editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity'>;
+  editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity' | 'available'>;
   overrides?: Partial<FormData>;
   onChange?: (partial: Partial<FormData>) => void;
   onImagesLoadingChange?: (loading: boolean) => void;
+  onParamsChange?: (params: ProductParam[]) => void;
+  forceParamsEditable?: boolean;
 }
 interface ProductParam {
   id?: string;
@@ -78,6 +80,7 @@ interface FormData {
   supplier_id: string;
   category_id: string;
   category_external_id: string;
+  category_name?: string;
   currency_code: string;
   price: number;
   price_old: number;
@@ -95,7 +98,9 @@ export function ProductFormTabs({
   editableKeys,
   overrides,
   onChange,
-  onImagesLoadingChange
+  onImagesLoadingChange,
+  onParamsChange,
+  forceParamsEditable
 }: ProductFormTabsProps) {
   // 500px in rem (to avoid fixed px in CSS): 500 / 16 = 31.25
   const DEFAULT_PHOTO_SIZE_REM = 31.25;
@@ -246,6 +251,7 @@ export function ProductFormTabs({
     supplier_id: '',
     category_id: '',
     category_external_id: '',
+    category_name: '',
     currency_code: 'UAH',
     price: 0,
     price_old: 0,
@@ -756,14 +762,18 @@ export function ProductFormTabs({
         const resolved = await Promise.all(imagesData.map(async (img: any) => {
           let previewUrl: string = img.url;
           const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          if (typeof previewUrl === 'string' && (previewUrl.includes('r2.dev') || previewUrl.includes('cloudflarestorage.com'))) {
-            const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
-            if (objectKey) {
-              try {
-                const signed = await R2Storage.getViewUrl(objectKey);
-                if (signed) previewUrl = signed;
-              } catch (e) {
-                console.warn('Failed to sign view URL for image:', e);
+          if (typeof previewUrl === 'string') {
+            let host = '';
+            try { host = new URL(previewUrl).host; } catch {}
+            const isR2Dev = previewUrl.includes('r2.dev');
+            const isOurBucket = host === 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com';
+            if (isR2Dev || isOurBucket) {
+              const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
+              if (objectKey) {
+                try {
+                  const signed = await R2Storage.getViewUrl(objectKey);
+                  if (signed) previewUrl = signed;
+                } catch (e) {}
               }
             }
           }
@@ -784,14 +794,16 @@ export function ProductFormTabs({
         data: paramsData
       } = await supabase.from('store_product_params').select('*').eq('product_id', product.id).order('order_index');
       if (paramsData) {
-        setParameters(paramsData.map(param => ({
+        const mapped = paramsData.map(param => ({
           id: String(param.id),
           name: param.name,
           value: param.value,
           order_index: param.order_index,
           paramid: (param as any).paramid || '',
           valueid: (param as any).valueid || ''
-        })));
+        }));
+        setParameters(mapped);
+        onParamsChange?.(mapped);
       }
     } catch (error) {
       console.error('Error loading product data:', error);
@@ -1108,6 +1120,7 @@ export function ProductFormTabs({
         order_index: parameters.length
       }];
       setParameters(newParams);
+      onParamsChange?.(newParams);
     } else {
       const updated = [...parameters];
       updated[editingParamIndex] = {
@@ -1118,6 +1131,7 @@ export function ProductFormTabs({
         valueid
       };
       setParameters(updated);
+      onParamsChange?.(updated);
     }
     setIsParamModalOpen(false);
   };
@@ -1127,6 +1141,7 @@ export function ProductFormTabs({
       order_index: i
     }));
     setParameters(newParams);
+    onParamsChange?.(newParams);
   };
   const [selectedParamRows, setSelectedParamRows] = useState<number[]>([]);
   const deleteSelectedParams = (indexes: number[]) => {
@@ -1136,6 +1151,7 @@ export function ProductFormTabs({
       order_index: i
     }));
     setParameters(keep);
+    onParamsChange?.(keep);
   };
   return <div className="container mx-auto px-2 sm:px-6 py-3 sm:py-6 max-w-7xl" data-testid="productFormTabs_container">
       <Card>
@@ -1308,7 +1324,13 @@ export function ProductFormTabs({
                     setFormData({
                       ...formData,
                       category_id: value,
-                      category_external_id: cat?.external_id || ''
+                      category_external_id: cat?.external_id || '',
+                      category_name: cat?.name || ''
+                    });
+                    onChange?.({
+                      category_id: value,
+                      category_external_id: cat?.external_id || '',
+                      category_name: cat?.name || ''
                     });
                   }}>
                       <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
@@ -1347,24 +1369,40 @@ export function ProductFormTabs({
                         <SelectItem value="used">{t('status_used')}</SelectItem>
                         <SelectItem value="refurbished">{t('status_refurbished')}</SelectItem>
                       </SelectContent>
-                    </Select>
-                  </div>
+              </Select>
+            </div>
 
-                  {/* Кількість на складі — перенесено справа от статуса */}
-                  <div className="space-y-2">
-                    <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-                    <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => {
-                    const v = parseInt(e.target.value) || 0;
-                    setFormData({
-                      ...formData,
-                      stock_quantity: v
-                    });
-                    onChange?.({
-                      stock_quantity: v
-                    });
-                  }} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" disabled={!!readOnly && !(editableKeys || []).includes('stock_quantity')} />
-                  </div>
-                </div>
+            {/* Кількість на складі — перенесено справа от статуса */}
+            <div className="space-y-2">
+              <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
+              <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => {
+                const v = parseInt(e.target.value) || 0;
+                setFormData({
+                  ...formData,
+                  stock_quantity: v
+                });
+                onChange?.({
+                  stock_quantity: v
+                });
+              }} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" disabled={!!readOnly && !(editableKeys || []).includes('stock_quantity')} />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="available"
+                checked={!!formData.available}
+                onChange={(e) => {
+                  const val = !!e.target.checked;
+                  setFormData({ ...formData, available: val });
+                  onChange?.({ available: val });
+                }}
+                className="rounded border-gray-300"
+                data-testid="productFormTabs_available"
+                disabled={!!readOnly && !(editableKeys || []).includes('available')}
+              />
+              <Label htmlFor="available">{t('product_available')}</Label>
+            </div>
+          </div>
               </div>
 
               {/* Блок назви та опис — вынесен ниже редактора категорій, на всю ширину */}
@@ -1593,21 +1631,31 @@ export function ProductFormTabs({
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>{t('product_characteristics')}</span>
+                    {(readOnly && !forceParamsEditable) ? null : (
+                      <Button
+                        type="button"
+                        onClick={openAddParamModal}
+                        size="sm"
+                        variant="outline"
+                        data-testid="productForm_addCharacteristic"
+                        aria-label={t('add_characteristic')}
+                        className="max-[550px]:ml-auto"
+                      >
+                        <Plus className="h-4 w-4 mr-2 max-[550px]:mr-0" />
+                        <span className="max-[550px]:hidden">{t('add_characteristic')}</span>
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {parameters.length === 0 ? <div className="text-center py-12 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-                      <Settings className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">{t('no_characteristics_added')}</p>
-                      {readOnly ? null : <p className="text-sm text-muted-foreground mt-2">{t('add_characteristics_instruction')}</p>}
-                    </div> : readOnly ? <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {((readOnly && !forceParamsEditable)) ? <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {parameters.map(p => <div key={`${p.name}_${p.order_index}`} className="border rounded-md p-2">
                           <div className="text-xs text-muted-foreground">{p.name}</div>
                           <div className="text-sm break-words">{p.value}</div>
                         </div>)}
-                    </div> : <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} onAddParam={openAddParamModal} />}
+                    </div> : <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} onAddParam={openAddParamModal} onReplaceData={(rows) => { setParameters(rows); onParamsChange?.(rows); }} />}
 
-                  {readOnly ? null : <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
+                  {(readOnly && !forceParamsEditable) ? null : <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
                       <DialogContent data-testid="productForm_paramModal">
                         <DialogHeader>
                           <DialogTitle>

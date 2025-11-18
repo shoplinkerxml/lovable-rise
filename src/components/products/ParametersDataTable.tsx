@@ -30,7 +30,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil, Plus } from "lucide-react";
+import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil, Plus, Upload, Download } from "lucide-react";
+import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/providers/i18n-provider";
 
 // Keep local type consistent with ProductFormTabs
@@ -50,9 +53,10 @@ type Props = {
   onDeleteSelected?: (rowIndexes: number[]) => void;
   onSelectionChange?: (rowIndexes: number[]) => void;
   onAddParam?: () => void;
+  onReplaceData?: (rows: ProductParam[]) => void;
 };
 
-export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSelected, onSelectionChange, onAddParam }: Props) {
+export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSelected, onSelectionChange, onAddParam, onReplaceData }: Props) {
   const { t } = useI18n();
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
@@ -60,6 +64,11 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [dragActive, setDragActive] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [previewRows, setPreviewRows] = React.useState<ProductParam[]>([]);
+  const [previewFilename, setPreviewFilename] = React.useState<string>("");
 
   const columns = React.useMemo<ColumnDef<ProductParam>[]>(() => [
     {
@@ -177,6 +186,158 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
     setRowSelection({});
   }, [data]);
 
+  const buildCsv = (rows: ProductParam[]) => {
+    const header = ["name","value","paramid","valueid","order_index"].join(",");
+    const payload = rows.map(r => [
+      JSON.stringify(r.name || ""),
+      JSON.stringify(r.value || ""),
+      JSON.stringify(r.paramid || ""),
+      JSON.stringify(r.valueid || ""),
+      String(typeof r.order_index === "number" ? r.order_index : 0)
+    ].join(","));
+    return [header, ...payload].join("\n");
+  };
+  const downloadText = (text: string, filename: string, mime: string) => {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+  const handleExportCsv = () => {
+    const csv = buildCsv(data);
+    downloadText(csv, "product-params.csv", "text/csv;charset=utf-8");
+  };
+  const handleExportJson = () => {
+    const json = JSON.stringify(data);
+    downloadText(json, "product-params.json", "application/json;charset=utf-8");
+  };
+  const triggerImport = () => {
+    fileInputRef.current?.click();
+  };
+  const openPreview = (rows: ProductParam[], filename: string) => {
+    setPreviewRows(rows);
+    setPreviewFilename(filename);
+    setPreviewOpen(true);
+  };
+  const confirmReplace = () => {
+    if (previewRows.length === 0) {
+      setPreviewOpen(false);
+      return;
+    }
+    onReplaceData?.(previewRows);
+    setPreviewOpen(false);
+  };
+  const cancelPreview = () => {
+    setPreviewOpen(false);
+    setPreviewRows([]);
+    setPreviewFilename("");
+  };
+  const processFile = async (file: File) => {
+    const text = await file.text();
+    const name = (file.name || "").toLowerCase();
+    let rows: ProductParam[] = [];
+    if (name.endsWith('.json')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          rows = parsed.map((p: unknown, idx: number) => {
+            const obj = p as Record<string, unknown>;
+            return {
+              name: String(obj?.name ?? ""),
+              value: String(obj?.value ?? ""),
+              paramid: obj?.paramid ? String(obj.paramid as string) : "",
+              valueid: obj?.valueid ? String(obj.valueid as string) : "",
+              order_index: typeof obj?.order_index === 'number' ? (obj.order_index as number) : idx,
+            };
+          });
+        }
+      } catch {
+        rows = [];
+      }
+    } else if (name.endsWith('.csv')) {
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length > 0) {
+        const header = parseCsvRow(lines[0]).map(h => h.toLowerCase());
+        const idxName = header.indexOf('name');
+        const idxValue = header.indexOf('value');
+        const idxParamId = header.indexOf('paramid');
+        const idxValueId = header.indexOf('valueid');
+        const idxOrder = header.indexOf('order_index');
+        if (idxName < 0 || idxValue < 0) {
+          toast.error(t('validation_error'));
+          return;
+        }
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvRow(lines[i]);
+          rows.push({
+            name: String(cols[idxName] || ""),
+            value: String(cols[idxValue] || ""),
+            paramid: idxParamId >= 0 ? String(cols[idxParamId] || "") : "",
+            valueid: idxValueId >= 0 ? String(cols[idxValueId] || "") : "",
+            order_index: idxOrder >= 0 ? Number(cols[idxOrder] || i - 1) || (i - 1) : (i - 1),
+          });
+        }
+      }
+    }
+    if (rows.length > 0) {
+      openPreview(rows, file.name || "import");
+    } else {
+      toast.error(t('invalid_file_type'));
+    }
+  };
+  const parseCsvRow = (line: string) => {
+    const out: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (ch === ',' && !inQuotes) {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out.map(s => s.trim());
+  };
+  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const file = e.target.files?.[0] || null;
+    e.currentTarget.value = "";
+    if (!file) return;
+    await processFile(file);
+  };
+  const handleDrop: React.DragEventHandler<HTMLDivElement> = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (!onReplaceData) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  };
+  const handleDragOver: React.DragEventHandler<HTMLDivElement> = (e) => {
+    if (!onReplaceData) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+  const handleDragLeave: React.DragEventHandler<HTMLDivElement> = (e) => {
+    if (!onReplaceData) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
   return (
     <div className="flex flex-col gap-3" data-testid="parametersDataTable_root">
       {/* Toolbar */}
@@ -190,7 +351,13 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
             data-testid="parametersDataTable_filter"
           />
         </div>
-        <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm" data-testid="parametersDataTable_actions_block">
+        <div
+          className={`flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm ${dragActive ? 'ring-2 ring-primary border-primary' : ''}`}
+          data-testid="parametersDataTable_actions_block"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           {onAddParam && (
             <Button
               type="button"
@@ -203,6 +370,40 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
             >
               <Plus className="h-4 w-4 text-foreground" />
             </Button>
+          )}
+          {onReplaceData && (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" onClick={triggerImport} variant="ghost" size="icon" className="h-8 w-8" data-testid="parametersDataTable_import" aria-label={t('upload')}>
+                      <Upload className="h-4 w-4 text-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('upload')}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" data-testid="parametersDataTable_export" aria-label={t('export_section')}>
+                          <Download className="h-4 w-4 text-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleExportCsv} data-testid="parametersDataTable_export_csv">CSV</DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleExportJson} data-testid="parametersDataTable_export_json">JSON</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('export_section')}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <input ref={fileInputRef} className="hidden" type="file" accept=".csv,.json" onChange={handleFileChange} />
+            </>
           )}
           {(() => {
             const canDeleteSelected = selectedIndices.length > 0;
@@ -262,7 +463,37 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
         </div>
       </div>
 
-      
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('tab_preview')}</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground mb-2">{previewFilename}</div>
+          <div className="max-h-64 overflow-auto border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('characteristic_name')}</TableHead>
+                  <TableHead>{t('value')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {previewRows.slice(0, 5).map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm text-muted-foreground">{r.name}</TableCell>
+                    <TableCell className="text-sm font-medium">{r.value}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2">{previewRows.length} rows</div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={cancelPreview}>{t('btn_cancel')}</Button>
+            <Button type="button" onClick={confirmReplace}>{t('btn_update')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Table */}
       <div className="overflow-hidden rounded-lg border">

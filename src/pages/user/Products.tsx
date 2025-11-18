@@ -63,19 +63,26 @@ export const Products = () => {
   };
 
   const handleDelete = async (product: Product) => {
+    const key = ['products', 'all'] as const;
     try {
       const nameForUi = product.name_ua || product.name || product.external_id || product.id;
       setDeletingName(nameForUi);
       setIsDeleteOpen(true);
+
+      const prev = (queryClient.getQueryData(key) as any[] | undefined) ?? [];
+      queryClient.setQueryData<any[]>(key, (old) => (old ?? []).filter((p) => String((p as any)?.id) !== String(product.id)));
+
       await ProductService.deleteProduct(product.id);
       toast.success(t('product_deleted'));
-      setRefreshTrigger(prev => prev + 1);
-      queryClient.invalidateQueries({ queryKey: ['products', 'all'] });
+      // Optional background revalidation to sync with server, does not block UI
+      queryClient.invalidateQueries({ queryKey: key });
     } catch (error: any) {
+      const prev = (queryClient.getQueryData(['products', 'all']) as any[] | undefined) ?? [];
+      // Rollback UI if deletion failed
+      queryClient.setQueryData<any[]>(['products', 'all'], prev);
       console.error('Delete error:', error);
       toast.error(error?.message || t('failed_delete_product'));
-    }
-    finally {
+    } finally {
       setIsDeleteOpen(false);
       setDeletingName(null);
     }

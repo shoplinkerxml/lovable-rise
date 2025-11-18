@@ -260,6 +260,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                       custom_price_old: (product as any).price_old ?? null,
                                       custom_price_promo: (product as any).price_promo ?? null,
                                       custom_stock_quantity: (product as any).stock_quantity ?? null,
+                                      custom_available: (product as any).available ?? true,
                                     },
                                   ])
                                   .select('*');
@@ -338,6 +339,9 @@ export const ProductsTable = ({
 }: ProductsTableProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const setProductsCached = (updater: (prev: ProductRow[]) => ProductRow[]) => {
+    queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
+  };
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
     open: false,
@@ -375,13 +379,19 @@ export const ProductsTable = ({
           const main = rows.find((x) => x.is_main) || rows.sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0];
           if (main?.url) {
             let url = main.url as string;
-            if (typeof url === "string" && (url.includes("r2.dev") || url.includes("cloudflarestorage.com"))) {
-              const objectKey = R2Storage.extractObjectKeyFromUrl(url);
-              if (objectKey) {
-                try {
-                  const signed = await R2Storage.getViewUrl(objectKey);
-                  if (signed) url = signed;
-                } catch {}
+            if (typeof url === "string") {
+              let host = "";
+              try { host = new URL(url).host; } catch {}
+              const isR2Dev = url.includes("r2.dev");
+              const isOurBucket = host === "shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com";
+              if (isR2Dev || isOurBucket) {
+                const objectKey = R2Storage.extractObjectKeyFromUrl(url);
+                if (objectKey) {
+                  try {
+                    const signed = await R2Storage.getViewUrl(objectKey);
+                    if (signed) url = signed;
+                  } catch {}
+                }
               }
             }
             mainImageMap[pid] = url;
@@ -608,7 +618,7 @@ export const ProductsTable = ({
         linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
       }));
 
-      setProducts(augmented as ProductRow[]);
+      setProductsCached(() => augmented as ProductRow[]);
     } catch (error) {
       console.error("Failed to load products", error);
     } finally {
@@ -1361,7 +1371,7 @@ export const ProductsTable = ({
             hideDuplicate={hideDuplicate}
             storeId={storeId}
             onStoresUpdate={(productId, ids) => {
-              setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
+              setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
             }}
           />
         </div>
@@ -1379,10 +1389,10 @@ export const ProductsTable = ({
             checked={!!(row.original as any).available}
             onCheckedChange={async (checked) => {
               try {
-                setProducts((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: checked } : p));
+                setProductsCached((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: checked } : p));
                 await ProductService.updateStoreProductLink(row.original.id, String(storeId), { custom_available: checked });
               } catch (_) {
-                setProducts((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: !checked } : p));
+                setProductsCached((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: !checked } : p));
                 toast.error(t("operation_failed"));
               }
             }}
@@ -1756,7 +1766,7 @@ export const ProductsTable = ({
                               toast.error(t('failed_remove_from_store'));
                             } else {
                               toast.success(t('product_removed_from_store'));
-                              setProducts((prev) => prev.map((p) => {
+                              setProductsCached((prev) => prev.map((p) => {
                                 const pid = String(p.id);
                                 if (!productIds.includes(pid)) return p;
                                 const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.includes(String(sid)));
@@ -1799,6 +1809,7 @@ export const ProductsTable = ({
                                   custom_price_old: p.price_old ?? null,
                                   custom_price_promo: p.price_promo ?? null,
                                   custom_stock_quantity: p.stock_quantity ?? null,
+                                  custom_available: (p as any).available ?? true,
                                 });
                               }
                             }
@@ -1824,7 +1835,7 @@ export const ProductsTable = ({
                                 toast.error(t('failed_add_product_to_stores'));
                               } else {
                                 toast.success(t('product_added_to_stores'));
-                                setProducts((prev) => prev.map((p) => {
+                                setProductsCached((prev) => prev.map((p) => {
                                   const pid = String(p.id);
                                   if (!productIds.includes(pid)) return p;
                                   const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));

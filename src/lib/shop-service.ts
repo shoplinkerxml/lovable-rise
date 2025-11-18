@@ -418,4 +418,89 @@ export class ShopService {
       .in('category_id', ids);
     if (catErr) throw new Error(catErr.message);
   }
+
+  /** Убедиться, что категория привязана к магазину (апсерт) */
+  static async ensureStoreCategory(storeId: string, categoryId: number, options?: { external_id?: string | null; custom_name?: string | null }): Promise<number | null> {
+    if (!storeId || !Number.isFinite(categoryId)) throw new Error('storeId and categoryId required');
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) throw new Error('Invalid session');
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: storeOwner, error: storeOwnerErr } = await (supabase as any)
+      .from('user_stores')
+      .select('id,user_id')
+      .eq('id', storeId)
+      .maybeSingle();
+    if (storeOwnerErr) throw new Error(storeOwnerErr.message);
+    if (!storeOwner) throw new Error('Store not found');
+    if (String(storeOwner.user_id) !== String(user.id)) throw new Error('store_not_owned_by_user');
+
+    const { data: existing, error: selErr } = await (supabase as any)
+      .from('store_store_categories')
+      .select('id,is_active,external_id')
+      .eq('store_id', storeId)
+      .eq('category_id', categoryId)
+      .maybeSingle();
+    if (selErr) throw new Error(selErr.message);
+
+    if (existing?.id) {
+      const patch: any = { is_active: true };
+      if (options?.external_id !== undefined) patch.external_id = options.external_id;
+      if (options?.custom_name !== undefined) patch.custom_name = options.custom_name;
+      const { error: updErr } = await (supabase as any)
+        .from('store_store_categories')
+        .update(patch)
+        .eq('id', existing.id);
+      if (updErr) throw new Error(updErr.message);
+      return Number(existing.id);
+    }
+
+    const payload: any = {
+      store_id: storeId,
+      category_id: Number(categoryId),
+      is_active: true,
+      external_id: options?.external_id ?? null,
+      custom_name: options?.custom_name ?? null,
+    };
+    const { data: inserted, error: insErr } = await (supabase as any)
+      .from('store_store_categories')
+      .insert([payload])
+      .select('id')
+      .single();
+    if (insErr) throw new Error(insErr.message);
+    return inserted?.id ? Number(inserted.id) : null;
+  }
+
+  /** Получить внешний ID категории магазина для пары (store_id, category_id) */
+  static async getStoreCategoryExternalId(storeId: string, categoryId: number): Promise<string | null> {
+    if (!storeId || !Number.isFinite(categoryId)) throw new Error('storeId and categoryId required');
+    const { data, error } = await (supabase as any)
+      .from('store_store_categories')
+      .select('external_id')
+      .eq('store_id', storeId)
+      .eq('category_id', categoryId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return (data as any)?.external_id ?? null;
+  }
+
+  static async cleanupUnusedStoreCategory(storeId: string, categoryId: number): Promise<void> {
+    if (!storeId || !Number.isFinite(categoryId)) return;
+    const { data: prod, error: prodErr } = await (supabase as any)
+      .from('store_products')
+      .select('id')
+      .eq('store_id', storeId)
+      .eq('category_id', categoryId)
+      .limit(1);
+    if (prodErr) return;
+    const used = Array.isArray(prod) && prod.length > 0;
+    if (used) return;
+    await (supabase as any)
+      .from('store_store_categories')
+      .delete()
+      .eq('store_id', storeId)
+      .eq('category_id', categoryId);
+  }
 }

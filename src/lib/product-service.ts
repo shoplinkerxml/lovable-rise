@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { R2Storage } from "@/lib/r2-storage";
+import { ApiError } from "./user-service";
 import { SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
 
@@ -16,7 +16,7 @@ export interface Product {
   description_ua?: string | null;
   vendor?: string | null;
   article?: string | null;
-  category_id?: string | null;
+  category_id?: number | null;
   category_external_id?: string | null;
   currency_id?: string | null;
   currency_code?: string | null;
@@ -60,7 +60,7 @@ export interface CreateProductData {
   description_ua?: string | null;
   vendor?: string | null;
   article?: string | null;
-  category_id?: string | null;
+  category_id?: number | string | null;
   category_external_id?: string | null;
   supplier_id?: number | string | null;
   currency_code?: string | null;
@@ -72,6 +72,17 @@ export interface CreateProductData {
   state?: string;
   params?: ProductParam[];
   images?: ProductImage[];
+  links?: Array<{
+    store_id: string;
+    is_active?: boolean;
+    custom_price?: number | null;
+    custom_price_promo?: number | null;
+    custom_stock_quantity?: number | null;
+    custom_available?: boolean | null;
+    custom_name?: string | null;
+    custom_description?: string | null;
+    custom_category_id?: number | null;
+  }>;
 }
 
 export interface UpdateProductData {
@@ -85,7 +96,7 @@ export interface UpdateProductData {
   description_ua?: string | null;
   vendor?: string | null;
   article?: string | null;
-  category_id?: string | null;
+  category_id?: number | string | null;
   category_external_id?: string | null;
   supplier_id?: number | string | null;
   currency_code?: string | null;
@@ -106,6 +117,20 @@ export interface ProductLimitInfo {
 }
 
 export class ProductService {
+  private static castNullableNumber(value: unknown): number | null {
+    if (value === undefined || value === null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  private static edgeError(error: any, fallbackKey: string): never {
+    const status = (error?.context?.status ?? error?.status ?? error?.statusCode) as number | undefined;
+    const message = (error?.message as string | undefined) || undefined;
+    if (status === 403) throw new ApiError('permission_denied', 403, 'PERMISSION_DENIED');
+    if (status === 400) throw new ApiError('products_limit_reached', 400, 'LIMIT_REACHED');
+    if (status === 422) throw new ApiError('validation_error', 422, 'VALIDATION_ERROR');
+    throw new ApiError(message || fallbackKey, status || 500);
+  }
   /** Получение store_ids текущего пользователя */
   private static async getUserStoreIds(): Promise<string[]> {
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -221,18 +246,18 @@ export class ProductService {
   }
 
   static async updateStoreProductLink(productId: string, storeId: string, patch: any): Promise<any> {
-    const { data, error } = await (supabase as any)
-      .from('store_product_links')
-      .update(patch)
-      .eq('product_id', productId)
-      .eq('store_id', storeId)
-      .select('*')
-      .maybeSingle();
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const { data, error } = await (supabase as any).functions.invoke('update-store-product-link', {
+      body: { product_id: productId, store_id: storeId, patch },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
     if (error) {
-      console.error('Update store product link error:', error);
-      throw new Error(error.message);
+      const code = (error as unknown as { context?: { status?: number } })?.context?.status;
+      if (code === 403) throw new Error('Недостатньо прав');
+      throw new Error((error as unknown as { message?: string })?.message || 'update_failed');
     }
-    return data;
+    return (data as unknown as { link?: any })?.link ?? null;
   }
 
   static async removeStoreProductLink(productId: string, storeId: string): Promise<void> {
@@ -484,7 +509,6 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // Determine effective store_id: use provided or first active user store
     let effectiveStoreId = productData.store_id;
     if (!effectiveStoreId || effectiveStoreId.trim() === '') {
       const storeIds = await this.getUserStoreIds();
@@ -494,311 +518,68 @@ export class ProductService {
       }
     }
 
-    // Проверка лимита перед созданием товара (включая дублирование)
-    const limitInfo = await this.getProductLimit();
-    if (!limitInfo.canCreate) {
-      // Сообщение об ошибке будет отображено на UI через i18n
-      throw new Error("Ліміт товарів вичерпано");
-    }
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
 
-    // Подготавливаем данные для создания товара
-    const productInsertData = {
+    const payload: Record<string, unknown> = {
       store_id: effectiveStoreId,
-      supplier_id: productData.supplier_id !== undefined && productData.supplier_id !== null ? Number(productData.supplier_id) : undefined,
-      external_id: productData.external_id,
-      name: productData.name,
-      name_ua: productData.name_ua,
-      docket: productData.docket,
-      docket_ua: productData.docket_ua,
-      description: productData.description,
-      description_ua: productData.description_ua,
-      vendor: productData.vendor,
-      article: productData.article,
+      supplier_id: this.castNullableNumber(productData.supplier_id),
+      category_id: this.castNullableNumber(productData.category_id),
       category_external_id: productData.category_external_id ?? null,
       currency_code: productData.currency_code ?? null,
-      price: productData.price,
-      price_old: productData.price_old,
-      price_promo: productData.price_promo,
-      stock_quantity: productData.stock_quantity || 0,
-      available: productData.available !== false,
-      state: productData.state || 'new'
-    };
-
-    // Создаем товар
-    const { data: product, error: productError } = await (supabase as any)
-      .from('store_products')
-      .insert([productInsertData])
-      .select()
-      .single();
-
-    if (productError) {
-      console.error('Create product error:', productError);
-      throw new Error(productError.message);
-    }
-
-    // Создаем параметры товара, если они есть
-    if (productData.params && productData.params.length > 0) {
-      const paramsData = productData.params.map((param, index) => ({
-        product_id: product.id,
-        name: param.name,
-        value: param.value,
-        order_index: param.order_index || index,
-        paramid: param.paramid || null,
-        valueid: param.valueid || null
-      }));
-
-      const { error: paramsError } = await (supabase as any)
-        .from('store_product_params')
-        .insert(paramsData);
-
-      if (paramsError) {
-        console.error('Create product params error:', paramsError);
-        // Не прерываем выполнение, просто логируем ошибку
-      }
-    }
-
-    
-
-    // Создаем изображения товара, если они есть
-    if (productData.images && productData.images.length > 0) {
-      // Нормализуем флаг главного изображения: должно быть ровно одно is_main=true
-      const hasExplicitMain = productData.images.some(img => img.is_main === true);
-      let mainAssigned = false;
-
-      const imagesData = productData.images.map((image, index) => {
-        let isMain: boolean;
-        if (hasExplicitMain) {
-          if (image.is_main === true && !mainAssigned) {
-            isMain = true;
-            mainAssigned = true;
-          } else {
-            isMain = false;
-          }
-        } else {
-          isMain = index === 0;
-        }
-
-        return {
-          product_id: product.id,
-          url: image.url,
-          order_index: image.order_index || index,
-          is_main: isMain
-        };
-      });
-
-      const mainIdx = imagesData.findIndex((i) => i.is_main === true);
-      const orderedImages = (() => {
-        const arr = imagesData.slice();
-        if (mainIdx > 0) {
-          const [main] = arr.splice(mainIdx, 1);
-          arr.unshift(main);
-        }
-        return arr.map((i, idx) => ({ ...i, order_index: idx }));
-      })();
-
-      const { error: imagesError } = await (supabase as any)
-        .from('store_product_images')
-        .insert(orderedImages);
-
-      if (imagesError) {
-        console.error('Create product images error:', imagesError);
-        // Не прерываем выполнение, просто логируем ошибку
-      }
-    }
-
-    return product;
-  }
-
-  /** Дублирование продукта с новым ID и копированием параметров и изображений */
-  static async duplicateProduct(id: string): Promise<Product> {
-    // 1. Получаем оригинальный продукт
-    const original = await this.getProductById(id);
-    if (!original) {
-      throw new Error("Товар не найден");
-    }
-
-    // 2. Загружаем связанные параметры и изображения
-    const [params, images] = await Promise.all([
-      this.getProductParams(original.id),
-      this.getProductImages(original.id),
-    ]);
-
-    // 3. Формируем данные для создания нового товара (идентичные поля, новый id сгенерируется БД)
-    const duplicateData: CreateProductData = {
-      store_id: original.store_id,
-      supplier_id: original.supplier_id ?? null,
-      external_id: original.external_id,
-      name: original.name,
-      name_ua: original.name_ua ?? null,
-      docket: original.docket ?? null,
-      docket_ua: original.docket_ua ?? null,
-      description: original.description ?? null,
-      description_ua: original.description_ua ?? null,
-      vendor: original.vendor ?? null,
-      article: original.article ?? null,
-      category_id: original.category_id ?? null,
-      category_external_id: original.category_external_id ?? null,
-      currency_code: original.currency_code ?? null,
-      price: original.price ?? null,
-      price_old: original.price_old ?? null,
-      price_promo: original.price_promo ?? null,
-      stock_quantity: original.stock_quantity,
-      available: original.available,
-      state: original.state,
-      params: (params || []).map((p, idx) => ({
+      external_id: productData.external_id ?? null,
+      name: productData.name,
+      name_ua: productData.name_ua ?? null,
+      vendor: productData.vendor ?? null,
+      article: productData.article ?? null,
+      available: productData.available !== undefined ? productData.available : true,
+      stock_quantity: productData.stock_quantity ?? 0,
+      price: productData.price ?? null,
+      price_old: productData.price_old ?? null,
+      price_promo: productData.price_promo ?? null,
+      description: productData.description ?? null,
+      description_ua: productData.description_ua ?? null,
+      docket: productData.docket ?? null,
+      docket_ua: productData.docket_ua ?? null,
+      state: productData.state ?? 'new',
+      images: (productData.images || []).map((img, index) => ({
+        key: (img as any)?.object_key || undefined,
+        url: img.url,
+        order_index: typeof (img as any).order_index === 'number' ? (img as any).order_index : index,
+        is_main: !!(img as any).is_main,
+      })),
+      params: (productData.params || []).map((p, index) => ({
         name: p.name,
         value: p.value,
-        order_index: p.order_index ?? idx,
+        order_index: typeof p.order_index === 'number' ? p.order_index : index,
         paramid: p.paramid ?? null,
         valueid: p.valueid ?? null,
       })),
+      links: (productData as any).links || undefined,
     };
 
-    try {
-      const created = await this.createProduct(duplicateData);
-      const { data: authData } = await (supabase as any).auth.getSession();
-      const accessToken: string | null = authData?.session?.access_token || null;
-      const originalImages = images || [];
-      if (originalImages.length > 0) {
-        const uploaded: ProductImage[] = [];
-        for (let idx = 0; idx < originalImages.length; idx++) {
-          const img = originalImages[idx];
-          let src = typeof img?.url === 'string' ? img.url : '';
-          const key = typeof img?.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          if (key && accessToken) {
-            try {
-              const { data, error } = await (supabase as any).functions.invoke('r2-copy', { body: { sourceObjectKey: key, productId: created.id }, headers: { Authorization: `Bearer ${accessToken}` } });
-              if (!error && data?.publicUrl) {
-                uploaded.push({ url: data.publicUrl, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
-                continue;
-              }
-            } catch {}
-          }
-          try {
-            const res = await fetch(src);
-            if (!res.ok) throw new Error(String(res.status));
-            const blob = await res.blob();
-            let name = '';
-            try {
-              const u = new URL(typeof img?.url === 'string' ? img.url : src);
-              const parts = u.pathname.split('/').filter(Boolean);
-              name = parts[parts.length - 1] || '';
-            } catch {}
-            if (!name) {
-              const mt = res.headers.get('content-type') || blob.type || '';
-              const ext = mt.includes('png') ? 'png' : mt.includes('webp') ? 'webp' : mt.includes('gif') ? 'gif' : 'jpg';
-              name = `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-            }
-            const file = new File([blob], name, { type: res.headers.get('content-type') || blob.type || 'application/octet-stream' });
-            const up = await R2Storage.uploadFile(file, created.id);
-            uploaded.push({ url: up.publicUrl || img.url, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
-          } catch {
-            uploaded.push({ url: typeof img?.url === 'string' ? img.url : src, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
-          }
-        }
-        if (uploaded.length > 0) {
-          const hasMain = uploaded.some((i) => i.is_main === true);
-          let assigned = false;
-          const normalized = uploaded.map((i, index) => {
-            let m = i.is_main === true && !assigned;
-            if (hasMain) {
-              if (i.is_main === true && !assigned) assigned = true; else m = false;
-            } else {
-              m = index === 0;
-            }
-            return { product_id: created.id, url: i.url, order_index: typeof i.order_index === 'number' ? i.order_index : index, is_main: m } as any;
-          });
+    const { data, error } = await (supabase as any).functions.invoke('create-product', {
+      body: payload,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) this.edgeError(error, 'failed_create_product');
+    const productId = (data as unknown as { product_id?: string })?.product_id;
+    if (!productId) throw new Error('create_failed');
+    const product = await this.getProductById(productId);
+    if (!product) throw new Error('create_failed');
+    return product;
+  }
 
-          const mainIdx = normalized.findIndex((i) => i.is_main === true);
-          const ordered = (() => {
-            const arr = normalized.slice();
-            if (mainIdx > 0) {
-              const [main] = arr.splice(mainIdx, 1);
-              arr.unshift(main);
-            }
-            return arr.map((i, idx) => ({ ...i, order_index: idx }));
-          })();
-
-          await (supabase as any).from('store_product_images').insert(ordered);
-        }
-      }
-      return created;
-    } catch (error: any) {
-      // Если сработало уникальное ограничение, пробуем скорректировать external_id
-      const msg = String(error?.message || "");
-      if (msg.toLowerCase().includes("unique") || msg.toLowerCase().includes("constraint")) {
-        const fallback: CreateProductData = { ...duplicateData, external_id: `${original.external_id}-copy-${Math.floor(Math.random()*1000)}` };
-        const created = await this.createProduct(fallback);
-        const { data: authData } = await (supabase as any).auth.getSession();
-        const accessToken: string | null = authData?.session?.access_token || null;
-        const originalImages = images || [];
-        if (originalImages.length > 0) {
-          const uploaded: ProductImage[] = [];
-          for (let idx = 0; idx < originalImages.length; idx++) {
-            const img = originalImages[idx];
-            let src = typeof img?.url === 'string' ? img.url : '';
-            const key = typeof img?.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-            if (key && accessToken) {
-              try {
-                const { data, error } = await (supabase as any).functions.invoke('r2-copy', { body: { sourceObjectKey: key, productId: created.id }, headers: { Authorization: `Bearer ${accessToken}` } });
-                if (!error && data?.publicUrl) {
-                  uploaded.push({ url: data.publicUrl, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
-                  continue;
-                }
-              } catch {}
-            }
-            try {
-              const res = await fetch(src);
-              if (!res.ok) throw new Error(String(res.status));
-              const blob = await res.blob();
-              let name = '';
-              try {
-                const u = new URL(typeof img?.url === 'string' ? img.url : src);
-                const parts = u.pathname.split('/').filter(Boolean);
-                name = parts[parts.length - 1] || '';
-              } catch {}
-              if (!name) {
-                const mt = res.headers.get('content-type') || blob.type || '';
-                const ext = mt.includes('png') ? 'png' : mt.includes('webp') ? 'webp' : mt.includes('gif') ? 'gif' : 'jpg';
-                name = `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-              }
-              const file = new File([blob], name, { type: res.headers.get('content-type') || blob.type || 'application/octet-stream' });
-              const up = await R2Storage.uploadFile(file, created.id);
-              uploaded.push({ url: up.publicUrl || img.url, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
-            } catch {
-              uploaded.push({ url: typeof img?.url === 'string' ? img.url : src, order_index: img?.order_index ?? idx, is_main: img?.is_main ?? (idx === 0) });
-            }
-          }
-          if (uploaded.length > 0) {
-            const hasMain = uploaded.some((i) => i.is_main === true);
-            let assigned = false;
-            const normalized = uploaded.map((i, index) => {
-              let m = i.is_main === true && !assigned;
-              if (hasMain) {
-                if (i.is_main === true && !assigned) assigned = true; else m = false;
-              } else {
-                m = index === 0;
-              }
-              return { product_id: created.id, url: i.url, order_index: typeof i.order_index === 'number' ? i.order_index : index, is_main: m } as any;
-            });
-
-            const mainIdx = normalized.findIndex((i) => i.is_main === true);
-            const ordered = (() => {
-              const arr = normalized.slice();
-              if (mainIdx > 0) {
-                const [main] = arr.splice(mainIdx, 1);
-                arr.unshift(main);
-              }
-              return arr.map((i, idx) => ({ ...i, order_index: idx }));
-            })();
-
-            await (supabase as any).from('store_product_images').insert(ordered);
-          }
-        }
-        return created;
-      }
-      throw error;
+  static async duplicateProduct(id: string): Promise<Product> {
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const { data, error } = await (supabase as any).functions.invoke('duplicate-product', { body: { productId: id }, headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined });
+    if (error) this.edgeError(error, 'failed_duplicate_product');
+    const product = (data as any)?.product as Product;
+    if (!product) {
+      throw new Error('duplicate_failed');
     }
+    return product;
   }
 
   /** Обновление товара */
@@ -808,189 +589,68 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // Подготавливаем данные для обновления товара
-    const productUpdateData: any = {};
-    
-    if (productData.store_id !== undefined) productUpdateData.store_id = productData.store_id;
-    if (productData.external_id !== undefined) productUpdateData.external_id = productData.external_id;
-    if (productData.name !== undefined) productUpdateData.name = productData.name;
-    if (productData.name_ua !== undefined) productUpdateData.name_ua = productData.name_ua;
-    if (productData.docket !== undefined) productUpdateData.docket = productData.docket;
-    if (productData.docket_ua !== undefined) productUpdateData.docket_ua = productData.docket_ua;
-    if (productData.description !== undefined) productUpdateData.description = productData.description;
-    if (productData.description_ua !== undefined) productUpdateData.description_ua = productData.description_ua;
-    if (productData.vendor !== undefined) productUpdateData.vendor = productData.vendor;
-    if (productData.article !== undefined) productUpdateData.article = productData.article;
-    if (productData.category_id !== undefined) productUpdateData.category_id = productData.category_id;
-    if (productData.category_external_id !== undefined) productUpdateData.category_external_id = productData.category_external_id;
-    if (productData.supplier_id !== undefined) productUpdateData.supplier_id = productData.supplier_id !== null ? Number(productData.supplier_id) : null;
-    if (productData.currency_code !== undefined) productUpdateData.currency_code = productData.currency_code;
-    if (productData.price !== undefined) productUpdateData.price = productData.price;
-    if (productData.price_old !== undefined) productUpdateData.price_old = productData.price_old;
-    if (productData.price_promo !== undefined) productUpdateData.price_promo = productData.price_promo;
-    if (productData.stock_quantity !== undefined) productUpdateData.stock_quantity = productData.stock_quantity;
-    if (productData.available !== undefined) productUpdateData.available = productData.available;
-    if (productData.state !== undefined) productUpdateData.state = productData.state;
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
 
-    // Обновляем товар
-    const { data: product, error: productError } = await (supabase as any)
-      .from('store_products')
-      .update(productUpdateData)
-      .eq('id', id)
-      .select()
-      .single();
+    const payload: Record<string, unknown> = {
+      product_id: id,
+      supplier_id: productData.supplier_id !== undefined ? this.castNullableNumber(productData.supplier_id) : undefined,
+      category_id: productData.category_id !== undefined ? this.castNullableNumber(productData.category_id) : undefined,
+      category_external_id: productData.category_external_id !== undefined ? productData.category_external_id : undefined,
+      currency_code: productData.currency_code !== undefined ? productData.currency_code : undefined,
+      external_id: productData.external_id !== undefined ? productData.external_id : undefined,
+      name: productData.name !== undefined ? productData.name : undefined,
+      name_ua: productData.name_ua !== undefined ? productData.name_ua : undefined,
+      vendor: productData.vendor !== undefined ? productData.vendor : undefined,
+      article: productData.article !== undefined ? productData.article : undefined,
+      available: productData.available !== undefined ? productData.available : undefined,
+      stock_quantity: productData.stock_quantity !== undefined ? productData.stock_quantity : undefined,
+      price: productData.price !== undefined ? productData.price : undefined,
+      price_old: productData.price_old !== undefined ? productData.price_old : undefined,
+      price_promo: productData.price_promo !== undefined ? productData.price_promo : undefined,
+      description: productData.description !== undefined ? productData.description : undefined,
+      description_ua: productData.description_ua !== undefined ? productData.description_ua : undefined,
+      docket: productData.docket !== undefined ? productData.docket : undefined,
+      docket_ua: productData.docket_ua !== undefined ? productData.docket_ua : undefined,
+      state: productData.state !== undefined ? productData.state : undefined,
+      images: productData.images !== undefined ? (productData.images || []).map((img, index) => ({
+        key: (img as any)?.object_key || undefined,
+        url: (img as any)?.url,
+        order_index: typeof (img as any).order_index === 'number' ? (img as any).order_index : index,
+        is_main: !!(img as any).is_main,
+      })) : undefined,
+      params: productData.params !== undefined ? (productData.params || []).map((p, index) => ({
+        name: p.name,
+        value: p.value,
+        order_index: typeof p.order_index === 'number' ? p.order_index : index,
+        paramid: p.paramid ?? null,
+        valueid: p.valueid ?? null,
+      })) : undefined,
+    };
 
-    if (productError) {
-      console.error('Update product error:', productError);
-      throw new Error(productError.message);
-    }
-
-    
-
-    // Обновляем параметры товара, если они переданы
-    if (productData.params !== undefined) {
-      // Удаляем старые параметры
-      await (supabase as any)
-        .from('store_product_params')
-        .delete()
-        .eq('product_id', id);
-
-      // Добавляем новые параметры
-      if (productData.params.length > 0) {
-        const paramsData = productData.params.map((param, index) => ({
-          product_id: id,
-          name: param.name,
-          value: param.value,
-          order_index: param.order_index || index,
-          paramid: param.paramid || null,
-          valueid: param.valueid || null
-        }));
-
-        const { error: paramsError } = await (supabase as any)
-          .from('store_product_params')
-          .insert(paramsData);
-
-        if (paramsError) {
-          console.error('Update product params error:', paramsError);
-        }
-      }
-    }
-
-    // Обновляем изображения товара, если они переданы
-    if (productData.images !== undefined) {
-      // Удаляем старые изображения
-      await (supabase as any)
-        .from('store_product_images')
-        .delete()
-        .eq('product_id', id);
-
-      // Добавляем новые изображения
-      if (productData.images.length > 0) {
-        // Нормализуем флаг главного изображения: должно быть ровно одно is_main=true
-        const hasExplicitMain = productData.images.some(img => img.is_main === true);
-        let mainAssigned = false;
-
-        const imagesData = productData.images.map((image, index) => {
-          let isMain: boolean;
-          if (hasExplicitMain) {
-            if (image.is_main === true && !mainAssigned) {
-              isMain = true;
-              mainAssigned = true;
-            } else {
-              isMain = false;
-            }
-          } else {
-            isMain = index === 0;
-          }
-
-          return {
-            product_id: id,
-            url: image.url,
-            order_index: image.order_index || index,
-            is_main: isMain
-          };
-        });
-
-        const mainIdx = imagesData.findIndex((i) => i.is_main === true);
-        const orderedImages = (() => {
-          const arr = imagesData.slice();
-          if (mainIdx > 0) {
-            const [main] = arr.splice(mainIdx, 1);
-            arr.unshift(main);
-          }
-          return arr.map((i, idx) => ({ ...i, order_index: idx }));
-        })();
-
-        const { error: imagesError } = await (supabase as any)
-          .from('store_product_images')
-          .insert(orderedImages);
-
-        if (imagesError) {
-          console.error('Update product images error:', imagesError);
-        }
-      }
-    }
-
+    const { data, error } = await (supabase as any).functions.invoke('update-product', {
+      body: payload,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) this.edgeError(error, 'failed_save_product');
+    const productId = (data as unknown as { product_id?: string })?.product_id || id;
+    const product = await this.getProductById(productId);
+    if (!product) throw new Error('update_failed');
     return product;
   }
 
   /** Удаление товара */
   static async deleteProduct(id: string): Promise<void> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
-    // 1) Удаляем связанные изображения из R2 (r2-delete)
-    try {
-      const { data: images, error: imagesFetchError } = await (supabase as any)
-        .from('store_product_images')
-        .select('*')
-        .eq('product_id', id)
-        .order('order_index', { ascending: true });
-
-      if (!imagesFetchError && Array.isArray(images) && images.length) {
-        const keys = images
-          .map((img: any) => img?.object_key || (typeof img?.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null))
-          .filter(Boolean) as string[];
-
-        if (keys.length) {
-          await Promise.all(
-            keys.map(async (key) => {
-              try {
-                await R2Storage.deleteFile(key);
-                // Очистка возможных временных загрузок
-                await R2Storage.removePendingUpload(key);
-              } catch (e) {
-                // Не блокируем удаление товара, но фиксируем проблему удаления файла
-                console.warn('R2 delete error for key:', key, e);
-              }
-            })
-          );
-        }
-      }
-    } catch (e) {
-      // Безопасно игнорируем ошибки на этапе удаления из R2, чтобы не блокировать удаление товара
-      console.warn('Failed to delete product images from R2:', e);
-    }
-
-    // 2) Удаляем связанные данные в БД
-    await Promise.all([
-      (supabase as any).from('store_product_params').delete().eq('product_id', id),
-      (supabase as any).from('store_product_images').delete().eq('product_id', id)
-    ]);
-
-    // 3) Удаляем товар
-    const { error } = await (supabase as any)
-      .from('store_products')
-      .delete()
-      .eq('id', id)
-      // RLS should ensure only the owner can delete
-      ;
-
-    if (error) {
-      console.error('Delete product error:', error);
-      throw new Error(error.message);
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const { data, error } = await (supabase as any).functions.invoke('delete-product', {
+      body: { productId: id },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) this.edgeError(error, 'failed_delete_product');
+    const ok = (data as unknown as { success?: boolean })?.success === true;
+    if (!ok) {
+      throw new Error('delete_failed');
     }
   }
 }

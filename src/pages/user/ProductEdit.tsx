@@ -95,7 +95,8 @@ export const ProductEdit = () => {
       navigate('/user/products');
     } catch (error: any) {
       console.error('Error updating product:', error);
-      toast.error(t('failed_save_product'));
+      const key = (error?.message as string) || 'failed_save_product';
+      toast.error(t(key as any));
     }
   };
 
@@ -128,8 +129,8 @@ export const ProductEdit = () => {
         }
       />
 
-      <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading || imagesLoading}>
-        {(loading || imagesLoading) && (
+      <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
+        {loading && (
           <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="product_edit_loader">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>

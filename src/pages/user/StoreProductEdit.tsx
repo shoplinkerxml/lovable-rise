@@ -13,6 +13,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { Loader2 } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
 import { CategoryService } from "@/lib/category-service";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type StoreProductLinkForm = {
   is_active: boolean;
@@ -20,6 +23,7 @@ type StoreProductLinkForm = {
   custom_price_old: string;
   custom_price_promo: string;
   custom_stock_quantity: string;
+  custom_available: boolean;
 };
 
 type StoreProductLinkPatch = {
@@ -28,6 +32,7 @@ type StoreProductLinkPatch = {
   custom_price_old: number | null;
   custom_price_promo: number | null;
   custom_stock_quantity: number | null;
+  custom_available: boolean | null;
 };
 
 export const StoreProductEdit = () => {
@@ -45,6 +50,7 @@ export const StoreProductEdit = () => {
     custom_price_old: "",
     custom_price_promo: "",
     custom_stock_quantity: "",
+    custom_available: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,6 +58,9 @@ export const StoreProductEdit = () => {
   const [images, setImages] = useState<ProductImage[]>([]);
   const [params, setParams] = useState<ProductParam[]>([]);
   const [imagesLoading, setImagesLoading] = useState<boolean>(false);
+  const [lastCategoryId, setLastCategoryId] = useState<string | null>(null);
+  const [storeCategories, setStoreCategories] = useState<Array<{ store_category_id: number; category_id: number; name: string; store_external_id: string | null; is_active: boolean }>>([]);
+  const [selectedStoreCategoryId, setSelectedStoreCategoryId] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -77,6 +86,7 @@ export const StoreProductEdit = () => {
           custom_price_old?: string | number | null;
           custom_price_promo?: string | number | null;
           custom_stock_quantity?: string | number | null;
+          custom_available?: boolean | null;
         };
         const link = linkRes.value as StoreProductLinkDb | null;
         if (link) {
@@ -86,6 +96,7 @@ export const StoreProductEdit = () => {
             custom_price_old: link.custom_price_old == null ? "" : String(link.custom_price_old),
             custom_price_promo: link.custom_price_promo == null ? "" : String(link.custom_price_promo),
             custom_stock_quantity: link.custom_stock_quantity == null ? "" : String(link.custom_stock_quantity),
+            custom_available: link.custom_available == null ? (productRes.status === "fulfilled" ? !!productRes.value?.available : true) : !!link.custom_available,
           });
         }
       } else {
@@ -116,6 +127,23 @@ export const StoreProductEdit = () => {
   }, [pid, storeId, t]);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const rows = await ShopService.getStoreCategories(storeId);
+        setStoreCategories(rows.map(r => ({
+          store_category_id: r.store_category_id,
+          category_id: r.category_id,
+          name: r.name,
+          store_external_id: r.store_external_id ?? null,
+          is_active: r.is_active,
+        })));
+      } catch (_) {
+        setStoreCategories([]);
+      }
+    })();
+  }, [storeId]);
+
+  useEffect(() => {
     const loadCategoryName = async () => {
       if (!baseProduct) return;
       try {
@@ -141,12 +169,16 @@ export const StoreProductEdit = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      if (params && params.length >= 0) {
+        await ProductService.updateProduct(pid, { params });
+      }
       const patch: StoreProductLinkPatch = {
         is_active: !!form.is_active,
         custom_price: null,
         custom_price_old: null,
         custom_price_promo: null,
         custom_stock_quantity: null,
+        custom_available: form.custom_available ? true : false,
       };
 
       const priceStr = form.custom_price.trim();
@@ -166,6 +198,17 @@ export const StoreProductEdit = () => {
       patch.custom_stock_quantity = stockStr ? (Number.isFinite(stockNum) ? stockNum : null) : null;
 
       await ProductService.updateStoreProductLink(pid, storeId, patch);
+      if (lastCategoryId) {
+        const num = Number(lastCategoryId);
+        if (Number.isFinite(num)) {
+          try {
+            const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
+            await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
+          } catch (_) {
+            // ignore
+          }
+        }
+      }
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}/products`);
     } catch (e) {
@@ -199,8 +242,8 @@ export const StoreProductEdit = () => {
             {t("back_to_products")}
           </Link>
         </div>
-        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading || imagesLoading}>
-          {(loading || imagesLoading) && (
+        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
+          {loading && (
             <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="store_product_edit_loader">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
@@ -211,24 +254,106 @@ export const StoreProductEdit = () => {
                 <ProductFormTabs
                   product={baseProduct}
                   readOnly
-                  editableKeys={["price", "price_old", "price_promo", "stock_quantity"]}
+                  editableKeys={["price", "price_old", "price_promo", "stock_quantity", "available"]}
                   overrides={{
                     price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
                     price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
                     price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
                     stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
                   }}
-                  onChange={(partial) => {
+                  onChange={async (partial) => {
                     if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
                     if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
                     if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
                     if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
+                    if (typeof partial.available === "boolean") {
+                      updateField("custom_available", partial.available);
+                      try {
+                        await ProductService.updateStoreProductLink(pid, storeId, { custom_available: partial.available });
+                      } catch (_) {
+                        toast.error(t("operation_failed"));
+                      }
+                    }
+                    if (typeof partial.category_id === "string" && partial.category_id.trim()) {
+                      const cid = partial.category_id.trim();
+                      if (cid !== lastCategoryId) {
+                        setLastCategoryId(cid);
+                        if (partial.category_name) setCategoryName(partial.category_name);
+                        const num = Number(cid);
+                        if (Number.isFinite(num)) {
+                          const prevNum = baseProduct?.category_id ?? null;
+                          try {
+                            await ProductService.updateProduct(pid, { category_id: num });
+                            setBaseProduct((prev) => prev ? { ...prev, category_id: num } : prev);
+                            await ShopService.ensureStoreCategory(storeId, num, { external_id: partial.category_external_id || null });
+                            const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
+                            await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
+                            if (prevNum && Number.isFinite(prevNum) && prevNum !== num) {
+                              await ShopService.cleanupUnusedStoreCategory(storeId, prevNum);
+                            }
+                          } catch (_) {
+                            toast.error(t("failed_save_category"));
+                          }
+                        }
+                      }
+                    }
                   }}
+                  forceParamsEditable
+                  onParamsChange={(p) => setParams(p)}
                   onImagesLoadingChange={setImagesLoading}
                 />
               ) : null}
 
               <div className="space-y-3">
+                <div className="grid gap-2">
+                  <div className="space-y-1">
+                    <Label>Категория магазина</Label>
+                    <Select
+                      value={selectedStoreCategoryId != null ? String(selectedStoreCategoryId) : undefined}
+                      onValueChange={async (val) => {
+                        const idNum = Number(val);
+                        setSelectedStoreCategoryId(Number.isFinite(idNum) ? idNum : null);
+                        const sc = storeCategories.find(c => c.store_category_id === idNum);
+                        const extId = sc?.store_external_id ?? null;
+                        try {
+                          await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: extId });
+                          if (!extId) {
+                            toast.error(t('validation_error'));
+                          } else {
+                            toast.success(t('product_updated'));
+                          }
+                        } catch (_) {
+                          toast.error(t('failed_save_category'));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full max-w-sm">
+                        <SelectValue placeholder={"Выберите категорию магазина"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {storeCategories.map((c) => (
+                          <SelectItem key={c.store_category_id} value={String(c.store_category_id)}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="text-xs text-muted-foreground">Сохраняется external_id категории магазина для экспорта</div>
+                    {(() => {
+                      const sc = selectedStoreCategoryId ? storeCategories.find(c => c.store_category_id === selectedStoreCategoryId) : null;
+                      if (sc && !sc.store_external_id) {
+                        return (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertDescription>
+                              У выбранной категории отсутствует external_id. Заполните его в списке категорий магазина, иначе экспорт будет невозможен.
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </div>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
                   <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
