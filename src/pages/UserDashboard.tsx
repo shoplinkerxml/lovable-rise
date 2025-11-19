@@ -1,5 +1,6 @@
 import { useOutletContext } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,19 +14,22 @@ import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { TariffService } from "@/lib/tariff-service";
-import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
+import { useUserData } from "@/providers/user-provider";
 interface UserDashboardContextType {
   user: UserProfileType;
+  subscription: any | null;
   menuItems: UserMenuItem[];
   onMenuUpdate: () => void;
 }
 const UserDashboard = () => {
   const {
     user,
+    subscription,
     menuItems,
     onMenuUpdate
   } = useOutletContext<UserDashboardContextType>();
+  const { subscription: providerSubscription, tariffLimits, refresh } = useUserData();
   const {
     t
   } = useI18n();
@@ -55,40 +59,53 @@ const UserDashboard = () => {
     id?: number;
   }[]>([]);
   useEffect(() => {
-    async function loadSubscription() {
-      try {
-        const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
-        if (result.hasValidSubscription && result.subscription) {
-          const data = result.subscription;
-          const end = data.end_date ? new Date(data.end_date) : null;
-          setEndDate(end ? end.toISOString() : null);
-          setTariffName(data.tariffs?.name || null);
-          setDurationDays(data.tariffs?.duration_days ?? null);
-          setExpired(false);
-          setIsDemo(result.isDemo);
-          setIsLifetime(data.tariffs?.is_lifetime === true);
-          const tariffId = data.tariffs?.id ?? data.tariff_id;
-          if (tariffId) {
-            try {
-              const limitsData = await TariffService.getTariffLimits(tariffId);
-              setLimits(limitsData || []);
-            } catch {}
-          }
-        } else {
-          setEndDate(null);
-          setTariffName(null);
-          setDurationDays(null);
-          setExpired(false);
-          setIsDemo(false);
-          setIsLifetime(false);
-          setLimits([]);
-        }
-      } catch (e) {
-        console.error('Error loading subscription:', e);
-      }
+    const data = providerSubscription ?? subscription;
+    if (data && data.hasValidSubscription && data.subscription) {
+      const s = data.subscription;
+      const end = s.end_date ? new Date(s.end_date) : null;
+      setEndDate(end ? end.toISOString() : null);
+      setTariffName(s.tariffs?.name || null);
+      setDurationDays(s.tariffs?.duration_days ?? null);
+      setExpired(false);
+      setIsDemo(data.isDemo);
+      setIsLifetime(s.tariffs?.is_lifetime === true);
+    } else {
+      setEndDate(null);
+      setTariffName(null);
+      setDurationDays(null);
+      setExpired(false);
+      setIsDemo(false);
+      setIsLifetime(false);
+      setLimits([]);
     }
-    loadSubscription();
-  }, [user.id]);
+  }, [providerSubscription, subscription]);
+
+  useEffect(() => {
+    if (tariffLimits && tariffLimits.length > 0) setLimits(tariffLimits);
+  }, [tariffLimits]);
+
+  const effectiveSubscription = providerSubscription ?? subscription;
+  const tariffId = effectiveSubscription?.subscription?.tariffs?.id ?? effectiveSubscription?.subscription?.tariff_id ?? null;
+  const { data: limitsFetched } = useQuery({
+    queryKey: ['tariffLimits', tariffId],
+    queryFn: async () => {
+      if (!tariffId) return [] as { limit_name: string; value: number; id?: number }[];
+      const res = await TariffService.getTariffLimits(Number(tariffId));
+      return res || [];
+    },
+    enabled: !!tariffId,
+    staleTime: 900_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as { limit_name: string; value: number; id?: number }[] | undefined,
+  });
+  useEffect(() => {
+    if ((!tariffLimits || tariffLimits.length === 0) && limitsFetched) {
+      setLimits(limitsFetched);
+    }
+  }, [limitsFetched, tariffLimits]);
+  const handleRefresh = async () => {
+    await refresh();
+  };
   return <div className="space-y-6 p-6">
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbs} />
@@ -110,6 +127,9 @@ const UserDashboard = () => {
                   <li key={l.id ?? `${l.limit_name}`}>{l.limit_name} - {l.value}</li>
                 ))}
               </ul>
+              <div className="pt-2">
+                <Button size="sm" variant="outline" onClick={handleRefresh}>{t('refresh_data') || 'Обновить данные'}</Button>
+              </div>
             </AlertDescription>
           </Alert> : <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
             <AlertTitle>

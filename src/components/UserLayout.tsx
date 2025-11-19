@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Outlet, useNavigate, useLocation, useOutletContext } from "react-router-dom";
+import { UserProvider, useUserData } from "@/providers/user-provider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from "@/components/ui/sheet-no-overlay";
@@ -214,7 +215,7 @@ const UserLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   // Read from guard context to avoid duplicate fetching
-  const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile } = useOutletContext<{ hasAccess: boolean, user: UserProfile, uiUserProfile: UIUserProfile }>();
+  const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile, subscription: ctxSubscription } = useOutletContext<{ hasAccess: boolean, user: UserProfile, uiUserProfile: UIUserProfile, subscription: any }>();
   const signOut = async () => {
     await supabase.auth.signOut();
     window.location.href = "/user-auth";
@@ -239,9 +240,11 @@ const UserLayout = () => {
         </div>
       </div>;
   }
-  return <UserMenuProvider userId={ctxUser.id} hasAccess={hasAccess}>
+  return <UserProvider initialUser={ctxUser} initialSubscription={ctxSubscription}>
+    <UserMenuProvider userId={ctxUser.id} hasAccess={hasAccess}>
       <UserLayoutContent user={ctxUser} uiUserProfile={ctxUiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
-    </UserMenuProvider>;
+    </UserMenuProvider>
+  </UserProvider>;
 };
 const UserLayoutContent = ({
   user,
@@ -282,6 +285,7 @@ const UserLayoutContent = ({
     refreshMenuItems,
     hasAccess
   } = useUserMenu();
+  const { subscription: providerSubscription } = useUserData();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -535,6 +539,7 @@ const UserLayoutContent = ({
           <div className="h-full">
             <Outlet context={{
             user,
+            subscription: providerSubscription,
             menuItems,
             onMenuUpdate: refreshMenuItems
           }} />

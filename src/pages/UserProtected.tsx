@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
@@ -13,6 +14,8 @@ const UserProtected = () => {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(true);
   const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
+  const [subscription, setSubscription] = useState<any | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -46,9 +49,12 @@ const UserProtected = () => {
             try {
               const result = await SubscriptionValidationService.ensureValidSubscription(currentUser.id);
               setHasAccess(result.hasValidSubscription);
+              setSubscription(result.subscription);
+              queryClient.setQueryData(['auth','session'], session);
+              queryClient.setQueryData(['user','profile'], currentUser);
+              queryClient.setQueryData(['subscription', currentUser.id], result);
             } catch (subError) {
               console.error('[UserProtected] Subscription validation error:', subError);
-              // Continue anyway - subscription validation is non-blocking
             }
             
             setAuthenticated(true);
@@ -109,7 +115,7 @@ const UserProtected = () => {
     return <Navigate to="/admin" replace />;
   }
 
-  return <Outlet context={{ hasAccess, user, uiUserProfile }} />;
+  return <Outlet context={{ hasAccess, user, uiUserProfile, subscription }} />;
 };
 
 export default UserProtected;
