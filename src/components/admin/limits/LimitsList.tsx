@@ -280,7 +280,7 @@ export const LimitsList = ({
       </DndContext>
 
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, limit: null })}>
-        <AlertDialogContent>
+        <AlertDialogContent noOverlay>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('delete_limit_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>

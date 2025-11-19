@@ -464,7 +464,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
       </div>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent>
+        <DialogContent noOverlay>
           <DialogHeader>
             <DialogTitle>{t('tab_preview')}</DialogTitle>
           </DialogHeader>

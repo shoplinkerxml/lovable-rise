@@ -1,7 +1,6 @@
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@/providers/i18n-provider";
 
 interface PageHeaderProps {
   title: string;
@@ -18,16 +17,15 @@ export const PageHeader = ({
   className,
   cardClassName
 }: PageHeaderProps) => {
-  const { t } = useI18n();
   
   return (
     <div className={cn("mb-6", className)}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t(title)}</h1>
+          <h1 className="text-2xl font-bold">{title}</h1>
           {description && (
             <p className="text-muted-foreground mt-1">
-              {t(description)}
+              {description}
             </p>
           )}
         </div>
@@ -48,19 +46,10 @@ export const PageCardHeader = ({
   actions,
   className
 }: PageCardHeaderProps) => {
-  const { t } = useI18n();
-  
-  // Try to translate the title. If it returns with brackets, it means the key wasn't found
-  // and we should display the original title instead
-  const translatedTitle = t(title);
-  const displayTitle = translatedTitle.startsWith('[') && translatedTitle.endsWith(']') 
-    ? title 
-    : translatedTitle;
-  
   return (
     <CardHeader className={className}>
       <div className="flex items-center justify-between">
-        <CardTitle>{displayTitle}</CardTitle>
+        <CardTitle>{title}</CardTitle>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
     </CardHeader>
@@ -77,12 +66,10 @@ export const ActionButton = ({
   label, 
   ...props 
 }: ActionButtonProps) => {
-  const { t } = useI18n();
-  
   return (
     <Button {...props}>
       {icon && <span className="mr-2 h-4 w-4">{icon}</span>}
-      {t(label)}
+      {label}
     </Button>
   );
 };

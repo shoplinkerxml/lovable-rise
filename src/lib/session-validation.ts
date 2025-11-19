@@ -224,7 +224,7 @@ export class SessionValidator {
    */
   static async validateRLSContext(): Promise<{ isValid: boolean; userId: string | null; error?: string }> {
     try {
-      const validation = await this.ensureValidSession();
+      const validation = await this.validateSession();
       
       if (!validation.isValid || !validation.accessToken) {
         return {
@@ -270,6 +270,9 @@ export class SessionValidator {
    * Useful for troubleshooting authentication and RLS issues
    */
   static async logSessionDebugInfo(context: string = 'general'): Promise<void> {
+    // Only log in development to avoid extra network calls in production
+    const isDev = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.DEV === true;
+    if (!isDev) return;
     try {
       const validation = await this.validateSession();
       const debugInfo = await this.getTokenDebugInfo();

@@ -109,7 +109,65 @@ Deno.serve(async (req) => {
     if (storeErr) return new Response(JSON.stringify({ error: 'store_fetch_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     const xmlConfig = storeRow?.xml_config ?? {};
     const rawFields: XMLFieldConfig[] = Array.isArray(xmlConfig?.fields) ? (xmlConfig.fields as XMLFieldConfig[]) : [];
-    const fieldPaths: string[] = rawFields.map((x) => String(x?.path || '')).filter((p) => p.length > 0);
+    let fieldPaths: string[] = rawFields.map((x) => String(x?.path || '')).filter((p) => p.length > 0);
+    const storeName = String((storeRow as StoreRow)?.store_name || '').toLowerCase();
+    if (storeName === 'rozetka') {
+      const extra: string[] = [
+        'shop.currencies',
+        'shop.categories',
+        'offers.offer.price',
+        'offers.offer.price_old',
+        'offers.offer.price_promo',
+        'offers.offer.currencyId',
+        'offers.offer.categoryId',
+        'offers.offer.vendor',
+        'offers.offer.article',
+        'offers.offer.name',
+        'offers.offer.name_ua',
+        'offers.offer.description',
+        'offers.offer.description_ua',
+        'offers.offer.state',
+        'offers.offer.docket',
+        'offers.offer.docket_ua',
+        'offers.offer.stock_quantity',
+        'offers.offer.picture[0]',
+        'offers.offer.picture[1]',
+        'offers.offer.picture[2]',
+        'offers.offer.picture[3]',
+        'offers.offer.picture[4]',
+        'offers.offer.picture[5]',
+        'offers.offer.picture[6]',
+        'offers.offer.picture[7]',
+        'offers.offer.picture[8]',
+        'offers.offer.picture[9]',
+        'offers.offer.param[0]',
+        'offers.offer.param[1]',
+        'offers.offer.param[2]',
+        'offers.offer.param[3]',
+        'offers.offer.param[4]',
+        'offers.offer.param[5]',
+        'offers.offer.param[6]',
+        'offers.offer.param[7]',
+        'offers.offer.param[8]',
+        'offers.offer.param[9]',
+        'offers.offer.param[10]',
+        'offers.offer.param[11]',
+        'offers.offer.param[12]',
+        'offers.offer.param[13]',
+        'offers.offer.param[14]',
+        'offers.offer.param[15]',
+        'offers.offer.param[16]',
+        'offers.offer.param[17]',
+        'offers.offer.param[18]',
+        'offers.offer.param[19]'
+      ];
+      const set = new Set(fieldPaths);
+      for (const p of extra) set.add(p);
+      fieldPaths = Array.from(set);
+    }
+    const offerFieldPaths = fieldPaths.filter((p) => p.includes('offers.offer.'));
+    const hasConfiguredOfferFields = offerFieldPaths.length > 0;
+    const mandatoryFields = new Set(['price','currencyId','name','categoryId']);
     const cfgRoot = typeof xmlConfig?.root === 'string' ? String(xmlConfig.root).trim() : '';
     const rootTag = /^[A-Za-z_][\w.-]*$/.test(cfgRoot) ? cfgRoot : 'yml_catalog';
 
@@ -181,8 +239,8 @@ Deno.serve(async (req) => {
       })
       .map((row: LinkRow) => {
       const base: Product = row.store_products || ({} as Product);
-      const imgs: ImageRow[] = ((imagesData || []) as ImageRow[]).filter((i) => i.product_id === String(base.id));
-      const prms: ParamRow[] = ((paramsData || []) as ParamRow[]).filter((p) => p.product_id === String(base.id));
+      const imgs: ImageRow[] = ((imagesData || []) as any[]).filter((i) => String(i.product_id) === String(base.id));
+      const prms: ParamRow[] = ((paramsData || []) as any[]).filter((p) => String(p.product_id) === String(base.id));
       const docketUaVal = String((prms.find((p) => p.name === 'docket_ua')?.value) || '');
       const docketVal = String((prms.find((p) => p.name === 'docket')?.value) || '');
 
@@ -212,21 +270,33 @@ Deno.serve(async (req) => {
         return String(bv ?? lv ?? '');
       };
 
-      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','vendor','article','state','categoryId','stock_quantity','docket','docket_ua'];
+      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','vendor','article','state','categoryId','stock_quantity','docket','docket_ua','url'];
+      const excludedForRozetka = storeName === 'rozetka' ? new Set(['url']) : new Set<string>();
+      const shouldInclude = (sf: string) => {
+        if (sf === 'docket' || sf === 'docket_ua') return true;
+        return !excludedForRozetka.has(sf) && (mandatoryFields.has(sf) || fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)));
+      };
       const simpleXml = simpleFields
-        .filter((sf) => fieldPaths.some((p) => p.includes(`offers.offer.${sf}`)))
-        .map((sf) => `<${sf}>${xmlEscape(cleanText(getVal(sf)))}</${sf}>`).join('');
+        .filter((sf) => {
+          if (!shouldInclude(sf)) return false;
+          const v = cleanText(getVal(sf));
+          return v.length > 0;
+        })
+        .map((sf) => `<${sf}>${xmlEscape(cleanText(getVal(sf)))}</${sf}>`)
+        .join('');
 
       const picturesXml = (() => {
         const picPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.picture\[\d+\]$/));
-        if (picPaths.length === 0) return '';
+        const includePics = (imgs.length > 0) || (picPaths.length > 0);
+        if (!includePics) return '';
         return imgs.map((img) => `<picture>${xmlEscape(cleanText(String(img.url || '')))}</picture>`).join('');
       })();
 
       const paramsXml = (() => {
         const paramPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.param\[\d+\]/));
-        if (paramPaths.length === 0) return '';
         const prmsFiltered = prms.filter((pm) => pm.name !== 'docket_ua' && pm.name !== 'docket');
+        const includeParams = (prmsFiltered.length > 0) || (paramPaths.length > 0);
+        if (!includeParams) return '';
         return prmsFiltered.map((pm: ParamRow) => {
           const attrs: string[] = [];
           if (pm.name) attrs.push(`name="${xmlEscape(String(pm.name))}"`);

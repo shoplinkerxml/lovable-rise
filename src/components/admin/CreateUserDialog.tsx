@@ -100,7 +100,7 @@ export function CreateUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" noOverlay>
         <DialogHeader>
           <DialogTitle>{t("create_user_title")}</DialogTitle>
           <DialogDescription>

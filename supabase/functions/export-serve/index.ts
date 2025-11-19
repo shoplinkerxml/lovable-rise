@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
 
     const format = parts[idx + 1];
     const token = parts[idx + 2];
+    const dl = url.searchParams.get("dl");
 
     if (format !== "xml" && format !== "csv") {
       return new Response(JSON.stringify({ error: "unsupported_format" }), {
@@ -114,6 +115,7 @@ Deno.serve(async (req) => {
       format === "xml"
         ? "application/xml; charset=utf-8"
         : "text/csv; charset=utf-8";
+    const filename = format === "xml" ? "export.xml" : "export.csv";
 
     let stream: ReadableStream<Uint8Array> | null = null;
 
@@ -141,7 +143,9 @@ Deno.serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": contentType,
-        "Content-Disposition": "inline; filename=export.xml",
+        "Content-Disposition": (format === "xml" && dl !== "1")
+          ? `inline; filename=${filename}`
+          : `attachment; filename=${filename}`,
         "Cache-Control": "no-store, no-cache, must-revalidate",
         Pragma: "no-cache",
         Expires: "0",

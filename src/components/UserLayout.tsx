@@ -13,15 +13,25 @@ import { ProfileSheetContent } from "@/components/ui/profile-sheet-content";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
 import { useI18n } from "@/providers/i18n-provider";
 import { supabase } from "@/integrations/supabase/client";
-import { ProfileService } from "@/lib/profile-service";
 import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
-import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 // Subscription access is validated in UserProtected and passed via Outlet context
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MenuSection } from "@/components/user/MenuSection";
 import { MenuItemWithIcon } from "@/components/user/MenuItemWithIcon";
+import type { TariffLimit } from "@/lib/tariff-service";
+
+type SubscriptionEntity = {
+  tariff_id?: number;
+  end_date?: string | null;
+  tariffs?: {
+    id?: number;
+    name?: string | null;
+    duration_days?: number | null;
+    is_lifetime?: boolean | null;
+  };
+};
 
 // Static routes that are always available regardless of database state
 const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
@@ -75,7 +85,9 @@ function buildTree(items: UserMenuItem[]): Record<number | "root", UserMenuItem[
     map[key].push(it);
   }
   for (const key in map) {
-    map[key as any].sort((a, b) => a.order_index - b.order_index);
+    const k = key as unknown as keyof typeof map;
+    const arr = map[k];
+    if (arr) arr.sort((a, b) => a.order_index - b.order_index);
   }
   return map;
 }
@@ -214,71 +226,8 @@ const UserLayout = () => {
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      await loadUserData();
-      if (cancelled) return;
-    };
-    run();
-    return () => { cancelled = true; };
-  }, []);
-  const loadUserData = async () => {
-    try {
-      setLoading(true);
-
-      // Get current user
-      const {
-        user: currentUser,
-        session,
-        error
-      } = await UserAuthService.getCurrentUser();
-      if (error || !currentUser || !session) {
-        toast.error(t("please_log_in"));
-        navigate('/user-auth');
-        return;
-      }
-
-      // Try to get existing profile first
-      const profile = await ProfileService.getProfile(currentUser.id);
-      if (profile) {
-        // Use existing profile data
-        const finalAvatarUrl = profile.avatar_url && profile.avatar_url.trim() !== '' ? profile.avatar_url : '/placeholder.svg';
-        setUser({
-          id: currentUser.id,
-          email: currentUser.email || '',
-          name: profile.name || 'User',
-          role: profile.role || 'user',
-          status: 'active',
-          avatar_url: finalAvatarUrl,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-        // Set UI user profile for the header - ensure role is correctly set to 'user'
-        setUiUserProfile({
-          id: currentUser.id,
-          email: currentUser.email || '',
-          name: profile.name || 'User',
-          role: profile.role === 'admin' || profile.role === 'manager' ? profile.role : 'user',
-          avatarUrl: finalAvatarUrl
-        });
-      } else {
-        toast.error(t("failed_load_user_profile"));
-        navigate('/user-auth');
-        return;
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      toast.error(t("failed_load_user_data"));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile, subscription, tariffLimits, refresh } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; refresh: () => Promise<void> }>();
   const signOut = async () => {
     await supabase.auth.signOut();
     window.location.href = "/user-auth";
@@ -295,14 +244,7 @@ const UserLayout = () => {
   const toggleTheme = useCallback(() => {
     setTheme(theme === "light" ? "dark" : "light");
   }, [theme, setTheme]);
-  // Read hasAccess from UserProtected Outlet context early to keep hook order stable
-  const { hasAccess } = useOutletContext<{ hasAccess: boolean }>();
-  if (loading) {
-    return <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>;
-  }
-  if (!user || !uiUserProfile) {
+  if (!ctxUser || !ctxUiUserProfile) {
     return <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
@@ -310,8 +252,8 @@ const UserLayout = () => {
         </div>
       </div>;
   }
-  return <UserMenuProvider userId={user.id} hasAccess={hasAccess}>
-      <UserLayoutContent user={user} uiUserProfile={uiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
+  return <UserMenuProvider userId={ctxUser.id} hasAccess={hasAccess}>
+      <UserLayoutContent user={ctxUser} uiUserProfile={ctxUiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
     </UserMenuProvider>;
 };
 const UserLayoutContent = ({
@@ -353,6 +295,7 @@ const UserLayoutContent = ({
     refreshMenuItems,
     hasAccess
   } = useUserMenu();
+  const { refresh: refreshUserData, subscription: guardSubscription, tariffLimits: guardTariffLimits } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; refresh: () => Promise<void> }>();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -420,7 +363,7 @@ const UserLayoutContent = ({
                             <div className="border-t border-gray-200" />
                           </div>}
                         
-                        <MenuSection title={section.key === 'main' ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={false} isCollapsible={section.isCollapsible} children={effectiveMenuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} hasAccess={hasAccess} />
+                        <MenuSection title={section.key === 'main' ? undefined : t(section.titleKey as string)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={false} isCollapsible={section.isCollapsible} children={effectiveMenuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} hasAccess={hasAccess} />
                       </div>;
               })}
                 </>}
@@ -493,7 +436,7 @@ const UserLayoutContent = ({
                         <div className="border-t border-gray-200" />
                       </div>}
                     
-                    <MenuSection title={section.key === 'main' ? undefined : sidebarCollapsed ? undefined : t(section.titleKey as any)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={sidebarCollapsed} isCollapsible={section.isCollapsible} children={effectiveMenuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} hasAccess={hasAccess} />
+                    <MenuSection title={section.key === 'main' ? undefined : sidebarCollapsed ? undefined : t(section.titleKey as string)} type={section.key === 'main' ? 'main' : 'settings'} items={section.items} collapsed={sidebarCollapsed} isCollapsible={section.isCollapsible} children={effectiveMenuItems.filter(item => section.items.some(parent => parent.id === item.parent_id))} onItemClick={handleMenuClick} isActiveItem={isActiveItem} buildTree={buildTree} hasAccess={hasAccess} />
                   </div>;
           })}
             </>}
@@ -607,7 +550,10 @@ const UserLayoutContent = ({
             <Outlet context={{
             user,
             menuItems,
-            onMenuUpdate: refreshMenuItems
+            onMenuUpdate: refreshMenuItems,
+            refetch: refreshUserData,
+            subscription: guardSubscription,
+            tariffLimits: guardTariffLimits
           }} />
           </div>
         </main>

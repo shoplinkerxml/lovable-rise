@@ -295,7 +295,7 @@ const CurrencyManagement = () => {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent noOverlay>
           <DialogHeader>
             <DialogTitle>
               {editingCurrency ? t("edit_currency") : t("add_currency")}

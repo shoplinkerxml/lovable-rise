@@ -116,7 +116,7 @@ export const XMLStructureDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col" noOverlay>
         <DialogHeader>
           <DialogTitle>Визначення структури XML</DialogTitle>
           <DialogDescription>

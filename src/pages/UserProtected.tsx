@@ -4,6 +4,20 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
+import { TariffService } from "@/lib/tariff-service";
+import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
+import type { TariffLimit } from "@/lib/tariff-service";
+
+type SubscriptionEntity = {
+  tariff_id?: number;
+  end_date?: string | null;
+  tariffs?: {
+    id?: number;
+    name?: string | null;
+    duration_days?: number | null;
+    is_lifetime?: boolean | null;
+  };
+};
 
 const UserProtected = () => {
   const [ready, setReady] = useState(false);
@@ -11,6 +25,9 @@ const UserProtected = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(true);
+  const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
+  const [subscription, setSubscription] = useState<{ hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null>(null);
+  const [tariffLimits, setTariffLimits] = useState<TariffLimit[]>([]);
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -26,7 +43,6 @@ const UserProtected = () => {
           return;
         }
         
-        // Log session info for debugging
         await SessionValidator.logSessionDebugInfo('user-protected-route');
         
         // Get user profile with enhanced error handling
@@ -43,17 +59,29 @@ const UserProtected = () => {
         if (session && currentUser) {
           // Check if user has 'user' role
           if (currentUser.role === 'user') {
-            // Validate subscription and deactivate if expired
             try {
               const result = await SubscriptionValidationService.ensureValidSubscription(currentUser.id);
               setHasAccess(result.hasValidSubscription);
+              setSubscription(result);
+              const tariffId = (result.subscription?.tariffs?.id) ?? (result.subscription?.tariff_id);
+              if (tariffId) {
+                const limits = await TariffService.getTariffLimits(tariffId);
+                setTariffLimits(limits || []);
+              } else {
+                setTariffLimits([]);
+              }
             } catch (subError) {
               console.error('[UserProtected] Subscription validation error:', subError);
-              // Continue anyway - subscription validation is non-blocking
             }
             
             setAuthenticated(true);
             setUser(currentUser);
+            setUiUserProfile({
+              email: currentUser.email,
+              name: currentUser.name,
+              role: currentUser.role,
+              avatarUrl: currentUser.avatar_url || ""
+            });
             setSessionError(null);
           } else {
             // If admin or manager, redirect to admin interface
@@ -86,14 +114,14 @@ const UserProtected = () => {
       try {
         const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
         setHasAccess(result.hasValidSubscription);
-      } catch {}
+      } catch (_e) { void 0; }
     };
     const onVisibility = async () => {
       if (!document.hidden) {
         try {
           const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
           setHasAccess(result.hasValidSubscription);
-        } catch {}
+        } catch (_e) { void 0; }
       }
     };
     window.addEventListener('focus', onFocus);
@@ -126,7 +154,27 @@ const UserProtected = () => {
     return <Navigate to="/admin" replace />;
   }
 
-  return <Outlet context={{ hasAccess }} />;
+  const refresh = async () => {
+    try {
+      if (!user?.id) return;
+      const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
+      setHasAccess(result.hasValidSubscription);
+      setSubscription({
+        hasValidSubscription: result.hasValidSubscription,
+        subscription: (result.subscription as SubscriptionEntity) || null,
+        isDemo: result.isDemo
+      });
+      const tariffId = ((result.subscription as SubscriptionEntity)?.tariffs?.id) ?? ((result.subscription as SubscriptionEntity)?.tariff_id);
+      if (tariffId) {
+        const limits = await TariffService.getTariffLimits(tariffId);
+        setTariffLimits(limits || []);
+      } else {
+        setTariffLimits([]);
+      }
+    } catch (_e) { void 0; }
+  };
+
+  return <Outlet context={{ hasAccess, user, uiUserProfile, subscription, tariffLimits, refresh }} />;
 };
 
 export default UserProtected;

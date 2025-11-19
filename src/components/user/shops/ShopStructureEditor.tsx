@@ -57,7 +57,7 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" hideClose>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" hideClose noOverlay>
         <div className="sticky top-0 bg-background z-10">
           <DialogHeader className="flex-row items-center justify-between space-y-0 p-6 pb-4">
             <div>

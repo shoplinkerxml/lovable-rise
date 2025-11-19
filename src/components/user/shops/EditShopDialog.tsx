@@ -51,7 +51,6 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     parent_external_id: string | null;
     base_rz_id: string | null;
     store_external_id: string | null;
-    store_rz_id: string | null;
     store_rz_id_value: string | null;
     is_active: boolean;
   }>>([]);
@@ -278,7 +277,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[clamp(30rem,70vw,46rem)] max-h-[80vh] overflow-y-auto py-6 sm:py-8">
+      <DialogContent className="max-w-[clamp(30rem,70vw,46rem)] max-h-[80vh] overflow-y-auto py-6 sm:py-8" noOverlay>
         <DialogHeader>
           <DialogTitle>Редагувати магазин</DialogTitle>
           <DialogDescription>

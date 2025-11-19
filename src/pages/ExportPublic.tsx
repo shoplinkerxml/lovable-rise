@@ -23,20 +23,14 @@ export default function ExportPublic() {
         }
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
-        const openLink = document.createElement('a');
-        openLink.href = objectUrl;
-        openLink.target = '_blank';
-        document.body.appendChild(openLink);
-        openLink.click();
-        openLink.remove();
-
         const downloadLink = document.createElement('a');
         downloadLink.href = objectUrl;
-        downloadLink.download = format === 'xml' ? 'export.xml' : 'export.csv';
+        const ct = res.headers.get('Content-Type') || '';
+        const isXml = ct.includes('xml') || format === 'xml';
+        downloadLink.download = isXml ? 'export.xml' : 'export.csv';
         document.body.appendChild(downloadLink);
         downloadLink.click();
         downloadLink.remove();
-
         URL.revokeObjectURL(objectUrl);
       } catch {
         window.location.href = url;

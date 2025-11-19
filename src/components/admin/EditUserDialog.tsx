@@ -104,7 +104,7 @@ export function EditUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" noOverlay>
         <DialogHeader>
           <DialogTitle>{t("edit_user_title")}</DialogTitle>
           <DialogDescription>

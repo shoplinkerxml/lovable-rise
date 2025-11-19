@@ -59,7 +59,7 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[clamp(24rem,70vw,40rem)] overflow-x-hidden" data-testid="user_shop_export_dialog">
+      <DialogContent className="sm:max-w-[clamp(24rem,70vw,40rem)] overflow-x-hidden" data-testid="user_shop_export_dialog" noOverlay>
         <DialogHeader>
           <DialogTitle>{t('export_section')}</DialogTitle>
         </DialogHeader>

@@ -1886,13 +1886,13 @@ export const ProductsTable = ({
 
       {/* Table */}
       <div className="bg-background" data-testid="user_products_table">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => {
-              const ids = headerGroup.headers.map((h) => h.column.id).filter((id) => id !== "actions");
-              return (
-                <DndContext key={headerGroup.id} sensors={sensors} onDragEnd={handleDragEnd}>
-                  <SortableContext items={ids}>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => {
+                const ids = headerGroup.headers.map((h) => h.column.id).filter((id) => id !== "actions");
+                return (
+                  <SortableContext key={headerGroup.id} items={ids}>
                     <TableRow>
                       {headerGroup.headers.map((header) => (
                         <TableHead key={header.id} className={header.column.id === "actions" ? "text-center" : "text-left"}>
@@ -1909,11 +1909,10 @@ export const ProductsTable = ({
                       ))}
                     </TableRow>
                   </SortableContext>
-                </DndContext>
-              );
-            })}
-          </TableHeader>
-      <TableBody>
+                );
+              })}
+            </TableHeader>
+        <TableBody>
             {loading ? (
               <>
                 <LoadingSkeleton />
@@ -1937,6 +1936,7 @@ export const ProductsTable = ({
             )}
           </TableBody>
         </Table>
+        </DndContext>
       </div>
 
       {/* Copying progress - non-modal top-right */}
