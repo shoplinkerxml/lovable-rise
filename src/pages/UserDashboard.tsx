@@ -57,7 +57,6 @@ const UserDashboard = () => {
   useEffect(() => {
     async function loadSubscription() {
       try {
-        // Use new validation service that checks end_date and deactivates expired subscriptions
         const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
         if (result.hasValidSubscription && result.subscription) {
           const data = result.subscription;
@@ -65,7 +64,7 @@ const UserDashboard = () => {
           setEndDate(end ? end.toISOString() : null);
           setTariffName(data.tariffs?.name || null);
           setDurationDays(data.tariffs?.duration_days ?? null);
-          setExpired(false); // If subscription is valid, it's not expired
+          setExpired(false);
           setIsDemo(result.isDemo);
           setIsLifetime(data.tariffs?.is_lifetime === true);
           const tariffId = data.tariffs?.id ?? data.tariff_id;
@@ -76,7 +75,6 @@ const UserDashboard = () => {
             } catch {}
           }
         } else {
-          // No valid subscription
           setEndDate(null);
           setTariffName(null);
           setDurationDays(null);
@@ -87,20 +85,9 @@ const UserDashboard = () => {
         }
       } catch (e) {
         console.error('Error loading subscription:', e);
-        // Silent fail, no alert
       }
     }
     loadSubscription();
-    const onFocus = () => loadSubscription();
-    const onVisibility = () => {
-      if (!document.hidden) loadSubscription();
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
   }, [user.id]);
   return <div className="space-y-6 p-6">
       {/* Breadcrumb */}

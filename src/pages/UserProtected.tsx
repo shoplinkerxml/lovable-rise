@@ -4,6 +4,7 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
+import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
 
 const UserProtected = () => {
   const [ready, setReady] = useState(false);
@@ -11,6 +12,7 @@ const UserProtected = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(true);
+  const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -25,9 +27,6 @@ const UserProtected = () => {
           setReady(true);
           return;
         }
-        
-        // Log session info for debugging
-        await SessionValidator.logSessionDebugInfo('user-protected-route');
         
         // Get user profile with enhanced error handling
         const { user: currentUser, session, error } = await UserAuthService.getCurrentUser();
@@ -54,6 +53,13 @@ const UserProtected = () => {
             
             setAuthenticated(true);
             setUser(currentUser);
+            setUiUserProfile({
+              id: currentUser.id,
+              email: currentUser.email,
+              name: currentUser.name,
+              role: 'user',
+              avatarUrl: currentUser.avatar_url || '/placeholder.svg'
+            });
             setSessionError(null);
           } else {
             // If admin or manager, redirect to admin interface
@@ -79,30 +85,7 @@ const UserProtected = () => {
     checkAuthentication();
   }, []);
 
-  // Refresh subscription access on window focus / visibility change
-  useEffect(() => {
-    if (!user?.id) return;
-    const onFocus = async () => {
-      try {
-        const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
-        setHasAccess(result.hasValidSubscription);
-      } catch {}
-    };
-    const onVisibility = async () => {
-      if (!document.hidden) {
-        try {
-          const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
-          setHasAccess(result.hasValidSubscription);
-        } catch {}
-      }
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [user?.id]);
+  // Removed focus/visibility refetch to avoid redundant queries
 
   if (!ready) {
     return (
@@ -126,7 +109,7 @@ const UserProtected = () => {
     return <Navigate to="/admin" replace />;
   }
 
-  return <Outlet context={{ hasAccess }} />;
+  return <Outlet context={{ hasAccess, user, uiUserProfile }} />;
 };
 
 export default UserProtected;
