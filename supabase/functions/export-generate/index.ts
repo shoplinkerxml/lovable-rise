@@ -20,6 +20,8 @@ type Product = {
   name_ua?: string;
   description?: string;
   description_ua?: string;
+  docket?: string;
+  docket_ua?: string;
   vendor?: string;
   category_id?: string;
   category_external_id?: string;
@@ -241,8 +243,8 @@ Deno.serve(async (req) => {
       const base: Product = row.store_products || ({} as Product);
       const imgs: ImageRow[] = ((imagesData || []) as any[]).filter((i) => String(i.product_id) === String(base.id));
       const prms: ParamRow[] = ((paramsData || []) as any[]).filter((p) => String(p.product_id) === String(base.id));
-      const docketUaVal = String((prms.find((p) => p.name === 'docket_ua')?.value) || '');
-      const docketVal = String((prms.find((p) => p.name === 'docket')?.value) || '');
+      const docketUaVal = String((prms.find((p) => p.name === 'docket_ua')?.value) ?? base.description_ua ?? base.docket_ua ?? '');
+      const docketVal = String((prms.find((p) => p.name === 'docket')?.value) ?? base.description ?? base.docket ?? '');
 
       const getVal = (name: string): string => {
         if (name === 'id') return row.custom_external_id ?? base.external_id ?? base.id;
@@ -270,7 +272,19 @@ Deno.serve(async (req) => {
         return String(bv ?? lv ?? '');
       };
 
-      const simpleFields = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','vendor','article','state','categoryId','stock_quantity','docket','docket_ua','url'];
+      const configuredSimpleSet = (() => {
+        const s = new Set<string>();
+        for (const p of fieldPaths) {
+          if (!p.startsWith('offers.offer.')) continue;
+          const m = p.match(/^offers\.offer\.([A-Za-z0-9_:-]+)(?:\[\d+\])?$/);
+          const key = m?.[1] || '';
+          if (!key || key === 'picture' || key === 'param') continue;
+          s.add(key);
+        }
+        return s;
+      })();
+      const defaultSimple = ['price','price_old','price_promo','currencyId','name','name_ua','description','description_ua','vendor','article','state','categoryId','stock_quantity','docket','docket_ua','url'];
+      const simpleFields = Array.from(new Set<string>([...defaultSimple, ...configuredSimpleSet]));
       const excludedForRozetka = storeName === 'rozetka' ? new Set(['url']) : new Set<string>();
       const shouldInclude = (sf: string) => {
         if (sf === 'docket' || sf === 'docket_ua') return true;

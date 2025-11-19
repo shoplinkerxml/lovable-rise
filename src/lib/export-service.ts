@@ -103,6 +103,8 @@ export const ExportService = {
         `<stock_quantity>${p.stock_quantity ?? 0}</stock_quantity>`,
         `<vendor>${escape(p.vendor || '')}</vendor>`,
         `<article>${escape(p.article || '')}</article>`,
+        `<docket>${escape(p.docket || '')}</docket>`,
+        `<docket_ua>${escape(p.docket_ua || '')}</docket_ua>`,
         `<description>${escape(p.description || '')}</description>`,
         `<updated_at>${escape(p.updated_at)}</updated_at>`,
       ].join('');
@@ -113,7 +115,7 @@ export const ExportService = {
   },
 
   buildCsv(products: Product[]): string {
-    const header = ['id','name','price','currency','available','stock_quantity','vendor','article'].join(',');
+    const header = ['id','name','price','currency','available','stock_quantity','vendor','article','docket','docket_ua'].join(',');
     const rows = products.filter(p => p.is_active).map(p => [
       JSON.stringify(p.external_id || p.id),
       JSON.stringify(p.name || ''),
@@ -123,6 +125,8 @@ export const ExportService = {
       String(p.stock_quantity ?? 0),
       JSON.stringify(p.vendor || ''),
       JSON.stringify(p.article || ''),
+      JSON.stringify(p.docket || ''),
+      JSON.stringify(p.docket_ua || ''),
     ].join(','));
     return [header, ...rows].join('\n');
   },
