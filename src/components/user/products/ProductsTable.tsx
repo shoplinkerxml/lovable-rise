@@ -1885,35 +1885,34 @@ export const ProductsTable = ({
       </div>
 
       {/* Table */}
-      <div className="bg-background" data-testid="user_products_table">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => {
-              const ids = headerGroup.headers.map((h) => h.column.id).filter((id) => id !== "actions");
-              return (
-                <DndContext key={headerGroup.id} sensors={sensors} onDragEnd={handleDragEnd}>
-                  <SortableContext items={ids}>
-                    <TableRow>
-                      {headerGroup.headers.map((header) => (
-                        <TableHead key={header.id} className={header.column.id === "actions" ? "text-center" : "text-left"}>
-                          {header.isPlaceholder ? null : (
-                            header.column.id === "actions" ? (
-                              flexRender(header.column.columnDef.header, header.getContext())
-                            ) : (
-                              <SortableHeader id={header.column.id}>
-                                {flexRender(header.column.columnDef.header, header.getContext())}
-                              </SortableHeader>
-                            )
-                          )}
-                        </TableHead>
-                      ))}
-                    </TableRow>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="bg-background" data-testid="user_products_table">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => {
+                const ids = headerGroup.headers.map((h) => h.column.id).filter((id) => id !== "actions");
+                return (
+                  <SortableContext key={headerGroup.id} items={ids}>
+                      <TableRow>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id} className={header.column.id === "actions" ? "text-center" : "text-left"}>
+                            {header.isPlaceholder ? null : (
+                              header.column.id === "actions" ? (
+                                flexRender(header.column.columnDef.header, header.getContext())
+                              ) : (
+                                <SortableHeader id={header.column.id}>
+                                  {flexRender(header.column.columnDef.header, header.getContext())}
+                                </SortableHeader>
+                              )
+                            )}
+                          </TableHead>
+                        ))}
+                      </TableRow>
                   </SortableContext>
-                </DndContext>
-              );
-            })}
-          </TableHeader>
-      <TableBody>
+                );
+              })}
+            </TableHeader>
+        <TableBody>
             {loading ? (
               <>
                 <LoadingSkeleton />
@@ -1936,8 +1935,9 @@ export const ProductsTable = ({
               </TableRow>
             )}
           </TableBody>
-        </Table>
-      </div>
+          </Table>
+        </div>
+      </DndContext>
 
       {/* Copying progress - non-modal top-right */}
       <DialogNoOverlay

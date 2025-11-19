@@ -2,7 +2,6 @@ import { useOutletContext } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +28,7 @@ const UserDashboard = () => {
     menuItems,
     onMenuUpdate
   } = useOutletContext<UserDashboardContextType>();
-  const { subscription: providerSubscription, tariffLimits, refresh } = useUserData();
+  const { subscription: providerSubscription, tariffLimits } = useUserData();
   const {
     t
   } = useI18n();
@@ -103,9 +102,7 @@ const UserDashboard = () => {
       setLimits(limitsFetched);
     }
   }, [limitsFetched, tariffLimits]);
-  const handleRefresh = async () => {
-    await refresh();
-  };
+  
   return <div className="space-y-6 p-6">
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbs} />
@@ -127,9 +124,7 @@ const UserDashboard = () => {
                   <li key={l.id ?? `${l.limit_name}`}>{l.limit_name} - {l.value}</li>
                 ))}
               </ul>
-              <div className="pt-2">
-                <Button size="sm" variant="outline" onClick={handleRefresh}>{t('refresh_data') || 'Обновить данные'}</Button>
-              </div>
+              
             </AlertDescription>
           </Alert> : <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
             <AlertTitle>

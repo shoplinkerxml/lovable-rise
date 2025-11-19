@@ -5,6 +5,7 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
+import { TariffService } from "@/lib/tariff-service";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
 
 const UserProtected = () => {
@@ -53,6 +54,13 @@ const UserProtected = () => {
               queryClient.setQueryData(['auth','session'], session);
               queryClient.setQueryData(['user','profile'], currentUser);
               queryClient.setQueryData(['subscription', currentUser.id], result);
+              const tid = result.subscription?.tariffs?.id ?? result.subscription?.tariff_id;
+              if (tid) {
+                try {
+                  const limits = await TariffService.getTariffLimits(Number(tid));
+                  queryClient.setQueryData(['tariffLimits', Number(tid)], limits);
+                } catch {}
+              }
             } catch (subError) {
               console.error('[UserProtected] Subscription validation error:', subError);
             }
