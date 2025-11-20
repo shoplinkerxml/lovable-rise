@@ -49,6 +49,13 @@ export interface ProductImage {
   is_main?: boolean;
 }
 
+export interface ProductAggregated extends Product {
+  mainImageUrl?: string;
+  categoryName?: string;
+  supplierName?: string;
+  linkedStoreIds?: string[];
+}
+
 export interface CreateProductData {
   store_id?: string;
   external_id: string;
@@ -229,6 +236,199 @@ export class ProductService {
     });
 
     return mapped;
+  }
+
+  static async getProductsAggregated(storeId?: string | null): Promise<ProductAggregated[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const payload: Record<string, unknown> = { store_id: storeId ?? null };
+    try {
+      const { data, error } = await (supabase as any).functions.invoke('user-products-list', {
+        body: payload,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) throw error;
+      const rows = (data as unknown as { products?: ProductAggregated[] })?.products || [];
+      return rows as ProductAggregated[];
+    } catch (err) {
+      // Fallback: агрегируем на клиенте параллельно, чтобы UI не ломался, если функция не доступна
+      // Минимизируем количество запросов и исключаем последовательность
+      const baseProducts: Product[] = storeId
+        ? await (async () => {
+            const { data, error } = await (supabase as any)
+              .from('store_product_links')
+              .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)')
+              .eq('store_id', storeId);
+            if (error) return [] as Product[];
+            const rows = (data || []) as Array<{
+              product_id: string;
+              store_id: string;
+              is_active?: boolean | null;
+              custom_name?: string | null;
+              custom_description?: string | null;
+              custom_price?: number | null;
+              custom_price_promo?: number | null;
+              custom_stock_quantity?: number | null;
+              custom_available?: boolean | null;
+              store_products?: Product | null;
+            }>;
+            return rows.map((r) => {
+              const base = (r.store_products || {}) as Product;
+              return {
+                id: String(base.id),
+                store_id: String(r.store_id || base.store_id),
+                supplier_id: base.supplier_id ?? null,
+                external_id: base.external_id,
+                name: r.custom_name ?? base.name,
+                name_ua: base.name_ua ?? null,
+                docket: base.docket ?? null,
+                docket_ua: base.docket_ua ?? null,
+                description: r.custom_description ?? base.description ?? null,
+                description_ua: base.description_ua ?? null,
+                vendor: base.vendor ?? null,
+                article: base.article ?? null,
+                category_id: base.category_id ?? null,
+                category_external_id: base.category_external_id ?? null,
+                currency_id: base.currency_id ?? null,
+                currency_code: base.currency_code ?? null,
+                price: r.custom_price ?? base.price ?? null,
+                price_old: base.price_old ?? null,
+                price_promo: r.custom_price_promo ?? base.price_promo ?? null,
+                stock_quantity: (r.custom_stock_quantity ?? base.stock_quantity ?? 0) as number,
+                available: (r.custom_available ?? base.available ?? true) as boolean,
+                state: base.state ?? 'new',
+                created_at: base.created_at ?? new Date().toISOString(),
+                updated_at: base.updated_at ?? new Date().toISOString(),
+                is_active: r.is_active === true,
+              } as Product;
+            });
+          })()
+        : await (async () => {
+            const { data, error } = await (supabase as any)
+              .from('store_products')
+              .select('*')
+              .order('created_at', { ascending: false });
+            if (error) return [] as Product[];
+            return (data || []) as Product[];
+          })();
+
+      const ids = baseProducts.map((p) => p.id).filter(Boolean);
+      const categoryIds = baseProducts.map((p) => p.category_id).filter((v) => v != null) as number[];
+      const externalCategoryIds = baseProducts.map((p) => p.category_external_id).filter((v) => !!v) as string[];
+      const supplierIdsRaw = baseProducts.map((p) => p.supplier_id).filter((v) => v != null) as number[];
+      const supplierIds = Array.from(new Set(supplierIdsRaw));
+
+      const [imgRows, catRows, extCatRows, supRows, linkRows, paramRows] = await Promise.all([
+        ids.length
+          ? (supabase as any)
+              .from('store_product_images')
+              .select('product_id,url,is_main,order_index')
+              .in('product_id', ids)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+        categoryIds.length
+          ? (supabase as any)
+              .from('store_categories')
+              .select('id,name')
+              .in('id', categoryIds)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+        externalCategoryIds.length
+          ? (supabase as any)
+              .from('store_categories')
+              .select('external_id,name')
+              .in('external_id', externalCategoryIds)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+        supplierIds.length
+          ? (supabase as any)
+              .from('user_suppliers')
+              .select('id,supplier_name')
+              .in('id', supplierIds as any)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+        !storeId && ids.length
+          ? (supabase as any)
+              .from('store_product_links')
+              .select('product_id,store_id,is_active')
+              .in('product_id', ids)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+        ids.length
+          ? (supabase as any)
+              .from('store_product_params')
+              .select('product_id,name,value')
+              .in('product_id', ids)
+              .in('name', ['docket', 'docket_ua'])
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+      ]);
+
+      const mainImageMap: Record<string, string> = {};
+      const grouped: Record<string, Array<{ product_id: string; url?: string; is_main?: boolean; order_index?: number }>> = {};
+      for (const r of imgRows as Array<{ product_id: string; url?: string; is_main?: boolean; order_index?: number }>) {
+        const pid = String(r.product_id);
+        if (!grouped[pid]) grouped[pid] = [];
+        grouped[pid].push(r);
+      }
+      for (const [pid, rows] of Object.entries(grouped)) {
+        const main = rows.find((x) => x.is_main) || rows.sort((a, b) => (Number(a.order_index ?? 999) - Number(b.order_index ?? 999)))[0];
+        if (main?.url) mainImageMap[pid] = String(main.url);
+      }
+
+      const categoryNameMap: Record<string, string> = {};
+      for (const r of catRows as Array<{ id: number; name: string }>) {
+        if (r.id != null && r.name) categoryNameMap[String(r.id)] = String(r.name);
+      }
+      for (const r of extCatRows as Array<{ external_id: string; name: string }>) {
+        if (r.external_id && r.name) categoryNameMap[String(r.external_id)] = String(r.name);
+      }
+
+      const supplierNameMap: Record<string | number, string> = {};
+      for (const r of supRows as Array<{ id: number; supplier_name: string }>) {
+        if (r.id != null && r.supplier_name) supplierNameMap[r.id] = String(r.supplier_name);
+      }
+
+      const storeLinksByProduct: Record<string, string[]> = {};
+      for (const r of linkRows as Array<{ product_id: string | number; store_id?: string | number; is_active?: boolean }>) {
+        const pid = String(r.product_id);
+        const sid = r?.store_id != null ? String(r.store_id) : '';
+        const active = r?.is_active !== false;
+        if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = [];
+        if (sid && active) storeLinksByProduct[pid].push(sid);
+      }
+
+      const paramsMap: Record<string, Record<string, string>> = {};
+      for (const pr of paramRows as Array<{ product_id: string | number; name: string; value: string }>) {
+        const pid = String(pr.product_id);
+        if (!paramsMap[pid]) paramsMap[pid] = {};
+        paramsMap[pid][String(pr.name)] = String(pr.value);
+      }
+
+      const aggregated: ProductAggregated[] = baseProducts.map((p) => {
+        const pid = String(p.id);
+        const docket = p.docket ?? paramsMap[pid]?.['docket'] ?? null;
+        const docketUa = p.docket_ua ?? paramsMap[pid]?.['docket_ua'] ?? null;
+        return {
+          ...p,
+          docket,
+          docket_ua: docketUa,
+          mainImageUrl: mainImageMap[pid],
+          categoryName:
+            (p.category_id != null ? categoryNameMap[String(p.category_id)] : undefined) ||
+            (p.category_external_id ? categoryNameMap[String(p.category_external_id)] : undefined),
+          supplierName: p.supplier_id != null ? supplierNameMap[p.supplier_id] : undefined,
+          linkedStoreIds: storeLinksByProduct[pid] || [],
+        } as ProductAggregated;
+      });
+
+      return aggregated;
+    }
   }
 
   /** Получить и обновить переопределения для пары (product_id, store_id) */

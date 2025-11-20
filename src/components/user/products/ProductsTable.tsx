@@ -358,111 +358,11 @@ export const ProductsTable = ({
   const { data: productsData, isLoading } = useQuery<ProductRow[]>({
     queryKey: ['products', storeId ?? 'all'],
     queryFn: async () => {
-      const data = storeId ? await ProductService.getProductsForStore(storeId) : await ProductService.getProducts();
-      onProductsLoaded?.(data.length);
-      const ids = (data ?? []).map((p) => p.id).filter(Boolean) as string[];
-      const categoryIds = (data ?? []).map((p: any) => p.category_id).filter((v) => !!v);
-      const mainImageMap: Record<string, string> = {};
-      const categoryNameMap: Record<string, string> = {};
-      if (ids.length > 0) {
-        const { data: imgRows } = await (supabase as any)
-          .from('store_product_images')
-          .select('product_id,url,is_main,order_index')
-          .in('product_id', ids);
-        const grouped: Record<string, any[]> = {};
-        (imgRows ?? []).forEach((r: any) => {
-          const pid = String(r.product_id);
-          if (!grouped[pid]) grouped[pid] = [];
-          grouped[pid].push(r);
-        });
-        for (const [pid, rows] of Object.entries(grouped)) {
-          const main = rows.find((x) => x.is_main) || rows.sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0];
-          if (main?.url) {
-            let url = main.url as string;
-            if (typeof url === "string") {
-              let host = "";
-              try { host = new URL(url).host; } catch {}
-              const isR2Dev = url.includes("r2.dev");
-              const isOurBucket = host === "shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com";
-              if (isR2Dev || isOurBucket) {
-                const objectKey = R2Storage.extractObjectKeyFromUrl(url);
-                if (objectKey) {
-                  try {
-                    const signed = await R2Storage.getViewUrl(objectKey);
-                    if (signed) url = signed;
-                  } catch {}
-                }
-              }
-            }
-            mainImageMap[pid] = url;
-          }
-        }
-      }
-      if (categoryIds.length > 0) {
-        const { data: catRows } = await (supabase as any)
-          .from('store_categories')
-          .select('id,name')
-          .in('id', categoryIds);
-        (catRows ?? []).forEach((r: any) => {
-          if (r.id && r.name) {
-            categoryNameMap[String(r.id)] = r.name;
-          }
-        });
-      }
-      const externalCategoryIds = (data ?? []).map((p: any) => p.category_external_id).filter((v) => !!v);
-      if (externalCategoryIds.length > 0) {
-        const { data: extCatRows } = await (supabase as any)
-          .from('store_categories')
-          .select('external_id,name')
-          .in('external_id', externalCategoryIds);
-        (extCatRows ?? []).forEach((r: any) => {
-          if (r.external_id && r.name) {
-            categoryNameMap[String(r.external_id)] = r.name;
-          }
-        });
-      }
-      const supplierIdsRaw = (data ?? []).map((p: any) => p.supplier_id).filter((v) => v !== null && v !== undefined);
-      const supplierIds = Array.from(new Set(supplierIdsRaw));
-      const supplierNameMap: Record<string | number, string> = {};
-      if (supplierIds.length > 0) {
-        const { data: supRows } = await (supabase as any)
-          .from('user_suppliers')
-          .select('id,supplier_name')
-          .in('id', supplierIds as any);
-        (supRows ?? []).forEach((r: any) => {
-          if (r.id != null && r.supplier_name) {
-            supplierNameMap[r.id] = r.supplier_name;
-          }
-        });
-      }
-      const storeLinksByProduct: Record<string, string[]> = {};
-      if (!storeId && ids.length > 0) {
-        const { data: linkRows } = await (supabase as any)
-          .from('store_product_links')
-          .select('product_id,store_id,is_active')
-          .in('product_id', ids);
-        (linkRows ?? []).forEach((r: any) => {
-          const pid = String(r.product_id);
-          const sid = r?.store_id != null ? String(r.store_id) : '';
-          const active = r?.is_active !== false;
-          if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = [];
-          if (sid && active) storeLinksByProduct[pid].push(sid);
-        });
-      }
-      const augmented = (data ?? []).map((p: any) => ({
-        ...p,
-        mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
-        categoryName:
-          (p.category_id && categoryNameMap[String(p.category_id)]) ||
-          (p.category_external_id && categoryNameMap[String(p.category_external_id)]) ||
-          undefined,
-        supplierName:
-          (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
-          undefined,
-        linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
-      }));
-      return augmented as ProductRow[];
+      const rows = await ProductService.getProductsAggregated(storeId);
+      onProductsLoaded?.(rows.length);
+      return rows as ProductRow[];
     },
+    retry: false,
     staleTime: 300_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
