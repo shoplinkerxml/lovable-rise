@@ -4,13 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TariffService, type TariffWithDetails } from '@/lib/tariff-service';
-import { SubscriptionValidationService } from '@/lib/subscription-validation-service';
 import { toast } from 'sonner';
 import { 
   CheckCircle, 
   XCircle, 
   CreditCard, 
-  Plus, 
   Info, 
   Zap, 
   Shield,
@@ -23,8 +21,6 @@ import {
   Globe,
   BarChart3,
   FileText,
-  Mail,
-  Phone,
   Headphones,
   Upload,
   Download,
@@ -45,87 +41,53 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { PageHeader } from '@/components/PageHeader';
+import { useOutletContext } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
+import { AdminService } from '@/lib/admin-service';
+import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
+import { useQuery } from '@tanstack/react-query';
 
 const TariffPage = () => {
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
-  const pageInfo = usePageInfo();
   
-  const [tariffs, setTariffs] = useState<TariffWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  
   const [activeTariffId, setActiveTariffId] = useState<number | null>(null);
 
+  const { data: tariffsData, isLoading } = useQuery<TariffWithDetails[]>({
+    queryKey: ['tariffs','visible'],
+    queryFn: async () => {
+      const rows = await TariffService.getTariffsAggregated(false);
+      return rows as TariffWithDetails[];
+    },
+    retry: false,
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: (prev) => prev as TariffWithDetails[] | undefined,
+  });
+
+  const normalizedTariffs: TariffWithDetails[] = Array.isArray(tariffsData) ? tariffsData : [];
+  const visibleTariffs: TariffWithDetails[] = normalizedTariffs.filter((t) => {
+    const name = String(t.name || '').toLowerCase();
+    return !(name.includes('демо') || name.includes('demo'));
+  });
+
+  type SubscriptionEntity = { tariff_id?: number; end_date?: string | null };
+  const { subscription: subscriptionCtx } = useOutletContext<{ subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null }>();
   useEffect(() => {
-    fetchTariffs();
-  }, []);
+    const sub = subscriptionCtx?.subscription || null;
+    const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
+    setActiveTariffId(valid ? (sub?.tariff_id ?? null) : null);
+  }, [subscriptionCtx?.subscription?.tariff_id, subscriptionCtx?.subscription?.end_date]);
 
-  useEffect(() => {
-    async function fetchActive() {
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const uid = auth.user?.id;
-        if (!uid) return;
-        
-        // Use validation service to check and deactivate expired subscriptions
-        const result = await SubscriptionValidationService.ensureValidSubscription(uid);
-        
-        if (result.hasValidSubscription && result.subscription) {
-          setActiveTariffId(result.subscription.tariff_id ?? null);
-        } else {
-          setActiveTariffId(null);
-        }
-      } catch {}
-    }
-    fetchActive();
-  }, []);
+  
 
-  const fetchTariffs = async () => {
-    try {
-      setLoading(true);
-      const tariffData = await TariffService.getAllTariffs();
-      // Filter only visible tariffs for users
-      const visibleTariffs = tariffData.filter((tariff: any) => tariff.visible !== false);
-      setTariffs(visibleTariffs);
-    } catch (error) {
-      console.error('Error fetching tariffs:', error);
-      toast.error(t('failed_load_currencies'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Function to get currency symbol based on currency code
-  // Uses actual currency symbols for better visual consistency
-  const getCurrencySymbol = (currencyCode: string | undefined) => {
-    if (!currencyCode) return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">$</span>;
-    
-    switch (currencyCode.toUpperCase()) {
-      case 'USD':
-        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">$</span>;
-      case 'EUR':
-        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">€</span>;
-      case 'GBP':
-        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">£</span>;
-      case 'JPY':
-        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">¥</span>;
-      case 'UAH':
-        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">₴</span>;
-      default:
-        return <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">$</span>; // Default to dollar sign
-    }
-  };
-
-  const formatDuration = (days: number | null) => {
-    if (days === null || days === undefined) return t('lifetime_tariff');
-    if (days === 30) return t('pricing_period_monthly');
-    if (days === 365) return t('pricing_period_yearly');
-    return `${days} ${t('days_tariff')}`;
-  };
+  
 
   // Function to get relevant icon for a tariff based on price and sort order
-  const getTariffIcon = (tariff: TariffWithDetails) => {
+  const getTariffIcon = (tariff: TariffWithDetails, allTariffs: TariffWithDetails[] | undefined) => {
     if (tariff.is_free) {
       return <Zap className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
@@ -134,7 +96,7 @@ const TariffPage = () => {
       return <Crown className="h-5 w-5 sm:h-6 sm:w-6" />;
     }
     
-    const paidTariffs = tariffs.filter(t => !t.is_free && t.new_price !== null) as TariffWithDetails[];
+    const paidTariffs = (allTariffs ?? []).filter(t => !t.is_free && t.new_price !== null) as TariffWithDetails[];
     
     if (paidTariffs.length <= 1) {
       return <CreditCard className="h-5 w-5 sm:h-6 sm:w-6" />;
@@ -203,7 +165,7 @@ const TariffPage = () => {
     return Info;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
         <PageHeader
@@ -297,7 +259,11 @@ const TariffPage = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tariffs.map((tariff: any) => {
+        {(visibleTariffs.length === 0) ? (
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center text-muted-foreground">
+            {t('no_tariffs_found')}
+          </div>
+        ) : visibleTariffs.map((tariff: TariffWithDetails) => {
           const isPopular = tariff.popular === true;
           return (
             <Card 
@@ -318,7 +284,7 @@ const TariffPage = () => {
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-3">
-                      {getTariffIcon(tariff)}
+                      {getTariffIcon(tariff, visibleTariffs)}
                       <h3 className="text-2xl font-bold">
                         {tariff.name}
                       </h3>
@@ -410,7 +376,7 @@ const TariffPage = () => {
                     </h4>
                     <div className="space-y-2">
                       {tariff.features.length > 0 ? (
-                        tariff.features.slice(0, 5).map((feature) => {
+                        tariff.features.slice(0, 5).map((feature: TariffWithDetails['features'][number]) => {
                           const IconComponent = getFeatureIcon(feature.feature_name);
                           return (
                             <div key={feature.id} className="flex items-start gap-2">
@@ -442,7 +408,7 @@ const TariffPage = () => {
                     </h4>
                     <div className="space-y-2">
                       {tariff.limits.length > 0 ? (
-                        tariff.limits.map((limit) => {
+                        tariff.limits.map((limit: TariffWithDetails['limits'][number]) => {
                           const IconComponent = getLimitIcon(limit.limit_name);
                           return (
                             <div key={limit.id} className="flex items-center justify-between">
@@ -472,49 +438,16 @@ const TariffPage = () => {
                     disabled={activeTariffId === tariff.id}
                     onClick={async () => {
                       try {
-                        // Получаем текущего пользователя
                         const { data } = await supabase.auth.getUser();
                         const userId = data.user?.id;
                         if (!userId) {
                           toast.error(t('please_log_in'));
                           return;
                         }
-                        // Деактивируем предыдущие подписки
-                        await (supabase as any)
-                          .from('user_subscriptions')
-                          .update({ is_active: false })
-                          .eq('user_id', userId)
-                          .eq('is_active', true);
-                        // Получаем duration_days выбранного тарифа
-                        const { data: tariffRow } = await (supabase as any)
-                          .from('tariffs')
-                          .select('duration_days')
-                          .eq('id', tariff.id)
-                          .maybeSingle();
-                        const start = new Date();
-                        let endDate: string | null = null;
-                        if (tariffRow?.duration_days) {
-                          endDate = new Date(start.getTime() + tariffRow.duration_days * 24 * 60 * 60 * 1000).toISOString();
-                        }
-                        // Создаём новую активную подписку
-                        const { error: insertError } = await (supabase as any)
-                          .from('user_subscriptions')
-                          .insert({
-                            user_id: userId,
-                            tariff_id: tariff.id,
-                            start_date: start.toISOString(),
-                            end_date: endDate,
-                            is_active: true
-                          });
-                        if (insertError) {
-                          toast.error(t('failed_update_tariff'));
-                          return;
-                        }
+                        await AdminService.activateUserTariff(userId, Number(tariff.id));
                         toast.success(t('tariff_updated_successfully'));
-                        // Перенаправляем на dashboard
                         window.location.href = '/user/dashboard';
                       } catch (e) {
-                        console.error('Activate tariff error:', e);
                         toast.error(t('failed_update_tariff'));
                       }
                     }}

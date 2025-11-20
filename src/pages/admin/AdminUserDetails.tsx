@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Crown, CreditCard, AlertCircle, MoreHorizontal, Plus, Trash2, XCircle, CheckCircle2, TrendingUp } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 import { supabase } from "@/integrations/supabase/client";
+import { TariffService, type TariffWithDetails } from "@/lib/tariff-service";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
@@ -188,44 +189,22 @@ const AdminUserDetails = () => {
         setSubscriptionHistory([]);
       }
 
-      // Load all available tariffs
-      const { data: tariffsData, error: tariffsError } = await supabase
-        .from('tariffs')
-        .select('id,name,new_price,duration_days,is_lifetime,popular,currency_id,sort_order')
-        .eq('visible', true)
-        .order('sort_order', { ascending: true });
-      
-      if (tariffsError) {
-        console.error('Tariffs error:', tariffsError);
-        setAvailableTariffs([]);
-      } else if (tariffsData) {
-        // Load currency for each tariff
-        const tariffsWithCurrency = await Promise.all(
-          tariffsData.map(async (tariff: any) => {
-            const { data: currency } = await supabase
-              .from('currencies')
-              .select('code')
-              .eq('id', tariff.currency_id)
-              .single();
-            
-            const symbolMap: Record<string, string> = {
-              'USD': '$',
-              'EUR': '€',
-              'GBP': '£',
-              'UAH': '₴'
-            };
-            
-            return {
-              ...tariff,
-              currency: {
-                code: currency?.code || 'USD',
-                symbol: symbolMap[currency?.code || 'USD'] || '$'
-              }
-            };
-          })
-        );
-        setAvailableTariffs(tariffsWithCurrency);
-      }
+      // Load all available tariffs via service with includeDemo for admin
+      const rows: TariffWithDetails[] = await TariffService.getTariffsAggregated(true, true);
+      const symbolMap: Record<string, string> = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'UAH': '₴' };
+      const tariffsWithCurrency = (rows || []).map((t: TariffWithDetails) => ({
+        id: t.id,
+        name: t.name,
+        new_price: t.new_price,
+        duration_days: t.duration_days,
+        is_lifetime: t.is_lifetime,
+        is_popular: t.popular === true,
+        currency: {
+          code: (t.currency_data?.code || t.currency_code || 'USD'),
+          symbol: symbolMap[(t.currency_data?.code || t.currency_code || 'USD')] || '$'
+        }
+      }));
+      setAvailableTariffs(tariffsWithCurrency);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {

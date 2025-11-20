@@ -61,7 +61,7 @@ const AdminTariffFeatures = () => {
   const fetchTariffs = async () => {
     try {
       setLoading(true);
-      const tariffData = await TariffService.getAllTariffs(true);
+      const tariffData = await TariffService.getAllTariffs(true, true);
       setTariffs(tariffData);
     } catch (error) {
       console.error('Error fetching tariffs:', error);

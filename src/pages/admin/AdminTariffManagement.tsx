@@ -92,7 +92,7 @@ const AdminTariffManagement = () => {
       }
       
       setLoading(true);
-      const tariffData = await TariffService.getAllTariffs(true);
+      const tariffData = await TariffService.getAllTariffs(true, true);
       setTariffs(tariffData);
       // Cache the data
       TariffCache.set(tariffData);
@@ -106,7 +106,7 @@ const AdminTariffManagement = () => {
 
   const refreshTariffsInBackground = async () => {
     try {
-      const tariffData = await TariffService.getAllTariffs(true);
+      const tariffData = await TariffService.getAllTariffs(true, true);
       setTariffs(tariffData);
       // Update cache
       TariffCache.set(tariffData);

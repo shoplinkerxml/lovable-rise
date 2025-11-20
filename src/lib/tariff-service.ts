@@ -38,8 +38,25 @@ export interface TariffWithDetails {
 }
 
 export class TariffService {
+  static async getTariffsAggregated(includeInactive = false, includeDemo = false): Promise<TariffWithDetails[]> {
+    try {
+      const { data: auth } = await (supabase as any).auth.getSession();
+      const accessToken: string | null = auth?.session?.access_token || null;
+      const { data, error } = await (supabase as any).functions.invoke('tariffs-list', {
+        body: { includeInactive, includeDemo },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) throw error;
+      const payload = typeof data === 'string' ? JSON.parse(data) : (data as any);
+      const rows = payload?.tariffs;
+      return Array.isArray(rows) ? (rows as TariffWithDetails[]) : [];
+    } catch (_e) {
+      const rows = await this.getAllTariffs(includeInactive, includeDemo);
+      return Array.isArray(rows) ? (rows as any) : [];
+    }
+  }
   // Get all tariffs with currency data, features, and limits
-  static async getAllTariffs(includeInactive = false) {
+  static async getAllTariffs(includeInactive = false, includeDemo = false) {
     try {
       console.log('TariffService.getAllTariffs called with includeInactive:', includeInactive);
       
@@ -50,7 +67,7 @@ export class TariffService {
         .order('sort_order', { ascending: true });
 
       if (!includeInactive) {
-        query = query.eq('is_active', true).eq('visible', true);
+        query = query.eq('is_active', true);
       }
 
       const { data, error } = await query;
@@ -121,7 +138,12 @@ export class TariffService {
       }
       
       // Собираем результат из Mapов
-      const tariffsWithDetails = data.map(tariff => {
+      const filtered = (data || []).filter(t => {
+        if (includeDemo) return true;
+        const n = String((t as any)?.name || '').toLowerCase();
+        return !(n.includes('демо') || n.includes('demo'));
+      });
+      const tariffsWithDetails = filtered.map(tariff => {
         const currencyId = (tariff as any).currency_id || (tariff as any).currency;
         const currencyData = currencyId ? currenciesMap.get(currencyId) : null;
         
