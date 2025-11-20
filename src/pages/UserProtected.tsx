@@ -112,14 +112,14 @@ const UserProtected = () => {
     if (!user?.id) return;
     const onFocus = async () => {
       try {
-        const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
+        const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
         setHasAccess(result.hasValidSubscription);
       } catch (_e) { void 0; }
     };
     const onVisibility = async () => {
       if (!document.hidden) {
         try {
-          const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
+          const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
           setHasAccess(result.hasValidSubscription);
         } catch (_e) { void 0; }
       }

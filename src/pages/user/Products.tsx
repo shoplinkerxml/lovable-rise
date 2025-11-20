@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Package, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +11,7 @@ import { ProductService, type Product, type ProductLimitInfo } from '@/lib/produ
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from '@/components/ui/dialog-no-overlay';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const Products = () => {
   const { t } = useI18n();
@@ -22,24 +23,13 @@ export const Products = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
   const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
 
   const queryClient = useQueryClient();
-  const { data: maxLimitData } = useQuery<number>({
-    queryKey: ['productsMaxLimit'],
-    queryFn: async () => {
-      const maxLimit = await ProductService.getProductLimitOnly();
-      return maxLimit;
-    },
-    staleTime: 300_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    placeholderData: (prev) => prev as number | undefined,
-  });
   useEffect(() => {
-    if (maxLimitData != null) {
-      setLimitInfo(prev => ({ ...prev, max: maxLimitData, canCreate: prev.current < maxLimitData }));
-    }
-  }, [maxLimitData]);
+    const productLimit = (tariffLimits || []).find((l) => String(l.limit_name || '').toLowerCase().includes('товар'))?.value ?? 0;
+    setLimitInfo((prev) => ({ ...prev, max: productLimit, canCreate: prev.current < productLimit }));
+  }, [tariffLimits]);
 
   const handleProductsLoaded = (count: number) => {
     setProductsCount(count);
