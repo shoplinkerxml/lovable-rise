@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -19,22 +20,11 @@ export const Shops = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
 
+  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
   useEffect(() => {
-    loadMaxLimit();
-  }, []);
-
-  const loadMaxLimit = async () => {
-    try {
-      const maxLimit = await ShopService.getShopLimitOnly();
-      setLimitInfo(prev => ({
-        ...prev,
-        max: maxLimit,
-        canCreate: prev.current < maxLimit
-      }));
-    } catch (error: any) {
-      console.error('Load max limit error:', error);
-    }
-  };
+    const shopLimit = (tariffLimits || []).find((l) => String(l.limit_name || '').toLowerCase().includes('магаз'))?.value ?? 0;
+    setLimitInfo((prev) => ({ ...prev, max: shopLimit, canCreate: prev.current < shopLimit }));
+  }, [tariffLimits]);
 
   const handleShopsLoaded = (count: number) => {
     setShopsCount(count);
@@ -65,9 +55,10 @@ export const Shops = () => {
       await ShopService.deleteShop(id);
       toast.success(t('shop_deleted'));
       setRefreshTrigger(prev => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Delete error:', error);
-      toast.error(error?.message || t('failed_delete_shop'));
+      const message = (error as Error)?.message || t('failed_delete_shop');
+      toast.error(message);
     }
   };
 

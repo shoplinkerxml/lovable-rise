@@ -40,6 +40,12 @@ export interface ShopLimitInfo {
   canCreate: boolean;
 }
 
+export interface ShopAggregated extends Shop {
+  marketplace?: string;
+  productsCount?: number;
+  categoriesCount?: number;
+}
+
 export class ShopService {
   /** Получение только максимального лимита магазинов (без подсчета текущих) */
   static async getShopLimitOnly(): Promise<number> {
@@ -149,6 +155,67 @@ export class ShopService {
       console.error('Get shops error:', error);
       // Return empty array instead of throwing error
       return [];
+    }
+  }
+
+  static async getShopsAggregated(): Promise<ShopAggregated[]> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    try {
+      const { data, error } = await (supabase as any).functions.invoke('user-shops-list', {
+        body: {},
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) throw error;
+      const rows = (data as unknown as { shops?: ShopAggregated[] })?.shops || [];
+      return rows as ShopAggregated[];
+    } catch (_) {
+      // Фолбэк: агрегируем на клиенте параллельно
+      const baseShops: Shop[] = await this.getShops();
+      const storeIds = baseShops.map((s) => s.id);
+      const templateIds = Array.from(new Set(baseShops.map((s) => s.template_id).filter((v) => !!v))) as string[];
+      const [templates, prodRows] = await Promise.all([
+        templateIds.length
+          ? (supabase as any)
+              .from('store_templates')
+              .select('id,marketplace')
+              .in('id', templateIds)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+        storeIds.length
+          ? (supabase as any)
+              .from('store_products')
+              .select('store_id,category_id,category_external_id')
+              .in('store_id', storeIds)
+              .then((r: any) => r.data || [])
+          : Promise.resolve([]),
+      ]);
+      const templatesMap: Record<string, string> = {};
+      for (const r of templates as Array<{ id: string; marketplace?: string }>) {
+        if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
+      }
+      const productsCountMap: Record<string, number> = {};
+      const categoriesMap: Record<string, Set<string>> = {};
+      for (const r of prodRows as Array<{ store_id: string; category_id?: number | null; category_external_id?: string | null }>) {
+        const sid = String(r.store_id);
+        productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
+        const catId = r.category_id != null ? String(r.category_id) : r.category_external_id ? String(r.category_external_id) : null;
+        if (catId) {
+          if (!categoriesMap[sid]) categoriesMap[sid] = new Set();
+          categoriesMap[sid].add(catId);
+        }
+      }
+      return baseShops.map((s) => ({
+        ...s,
+        marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
+        productsCount: productsCountMap[s.id] || 0,
+        categoriesCount: (categoriesMap[s.id]?.size) || 0,
+      }));
     }
   }
 

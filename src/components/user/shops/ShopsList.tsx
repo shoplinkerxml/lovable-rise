@@ -15,14 +15,12 @@ import {
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { Store, Edit, Trash2, Loader2, Package, List } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
-import { ShopService, type Shop } from '@/lib/shop-service';
+import { ShopService, type ShopAggregated } from '@/lib/shop-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-interface ShopWithMarketplace extends Shop {
-  marketplace?: string;
-}
+type ShopWithMarketplace = ShopAggregated;
 
 interface ShopsListProps {
   onDelete?: (id: string) => void;
@@ -49,68 +47,10 @@ export const ShopsList = ({
   const { data: shopsData, isLoading } = useQuery<ShopWithMarketplace[]>({
     queryKey: ['shopsList'],
     queryFn: async () => {
-      const data = await ShopService.getShops();
-      const storeIds = data.map((s) => s.id);
-      const templateIds = Array.from(new Set(data.map((s) => s.template_id).filter((v) => !!v))) as string[];
-      const templatesMap: Record<string, string> = {};
-      if (templateIds.length > 0) {
-        const { data: templates } = await (supabase as any)
-          .from('store_templates')
-          .select('id,marketplace')
-          .in('id', templateIds);
-        (templates || []).forEach((r: any) => {
-          if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
-        });
-      }
-      const productsRes = storeIds.length > 0
-        ? await (supabase as any)
-            .from('store_product_links')
-            .select('store_id,store_products(category_id,category_external_id)')
-            .in('store_id', storeIds)
-        : { data: [] };
-      const rows = (productsRes.data || []) as any[];
-      const productsCountMap: Record<string, number> = {};
-      const categoriesMap: Record<string, Set<string>> = {};
-      const categoryIdsRaw = rows
-        .map((row: any) => row?.store_products?.category_id)
-        .filter((v: any) => v != null && String(v).trim() !== '');
-      const uniqueCategoryIds = Array.from(new Set(categoryIdsRaw.map((v: any) => String(v))));
-      const idToExternal: Record<string, string> = {};
-      if (uniqueCategoryIds.length > 0) {
-        const { data: catMapRows } = await (supabase as any)
-          .from('store_categories')
-          .select('id,external_id')
-          .in('id', uniqueCategoryIds);
-        (catMapRows ?? []).forEach((r: any) => {
-          if (r?.id && r?.external_id != null) {
-            idToExternal[String(r.id)] = String(r.external_id);
-          }
-        });
-      }
-      rows.forEach((row: any) => {
-        const sid = String(row.store_id);
-        productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
-        const catId = row?.store_products?.category_id;
-        const catExt = row?.store_products?.category_external_id;
-        const canonical = (() => {
-          const idStr = catId != null ? String(catId).trim() : '';
-          if (idStr) {
-            const mapped = idToExternal[idStr];
-            if (mapped) return mapped;
-          }
-          return catExt != null ? String(catExt) : '';
-        })();
-        if (!categoriesMap[sid]) categoriesMap[sid] = new Set<string>();
-        if (canonical) categoriesMap[sid].add(canonical);
-      });
-      const result = data.map((shop) => ({
-        ...shop,
-        marketplace: templatesMap[String(shop.template_id)] || 'Не вказано',
-        productsCount: productsCountMap[shop.id] || 0,
-        categoriesCount: (categoriesMap[shop.id]?.size) || 0,
-      }) as any);
-      return result;
+      const rows = await ShopService.getShopsAggregated();
+      return rows as ShopWithMarketplace[];
     },
+    retry: false,
     staleTime: 300_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
