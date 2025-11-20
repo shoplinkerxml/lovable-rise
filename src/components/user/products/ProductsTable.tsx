@@ -366,6 +366,7 @@ export const ProductsTable = ({
     staleTime: 300_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     placeholderData: (prev) => prev as ProductRow[] | undefined,
   });
   const products: ProductRow[] = productsData ?? [];
@@ -374,26 +375,25 @@ export const ProductsTable = ({
   useEffect(() => { onLoadingChange?.(isLoading); setLoading(isLoading); }, [isLoading]);
   useEffect(() => { queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] }); }, [refreshTrigger]);
   useEffect(() => {
-    const channels: any[] = [];
-    try {
-      channels.push((supabase as any).channel('products_images').on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'store_product_images' },
-        () => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })
-      ).subscribe());
-      channels.push((supabase as any).channel('products_links').on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'store_product_links' },
-        () => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })
-      ).subscribe());
-      channels.push((supabase as any).channel('products_main').on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'store_products' },
-        () => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })
-      ).subscribe());
-    } catch {}
+    let scheduled = false;
+    let timeoutId: any = null;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      timeoutId = setTimeout(() => {
+        scheduled = false;
+        queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
+      }, 300);
+    };
+    const channel = (supabase as any)
+      .channel(`products_${storeId ?? 'all'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_products', ...(storeId ? { filter: `store_id=eq.${storeId}` } : {}) }, () => schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_links', ...(storeId ? { filter: `store_id=eq.${storeId}` } : {}) }, () => schedule())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_images' }, () => schedule())
+      .subscribe();
     return () => {
-      try { channels.forEach((ch) => (supabase as any).removeChannel(ch)); } catch {}
+      try { (supabase as any).removeChannel(channel); } catch {}
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [queryClient, storeId]);
 

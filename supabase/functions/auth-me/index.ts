@@ -104,13 +104,35 @@ Deno.serve(async (req) => {
       )
     }
 
+    const { data: subscription } = await supabaseClient
+      .from('user_subscriptions')
+      .select('*, tariffs(*)')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const tariffId = subscription?.tariffs?.id ?? subscription?.tariff_id
+    let tariffLimits: Array<{ limit_name: string; value: number }> = []
+    if (tariffId) {
+      const { data: limits } = await supabaseClient
+        .from('tariff_limits')
+        .select('limit_name,value')
+        .eq('tariff_id', tariffId)
+        .eq('is_active', true)
+      tariffLimits = (limits || []).map((l: any) => ({ limit_name: String(l.limit_name), value: Number(l.value) }))
+    }
+
     return new Response(
       JSON.stringify({
         user: {
           id: user.id,
           email: user.email,
           ...profile
-        }
+        },
+        subscription,
+        tariffLimits
       }),
       { 
         headers: { ...corsHeaders }

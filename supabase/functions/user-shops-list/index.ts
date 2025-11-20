@@ -66,22 +66,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data: prodRows } = await (supabase as any)
-      .from('store_products')
-      .select('store_id,category_id,category_external_id')
-      .in('store_id', storeIds)
+            const { data: linkRows } = await (supabase as any)
+              .from('store_product_links')
+              .select('store_id,is_active,custom_category_id,store_products(category_id,category_external_id)')
+              .in('store_id', storeIds)
 
-    const productsCountMap: Record<string, number> = {}
-    const categoriesMap: Record<string, Set<string>> = {}
-    for (const r of prodRows || []) {
-      const sid = String((r as any).store_id)
-      productsCountMap[sid] = (productsCountMap[sid] || 0) + 1
-      const catId = (r as any).category_id != null ? String((r as any).category_id) : (r as any).category_external_id ? String((r as any).category_external_id) : null
-      if (catId) {
-        if (!categoriesMap[sid]) categoriesMap[sid] = new Set()
-        categoriesMap[sid].add(catId)
-      }
-    }
+            const productsCountMap: Record<string, number> = {}
+            const categoriesMap: Record<string, Set<string>> = {}
+            for (const r of linkRows || []) {
+              const sid = String((r as any).store_id)
+              const active = (r as any).is_active !== false
+              if (active) productsCountMap[sid] = (productsCountMap[sid] || 0) + 1
+              const linkCat = (r as any).custom_category_id != null ? String((r as any).custom_category_id) : null
+              const baseCatId = (r as any)?.store_products?.category_id != null ? String((r as any).store_products.category_id) : (r as any)?.store_products?.category_external_id ? String((r as any).store_products.category_external_id) : null
+              const catId = linkCat || baseCatId
+              if (catId) {
+                if (!categoriesMap[sid]) categoriesMap[sid] = new Set()
+                categoriesMap[sid].add(catId)
+              }
+            }
 
     const aggregated: ShopAggregated[] = shops.map(s => ({
       ...s,

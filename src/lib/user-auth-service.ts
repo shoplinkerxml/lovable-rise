@@ -172,6 +172,9 @@ const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptions = {
 };
 
 export class UserAuthService {
+  private static authMeCache: { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }> } } | null = null;
+  private static authMeInFlight: Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }> }> | null = null;
+  private static readonly AUTH_ME_TTL_MS = 15000;
   /**
    * Register a new user with email confirmation flow
    * Following Supabase email confirmation workflow:
@@ -630,6 +633,46 @@ export class UserAuthService {
         error: UserAuthError.NETWORK_ERROR
       };
     }
+  }
+
+  static async fetchAuthMe(): Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }> }> {
+    const now = Date.now();
+    if (this.authMeCache && now - this.authMeCache.timestamp < this.AUTH_ME_TTL_MS) {
+      return this.authMeCache.data;
+    }
+    if (this.authMeInFlight) {
+      return this.authMeInFlight;
+    }
+    this.authMeInFlight = (async () => {
+      const validation = await SessionValidator.ensureValidSession();
+      if (!validation.isValid) {
+        this.authMeInFlight = null;
+        return { user: null, subscription: null, tariffLimits: [] };
+      }
+      const accessToken = validation.accessToken || await this.getCurrentAccessToken();
+      const { data, error } = await (supabase as any).functions.invoke('auth-me', {
+        body: {},
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) {
+        this.authMeInFlight = null;
+        return { user: null, subscription: null, tariffLimits: [] };
+      }
+      const resp: any = data;
+      const result = {
+        user: (resp?.user ?? null) as UserProfile | null,
+        subscription: resp?.subscription ?? null,
+        tariffLimits: Array.isArray(resp?.tariffLimits) ? resp.tariffLimits as Array<{ limit_name: string; value: number }> : [],
+      };
+      this.authMeCache = { timestamp: Date.now(), data: result };
+      this.authMeInFlight = null;
+      return result;
+    })();
+    return this.authMeInFlight;
+  }
+
+  static clearAuthMeCache(): void {
+    this.authMeCache = null;
   }
 
   /**

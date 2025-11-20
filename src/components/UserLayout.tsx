@@ -110,10 +110,11 @@ const UserMenuProvider: React.FC<{
     queryFn: async () => {
       return await UserMenuService.getUserMenuItems(userId, true);
     },
-    enabled: !!userId,
+    enabled: !!userId && !!hasAccess,
     staleTime: 300_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     placeholderData: (prev) => prev as UserMenuItem[] | undefined,
   });
   const menuItems: UserMenuItem[] = menuItemsData ?? [];

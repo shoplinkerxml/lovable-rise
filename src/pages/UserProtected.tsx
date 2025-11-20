@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
-import { SubscriptionValidationService } from "@/lib/subscription-validation-service";
-import { TariffService } from "@/lib/tariff-service";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
 import type { TariffLimit } from "@/lib/tariff-service";
 
@@ -43,36 +41,20 @@ const UserProtected = () => {
           return;
         }
         
-        await SessionValidator.logSessionDebugInfo('user-protected-route');
+        // debug logging disabled to avoid extra requests during navigation
         
-        // Get user profile with enhanced error handling
-        const { user: currentUser, session, error } = await UserAuthService.getCurrentUser();
-        
-        if (error) {
-          console.error('[UserProtected] Authentication error:', error);
-          setAuthenticated(false);
-          setSessionError(error);
-          setReady(true);
-          return;
-        }
+        const authMe = await UserAuthService.fetchAuthMe();
+        const currentUser = authMe.user;
+        const session = sessionValidation.isValid ? sessionValidation.session || null : null;
 
         if (session && currentUser) {
           // Check if user has 'user' role
           if (currentUser.role === 'user') {
-            try {
-              const result = await SubscriptionValidationService.ensureValidSubscription(currentUser.id);
-              setHasAccess(result.hasValidSubscription);
-              setSubscription(result);
-              const tariffId = (result.subscription?.tariffs?.id) ?? (result.subscription?.tariff_id);
-              if (tariffId) {
-                const limits = await TariffService.getTariffLimits(tariffId);
-                setTariffLimits(limits || []);
-              } else {
-                setTariffLimits([]);
-              }
-            } catch (subError) {
-              console.error('[UserProtected] Subscription validation error:', subError);
-            }
+            const sub = authMe.subscription as SubscriptionEntity | null;
+            const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
+            setHasAccess(valid);
+            setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
+            setTariffLimits(Array.isArray(authMe.tariffLimits) ? authMe.tariffLimits as any : []);
             
             setAuthenticated(true);
             setUser(currentUser);
@@ -107,30 +89,7 @@ const UserProtected = () => {
     checkAuthentication();
   }, []);
 
-  // Refresh subscription access on window focus / visibility change
-  useEffect(() => {
-    if (!user?.id) return;
-    const onFocus = async () => {
-      try {
-        const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
-        setHasAccess(result.hasValidSubscription);
-      } catch (_e) { void 0; }
-    };
-    const onVisibility = async () => {
-      if (!document.hidden) {
-        try {
-          const result = await SubscriptionValidationService.ensureValidSubscription(user.id);
-          setHasAccess(result.hasValidSubscription);
-        } catch (_e) { void 0; }
-      }
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [user?.id]);
+  // No background subscription checks on focus/visibility to avoid extra network requests
 
   if (!ready) {
     return (
@@ -157,20 +116,13 @@ const UserProtected = () => {
   const refresh = async () => {
     try {
       if (!user?.id) return;
-      const result = await SubscriptionValidationService.ensureValidSubscription(user.id, { forceRefresh: true });
-      setHasAccess(result.hasValidSubscription);
-      setSubscription({
-        hasValidSubscription: result.hasValidSubscription,
-        subscription: (result.subscription as SubscriptionEntity) || null,
-        isDemo: result.isDemo
-      });
-      const tariffId = ((result.subscription as SubscriptionEntity)?.tariffs?.id) ?? ((result.subscription as SubscriptionEntity)?.tariff_id);
-      if (tariffId) {
-        const limits = await TariffService.getTariffLimits(tariffId);
-        setTariffLimits(limits || []);
-      } else {
-        setTariffLimits([]);
-      }
+      UserAuthService.clearAuthMeCache();
+      const authMe = await UserAuthService.fetchAuthMe();
+      const sub = authMe.subscription as SubscriptionEntity | null;
+      const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
+      setHasAccess(valid);
+      setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
+      setTariffLimits(Array.isArray(authMe.tariffLimits) ? authMe.tariffLimits as any : []);
     } catch (_e) { void 0; }
   };
 

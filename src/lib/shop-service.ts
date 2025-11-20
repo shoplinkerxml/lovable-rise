@@ -179,37 +179,40 @@ export class ShopService {
       const baseShops: Shop[] = await this.getShops();
       const storeIds = baseShops.map((s) => s.id);
       const templateIds = Array.from(new Set(baseShops.map((s) => s.template_id).filter((v) => !!v))) as string[];
-      const [templates, prodRows] = await Promise.all([
-        templateIds.length
-          ? (supabase as any)
-              .from('store_templates')
-              .select('id,marketplace')
-              .in('id', templateIds)
-              .then((r: any) => r.data || [])
-          : Promise.resolve([]),
-        storeIds.length
-          ? (supabase as any)
-              .from('store_products')
-              .select('store_id,category_id,category_external_id')
-              .in('store_id', storeIds)
-              .then((r: any) => r.data || [])
-          : Promise.resolve([]),
-      ]);
-      const templatesMap: Record<string, string> = {};
-      for (const r of templates as Array<{ id: string; marketplace?: string }>) {
-        if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
-      }
-      const productsCountMap: Record<string, number> = {};
-      const categoriesMap: Record<string, Set<string>> = {};
-      for (const r of prodRows as Array<{ store_id: string; category_id?: number | null; category_external_id?: string | null }>) {
-        const sid = String(r.store_id);
-        productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
-        const catId = r.category_id != null ? String(r.category_id) : r.category_external_id ? String(r.category_external_id) : null;
-        if (catId) {
-          if (!categoriesMap[sid]) categoriesMap[sid] = new Set();
-          categoriesMap[sid].add(catId);
-        }
-      }
+            const [templates, linkRows] = await Promise.all([
+              templateIds.length
+                ? (supabase as any)
+                    .from('store_templates')
+                    .select('id,marketplace')
+                    .in('id', templateIds)
+                    .then((r: any) => r.data || [])
+                : Promise.resolve([]),
+              storeIds.length
+                ? (supabase as any)
+                    .from('store_product_links')
+                    .select('store_id,is_active,custom_category_id,store_products(category_id,category_external_id)')
+                    .in('store_id', storeIds)
+                    .then((r: any) => r.data || [])
+                : Promise.resolve([]),
+            ]);
+            const templatesMap: Record<string, string> = {};
+            for (const r of templates as Array<{ id: string; marketplace?: string }>) {
+              if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
+            }
+            const productsCountMap: Record<string, number> = {};
+            const categoriesMap: Record<string, Set<string>> = {};
+            for (const r of linkRows as Array<any>) {
+              const sid = String(r.store_id);
+              const active = r?.is_active !== false;
+              if (active) productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
+              const linkCat = r?.custom_category_id != null ? String(r.custom_category_id) : null;
+              const baseCatId = r?.store_products?.category_id != null ? String(r.store_products.category_id) : r?.store_products?.category_external_id ? String(r.store_products.category_external_id) : null;
+              const catId = linkCat || baseCatId;
+              if (catId) {
+                if (!categoriesMap[sid]) categoriesMap[sid] = new Set();
+                categoriesMap[sid].add(catId);
+              }
+            }
       return baseShops.map((s) => ({
         ...s,
         marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
