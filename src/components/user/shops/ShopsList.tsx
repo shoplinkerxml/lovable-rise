@@ -59,13 +59,13 @@ export const ShopsList = ({
       } catch {}
       const rows = await ShopService.getShopsAggregated();
       try {
-        const payload = JSON.stringify({ items: rows as ShopWithMarketplace[], expiresAt: Date.now() + 300_000 });
+        const payload = JSON.stringify({ items: rows as ShopWithMarketplace[], expiresAt: Date.now() + 900_000 });
         if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
       } catch {}
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 300_000,
+    staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev as ShopWithMarketplace[] | undefined,

@@ -78,7 +78,7 @@ export default function ShopSettings() {
       return shop;
     },
     enabled: !!id,
-    staleTime: 300_000,
+    staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
@@ -108,7 +108,7 @@ export default function ShopSettings() {
       return cats;
     },
     enabled: !!id,
-    staleTime: 300_000,
+    staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev as StoreCategoryRow[] | undefined,

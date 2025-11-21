@@ -111,7 +111,7 @@ const UserMenuProvider: React.FC<{
       return await UserMenuService.getUserMenuItems(userId, true);
     },
     enabled: !!userId && !!hasAccess,
-    staleTime: 300_000,
+    staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

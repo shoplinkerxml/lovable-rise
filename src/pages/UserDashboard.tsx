@@ -74,7 +74,7 @@ const UserDashboard = () => {
   }[]>([]);
   const [prefetchOpen, setPrefetchOpen] = useState(false);
   const [prefetchProgress, setPrefetchProgress] = useState(0);
-  const ttlMs = 600_000;
+  const ttlMs = 900_000;
   
   useEffect(() => {
     const result = subscription;
@@ -107,37 +107,43 @@ const UserDashboard = () => {
         let shopsOk = false;
         let productsOk = false;
         let tariffsOk = false;
+        let suppliersOk = false;
         try {
           const rawShops = typeof window !== 'undefined' ? window.localStorage.getItem('rq:shopsList') : null;
           const rawProducts = typeof window !== 'undefined' ? window.localStorage.getItem('rq:products:all') : null;
           const rawTariffs = typeof window !== 'undefined' ? window.localStorage.getItem('rq:tariffs:list') : null;
+          const rawSuppliers = typeof window !== 'undefined' ? window.localStorage.getItem('rq:suppliers:list') : null;
           if (rawShops) {
-            const parsed = JSON.parse(rawShops) as { items: any[]; expiresAt: number };
+            const parsed = JSON.parse(rawShops) as { items: unknown[]; expiresAt: number };
             shopsOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
           }
           if (rawProducts) {
-            const parsed = JSON.parse(rawProducts) as { items: any[]; expiresAt: number };
+            const parsed = JSON.parse(rawProducts) as { items: unknown[]; expiresAt: number };
             productsOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
           }
           if (rawTariffs) {
-            const parsed = JSON.parse(rawTariffs) as { items: any[]; expiresAt: number };
+            const parsed = JSON.parse(rawTariffs) as { items: unknown[]; expiresAt: number };
             tariffsOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
           }
-        } catch {}
-        if (shopsOk && productsOk && tariffsOk) return;
+          if (rawSuppliers) {
+            const parsed = JSON.parse(rawSuppliers) as { items: unknown[]; expiresAt: number };
+            suppliersOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
+          }
+        } catch (_e) { void 0; }
+        if (shopsOk && productsOk && tariffsOk && suppliersOk) return;
         setPrefetchOpen(true);
         setPrefetchProgress(8);
         if (!shopsOk) {
           const shops = await ShopService.getShopsAggregated();
           setPrefetchProgress(30);
-          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: shops, expiresAt: Date.now() + ttlMs })); } catch {}
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: shops, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
         } else {
           setPrefetchProgress(30);
         }
         if (!productsOk) {
           const products = await ProductService.getProductsAggregated(null);
           setPrefetchProgress(65);
-          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:all', JSON.stringify({ items: products, expiresAt: Date.now() + ttlMs })); } catch {}
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:all', JSON.stringify({ items: products, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
         } else {
           setPrefetchProgress(65);
         }
@@ -145,9 +151,17 @@ const UserDashboard = () => {
           const { TariffService } = await import('@/lib/tariff-service');
           const tariffs = await TariffService.getTariffsAggregated(false);
           setPrefetchProgress(95);
-          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch {}
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
         } else {
           setPrefetchProgress(95);
+        }
+        if (!suppliersOk) {
+          const { SupplierService } = await import('@/lib/supplier-service');
+          const suppliers = await SupplierService.getSuppliers();
+          setPrefetchProgress(98);
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:suppliers:list', JSON.stringify({ items: suppliers, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
+        } else {
+          setPrefetchProgress(98);
         }
         setPrefetchProgress(100);
       } finally {

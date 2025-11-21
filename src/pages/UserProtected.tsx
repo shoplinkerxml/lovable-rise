@@ -28,7 +28,7 @@ const UserProtected = () => {
   const [tariffLimits, setTariffLimits] = useState<TariffLimit[]>([]);
   const [prefetchOpen, setPrefetchOpen] = useState(false);
   const [prefetchProgress, setPrefetchProgress] = useState(0);
-  const ttlMs = 600_000;
+  const ttlMs = 900_000;
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -61,7 +61,7 @@ const UserProtected = () => {
             const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
             setHasAccess(valid);
             setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
-            setTariffLimits(Array.isArray(authMe.tariffLimits) ? authMe.tariffLimits as any : []);
+            setTariffLimits(Array.isArray(authMe.tariffLimits) ? (authMe.tariffLimits as unknown as TariffLimit[]) : []);
             
             setAuthenticated(true);
             setUser(currentUser);
@@ -79,7 +79,7 @@ const UserProtected = () => {
                 try {
                   const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
                   if (!raw) return null;
-                  const parsed = JSON.parse(raw) as { items: any[]; expiresAt: number };
+                  const parsed = JSON.parse(raw) as { items: unknown[]; expiresAt: number };
                   if (parsed && Array.isArray(parsed.items) && parsed.expiresAt > now) return parsed.items;
                   return null;
                 } catch { return null; }
@@ -87,14 +87,15 @@ const UserProtected = () => {
               const shopsCached = readCache('rq:shopsList');
               const productsCached = readCache('rq:products:all');
               const tariffsCached = readCache('rq:tariffs:list');
-              if (!shopsCached || !productsCached || !tariffsCached) {
+              const suppliersCached = readCache('rq:suppliers:list');
+              if (!shopsCached || !productsCached || !tariffsCached || !suppliersCached) {
                 setPrefetchProgress(18);
                 const tasks: Array<Promise<void>> = [];
                 if (!shopsCached) {
                   tasks.push((async () => {
                     const { ShopService } = await import('@/lib/shop-service');
                     const shops = await ShopService.getShopsAggregated();
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: shops, expiresAt: Date.now() + ttlMs })); } catch {}
+                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: shops, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
                     setPrefetchProgress((p) => Math.max(p, 35));
                   })());
                 }
@@ -102,7 +103,7 @@ const UserProtected = () => {
                   tasks.push((async () => {
                     const { ProductService } = await import('@/lib/product-service');
                     const products = await ProductService.getProductsAggregated(null);
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:all', JSON.stringify({ items: products, expiresAt: Date.now() + ttlMs })); } catch {}
+                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:all', JSON.stringify({ items: products, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
                     setPrefetchProgress((p) => Math.max(p, 70));
                   })());
                 }
@@ -110,8 +111,16 @@ const UserProtected = () => {
                   tasks.push((async () => {
                     const { TariffService } = await import('@/lib/tariff-service');
                     const tariffs = await TariffService.getTariffsAggregated(false);
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch {}
+                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
                     setPrefetchProgress((p) => Math.max(p, 95));
+                  })());
+                }
+                if (!suppliersCached) {
+                  tasks.push((async () => {
+                    const { SupplierService } = await import('@/lib/supplier-service');
+                    const suppliers = await SupplierService.getSuppliers();
+                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:suppliers:list', JSON.stringify({ items: suppliers, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
+                    setPrefetchProgress((p) => Math.max(p, 98));
                   })());
                 }
                 await Promise.allSettled(tasks);
@@ -187,7 +196,7 @@ const UserProtected = () => {
       const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
       setHasAccess(valid);
       setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
-      setTariffLimits(Array.isArray(authMe.tariffLimits) ? authMe.tariffLimits as any : []);
+            setTariffLimits(Array.isArray(authMe.tariffLimits) ? (authMe.tariffLimits as unknown as TariffLimit[]) : []);
     } catch (_e) { void 0; }
   };
 

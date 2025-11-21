@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft, Truck } from 'lucide-react';
+import { Plus, ArrowLeft, Truck, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -9,7 +9,7 @@ import { SuppliersList } from '@/components/user/suppliers';
 import { SupplierForm } from '@/components/user/suppliers';
 import { SupplierService, type Supplier, type SupplierLimitInfo } from '@/lib/supplier-service';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useOutletContext } from 'react-router-dom';
 
 type ViewMode = 'list' | 'create' | 'edit';
 
@@ -22,22 +22,15 @@ export const Suppliers = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<SupplierLimitInfo>({ current: 0, max: 0, canCreate: false });
 
-  const { data: supMaxLimit } = useQuery<number>({
-    queryKey: ['suppliersMaxLimit'],
-    queryFn: async () => {
-      const maxLimit = await SupplierService.getSupplierLimitOnly();
-      return maxLimit;
-    },
-    staleTime: 300_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    placeholderData: (prev) => prev as number | undefined,
-  });
+  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
   useEffect(() => {
-    if (supMaxLimit != null) {
-      setLimitInfo(prev => ({ ...prev, max: supMaxLimit, canCreate: prev.current < supMaxLimit }));
-    }
-  }, [supMaxLimit]);
+    const supplierLimit = (tariffLimits || [])
+      .find((l) => {
+        const n = String(l.limit_name || '').toLowerCase();
+        return n.includes('постач') || n.includes('supplier');
+      })?.value ?? 0;
+    setLimitInfo(prev => ({ ...prev, max: supplierLimit, canCreate: prev.current < supplierLimit }));
+  }, [tariffLimits]);
 
   const handleSuppliersLoaded = (count: number) => {
     setSuppliersCount(count);
@@ -68,14 +61,14 @@ export const Suppliers = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
       await SupplierService.deleteSupplier(id);
       toast.success(t('supplier_deleted'));
       setRefreshTrigger(prev => prev + 1);
-    } catch (error: any) {
-      console.error('Delete error:', error);
-      toast.error(error?.message || t('failed_delete_supplier'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      toast.error(message || t('failed_delete_supplier'));
     }
   };
 
@@ -105,6 +98,21 @@ export const Suppliers = () => {
                   <Truck className="h-4 w-4" />
                   <span>{limitInfo.current} / {limitInfo.max}</span>
                 </Badge>
+                <Button 
+                  variant="ghost"
+                  size="icon"
+                  title={t('refresh') || 'Оновити'}
+                  onClick={() => {
+                    try {
+                      if (typeof window !== 'undefined') {
+                        window.localStorage.removeItem('rq:suppliers:list');
+                      }
+                    } catch (_e) { void 0; }
+                    setRefreshTrigger(prev => prev + 1);
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
                 {suppliersCount > 0 && (
                   <Button 
                     onClick={handleCreateNew}

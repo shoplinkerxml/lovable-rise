@@ -69,13 +69,13 @@ const TariffPage = () => {
       } catch {}
       const rows = await TariffService.getTariffsAggregated(false);
       try {
-        const payload = JSON.stringify({ items: rows as TariffWithDetails[], expiresAt: Date.now() + 600_000 });
+        const payload = JSON.stringify({ items: rows as TariffWithDetails[], expiresAt: Date.now() + 900_000 });
         if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
       } catch {}
       return rows as TariffWithDetails[];
     },
     retry: false,
-    staleTime: 600_000,
+    staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

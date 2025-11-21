@@ -124,6 +124,12 @@ Deno.serve(async (req) => {
       tariffLimits = (limits || []).map((l: any) => ({ limit_name: String(l.limit_name), value: Number(l.value) }))
     }
 
+    const { data: menuItems } = await supabaseClient
+      .from('user_menu_items')
+      .select('*')
+      .eq('is_active', true)
+      .order('order_index', { ascending: true })
+
     return new Response(
       JSON.stringify({
         user: {
@@ -132,7 +138,8 @@ Deno.serve(async (req) => {
           ...profile
         },
         subscription,
-        tariffLimits
+        tariffLimits,
+        menuItems: menuItems || []
       }),
       { 
         headers: { ...corsHeaders }

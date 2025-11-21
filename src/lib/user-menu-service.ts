@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { UserAuthService } from "./user-auth-service";
 export interface UserMenuItem {
   id: number;
   user_id: string;
@@ -96,28 +97,38 @@ export class UserMenuService {
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
     try {
-      console.log('getUserMenuItems called with:', { userId, activeOnly }); // Debug log
-      // Get menu items - user menu items are shared across all users
+      const authMe = await UserAuthService.fetchAuthMe();
+      let items = Array.isArray(authMe.menuItems) ? authMe.menuItems : [];
+      if (activeOnly) items = items.filter(i => i.is_active === true);
+      if (items.length > 0) {
+        return items.map((item: UserMenuItem) => {
+          if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
+              (item.title.toLowerCase().includes('supplier') || 
+               item.title.toLowerCase().includes('постачальник') ||
+               item.title.toLowerCase().includes('shop') || 
+               item.title.toLowerCase().includes('магазин') ||
+               item.title.toLowerCase().includes('payment') || 
+               item.title.toLowerCase().includes('платеж') ||
+               item.path.toLowerCase().includes('supplier') || 
+               item.path.toLowerCase().includes('постачальник') ||
+               item.path.toLowerCase().includes('shop') || 
+               item.path.toLowerCase().includes('магазин') ||
+               item.path.toLowerCase().includes('payment') || 
+               item.path.toLowerCase().includes('платеж'))) {
+            return { ...item, icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
+          }
+          return item;
+        });
+      }
+
       let query = (supabase as any)
         .from('user_menu_items')
         .select('*');
-
-      if (activeOnly) {
-        query = query.eq('is_active', true);
-        console.log('Filtering for active items only'); // Debug log
-      }
-
-      // Apply ordering before executing the query
+      if (activeOnly) query = query.eq('is_active', true);
       const { data, error } = await query.order('order_index', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching user menu items:', error);
-        throw error;
-      }
-
-      // Only apply auto-icon assignment for items that don't have an icon or have the default circle icon
-      // AND are supplier/shop/payment-related
-      const itemsWithIcons = (data || []).map((item: UserMenuItem) => {
+      if (error) throw error;
+      const rows: UserMenuItem[] = (data || []) as UserMenuItem[];
+      return rows.map((item: UserMenuItem) => {
         if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
             (item.title.toLowerCase().includes('supplier') || 
              item.title.toLowerCase().includes('постачальник') ||
@@ -131,19 +142,11 @@ export class UserMenuService {
              item.path.toLowerCase().includes('магазин') ||
              item.path.toLowerCase().includes('payment') || 
              item.path.toLowerCase().includes('платеж'))) {
-          return {
-            ...item,
-            icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path })
-          };
+          return { ...item, icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
         }
         return item;
       });
-
-      console.log('Fetched user menu items:', itemsWithIcons); // Debug log
-      console.log('Active only:', activeOnly); // Debug log
-      return itemsWithIcons;
     } catch (error) {
-      console.error('Error in getUserMenuItems:', error);
       throw error;
     }
   }

@@ -371,14 +371,14 @@ export const ProductsTable = ({
       } catch {}
       const rows = await ProductService.getProductsAggregated(storeId);
       try {
-        const payload = JSON.stringify({ items: rows as ProductRow[], expiresAt: Date.now() + 300_000 });
+        const payload = JSON.stringify({ items: rows as ProductRow[], expiresAt: Date.now() + 900_000 });
         if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
       } catch {}
       onProductsLoaded?.(rows.length);
       return rows as ProductRow[];
     },
     retry: false,
-    staleTime: 300_000,
+    staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

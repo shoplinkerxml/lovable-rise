@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ProfileService } from "./profile-service";
+import type { UserMenuItem } from "./user-menu-service";
 import { UserExistenceService, UserExistenceCheck } from "./user-existence-service";
 import { 
   RegistrationData, 
@@ -172,8 +173,8 @@ const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptions = {
 };
 
 export class UserAuthService {
-  private static authMeCache: { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }> } } | null = null;
-  private static authMeInFlight: Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }> }> | null = null;
+  private static authMeCache: { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] } } | null = null;
+  private static authMeInFlight: Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> | null = null;
   private static readonly AUTH_ME_TTL_MS = 15000;
   /**
    * Register a new user with email confirmation flow
@@ -602,7 +603,7 @@ export class UserAuthService {
     }
   }
 
-  static async fetchAuthMe(): Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }> }> {
+  static async fetchAuthMe(): Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> {
     const now = Date.now();
     if (this.authMeCache && now - this.authMeCache.timestamp < this.AUTH_ME_TTL_MS) {
       return this.authMeCache.data;
@@ -614,22 +615,26 @@ export class UserAuthService {
       const validation = await SessionValidator.ensureValidSession();
       if (!validation.isValid) {
         this.authMeInFlight = null;
-        return { user: null, subscription: null, tariffLimits: [] };
+        return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
       }
       const accessToken = validation.accessToken || await this.getCurrentAccessToken();
-      const { data, error } = await (supabase as any).functions.invoke('auth-me', {
+      const { data, error } = await supabase.functions.invoke('auth-me', {
         body: {},
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
       if (error) {
         this.authMeInFlight = null;
-        return { user: null, subscription: null, tariffLimits: [] };
+        return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
       }
-      const resp: any = data;
+      const resp: { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] } =
+        typeof data === 'string'
+          ? (JSON.parse(data) as { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] })
+          : (data as { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] });
       const result = {
         user: (resp?.user ?? null) as UserProfile | null,
         subscription: resp?.subscription ?? null,
-        tariffLimits: Array.isArray(resp?.tariffLimits) ? resp.tariffLimits as Array<{ limit_name: string; value: number }> : [],
+        tariffLimits: Array.isArray(resp?.tariffLimits) ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>) : [],
+        menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
       };
       this.authMeCache = { timestamp: Date.now(), data: result };
       this.authMeInFlight = null;

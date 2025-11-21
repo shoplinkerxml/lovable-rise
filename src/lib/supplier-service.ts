@@ -2,14 +2,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
 
 export interface Supplier {
-  id: string;
+  id: number;
   user_id: string;
   supplier_name: string;
-  website_url?: string;
+  website_url: string | null;
   xml_feed_url: string | null;
-  phone?: string;
-  created_at: string;
-  updated_at: string;
+  phone: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  address?: string | null;
+  is_active?: boolean | null;
 }
 
 export interface CreateSupplierData {
@@ -101,8 +103,7 @@ export class SupplierService {
       throw new Error("User not authenticated");
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { count, error } = await (supabase as any)
+    const { count, error } = await supabase
       .from('user_suppliers')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
@@ -123,28 +124,35 @@ export class SupplierService {
     }
 
     try {
-      // @ts-ignore - table not in generated types yet
-      const { data, error } = await (supabase as any)
+      const { data: auth } = await supabase.auth.getSession();
+      const accessToken: string | null = auth?.session?.access_token || null;
+      const { data, error } = await supabase.functions.invoke('suppliers-list', {
+        body: {},
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (!error) {
+        const payload: { suppliers?: Supplier[] } = typeof data === 'string'
+          ? (JSON.parse(data) as { suppliers?: Supplier[] })
+          : (data as { suppliers?: Supplier[] });
+        const rows = payload?.suppliers;
+        if (Array.isArray(rows)) return rows;
+      }
+    } catch (_e) { void 0; }
+
+    try {
+      const { data, error } = await supabase
         .from('user_suppliers')
         .select('*')
         .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Get suppliers error:', error);
-        // Return empty array instead of throwing error for empty table
-        return [];
-      }
-
+      if (error) return [];
       return data || [];
-    } catch (error) {
-      console.error('Get suppliers error:', error);
-      // Return empty array instead of throwing error
+    } catch (_e) {
       return [];
     }
   }
 
   /** Отримання одного постачальника за ID */
-  static async getSupplier(id: string): Promise<Supplier> {
+  static async getSupplier(id: number): Promise<Supplier> {
     if (!id) throw new Error("Supplier ID is required");
 
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -152,8 +160,7 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('user_suppliers')
       .select('*')
       .eq('id', id)
@@ -197,8 +204,7 @@ export class SupplierService {
 
     const xmlUrl = supplierData.xml_feed_url ? supplierData.xml_feed_url.trim() : '';
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('user_suppliers')
       .insert({
         user_id: user.id,
@@ -215,11 +221,12 @@ export class SupplierService {
       throw new Error(error.message);
     }
 
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
     return data;
   }
 
   /** Оновлення постачальника */
-  static async updateSupplier(id: string, supplierData: UpdateSupplierData): Promise<Supplier> {
+  static async updateSupplier(id: number, supplierData: UpdateSupplierData): Promise<Supplier> {
     if (!id) throw new Error("Supplier ID is required");
 
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -227,7 +234,7 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const cleanData: any = {};
+    const cleanData: Partial<Pick<Supplier, 'supplier_name' | 'website_url' | 'xml_feed_url' | 'phone'>> & { updated_at?: string } = {};
     if (supplierData.supplier_name !== undefined) {
       if (!supplierData.supplier_name.trim()) {
         throw new Error("Назва постачальника обов'язкова");
@@ -252,8 +259,7 @@ export class SupplierService {
 
     cleanData.updated_at = new Date().toISOString();
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('user_suppliers')
       .update(cleanData)
       .eq('id', id)
@@ -265,11 +271,12 @@ export class SupplierService {
       throw new Error(error.message);
     }
 
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
     return data;
   }
 
   /** Видалення постачальника */
-  static async deleteSupplier(id: string): Promise<void> {
+  static async deleteSupplier(id: number): Promise<void> {
     if (!id) throw new Error("Supplier ID is required");
 
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -277,8 +284,7 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('user_suppliers')
       .delete()
       .eq('id', id);
@@ -287,5 +293,6 @@ export class SupplierService {
       console.error('Delete supplier error:', error);
       throw new Error(error.message);
     }
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
   }
 }

@@ -87,9 +87,9 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
         toast.success(t('supplier_created'));
       }
       onSuccess?.();
-    } catch (error: any) {
-      console.error('Save supplier error:', error);
-      toast.error(error?.message || t('failed_save_supplier'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      toast.error(message || t('failed_save_supplier'));
     } finally {
       setSaving(false);
     }
