@@ -358,7 +358,22 @@ export const ProductsTable = ({
   const { data: productsData, isLoading } = useQuery<ProductRow[]>({
     queryKey: ['products', storeId ?? 'all'],
     queryFn: async () => {
+      const cacheKey = `rq:products:${storeId ?? 'all'}`;
+      try {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+        if (raw) {
+          const parsed = JSON.parse(raw) as { items: ProductRow[]; expiresAt: number };
+          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+            onProductsLoaded?.(parsed.items.length);
+            return parsed.items;
+          }
+        }
+      } catch {}
       const rows = await ProductService.getProductsAggregated(storeId);
+      try {
+        const payload = JSON.stringify({ items: rows as ProductRow[], expiresAt: Date.now() + 300_000 });
+        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
+      } catch {}
       onProductsLoaded?.(rows.length);
       return rows as ProductRow[];
     },

@@ -47,7 +47,21 @@ export const ShopsList = ({
   const { data: shopsData, isLoading } = useQuery<ShopWithMarketplace[]>({
     queryKey: ['shopsList'],
     queryFn: async () => {
+      const cacheKey = 'rq:shopsList';
+      try {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+        if (raw) {
+          const parsed = JSON.parse(raw) as { items: ShopWithMarketplace[]; expiresAt: number };
+          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+            return parsed.items;
+          }
+        }
+      } catch {}
       const rows = await ShopService.getShopsAggregated();
+      try {
+        const payload = JSON.stringify({ items: rows as ShopWithMarketplace[], expiresAt: Date.now() + 300_000 });
+        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
+      } catch {}
       return rows as ShopWithMarketplace[];
     },
     retry: false,

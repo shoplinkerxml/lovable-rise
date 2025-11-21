@@ -767,6 +767,7 @@ export class ProductService {
     if (!productId) throw new Error('create_failed');
     const product = await this.getProductById(productId);
     if (!product) throw new Error('create_failed');
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
     return product;
   }
 
@@ -779,6 +780,7 @@ export class ProductService {
     if (!product) {
       throw new Error('duplicate_failed');
     }
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
     return product;
   }
 
@@ -836,6 +838,7 @@ export class ProductService {
     const productId = (data as unknown as { product_id?: string })?.product_id || id;
     const product = await this.getProductById(productId);
     if (!product) throw new Error('update_failed');
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
     return product;
   }
 
@@ -852,5 +855,6 @@ export class ProductService {
     if (!ok) {
       throw new Error('delete_failed');
     }
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
   }
 }

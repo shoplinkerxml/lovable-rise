@@ -292,6 +292,7 @@ export class ShopService {
       throw new Error(error.message);
     }
 
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
     return data;
   }
 
@@ -349,6 +350,7 @@ export class ShopService {
       throw new Error(error.message);
     }
 
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
     return data;
   }
 
@@ -371,6 +373,7 @@ export class ShopService {
       console.error('Delete shop error:', error);
       throw new Error(error.message);
     }
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
   }
 
   /** Категории магазина: объединённые данные ssc + sc */
