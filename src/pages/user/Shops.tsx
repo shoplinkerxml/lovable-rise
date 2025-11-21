@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft, Store } from 'lucide-react';
+import { Plus, ArrowLeft, Store, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -84,6 +84,17 @@ export const Shops = () => {
                   <Store className="h-4 w-4" />
                   <span>{limitInfo.current} / {limitInfo.max}</span>
                 </Badge>
+                <Button 
+                  variant="ghost"
+                  size="icon"
+                  title={t('refresh') || 'Оновити'}
+                  onClick={() => {
+                    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
+                    setRefreshTrigger(prev => prev + 1);
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
                 {shopsCount > 0 && (
                   <Button 
                     onClick={handleCreateNew}

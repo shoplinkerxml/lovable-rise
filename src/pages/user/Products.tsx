@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Package, Loader2 } from 'lucide-react';
+import { Package, RefreshCw } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -19,6 +20,7 @@ export const Products = () => {
   const navigate = useNavigate();
   const [productsCount, setProductsCount] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [loaderProgress, setLoaderProgress] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
@@ -26,6 +28,19 @@ export const Products = () => {
   const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
 
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (tableLoading) {
+      setLoaderProgress(10);
+      const id = setInterval(() => {
+        setLoaderProgress((prev) => (prev >= 95 ? 95 : prev + 15));
+      }, 250);
+      return () => clearInterval(id);
+    } else {
+      setLoaderProgress(100);
+      const t = setTimeout(() => setLoaderProgress(0), 300);
+      return () => clearTimeout(t);
+    }
+  }, [tableLoading]);
   useEffect(() => {
     const productLimit = (tariffLimits || []).find((l) => String(l.limit_name || '').toLowerCase().includes('товар'))?.value ?? 0;
     setLimitInfo((prev) => ({ ...prev, max: productLimit, canCreate: prev.current < productLimit }));
@@ -90,20 +105,27 @@ export const Products = () => {
               <Package className="h-4 w-4" />
               <span>{limitInfo.current} / {limitInfo.max}</span>
             </Badge>
+            <Button variant="ghost" size="icon" title={t('refresh') || 'Оновити'} onClick={() => {
+              try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
+              queryClient.invalidateQueries({ queryKey: ['products', 'all'] });
+              setRefreshTrigger(prev => prev + 1);
+            }}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         }
       />
 
       <div className="relative" aria-busy={tableLoading}>
-        {/* Page-level preloader overlay while table loads */}
-        {tableLoading && (
-          <div
-            className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm"
-            data-testid="user_products_page_loader"
-          >
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
+      {tableLoading && (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/60 backdrop-blur-sm"
+          data-testid="user_products_page_loader"
+        >
+          <Progress value={loaderProgress} className="w-64" />
+          <div className="text-sm text-muted-foreground">Завантаження товарів...</div>
+        </div>
+      )}
 
         <ProductsTable
           onEdit={handleEdit}

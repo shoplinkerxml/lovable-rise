@@ -285,6 +285,7 @@ export class TariffService {
       }
 
       // Return tariff without currency data if no valid currency field
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return createdTariff as Tariff;
     } catch (error) {
       console.error('Error creating tariff:', error);
@@ -335,6 +336,7 @@ export class TariffService {
         } as (Tariff & { currency_data: Currency });
       }
 
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return updatedTariff as Tariff;
     } catch (error) {
       console.error('Error updating tariff:', error);
@@ -351,6 +353,7 @@ export class TariffService {
         .eq('id', id);
 
       if (error) throw error;
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return true;
     } catch (error) {
       console.error('Error deleting tariff:', error);
@@ -386,6 +389,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return data as TariffFeature;
     } catch (error) {
       console.error('Error adding tariff feature:', error);
@@ -404,6 +408,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return data as TariffFeature;
     } catch (error) {
       console.error('Error updating tariff feature:', error);
@@ -418,6 +423,7 @@ export class TariffService {
         .from('tariff_features')
         .delete()
         .eq('id', id);
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
 
       if (error) throw error;
       return true;
@@ -455,6 +461,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return data as TariffLimit;
     } catch (error) {
       console.error('Error adding tariff limit:', error);
@@ -473,6 +480,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
       return data as TariffLimit;
     } catch (error) {
       console.error('Error updating tariff limit:', error);
@@ -487,6 +495,7 @@ export class TariffService {
         .from('tariff_limits')
         .delete()
         .eq('id', id);
+      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
 
       if (error) throw error;
       return true;

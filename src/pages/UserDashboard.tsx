@@ -9,6 +9,10 @@ import { UserMenuItem } from "@/lib/user-menu-service";
 import { useI18n } from "@/providers/i18n-provider";
 import { User, Settings, TrendingUp, BarChart3, Activity, Plus, Crown, CreditCard } from "lucide-react";
 import type { TariffLimit } from "@/lib/tariff-service";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { ShopService } from "@/lib/shop-service";
+import { ProductService } from "@/lib/product-service";
 
 type SubscriptionEntity = {
   tariff_id?: number;
@@ -68,6 +72,9 @@ const UserDashboard = () => {
     value: number;
     id?: number;
   }[]>([]);
+  const [prefetchOpen, setPrefetchOpen] = useState(false);
+  const [prefetchProgress, setPrefetchProgress] = useState(0);
+  const ttlMs = 600_000;
   
   useEffect(() => {
     const result = subscription;
@@ -93,7 +100,75 @@ const UserDashboard = () => {
   useEffect(() => {
     if (tariffLimits && tariffLimits.length > 0) setLimits(tariffLimits);
   }, [tariffLimits]);
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const now = Date.now();
+        let shopsOk = false;
+        let productsOk = false;
+        let tariffsOk = false;
+        try {
+          const rawShops = typeof window !== 'undefined' ? window.localStorage.getItem('rq:shopsList') : null;
+          const rawProducts = typeof window !== 'undefined' ? window.localStorage.getItem('rq:products:all') : null;
+          const rawTariffs = typeof window !== 'undefined' ? window.localStorage.getItem('rq:tariffs:list') : null;
+          if (rawShops) {
+            const parsed = JSON.parse(rawShops) as { items: any[]; expiresAt: number };
+            shopsOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
+          }
+          if (rawProducts) {
+            const parsed = JSON.parse(rawProducts) as { items: any[]; expiresAt: number };
+            productsOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
+          }
+          if (rawTariffs) {
+            const parsed = JSON.parse(rawTariffs) as { items: any[]; expiresAt: number };
+            tariffsOk = !!parsed && Array.isArray(parsed.items) && parsed.expiresAt > now;
+          }
+        } catch {}
+        if (shopsOk && productsOk && tariffsOk) return;
+        setPrefetchOpen(true);
+        setPrefetchProgress(8);
+        if (!shopsOk) {
+          const shops = await ShopService.getShopsAggregated();
+          setPrefetchProgress(30);
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: shops, expiresAt: Date.now() + ttlMs })); } catch {}
+        } else {
+          setPrefetchProgress(30);
+        }
+        if (!productsOk) {
+          const products = await ProductService.getProductsAggregated(null);
+          setPrefetchProgress(65);
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:all', JSON.stringify({ items: products, expiresAt: Date.now() + ttlMs })); } catch {}
+        } else {
+          setPrefetchProgress(65);
+        }
+        if (!tariffsOk) {
+          const { TariffService } = await import('@/lib/tariff-service');
+          const tariffs = await TariffService.getTariffsAggregated(false);
+          setPrefetchProgress(95);
+          try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch {}
+        } else {
+          setPrefetchProgress(95);
+        }
+        setPrefetchProgress(100);
+      } finally {
+        setTimeout(() => setPrefetchOpen(false), 300);
+      }
+    };
+    run();
+  }, []);
   return <div className="space-y-6 p-6">
+      <Dialog open={prefetchOpen}>
+        <DialogContent hideClose overlayClassName="bg-background/50">
+          <DialogHeader>
+            <DialogTitle>Завантажуємо кабінет</DialogTitle>
+            <DialogDescription>Будь ласка, зачекайте. Йде підготовка даних.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Progress value={prefetchProgress} />
+            <div className="text-xs text-muted-foreground">{prefetchProgress}%</div>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbs} />
 
