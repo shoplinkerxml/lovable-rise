@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { UserAuthService } from '@/lib/user-auth-service';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const useUserRole = () => {
@@ -7,15 +8,8 @@ export const useUserRole = () => {
   const { data: role, isLoading: loading } = useQuery({
     queryKey: ['userRole'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-      if (error) throw error;
-      return data?.role ?? null;
+      const resp = await UserAuthService.fetchAuthMe();
+      return resp?.user?.role ?? null;
     },
     staleTime: 60_000,
   });

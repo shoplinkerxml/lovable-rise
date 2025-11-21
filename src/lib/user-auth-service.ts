@@ -491,48 +491,15 @@ export class UserAuthService {
       }
 
       if (authData.user && authData.session) {
-        // Check if profile exists, if not create it (for users who confirmed email)
-        let profile = await ProfileService.getProfile(authData.user.id);
-        
-        if (!profile) {
-          console.log('Creating profile for confirmed user:', authData.user.id);
-          // Enhanced name extraction with fallbacks
-          const userName = authData.user.user_metadata?.name || 
-                          authData.user.user_metadata?.full_name ||
-                          authData.user.email?.split('@')[0] || 
-                          'User';
-          
-          try {
-            profile = await ProfileService.createProfileWithAuth({
-              id: authData.user.id,
-              email: data.email,
-              name: userName
-            }, authData.session.access_token);
-          } catch (profileError) {
-            console.error('Profile creation during login failed:', profileError);
-            return {
-              user: null,
-              session: null,
-              error: UserAuthError.PROFILE_CREATION_FAILED
-            };
-          }
+        // Use edge function as single source of truth and avoid extra profiles query
+        const authMe = await UserAuthService.fetchAuthMe();
+        if (!authMe.user) {
+          return { user: null, session: authData.session, error: UserAuthError.LOGIN_FAILED };
         }
-        
-        // Validate user role
-        if (profile && profile.role !== 'user') {
-          // If admin or manager, they should use admin interface
-          return {
-            user: null,
-            session: authData.session,
-            error: 'redirect_to_admin'
-          };
+        if (authMe.user.role && authMe.user.role !== 'user') {
+          return { user: null, session: authData.session, error: 'redirect_to_admin' };
         }
-
-        return {
-          user: profile,
-          session: authData.session,
-          error: null
-        };
+        return { user: authMe.user, session: authData.session, error: null };
       }
 
       return {
@@ -681,7 +648,6 @@ export class UserAuthService {
   static async getCurrentUser(): Promise<AuthResponse> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session) {
         return {
           user: null,
@@ -690,10 +656,9 @@ export class UserAuthService {
         };
       }
 
-      const profile = await ProfileService.getProfile(session.user.id);
-      
+      const authMe = await this.fetchAuthMe();
       return {
-        user: profile,
+        user: authMe.user,
         session: session,
         error: null
       };

@@ -225,43 +225,13 @@ export class SessionValidator {
   static async validateRLSContext(): Promise<{ isValid: boolean; userId: string | null; error?: string }> {
     try {
       const validation = await this.validateSession();
-      
       if (!validation.isValid || !validation.accessToken) {
-        return {
-          isValid: false,
-          userId: null,
-          error: 'No valid access token for RLS context'
-        };
+        return { isValid: false, userId: null, error: 'No valid access token for RLS context' };
       }
-      
-      // Test RLS context by calling a Supabase query that depends on auth.uid()
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', validation.user!.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('[SessionValidator] RLS context test failed:', error);
-        return {
-          isValid: false,
-          userId: validation.user?.id || null,
-          error: `RLS test failed: ${error.message}`
-        };
-      }
-      
-      return {
-        isValid: !!data,
-        userId: validation.user!.id,
-        error: !data ? 'RLS context not working - auth.uid() may be null' : undefined
-      };
+      // Avoid extra network calls: rely on session presence as RLS proxy
+      return { isValid: true, userId: validation.user?.id || null };
     } catch (error) {
-      console.error('[SessionValidator] RLS context validation error:', error);
-      return {
-        isValid: false,
-        userId: null,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      return { isValid: false, userId: null, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
   

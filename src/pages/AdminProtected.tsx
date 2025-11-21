@@ -2,7 +2,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "@/lib/session-validation";
-import { ProfileService } from "@/lib/profile-service";
+import { UserAuthService } from "@/lib/user-auth-service";
 
 const AdminProtected = () => {
   const [ready, setReady] = useState(false);
@@ -33,7 +33,8 @@ const AdminProtected = () => {
           
           // Check if user has admin role
           try {
-            const isAdmin = await ProfileService.isAdmin(validation.user.id);
+  const authMe = await UserAuthService.fetchAuthMe();
+  const isAdmin = String(authMe?.user?.role ?? "user") === "admin";
             setHasAdminRole(isAdmin);
             
             if (!isAdmin) {
