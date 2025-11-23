@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Package, RefreshCw } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -20,40 +19,25 @@ export const Products = () => {
   const navigate = useNavigate();
   const [productsCount, setProductsCount] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [loaderProgress, setLoaderProgress] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
-  const [tableLoading, setTableLoading] = useState<boolean>(true);
   const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
 
   const queryClient = useQueryClient();
-  useEffect(() => {
-    if (tableLoading) {
-      setLoaderProgress(10);
-      const id = setInterval(() => {
-        setLoaderProgress((prev) => (prev >= 95 ? 95 : prev + 15));
-      }, 250);
-      return () => clearInterval(id);
-    } else {
-      setLoaderProgress(100);
-      const t = setTimeout(() => setLoaderProgress(0), 300);
-      return () => clearTimeout(t);
-    }
-  }, [tableLoading]);
   useEffect(() => {
     const productLimit = (tariffLimits || []).find((l) => String(l.limit_name || '').toLowerCase().includes('товар'))?.value ?? 0;
     setLimitInfo((prev) => ({ ...prev, max: productLimit, canCreate: prev.current < productLimit }));
   }, [tariffLimits]);
 
-  const handleProductsLoaded = (count: number) => {
+  const handleProductsLoaded = useCallback((count: number) => {
     setProductsCount(count);
     setLimitInfo(prev => ({
       ...prev,
       current: count,
       canCreate: count < prev.max
     }));
-  };
+  }, []);
 
   const handleEdit = (product: Product) => {
     navigate(`/user/products/edit/${product.id}`);
@@ -116,23 +100,13 @@ export const Products = () => {
         }
       />
 
-      <div className="relative" aria-busy={tableLoading}>
-      {tableLoading && (
-        <div
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/60 backdrop-blur-sm"
-          data-testid="user_products_page_loader"
-        >
-          <Progress value={loaderProgress} className="w-64" />
-          <div className="text-sm text-muted-foreground">Завантаження товарів...</div>
-        </div>
-      )}
+      <div className="relative">
 
         <ProductsTable
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCreateNew={handleCreateNew}
           onProductsLoaded={handleProductsLoaded}
-          onLoadingChange={setTableLoading}
           refreshTrigger={refreshTrigger}
           canCreate={limitInfo.canCreate}
         />

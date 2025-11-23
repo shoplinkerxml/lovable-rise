@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -59,7 +59,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -326,6 +326,9 @@ type ProductRow = Product & {
   linkedStoreIds?: string[];
 };
 
+type PageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
+type ResponseData = { products: ProductRow[]; page: PageInfo };
+
 export const ProductsTable = ({
   onEdit,
   onDelete,
@@ -355,40 +358,102 @@ export const ProductsTable = ({
 
   let productsCount = 0;
 
-  const { data: productsData, isLoading } = useQuery<ProductRow[]>({
-    queryKey: ['products', storeId ?? 'all'],
-    queryFn: async () => {
-      const cacheKey = `rq:products:${storeId ?? 'all'}`;
-      try {
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { items: ProductRow[]; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            onProductsLoaded?.(parsed.items.length);
-            return parsed.items;
-          }
-        }
-      } catch {}
-      const rows = await ProductService.getProductsAggregated(storeId);
-      try {
-        const payload = JSON.stringify({ items: rows as ProductRow[], expiresAt: Date.now() + 900_000 });
-        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-      } catch {}
-      onProductsLoaded?.(rows.length);
-      return rows as ProductRow[];
-    },
-    retry: false,
-    staleTime: 900_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    placeholderData: (prev) => prev as ProductRow[] | undefined,
-  });
-  const products: ProductRow[] = productsData ?? [];
-  productsCount = products.length;
-  useEffect(() => { onProductsLoaded?.(products.length); }, [products.length]);
-  useEffect(() => { onLoadingChange?.(isLoading); setLoading(isLoading); }, [isLoading]);
-  useEffect(() => { queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] }); }, [refreshTrigger]);
+  const [items, setItems] = useState<ProductRow[]>([]);
+  const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const requestedOffsets = useRef<Set<number>>(new Set());
+  const loadingFirstRef = useRef(false);
+  const loadingNextRef = useRef(false);
+
+  const onProductsLoadedRef = useRef(onProductsLoaded);
+  const onLoadingChangeRef = useRef(onLoadingChange);
+  useEffect(() => { onProductsLoadedRef.current = onProductsLoaded; }, [onProductsLoaded]);
+  useEffect(() => { onLoadingChangeRef.current = onLoadingChange; }, [onLoadingChange]);
+
+  const loadFirstPage = useCallback(async () => {
+    setLoading(true);
+    onLoadingChangeRef.current?.(true);
+    if (loadingFirstRef.current) return;
+    loadingFirstRef.current = true;
+    requestedOffsets.current.clear();
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken: string | null = authData?.session?.access_token || null;
+      const { data, error } = await supabase.functions.invoke('user-products-list', {
+        body: { store_id: storeId ?? null, limit: pagination.pageSize, offset: 0 },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) {
+        setItems([]);
+        setPageInfo({ limit: pagination.pageSize, offset: 0, hasMore: false, nextOffset: null, total: 0 });
+        onProductsLoadedRef.current?.(0);
+        return;
+      }
+      const payload: ResponseData = typeof data === 'string' ? JSON.parse(data) : (data as ResponseData);
+      setItems(Array.isArray(payload.products) ? payload.products : []);
+      setPageInfo(payload.page ?? null);
+      onProductsLoadedRef.current?.(payload.page?.total ?? (Array.isArray(payload.products) ? payload.products.length : 0));
+      if (payload.page?.hasMore && payload.page?.nextOffset != null) {
+        await loadNextPage({ limit: payload.page.limit, offset: payload.page.nextOffset });
+      }
+    } finally {
+      setLoading(false);
+      onLoadingChangeRef.current?.(false);
+      loadingFirstRef.current = false;
+    }
+  }, [storeId, pagination.pageSize]);
+
+  const loadNextPage = useCallback(async (override?: { limit: number; offset: number | null }) => {
+    const nextOffset = override?.offset ?? pageInfo?.nextOffset ?? null;
+    const nextLimit = override?.limit ?? pageInfo?.limit ?? pagination.pageSize;
+    if (nextOffset == null) return;
+    if (pageInfo && !pageInfo.hasMore) return;
+    if (loadingNextRef.current) return;
+    if (requestedOffsets.current.has(nextOffset)) return;
+    requestedOffsets.current.add(nextOffset);
+    setLoading(true);
+    onLoadingChangeRef.current?.(true);
+    loadingNextRef.current = true;
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken: string | null = authData?.session?.access_token || null;
+      const { data, error } = await supabase.functions.invoke('user-products-list', {
+        body: { store_id: storeId ?? null, limit: nextLimit, offset: nextOffset },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) return;
+      const payload: ResponseData = typeof data === 'string' ? JSON.parse(data) : (data as ResponseData);
+      setItems((prev) => [...prev, ...((Array.isArray(payload.products) ? payload.products : []) as ProductRow[])]);
+      setPageInfo(payload.page ?? null);
+      onProductsLoadedRef.current?.(payload.page?.total ?? (items.length + (Array.isArray(payload.products) ? payload.products.length : 0)));
+    } finally {
+      setLoading(false);
+      onLoadingChangeRef.current?.(false);
+      loadingNextRef.current = false;
+    }
+  }, [pageInfo, storeId, items.length, pagination.pageSize]);
+
+  useEffect(() => { loadFirstPage(); }, [loadFirstPage, refreshTrigger]);
+  useEffect(() => {
+    const requiredForCurrent = (pagination.pageIndex + 1) * pagination.pageSize;
+    const requiredForPrefetch = (pagination.pageIndex + 2) * pagination.pageSize;
+    const canLoad = pageInfo && pageInfo.hasMore && pageInfo.nextOffset != null;
+    if (!canLoad) return;
+    if (items.length < requiredForCurrent && !loadingNextRef.current && !requestedOffsets.current.has(pageInfo!.nextOffset!)) {
+      loadNextPage();
+      return;
+    }
+    if (items.length >= requiredForCurrent && items.length < requiredForPrefetch && !loadingNextRef.current && !requestedOffsets.current.has(pageInfo!.nextOffset!)) {
+      loadNextPage();
+    }
+  }, [pagination.pageIndex, pagination.pageSize, items.length, pageInfo, loadNextPage]);
+
+  const products: ProductRow[] = items;
+  productsCount = pageInfo?.total ?? products.length;
+  useEffect(() => {
+    const total = pageInfo?.total ?? products.length;
+    onProductsLoadedRef.current?.(total);
+  }, [products.length, pageInfo]);
   useEffect(() => {
     let scheduled = false;
     let timeoutId: any = null;
@@ -566,7 +631,9 @@ export const ProductsTable = ({
     }
   };
 
-  const rows = useMemo(() => products, [products]);
+  const currentStart = pagination.pageIndex * pagination.pageSize;
+  const currentEnd = currentStart + pagination.pageSize;
+  const rows = useMemo(() => products.slice(currentStart, Math.min(currentEnd, products.length)), [products, currentStart, currentEnd]);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   // Persisted column visibility (hide vendor/short name/description by default)
@@ -629,7 +696,6 @@ export const ProductsTable = ({
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   // Управляемое состояние открытия меню колонок: не закрывать по клику внутри
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [storesMenuOpen, setStoresMenuOpen] = useState(false);
@@ -1329,6 +1395,8 @@ export const ProductsTable = ({
     getFacetedUniqueValues: getFacetedUniqueValues(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    manualPagination: true,
+    pageCount: Math.max(1, Math.ceil(((pageInfo?.total ?? products.length) / pagination.pageSize))),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
@@ -1359,18 +1427,12 @@ export const ProductsTable = ({
     });
   }
 
-  // При изменении набора строк корректируем пагинацию,
-  // чтобы не оставаться на несуществующей странице и не показывать пустоту.
   useEffect(() => {
-    const pageCount = table.getPageCount();
-    if (rows.length === 0 && pagination.pageIndex !== 0) {
-      setPagination(prev => ({ ...prev, pageIndex: 0 }));
-      return;
-    }
+    const pageCount = Math.max(1, Math.ceil(((pageInfo?.total ?? products.length) / pagination.pageSize)));
     if (pagination.pageIndex >= pageCount && pageCount > 0) {
       setPagination(prev => ({ ...prev, pageIndex: Math.max(0, pageCount - 1) }));
     }
-  }, [rows.length, pagination.pageIndex, table]);
+  }, [products.length, pagination.pageIndex, pagination.pageSize, pageInfo]);
 
   if (!loading && productsCount === 0) {
     return (
@@ -1828,11 +1890,11 @@ export const ProductsTable = ({
               })}
             </TableHeader>
         <TableBody>
-            {loading ? (
+            {(loading && rows.length === 0) ? (
               <>
-                <LoadingSkeleton />
-                <LoadingSkeleton />
-                <LoadingSkeleton />
+                {Array.from({ length: pagination.pageSize }).map((_, i) => (
+                  <LoadingSkeleton key={`loading-row-${i}`} />
+                ))}
               </>
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
@@ -2006,18 +2068,18 @@ export const ProductsTable = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
+        
         {/* Page indicator + controls */}
         <div className="flex items-center gap-2" data-testid="user_products_dataTable_pageControls">
           <div className="text-sm whitespace-nowrap" data-testid="user_products_dataTable_pageIndicator">
-            {t("page_of")} {table.getState().pagination.pageIndex + 1} {t("page_of_connector")} {table.getPageCount() || 1}
+            {t("page_of")} {pagination.pageIndex + 1} {t("page_of_connector")} {Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize)))}
           </div>
           <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => setPagination(prev => ({ ...prev, pageIndex: 0 }))}
+              disabled={pagination.pageIndex === 0}
               aria-label={t("first_page")}
               data-testid="user_products_dataTable_firstPage"
             >
@@ -2026,8 +2088,8 @@ export const ProductsTable = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => setPagination(prev => ({ ...prev, pageIndex: Math.max(0, prev.pageIndex - 1) }))}
+              disabled={pagination.pageIndex === 0}
               aria-label={t("previous_page")}
               data-testid="user_products_dataTable_prevPage"
             >
@@ -2036,8 +2098,8 @@ export const ProductsTable = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex + 1 }))}
+              disabled={(pagination.pageIndex + 1) >= Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize)))}
               aria-label={t("next_page")}
               data-testid="user_products_dataTable_nextPage"
             >
@@ -2046,8 +2108,8 @@ export const ProductsTable = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))}
-              disabled={!table.getCanNextPage()}
+              onClick={() => setPagination(prev => ({ ...prev, pageIndex: Math.max(0, Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize))) - 1) }))}
+              disabled={(pagination.pageIndex + 1) >= Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize)))}
               aria-label={t("last_page")}
               data-testid="user_products_dataTable_lastPage"
             >
