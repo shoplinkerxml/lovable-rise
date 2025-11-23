@@ -377,6 +377,36 @@ export const ProductsTable = ({
     loadingFirstRef.current = true;
     requestedOffsets.current.clear();
     try {
+      try {
+        const cacheKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+        if (raw) {
+          const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: PageInfo; expiresAt: number };
+          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+            setItems(parsed.items);
+            setPageInfo(parsed.page ?? null);
+            onProductsLoadedRef.current?.(parsed.page?.total ?? parsed.items.length);
+            if (parsed.page?.hasMore && parsed.page?.nextOffset != null) {
+              await loadNextPage({ limit: parsed.page.limit, offset: parsed.page.nextOffset });
+            }
+            return;
+          }
+        }
+        // fallback to prefetch without pageSize suffix
+        const raw2 = typeof window !== 'undefined' ? window.localStorage.getItem(`rq:products:first:${storeId ?? 'all'}`) : null;
+        if (raw2) {
+          const parsed = JSON.parse(raw2) as { items: ProductRow[]; page?: PageInfo; expiresAt: number };
+          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+            setItems(parsed.items);
+            setPageInfo(parsed.page ?? null);
+            onProductsLoadedRef.current?.(parsed.page?.total ?? parsed.items.length);
+            if (parsed.page?.hasMore && parsed.page?.nextOffset != null) {
+              await loadNextPage({ limit: parsed.page.limit, offset: parsed.page.nextOffset });
+            }
+            return;
+          }
+        }
+      } catch { /* ignore cache errors */ }
       const { data: authData } = await supabase.auth.getSession();
       const accessToken: string | null = authData?.session?.access_token || null;
       const { data, error } = await supabase.functions.invoke('user-products-list', {
@@ -393,6 +423,10 @@ export const ProductsTable = ({
       setItems(Array.isArray(payload.products) ? payload.products : []);
       setPageInfo(payload.page ?? null);
       onProductsLoadedRef.current?.(payload.page?.total ?? (Array.isArray(payload.products) ? payload.products.length : 0));
+      try {
+        const cacheKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
+        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, JSON.stringify({ items: payload.products, page: payload.page, expiresAt: Date.now() + 15 * 60 * 1000 }));
+      } catch { /* ignore cache errors */ }
       if (payload.page?.hasMore && payload.page?.nextOffset != null) {
         await loadNextPage({ limit: payload.page.limit, offset: payload.page.nextOffset });
       }

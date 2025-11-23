@@ -85,7 +85,7 @@ const UserProtected = () => {
                 } catch { return null; }
               };
               const shopsCached = readCache('rq:shopsList');
-              const productsCached = readCache('rq:products:all');
+              const productsCached = readCache('rq:products:first:all');
               const tariffsCached = readCache('rq:tariffs:list');
               const suppliersCached = readCache('rq:suppliers:list');
               if (!shopsCached || !productsCached || !tariffsCached || !suppliersCached) {
@@ -102,8 +102,8 @@ const UserProtected = () => {
                 if (!productsCached) {
                   tasks.push((async () => {
                     const { ProductService } = await import('@/lib/product-service');
-                    const products = await ProductService.getProductsAggregated(null);
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:all', JSON.stringify({ items: products, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
+                    const { products, page } = await ProductService.getProductsFirstPage(null, 10);
+                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:first:all', JSON.stringify({ items: products, page, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
                     setPrefetchProgress((p) => Math.max(p, 70));
                   })());
                 }

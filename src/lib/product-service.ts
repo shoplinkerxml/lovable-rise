@@ -431,6 +431,26 @@ export class ProductService {
     }
   }
 
+  static async getProductsFirstPage(storeId: string | null, limit: number): Promise<{ products: ProductAggregated[]; page: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number } }> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const payload: Record<string, unknown> = { store_id: storeId ?? null, limit, offset: 0 };
+    const { data, error } = await (supabase as any).functions.invoke('user-products-list', {
+      body: payload,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) ProductService.edgeError(error, 'user-products-list');
+    const resp = typeof data === 'string' ? JSON.parse(data) : (data as any);
+    const products = (resp?.products || []) as ProductAggregated[];
+    const page = (resp?.page || { limit, offset: 0, hasMore: false, nextOffset: null, total: products.length }) as { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
+    return { products, page };
+  }
+
   /** Получить и обновить переопределения для пары (product_id, store_id) */
   static async getStoreProductLink(productId: string, storeId: string): Promise<any | null> {
     const { data, error } = await (supabase as any)
