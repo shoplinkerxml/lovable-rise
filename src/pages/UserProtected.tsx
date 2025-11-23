@@ -102,8 +102,17 @@ const UserProtected = () => {
                 if (!productsCached) {
                   tasks.push((async () => {
                     const { ProductService } = await import('@/lib/product-service');
-                    const { products, page } = await ProductService.getProductsFirstPage(null, 10);
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:products:first:all', JSON.stringify({ items: products, page, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
+                    const limit = 10;
+                    const { products, page } = await ProductService.getProductsFirstPage(null, limit);
+                    try {
+                      if (typeof window !== 'undefined') {
+                        const keySized = `rq:products:first:${'all'}:${limit}`;
+                        const keyGeneric = `rq:products:first:${'all'}`;
+                        const payload = JSON.stringify({ items: products, page, expiresAt: Date.now() + ttlMs });
+                        window.localStorage.setItem(keySized, payload);
+                        window.localStorage.setItem(keyGeneric, payload);
+                      }
+                    } catch (_e) { /* noop */ }
                     setPrefetchProgress((p) => Math.max(p, 70));
                   })());
                 }

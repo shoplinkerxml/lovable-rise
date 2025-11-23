@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";
 import { Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const StoreProducts = () => {
   const { id } = useParams();
@@ -16,6 +17,7 @@ export const StoreProducts = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [shopName, setShopName] = useState("");
   const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!storeId) {
@@ -40,6 +42,7 @@ export const StoreProducts = () => {
       await ProductService.updateStoreProductLink(product.id, storeId, { is_active: false });
       await ProductService.removeStoreProductLink(product.id, storeId);
       setRefreshTrigger((p) => p + 1);
+      queryClient.invalidateQueries({ queryKey: ['shopsList'] });
     } catch (_) {
       toast.error(t("failed_remove_from_store"));
     }

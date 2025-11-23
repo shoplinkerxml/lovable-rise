@@ -158,6 +158,7 @@ function SortableHeader({ id, children }: { id: string; children: React.ReactNod
 
 function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[]) => void }) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [stores, setStores] = useState<any[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -273,6 +274,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                   return next;
                                 });
                                 toast.success(t('product_added_to_store'));
+                                queryClient.invalidateQueries({ queryKey: ['shopsList'] });
                               } else {
                                 toast.error(t('failed_add_to_store'));
                               }
@@ -289,6 +291,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                   return next;
                                 });
                                 toast.success(t('product_removed_from_store'));
+                                queryClient.invalidateQueries({ queryKey: ['shopsList'] });
                               } else {
                                 toast.error(t('failed_remove_from_store'));
                               }
@@ -2149,6 +2152,16 @@ export const ProductsTable = ({
             >
               <ChevronsRight className="h-4 w-4" />
             </Button>
+          </div>
+          <div className="ml-4 text-xs text-muted-foreground" data-testid="user_products_dataTable_rangeIndicator">
+            {(() => {
+              const total = pageInfo?.total ?? rows.length;
+              const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+              const end = Math.min(total, start + pagination.pageSize - 1);
+              return t("rows_selected") === "Вибрано"
+                ? `Показано ${start}-${end} із ${total}`
+                : `Showing ${start}-${end} of ${total}`;
+            })()}
           </div>
         </div>
       </div>
