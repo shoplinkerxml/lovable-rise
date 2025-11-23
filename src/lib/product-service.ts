@@ -437,6 +437,52 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
+    const sizedKey = `rq:products:first:${storeId ?? 'all'}:${limit}`;
+    const genericKey = `rq:products:first:${storeId ?? 'all'}`;
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) || window.localStorage.getItem(genericKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { items: ProductAggregated[]; page: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number }; expiresAt: number };
+        if (parsed && Array.isArray(parsed.items) && parsed.page && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+          const timeLeft = parsed.expiresAt - Date.now();
+          const threshold = 2 * 60 * 1000;
+          if (timeLeft < threshold) {
+            (async () => {
+              try {
+                const { data: authData } = await (supabase as any).auth.getSession();
+                const accessToken: string | null = authData?.session?.access_token || null;
+                const payload: Record<string, unknown> = { store_id: storeId ?? null, limit, offset: 0 };
+                const timeoutMs = 4000;
+                const invokePromise = (supabase as any).functions.invoke('user-products-list', {
+                  body: payload,
+                  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+                });
+                const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+                const respAny = await Promise.race([invokePromise, timeoutPromise]);
+                let out: { products: ProductAggregated[]; page: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number } } | null = null;
+                if (respAny && typeof respAny === 'object' && respAny !== null && !(respAny as any).error) {
+                  const respData = typeof (respAny as any).data === 'string' ? JSON.parse((respAny as any).data) : ((respAny as any).data as any);
+                  const productsN = (respData?.products || []) as ProductAggregated[];
+                  const pageN = (respData?.page || { limit, offset: 0, hasMore: false, nextOffset: null, total: productsN.length }) as { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
+                  out = { products: productsN, page: pageN };
+                }
+                if (out) {
+                  try {
+                    const payloadStore = JSON.stringify({ items: out.products, page: out.page, expiresAt: Date.now() + 900_000 });
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem(sizedKey, payloadStore);
+                      window.localStorage.setItem(genericKey, payloadStore);
+                    }
+                  } catch { void 0; }
+                }
+              } catch { void 0; }
+            })();
+          }
+          return { products: parsed.items, page: parsed.page };
+        }
+      }
+    } catch { void 0; }
+
     const { data: authData } = await (supabase as any).auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const payload: Record<string, unknown> = { store_id: storeId ?? null, limit, offset: 0 };
@@ -448,7 +494,61 @@ export class ProductService {
     const resp = typeof data === 'string' ? JSON.parse(data) : (data as any);
     const products = (resp?.products || []) as ProductAggregated[];
     const page = (resp?.page || { limit, offset: 0, hasMore: false, nextOffset: null, total: products.length }) as { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
+    try {
+      const payloadStore = JSON.stringify({ items: products, page, expiresAt: Date.now() + 900_000 });
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(sizedKey, payloadStore);
+        window.localStorage.setItem(genericKey, payloadStore);
+      }
+    } catch { void 0; }
     return { products, page };
+  }
+
+  static updateFirstPageCaches(storeId: string | null, mutate: (items: unknown[]) => unknown[]) {
+    try {
+      if (typeof window === 'undefined') return;
+      const prefix = `rq:products:first:${storeId ?? 'all'}`;
+      const keysToUpdate: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        if (k === prefix || k.startsWith(`${prefix}:`)) keysToUpdate.push(k);
+      }
+      for (const key of keysToUpdate) {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw) as { items: unknown[]; page?: unknown; expiresAt: number };
+        if (!Array.isArray(parsed.items)) continue;
+        const nextItems = mutate(parsed.items);
+        const payload = JSON.stringify({ items: nextItems, page: parsed.page, expiresAt: parsed.expiresAt });
+        window.localStorage.setItem(key, payload);
+      }
+    } catch { /* noop */ }
+  }
+
+  static patchProductCaches(productId: string, patch: Partial<ProductAggregated>, storeId?: string | null) {
+    try {
+      ProductService.updateFirstPageCaches(storeId ?? null, (arr) => {
+        const items = arr as ProductAggregated[];
+        return items.map((p) => (String(p.id) === String(productId) ? { ...p, ...patch } : p));
+      });
+      ProductService.updateFirstPageCaches(null, (arr) => {
+        const items = arr as ProductAggregated[];
+        return items.map((p) => (String(p.id) === String(productId) ? { ...p, ...patch } : p));
+      });
+      if (typeof window !== 'undefined') {
+        const key = 'rq:products:all';
+        const raw = window.localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { items: ProductAggregated[]; expiresAt: number };
+          if (parsed && Array.isArray(parsed.items)) {
+            const next = parsed.items.map((p) => (String(p.id) === String(productId) ? { ...p, ...patch } : p));
+            const payload = JSON.stringify({ items: next, expiresAt: parsed.expiresAt });
+            window.localStorage.setItem(key, payload);
+          }
+        }
+      }
+    } catch {}
   }
 
   /** Получить и обновить переопределения для пары (product_id, store_id) */

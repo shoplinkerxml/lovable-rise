@@ -47,6 +47,32 @@ export interface ShopAggregated extends Shop {
 }
 
 export class ShopService {
+  private static shopsRefreshInFlight = false;
+  private static shopsLastRefreshAt = 0;
+  static bumpProductsCountInCache(storeId: string, delta: number) {
+    try {
+      const cacheKey = 'rq:shopsList';
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
+      if (!parsed || !Array.isArray(parsed.items)) return;
+      const nextItems = parsed.items.map((s) => s.id === storeId ? { ...s, productsCount: Math.max(0, ((s as any).productsCount ?? 0) + delta) } : s);
+      const payload = JSON.stringify({ items: nextItems, expiresAt: parsed.expiresAt });
+      if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
+    } catch {}
+  }
+  static bumpCategoriesCountInCache(storeId: string, delta: number) {
+    try {
+      const cacheKey = 'rq:shopsList';
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
+      if (!parsed || !Array.isArray(parsed.items)) return;
+      const nextItems = parsed.items.map((s) => s.id === storeId ? { ...s, categoriesCount: Math.max(0, ((s as any).categoriesCount ?? 0) + delta) } : s);
+      const payload = JSON.stringify({ items: nextItems, expiresAt: parsed.expiresAt });
+      if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
+    } catch {}
+  }
   /** Получение только максимального лимита магазинов (без подсчета текущих) */
   static async getShopLimitOnly(): Promise<number> {
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -164,6 +190,52 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
+    try {
+      const cacheKey = 'rq:shopsList';
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
+        if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+          const timeLeft = parsed.expiresAt - Date.now();
+          const threshold = 2 * 60 * 1000;
+          if (timeLeft < threshold && !ShopService.shopsRefreshInFlight && Date.now() - ShopService.shopsLastRefreshAt > 60 * 1000) {
+            ShopService.shopsRefreshInFlight = true;
+            ShopService.shopsLastRefreshAt = Date.now();
+            (async () => {
+              try {
+                const { data: authData } = await (supabase as any).auth.getSession();
+                const accessToken: string | null = authData?.session?.access_token || null;
+                const timeoutMs = 4000;
+                const invokePromise = (supabase as any).functions.invoke('user-shops-list', {
+                  body: {},
+                  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+                });
+                const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+                const resp = await Promise.race([invokePromise, timeoutPromise]);
+                let rows: ShopAggregated[] | null = null;
+                if (resp && typeof resp === 'object' && resp !== null && !(resp as any).error) {
+                  const payload = typeof (resp as any).data === 'string' ? JSON.parse((resp as any).data) : ((resp as any).data as any);
+                  rows = Array.isArray(payload?.shops) ? (payload.shops as ShopAggregated[]) : null;
+                }
+                if (!rows) {
+                  const fallback = await ShopService.getShopsAggregatedFallback();
+                  rows = fallback;
+                }
+                if (rows) {
+                  try {
+                    const payload = JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 });
+                    if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
+                  } catch { void 0; }
+                }
+              } catch { void 0; }
+              finally { ShopService.shopsRefreshInFlight = false; }
+            })();
+          }
+          return parsed.items;
+        }
+      }
+    } catch { void 0; }
+
     const { data: authData } = await (supabase as any).auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     try {
@@ -172,54 +244,87 @@ export class ShopService {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
       if (error) throw error;
-      const rows = (data as unknown as { shops?: ShopAggregated[] })?.shops || [];
+      let rows = (data as unknown as { shops?: ShopAggregated[] })?.shops || [];
+      try {
+        const ids = rows.map((s) => String(s.id));
+        const recomputed = await ShopService.recomputeCategoriesCountActive(ids);
+        rows = rows.map((s) => ({ ...s, categoriesCount: recomputed[String(s.id)] ?? ((s as any).categoriesCount ?? 0) }));
+      } catch { void 0; }
+      try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 })); } catch { void 0; }
       return rows as ShopAggregated[];
     } catch (_) {
-      // Фолбэк: агрегируем на клиенте параллельно
-      const baseShops: Shop[] = await this.getShops();
-      const storeIds = baseShops.map((s) => s.id);
-      const templateIds = Array.from(new Set(baseShops.map((s) => s.template_id).filter((v) => !!v))) as string[];
-            const [templates, linkRows] = await Promise.all([
-              templateIds.length
-                ? (supabase as any)
-                    .from('store_templates')
-                    .select('id,marketplace')
-                    .in('id', templateIds)
-                    .then((r: any) => r.data || [])
-                : Promise.resolve([]),
-              storeIds.length
-                ? (supabase as any)
-                    .from('store_product_links')
-                    .select('store_id,is_active,custom_category_id,store_products(category_id,category_external_id)')
-                    .in('store_id', storeIds)
-                    .then((r: any) => r.data || [])
-                : Promise.resolve([]),
-            ]);
-            const templatesMap: Record<string, string> = {};
-            for (const r of templates as Array<{ id: string; marketplace?: string }>) {
-              if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
-            }
-            const productsCountMap: Record<string, number> = {};
-            const categoriesMap: Record<string, Set<string>> = {};
-            for (const r of linkRows as Array<any>) {
-              const sid = String(r.store_id);
-              const active = r?.is_active !== false;
-              if (active) productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
-              const linkCat = r?.custom_category_id != null ? String(r.custom_category_id) : null;
-              const baseCatId = r?.store_products?.category_id != null ? String(r.store_products.category_id) : r?.store_products?.category_external_id ? String(r.store_products.category_external_id) : null;
-              const catId = linkCat || baseCatId;
-              if (catId) {
-                if (!categoriesMap[sid]) categoriesMap[sid] = new Set();
-                categoriesMap[sid].add(catId);
-              }
-            }
-      return baseShops.map((s) => ({
-        ...s,
-        marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
-        productsCount: productsCountMap[s.id] || 0,
-        categoriesCount: (categoriesMap[s.id]?.size) || 0,
-      }));
+      const rows = await ShopService.getShopsAggregatedFallback();
+      try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 })); } catch { void 0; }
+      return rows;
     }
+  }
+
+  private static async getShopsAggregatedFallback(): Promise<ShopAggregated[]> {
+    const baseShops: Shop[] = await this.getShops();
+    const storeIds = baseShops.map((s) => s.id);
+    const templateIds = Array.from(new Set(baseShops.map((s) => s.template_id).filter((v) => !!v))) as string[];
+    const [templates, linkRows] = await Promise.all([
+      templateIds.length
+        ? (supabase as any)
+            .from('store_templates')
+            .select('id,marketplace')
+            .in('id', templateIds)
+            .then((r: any) => r.data || [])
+        : Promise.resolve([]),
+      storeIds.length
+        ? (supabase as any)
+            .from('store_product_links')
+            .select('store_id,is_active,custom_category_id,store_products(category_id,category_external_id)')
+            .in('store_id', storeIds)
+            .then((r: any) => r.data || [])
+        : Promise.resolve([]),
+    ]);
+    const templatesMap: Record<string, string> = {};
+    for (const r of templates as Array<{ id: string; marketplace?: string }>) {
+      if (r?.id) templatesMap[String(r.id)] = r?.marketplace || 'Не вказано';
+    }
+    const productsCountMap: Record<string, number> = {};
+    const categoriesMap: Record<string, Set<string>> = {};
+    for (const r of linkRows as Array<any>) {
+      const sid = String(r.store_id);
+      const active = r?.is_active !== false;
+      if (active) productsCountMap[sid] = (productsCountMap[sid] || 0) + 1;
+      const linkCat = r?.custom_category_id != null ? String(r.custom_category_id) : null;
+      const baseCatId = r?.store_products?.category_id != null ? String(r.store_products.category_id) : r?.store_products?.category_external_id ? String(r.store_products.category_external_id) : null;
+      const catId = linkCat || baseCatId;
+      if (active && catId) {
+        if (!categoriesMap[sid]) categoriesMap[sid] = new Set();
+        categoriesMap[sid].add(catId);
+      }
+    }
+    return baseShops.map((s) => ({
+      ...s,
+      marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
+      productsCount: productsCountMap[s.id] || 0,
+      categoriesCount: (categoriesMap[s.id]?.size) || 0,
+    }));
+  }
+
+  private static async recomputeCategoriesCountActive(storeIds: string[]): Promise<Record<string, number>> {
+    if (!storeIds.length) return {};
+    const { data: linkRows } = await (supabase as any)
+      .from('store_product_links')
+      .select('store_id,is_active,custom_category_id,store_products(category_id,category_external_id)')
+      .in('store_id', storeIds);
+    const categoriesMap: Record<string, Set<string>> = {};
+    for (const r of (linkRows || []) as Array<any>) {
+      const sid = String(r.store_id);
+      const active = r?.is_active !== false;
+      const linkCat = r?.custom_category_id != null ? String(r.custom_category_id) : null;
+      const baseCatId = r?.store_products?.category_id != null ? String(r.store_products.category_id) : r?.store_products?.category_external_id ? String(r.store_products.category_external_id) : null;
+      const catId = linkCat || baseCatId;
+      if (!active || !catId) continue;
+      if (!categoriesMap[sid]) categoriesMap[sid] = new Set();
+      categoriesMap[sid].add(catId);
+    }
+    const out: Record<string, number> = {};
+    Object.keys(categoriesMap).forEach((sid) => { out[sid] = categoriesMap[sid].size; });
+    return out;
   }
 
   /** Получение одного магазина по ID */

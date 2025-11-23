@@ -49,6 +49,7 @@ import {
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
 import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Store } from "lucide-react";
+import { ShopService } from "@/lib/shop-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
@@ -156,7 +157,7 @@ function SortableHeader({ id, children }: { id: string; children: React.ReactNod
   );
 }
 
-function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[]) => void }) {
+function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [stores, setStores] = useState<any[]>([]);
@@ -270,10 +271,12 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                               if (!error) {
                                 setLinkedStoreIds((prev) => {
                                   const next = Array.from(new Set([...prev, id]));
-                                  onStoresUpdate?.(product.id, next);
+                                  const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                                  onStoresUpdate?.(product.id, next, { storeIdChanged: id, added: true, categoryKey });
                                   return next;
                                 });
                                 toast.success(t('product_added_to_store'));
+                                ShopService.bumpProductsCountInCache(String(id), 1);
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
                               } else {
                                 toast.error(t('failed_add_to_store'));
@@ -287,10 +290,12 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                               if (!error) {
                                 setLinkedStoreIds((prev) => {
                                   const next = prev.filter((x) => x !== id);
-                                  onStoresUpdate?.(product.id, next);
+                                  const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                                  onStoresUpdate?.(product.id, next, { storeIdChanged: id, added: false, categoryKey });
                                   return next;
                                 });
                                 toast.success(t('product_removed_from_store'));
+                                ShopService.bumpProductsCountInCache(String(id), -1);
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
                               } else {
                                 toast.error(t('failed_remove_from_store'));
@@ -346,7 +351,26 @@ export const ProductsTable = ({
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const setProductsCached = (updater: (prev: ProductRow[]) => ProductRow[]) => {
+    setItems((prev) => updater(prev));
     queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
+    try {
+      const sizedKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
+      const genericKey = `rq:products:first:${storeId ?? 'all'}`;
+      const raw = typeof window !== 'undefined' ? (window.localStorage.getItem(sizedKey) || window.localStorage.getItem(genericKey)) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: any; expiresAt: number };
+        if (parsed && Array.isArray(parsed.items)) {
+          const nextItems = updater(parsed.items as ProductRow[]);
+          const payload = JSON.stringify({ items: nextItems, page: parsed.page, expiresAt: parsed.expiresAt });
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(sizedKey, payload);
+            window.localStorage.setItem(genericKey, payload);
+          }
+        }
+      }
+      ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
+      ProductService.updateFirstPageCaches(null, (arr) => updater(arr as ProductRow[]));
+    } catch {}
   };
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
@@ -572,15 +596,35 @@ export const ProductsTable = ({
         });
       }
 
-      // Resolve names by external_id when category_id is missing or not mapped
-      const externalCategoryIds = (data ?? [])
+      const customCategoryByProduct: Record<string, string | null> = {};
+      if (storeId && ids.length > 0) {
+        const { data: linkRowsForStore } = await (supabase as any)
+          .from('store_product_links')
+          .select('product_id,custom_category_id,is_active')
+          .eq('store_id', storeId)
+          .in('product_id', ids);
+        (linkRowsForStore ?? []).forEach((r: any) => {
+          const active = r?.is_active !== false;
+          if (!active) return;
+          const pid = String(r.product_id);
+          const ext = r?.custom_category_id != null ? String(r.custom_category_id) : null;
+          if (ext) customCategoryByProduct[pid] = ext;
+        });
+      }
+
+      const externalCategoryIds = Array.from(new Set((data ?? [])
         .map((p: any) => p.category_external_id)
-        .filter((v) => !!v);
-      if (externalCategoryIds.length > 0) {
+        .filter((v) => !!v))) as string[];
+      const customExtIds = Object.values(customCategoryByProduct).filter((v) => !!v) as string[];
+      const extIdsUnion = Array.from(new Set([...
+        externalCategoryIds,
+        ...customExtIds,
+      ]));
+      if (extIdsUnion.length > 0) {
         const { data: extCatRows } = await (supabase as any)
           .from('store_categories')
           .select('external_id,name')
-          .in('external_id', externalCategoryIds);
+          .in('external_id', extIdsUnion);
         (extCatRows ?? []).forEach((r: any) => {
           if (r.external_id && r.name) {
             categoryNameMap[String(r.external_id)] = r.name;
@@ -622,18 +666,23 @@ export const ProductsTable = ({
         });
       }
 
-      const augmented = (data ?? []).map((p: any) => ({
-        ...p,
-        mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
-        categoryName:
-          (p.category_id && categoryNameMap[String(p.category_id)]) ||
-          (p.category_external_id && categoryNameMap[String(p.category_external_id)]) ||
-          undefined,
-        supplierName:
-          (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
-          undefined,
-        linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
-      }));
+      const augmented = (data ?? []).map((p: any) => {
+        const pid = String(p.id);
+        const customExt = customCategoryByProduct[pid] || null;
+        return {
+          ...p,
+          mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
+          categoryName:
+            (customExt && categoryNameMap[String(customExt)]) ||
+            (p.category_id && categoryNameMap[String(p.category_id)]) ||
+            (p.category_external_id && categoryNameMap[String(p.category_external_id)]) ||
+            undefined,
+          supplierName:
+            (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
+            undefined,
+          linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
+        };
+      });
 
       setProductsCached(() => augmented as ProductRow[]);
     } catch (error) {
@@ -1388,7 +1437,29 @@ export const ProductsTable = ({
             canCreate={canCreate}
             hideDuplicate={hideDuplicate}
             storeId={storeId}
-            onStoresUpdate={(productId, ids) => {
+            onStoresUpdate={(productId, ids, opts) => {
+              try {
+                const storeChanged = opts?.storeIdChanged ? String(opts.storeIdChanged) : null;
+                const categoryKey = opts?.categoryKey || null;
+                const added = !!opts?.added;
+                if (storeChanged && categoryKey) {
+                  const matchesKey = (p: ProductRow) => {
+                    const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
+                    return key === categoryKey;
+                  };
+                  const hasOtherInCategory = items.some((p) => {
+                    if (String(p.id) === String(productId)) return false;
+                    const idsStr = (p.linkedStoreIds || []).map(String);
+                    return idsStr.includes(storeChanged) && matchesKey(p);
+                  });
+                  if (added) {
+                    if (!hasOtherInCategory) ShopService.bumpCategoriesCountInCache(storeChanged, 1);
+                  } else {
+                    const remains = hasOtherInCategory;
+                    if (!remains) ShopService.bumpCategoriesCountInCache(storeChanged, -1);
+                  }
+                }
+              } catch {}
               setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
             }}
           />
@@ -1786,6 +1857,20 @@ export const ProductsTable = ({
                                 const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.includes(String(sid)));
                                 return { ...p, linkedStoreIds: nextIds };
                               }));
+                              try {
+                                const countsByStore: Record<string, number> = {};
+                                for (const sid of storeIds) {
+                                  countsByStore[String(sid)] = 0;
+                                  for (const p of selected) {
+                                    const ids = (p.linkedStoreIds || []).map(String);
+                                    if (ids.includes(String(sid))) countsByStore[String(sid)] += 1;
+                                  }
+                                }
+                                Object.entries(countsByStore).forEach(([sid, cnt]) => {
+                                  if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), -cnt);
+                                });
+                                queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+                              } catch {}
                             }
                           } catch (e) {
                             toast.error(t('failed_remove_from_store'));
@@ -1855,6 +1940,17 @@ export const ProductsTable = ({
                                   const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));
                                   return { ...p, linkedStoreIds: merged };
                                 }));
+                                try {
+                                  const toInsertByStore: Record<string, number> = {};
+                                  for (const r of toInsert) {
+                                    const sid = String(r.store_id);
+                                    toInsertByStore[sid] = (toInsertByStore[sid] || 0) + 1;
+                                  }
+                                  Object.entries(toInsertByStore).forEach(([sid, cnt]) => {
+                                    if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt);
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+                                } catch {}
                               }
                             }
                           } catch (e) {

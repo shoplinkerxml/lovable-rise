@@ -43,6 +43,7 @@ export const StoreProducts = () => {
       await ProductService.removeStoreProductLink(product.id, storeId);
       setRefreshTrigger((p) => p + 1);
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+      try { ShopService.bumpProductsCountInCache(storeId, -1); } catch {}
     } catch (_) {
       toast.error(t("failed_remove_from_store"));
     }

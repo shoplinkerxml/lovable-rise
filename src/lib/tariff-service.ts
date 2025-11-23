@@ -38,8 +38,52 @@ export interface TariffWithDetails {
 }
 
 export class TariffService {
+  private static tariffsRefreshInFlight = false;
+  private static tariffsLastRefreshAt = 0;
   static async getTariffsAggregated(includeInactive = false, includeDemo = false): Promise<TariffWithDetails[]> {
     try {
+      try {
+        const ck = 'rq:tariffs:list';
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(ck) : null;
+        if (raw) {
+          const parsed = JSON.parse(raw) as { items: TariffWithDetails[]; expiresAt: number };
+          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+            const timeLeft = parsed.expiresAt - Date.now();
+            const threshold = 2 * 60 * 1000;
+            if (timeLeft < threshold && !TariffService.tariffsRefreshInFlight && Date.now() - TariffService.tariffsLastRefreshAt > 60 * 1000) {
+              TariffService.tariffsRefreshInFlight = true;
+              TariffService.tariffsLastRefreshAt = Date.now();
+              (async () => {
+                try {
+                  const { data: auth } = await (supabase as any).auth.getSession();
+                  const accessToken: string | null = auth?.session?.access_token || null;
+                  const timeoutMs = 4000;
+                  const invokePromise = (supabase as any).functions.invoke('tariffs-list', {
+                    body: { includeInactive, includeDemo },
+                    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+                  });
+                  const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+                  const respAny = await Promise.race([invokePromise, timeoutPromise]);
+                  let rows: TariffWithDetails[] | null = null;
+                  if (respAny && typeof respAny === 'object' && respAny !== null && !(respAny as any).error) {
+                    const payload = typeof (respAny as any).data === 'string' ? JSON.parse((respAny as any).data) : ((respAny as any).data as any);
+                    rows = Array.isArray(payload?.tariffs) ? (payload.tariffs as TariffWithDetails[]) : null;
+                  }
+                  if (!rows) {
+                    const fb = await TariffService.getAllTariffs(includeInactive, includeDemo);
+                    rows = Array.isArray(fb) ? (fb as unknown as TariffWithDetails[]) : null;
+                  }
+                  if (rows) {
+                    try { if (typeof window !== 'undefined') window.localStorage.setItem(ck, JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 })); } catch { void 0; }
+                  }
+                } catch { void 0; }
+                finally { TariffService.tariffsRefreshInFlight = false; }
+              })();
+            }
+            return parsed.items;
+          }
+        }
+      } catch { void 0; }
       const { data: auth } = await (supabase as any).auth.getSession();
       const accessToken: string | null = auth?.session?.access_token || null;
       const { data, error } = await (supabase as any).functions.invoke('tariffs-list', {
@@ -49,9 +93,11 @@ export class TariffService {
       if (error) throw error;
       const payload = typeof data === 'string' ? JSON.parse(data) : (data as any);
       const rows = payload?.tariffs;
+      try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: rows || [], expiresAt: Date.now() + 900_000 })); } catch { void 0; }
       return Array.isArray(rows) ? (rows as TariffWithDetails[]) : [];
     } catch (_e) {
       const rows = await this.getAllTariffs(includeInactive, includeDemo);
+      try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: rows || [], expiresAt: Date.now() + 900_000 })); } catch { void 0; }
       return Array.isArray(rows) ? (rows as any) : [];
     }
   }

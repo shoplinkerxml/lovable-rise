@@ -204,6 +204,7 @@ export const StoreProductEdit = () => {
           try {
             const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
             await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
+            ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null }, storeId);
           } catch (_) {
             // ignore
           }
@@ -288,6 +289,7 @@ export const StoreProductEdit = () => {
                             await ShopService.ensureStoreCategory(storeId, num, { external_id: partial.category_external_id || null });
                             const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
                             await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
+                            ProductService.patchProductCaches(pid, { category_id: num, category_external_id: partial.category_external_id || null, categoryName: partial.category_name || undefined }, storeId);
                             if (prevNum && Number.isFinite(prevNum) && prevNum !== num) {
                               await ShopService.cleanupUnusedStoreCategory(storeId, prevNum);
                             }
