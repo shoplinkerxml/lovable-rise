@@ -97,8 +97,29 @@ export const SuppliersList = ({
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      <div className="p-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={`supplier-skeleton-${i}`} className="overflow-hidden">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+                  <div className="flex gap-1">
+                    <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+                    <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+                  </div>
+                </div>
+                <div className="mt-2 h-5 w-40 rounded bg-muted animate-pulse" />
+                <div className="mt-1 h-4 w-28 rounded bg-muted animate-pulse" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="h-4 w-56 rounded bg-muted animate-pulse" />
+                <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+                <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }

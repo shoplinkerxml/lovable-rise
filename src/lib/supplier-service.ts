@@ -35,6 +35,9 @@ export interface SupplierLimitInfo {
 }
 
 export class SupplierService {
+  private static lastBackgroundRefreshAt = 0;
+  private static backgroundRefreshInFlight = false;
+
   /** Получение только максимального лимита поставщиков (без подсчета текущих) */
   static async getSupplierLimitOnly(): Promise<number> {
     const sessionValidation = await SessionValidator.ensureValidSession();
@@ -124,25 +127,89 @@ export class SupplierService {
     }
 
     try {
+      const cacheKey = 'rq:suppliers:list';
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { items: Supplier[]; expiresAt: number };
+        if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+          const timeLeft = parsed.expiresAt - Date.now();
+          const refreshThresholdMs = 2 * 60 * 1000;
+          if (timeLeft < refreshThresholdMs && !SupplierService.backgroundRefreshInFlight && Date.now() - SupplierService.lastBackgroundRefreshAt > 60 * 1000) {
+            SupplierService.backgroundRefreshInFlight = true;
+            SupplierService.lastBackgroundRefreshAt = Date.now();
+            (async () => {
+              try {
+                const { data: auth } = await supabase.auth.getSession();
+                const accessToken: string | null = auth?.session?.access_token || null;
+                const timeoutMs = 4000;
+                const invokePromise = supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
+                  body: {},
+                  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+                });
+                const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+                const resp = await Promise.race([invokePromise, timeoutPromise]);
+                let rows: Supplier[] | null = null;
+                if (resp && typeof resp === 'object' && resp !== null) {
+                  const r = resp as { data: unknown; error: unknown };
+                  if (r.error == null) {
+                    const payload: { suppliers?: Supplier[] } = typeof r.data === 'string'
+                      ? (JSON.parse(r.data as string) as { suppliers?: Supplier[] })
+                      : (r.data as { suppliers?: Supplier[] });
+                    rows = Array.isArray(payload?.suppliers) ? payload!.suppliers! : null;
+                  }
+                }
+                if (!rows) {
+                  const { data, error } = await supabase
+                    .from('user_suppliers')
+                    .select('id,user_id,supplier_name,website_url,xml_feed_url,phone,created_at,updated_at,is_active')
+                    .eq('user_id', sessionValidation.user.id)
+                    .order('created_at', { ascending: false });
+                  rows = error ? null : (data || []);
+                }
+                if (rows) {
+                  try {
+                    const payload = JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 });
+                    if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
+                  } catch { /* noop */ }
+                }
+              } catch { /* noop */ }
+              finally {
+                SupplierService.backgroundRefreshInFlight = false;
+              }
+            })();
+          }
+          return parsed.items;
+        }
+      }
+    } catch (_e) { void 0; }
+
+    try {
       const { data: auth } = await supabase.auth.getSession();
       const accessToken: string | null = auth?.session?.access_token || null;
-      const { data, error } = await supabase.functions.invoke('suppliers-list', {
+      const timeoutMs = 4000;
+      const invokePromise = supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
         body: {},
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
-      if (!error) {
-        const payload: { suppliers?: Supplier[] } = typeof data === 'string'
-          ? (JSON.parse(data) as { suppliers?: Supplier[] })
-          : (data as { suppliers?: Supplier[] });
-        const rows = payload?.suppliers;
-        if (Array.isArray(rows)) return rows;
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+      const resp = await Promise.race([invokePromise, timeoutPromise]);
+      if (resp && typeof resp === 'object' && resp !== null) {
+        const r = resp as { data: unknown; error: unknown };
+        if (r.error == null) {
+          const payload: { suppliers?: Supplier[] } = typeof r.data === 'string'
+            ? (JSON.parse(r.data as string) as { suppliers?: Supplier[] })
+            : (r.data as { suppliers?: Supplier[] });
+          const rows = payload?.suppliers;
+          if (Array.isArray(rows)) return rows;
+        }
       }
     } catch (_e) { void 0; }
 
     try {
       const { data, error } = await supabase
         .from('user_suppliers')
-        .select('*')
+        .select('id,user_id,supplier_name,website_url,xml_feed_url,phone,created_at,updated_at,is_active')
+        .eq('user_id', sessionValidation.user.id)
         .order('created_at', { ascending: false });
       if (error) return [];
       return data || [];
