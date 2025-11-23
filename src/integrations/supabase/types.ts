@@ -105,10 +105,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_menu_items_parent_id"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "user_menu_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "menu_items_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "user_menu_view"
             referencedColumns: ["id"]
           },
         ]
@@ -967,9 +981,87 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_menu_view: {
+        Row: {
+          created_at: string | null
+          id: number | null
+          is_active: boolean | null
+          order_index: number | null
+          parent_id: number | null
+          path: string | null
+          title: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number | null
+          is_active?: boolean | null
+          order_index?: number | null
+          parent_id?: number | null
+          path?: string | null
+          title?: string | null
+          user_id?: never
+        }
+        Update: {
+          created_at?: string | null
+          id?: number | null
+          is_active?: boolean | null
+          order_index?: number | null
+          parent_id?: number | null
+          path?: string | null
+          title?: string | null
+          user_id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_menu_items_parent_id"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_menu_items_parent_id"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "user_menu_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "menu_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "user_menu_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      activate_tariff: {
+        Args: { p_tariff_id: number; p_user_id: string }
+        Returns: {
+          end_date: string | null
+          id: number
+          is_active: boolean
+          start_date: string
+          tariff_id: number
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -977,6 +1069,13 @@ export type Database = {
       get_structured_menu: { Args: { user_uuid: string }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       is_owner_supplier: { Args: { p_supplier_id: number }; Returns: boolean }
+      user_stats: {
+        Args: never
+        Returns: {
+          active: number
+          total: number
+        }[]
+      }
     }
     Enums: {
       user_role: "admin" | "manager" | "user"
