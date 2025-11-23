@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ProductService, type Product } from "@/lib/product-service";
 import { useI18n } from "@/providers/i18n-provider";
@@ -11,7 +12,7 @@ import { ProductFormTabs } from "@/components/ProductFormTabs";
 import { type ProductParam, type ProductImage } from "@/lib/product-service";
 import { PageHeader } from "@/components/PageHeader";
 import { Loader2 } from "lucide-react";
-import { ShopService } from "@/lib/shop-service";
+import { ShopService, type Shop } from "@/lib/shop-service";
 import { CategoryService } from "@/lib/category-service";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ export const StoreProductEdit = () => {
   const pid = String(productId || "");
   const { t } = useI18n();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [shopName, setShopName] = useState("");
   const [categoryName, setCategoryName] = useState("");
 
@@ -116,7 +118,7 @@ export const StoreProductEdit = () => {
       }
 
       if (shopRes.status === "fulfilled") {
-        const shop: any = shopRes.value;
+        const shop = shopRes.value as Shop;
         setShopName(shop?.store_name || "");
       } else {
         setShopName("");
@@ -204,7 +206,16 @@ export const StoreProductEdit = () => {
           try {
             const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
             await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
-            ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null }, storeId);
+            const freshName = await CategoryService.getNameByIdSafe(num);
+            ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null, categoryName: freshName || undefined }, storeId);
+            
+            await ProductService.recomputeStoreCategoryFilterCache(storeId);
+            try {
+              queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+              queryClient.invalidateQueries({ queryKey: ["products", "all"] });
+              queryClient.invalidateQueries({ queryKey: ["shopsList"] });
+              try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
+            } catch { void 0; }
           } catch (_) {
             // ignore
           }
@@ -290,6 +301,12 @@ export const StoreProductEdit = () => {
                             const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
                             await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
                             ProductService.patchProductCaches(pid, { category_id: num, category_external_id: partial.category_external_id || null, categoryName: partial.category_name || undefined }, storeId);
+                            
+                            await ProductService.recomputeStoreCategoryFilterCache(storeId);
+                            try {
+                              queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+                              queryClient.invalidateQueries({ queryKey: ["products", "all"] });
+                            } catch { void 0; }
                             if (prevNum && Number.isFinite(prevNum) && prevNum !== num) {
                               await ShopService.cleanupUnusedStoreCategory(storeId, prevNum);
                             }
@@ -324,6 +341,15 @@ export const StoreProductEdit = () => {
                           } else {
                             toast.success(t('product_updated'));
                           }
+                          try {
+                            ProductService.patchProductCaches(pid, { category_external_id: extId || null, categoryName: sc?.name || undefined }, storeId);
+                            
+                            queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+                            queryClient.invalidateQueries({ queryKey: ["products", "all"] });
+                            queryClient.invalidateQueries({ queryKey: ["shopsList"] });
+                            try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
+                            await ProductService.recomputeStoreCategoryFilterCache(storeId);
+                          } catch { void 0; }
                         } catch (_) {
                           toast.error(t('failed_save_category'));
                         }

@@ -160,6 +160,7 @@ function SortableHeader({ id, children }: { id: string; children: React.ReactNod
 function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -170,11 +171,7 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
     try {
       const data = await ProductService.getUserStores();
       setStores(data || []);
-      const { data: links } = await (supabase as any)
-        .from('store_product_links')
-        .select('store_id')
-        .eq('product_id', product.id);
-      const ids = (links || []).map((r: any) => String(r.store_id));
+      const ids = await ProductService.getStoreLinksForProduct(product.id);
       setLinkedStoreIds(ids);
     } catch (_) {
       setStores([]);
@@ -243,32 +240,19 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                         onCheckedChange={async (v) => {
                           try {
                             if (v) {
-                              const { data: existing } = await (supabase as any)
-                                .from('store_product_links')
-                                .select('product_id,store_id')
-                                .eq('product_id', product.id)
-                                .eq('store_id', id)
-                                .maybeSingle();
-                              let error: any = null;
-                              if (!existing) {
-                                const res = await (supabase as any)
-                                  .from('store_product_links')
-                                  .insert([
-                                    {
-                                      product_id: product.id,
-                                      store_id: id,
-                                      is_active: true,
-                                      custom_price: (product as any).price ?? null,
-                                      custom_price_old: (product as any).price_old ?? null,
-                                      custom_price_promo: (product as any).price_promo ?? null,
-                                      custom_stock_quantity: (product as any).stock_quantity ?? null,
-                                      custom_available: (product as any).available ?? true,
-                                    },
-                                  ])
-                                  .select('*');
-                                error = res.error;
-                              }
-                              if (!error) {
+                              await ProductService.bulkAddStoreProductLinks([
+                                {
+                                  product_id: String(product.id),
+                                  store_id: String(id),
+                                  is_active: true,
+                                  custom_price: (product as any).price ?? null,
+                                  custom_price_old: (product as any).price_old ?? null,
+                                  custom_price_promo: (product as any).price_promo ?? null,
+                                  custom_stock_quantity: (product as any).stock_quantity ?? null,
+                                  custom_available: (product as any).available ?? true,
+                                },
+                              ]);
+                              {
                                 setLinkedStoreIds((prev) => {
                                   const next = Array.from(new Set([...prev, id]));
                                   const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
@@ -277,17 +261,12 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                 });
                                 toast.success(t('product_added_to_store'));
                                 ShopService.bumpProductsCountInCache(String(id), 1);
+                                try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                              } else {
-                                toast.error(t('failed_add_to_store'));
                               }
                             } else {
-                              const { error } = await (supabase as any)
-                                .from('store_product_links')
-                                .delete()
-                                .eq('product_id', product.id)
-                                .eq('store_id', id);
-                              if (!error) {
+                              await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
+                              {
                                 setLinkedStoreIds((prev) => {
                                   const next = prev.filter((x) => x !== id);
                                   const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
@@ -296,9 +275,8 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                 });
                                 toast.success(t('product_removed_from_store'));
                                 ShopService.bumpProductsCountInCache(String(id), -1);
+                                try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                              } else {
-                                toast.error(t('failed_remove_from_store'));
                               }
                             }
                           } catch (_) {
@@ -370,7 +348,7 @@ export const ProductsTable = ({
       }
       ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
       ProductService.updateFirstPageCaches(null, (arr) => updater(arr as ProductRow[]));
-    } catch {}
+    } catch { void 0; }
   };
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
@@ -388,9 +366,11 @@ export const ProductsTable = ({
   const [items, setItems] = useState<ProductRow[]>([]);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
   const requestedOffsets = useRef<Set<number>>(new Set());
   const loadingFirstRef = useRef(false);
   const loadingNextRef = useRef(false);
+  const [lastSelectedProductIds, setLastSelectedProductIds] = useState<string[]>([]);
 
   const onProductsLoadedRef = useRef(onProductsLoaded);
   const onLoadingChangeRef = useRef(onLoadingChange);
@@ -404,58 +384,12 @@ export const ProductsTable = ({
     loadingFirstRef.current = true;
     requestedOffsets.current.clear();
     try {
-      try {
-        const cacheKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: PageInfo; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            setItems(parsed.items);
-            setPageInfo(parsed.page ?? null);
-            onProductsLoadedRef.current?.(parsed.page?.total ?? parsed.items.length);
-            if (parsed.page?.hasMore && parsed.page?.nextOffset != null) {
-              await loadNextPage({ limit: parsed.page.limit, offset: parsed.page.nextOffset });
-            }
-            return;
-          }
-        }
-        // fallback to prefetch without pageSize suffix
-        const raw2 = typeof window !== 'undefined' ? window.localStorage.getItem(`rq:products:first:${storeId ?? 'all'}`) : null;
-        if (raw2) {
-          const parsed = JSON.parse(raw2) as { items: ProductRow[]; page?: PageInfo; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            setItems(parsed.items);
-            setPageInfo(parsed.page ?? null);
-            onProductsLoadedRef.current?.(parsed.page?.total ?? parsed.items.length);
-            if (parsed.page?.hasMore && parsed.page?.nextOffset != null) {
-              await loadNextPage({ limit: parsed.page.limit, offset: parsed.page.nextOffset });
-            }
-            return;
-          }
-        }
-      } catch { /* ignore cache errors */ }
-      const { data: authData } = await supabase.auth.getSession();
-      const accessToken: string | null = authData?.session?.access_token || null;
-      const { data, error } = await supabase.functions.invoke('user-products-list', {
-        body: { store_id: storeId ?? null, limit: pagination.pageSize, offset: 0 },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      if (error) {
-        setItems([]);
-        setPageInfo({ limit: pagination.pageSize, offset: 0, hasMore: false, nextOffset: null, total: 0 });
-        onProductsLoadedRef.current?.(0);
-        return;
-      }
-      const payload: ResponseData = typeof data === 'string' ? JSON.parse(data) : (data as ResponseData);
-      setItems(Array.isArray(payload.products) ? payload.products : []);
-      setPageInfo(payload.page ?? null);
-      onProductsLoadedRef.current?.(payload.page?.total ?? (Array.isArray(payload.products) ? payload.products.length : 0));
-      try {
-        const cacheKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
-        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, JSON.stringify({ items: payload.products, page: payload.page, expiresAt: Date.now() + 15 * 60 * 1000 }));
-      } catch { /* ignore cache errors */ }
-      if (payload.page?.hasMore && payload.page?.nextOffset != null) {
-        await loadNextPage({ limit: payload.page.limit, offset: payload.page.nextOffset });
+      const { products, page } = await ProductService.getProductsFirstPage(storeId ?? null, pagination.pageSize);
+      setItems(products as ProductRow[]);
+      setPageInfo(page);
+      onProductsLoadedRef.current?.(page?.total ?? products.length);
+      if (page?.hasMore && page?.nextOffset != null) {
+        await loadNextPage({ limit: page.limit, offset: page.nextOffset });
       }
     } finally {
       setLoading(false);
@@ -476,23 +410,29 @@ export const ProductsTable = ({
     onLoadingChangeRef.current?.(true);
     loadingNextRef.current = true;
     try {
-      const { data: authData } = await supabase.auth.getSession();
-      const accessToken: string | null = authData?.session?.access_token || null;
-      const { data, error } = await supabase.functions.invoke('user-products-list', {
-        body: { store_id: storeId ?? null, limit: nextLimit, offset: nextOffset },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      if (error) return;
-      const payload: ResponseData = typeof data === 'string' ? JSON.parse(data) : (data as ResponseData);
-      setItems((prev) => [...prev, ...((Array.isArray(payload.products) ? payload.products : []) as ProductRow[])]);
-      setPageInfo(payload.page ?? null);
-      onProductsLoadedRef.current?.(payload.page?.total ?? (items.length + (Array.isArray(payload.products) ? payload.products.length : 0)));
+      const { products, page } = await ProductService.getProductsPage(storeId ?? null, nextLimit, nextOffset);
+      setItems((prev) => [...prev, ...(products as ProductRow[])]);
+      setPageInfo(page ?? null);
+      onProductsLoadedRef.current?.(page?.total ?? (items.length + products.length));
     } finally {
       setLoading(false);
       onLoadingChangeRef.current?.(false);
       loadingNextRef.current = false;
     }
   }, [pageInfo, storeId, items.length, pagination.pageSize]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (storeId) {
+          const names = await ProductService.getStoreCategoryFilterOptions(String(storeId));
+          setCategoryFilterOptions(names);
+        } else {
+          setCategoryFilterOptions([]);
+        }
+      } catch { setCategoryFilterOptions([]); }
+    })();
+  }, [storeId]);
 
   useEffect(() => { loadFirstPage(); }, [loadFirstPage, refreshTrigger]);
   useEffect(() => {
@@ -533,165 +473,12 @@ export const ProductsTable = ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_images' }, () => schedule())
       .subscribe();
     return () => {
-      try { (supabase as any).removeChannel(channel); } catch {}
+      try { (supabase as any).removeChannel(channel); } catch { void 0; }
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [queryClient, storeId]);
 
-  const loadProducts = async () => {
-    setLoading(true);
-    onLoadingChange?.(true);
-    try {
-      const data = storeId ? await ProductService.getProductsForStore(storeId) : await ProductService.getProducts();
-      onProductsLoaded?.(data.length);
-
-      const ids = (data ?? []).map((p) => p.id).filter(Boolean) as string[];
-      const categoryIds = (data ?? [])
-        .map((p: any) => p.category_id)
-        .filter((v) => !!v);
-
-      const mainImageMap: Record<string, string> = {};
-      const categoryNameMap: Record<string, string> = {};
-
-      if (ids.length > 0) {
-        // Загружаем все изображения товаров и выбираем главное:
-        // приоритет is_main=true, иначе самое раннее по order_index
-        const { data: imgRows } = await (supabase as any)
-          .from('store_product_images')
-          .select('product_id,url,is_main,order_index')
-          .in('product_id', ids);
-        const grouped: Record<string, any[]> = {};
-        (imgRows ?? []).forEach((r: any) => {
-          const pid = String(r.product_id);
-          if (!grouped[pid]) grouped[pid] = [];
-          grouped[pid].push(r);
-        });
-        for (const [pid, rows] of Object.entries(grouped)) {
-          const main = rows.find((x) => x.is_main) || rows.sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0];
-          if (main?.url) {
-            let url = main.url as string;
-            if (typeof url === "string" && (url.includes("r2.dev") || url.includes("cloudflarestorage.com"))) {
-              const objectKey = R2Storage.extractObjectKeyFromUrl(url);
-              if (objectKey) {
-                try {
-                  const signed = await R2Storage.getViewUrl(objectKey);
-                  if (signed) url = signed;
-                } catch {}
-              }
-            }
-            mainImageMap[pid] = url;
-          }
-        }
-      }
-
-      if (categoryIds.length > 0) {
-        const { data: catRows } = await (supabase as any)
-          .from('store_categories')
-          .select('id,name')
-          .in('id', categoryIds);
-        (catRows ?? []).forEach((r: any) => {
-          if (r.id && r.name) {
-            categoryNameMap[String(r.id)] = r.name;
-          }
-        });
-      }
-
-      const customCategoryByProduct: Record<string, string | null> = {};
-      if (storeId && ids.length > 0) {
-        const { data: linkRowsForStore } = await (supabase as any)
-          .from('store_product_links')
-          .select('product_id,custom_category_id,is_active')
-          .eq('store_id', storeId)
-          .in('product_id', ids);
-        (linkRowsForStore ?? []).forEach((r: any) => {
-          const active = r?.is_active !== false;
-          if (!active) return;
-          const pid = String(r.product_id);
-          const ext = r?.custom_category_id != null ? String(r.custom_category_id) : null;
-          if (ext) customCategoryByProduct[pid] = ext;
-        });
-      }
-
-      const externalCategoryIds = Array.from(new Set((data ?? [])
-        .map((p: any) => p.category_external_id)
-        .filter((v) => !!v))) as string[];
-      const customExtIds = Object.values(customCategoryByProduct).filter((v) => !!v) as string[];
-      const extIdsUnion = Array.from(new Set([...
-        externalCategoryIds,
-        ...customExtIds,
-      ]));
-      if (extIdsUnion.length > 0) {
-        const { data: extCatRows } = await (supabase as any)
-          .from('store_categories')
-          .select('external_id,name')
-          .in('external_id', extIdsUnion);
-        (extCatRows ?? []).forEach((r: any) => {
-          if (r.external_id && r.name) {
-            categoryNameMap[String(r.external_id)] = r.name;
-          }
-        });
-      }
-
-      // Map supplier_id → supplier_name
-      const supplierIdsRaw = (data ?? [])
-        .map((p: any) => p.supplier_id)
-        .filter((v) => v !== null && v !== undefined);
-      const supplierIds = Array.from(new Set(supplierIdsRaw));
-      const supplierNameMap: Record<string | number, string> = {};
-      if (supplierIds.length > 0) {
-        const { data: supRows } = await (supabase as any)
-          .from('user_suppliers')
-          .select('id,supplier_name')
-          .in('id', supplierIds as any);
-        (supRows ?? []).forEach((r: any) => {
-          if (r.id != null && r.supplier_name) {
-            supplierNameMap[r.id] = r.supplier_name;
-          }
-        });
-      }
-
-      // Map product_id → active store_ids
-      const storeLinksByProduct: Record<string, string[]> = {};
-      if (!storeId && ids.length > 0) {
-        const { data: linkRows } = await (supabase as any)
-          .from('store_product_links')
-          .select('product_id,store_id,is_active')
-          .in('product_id', ids);
-        (linkRows ?? []).forEach((r: any) => {
-          const pid = String(r.product_id);
-          const sid = r?.store_id != null ? String(r.store_id) : '';
-          const active = r?.is_active !== false;
-          if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = [];
-          if (sid && active) storeLinksByProduct[pid].push(sid);
-        });
-      }
-
-      const augmented = (data ?? []).map((p: any) => {
-        const pid = String(p.id);
-        const customExt = customCategoryByProduct[pid] || null;
-        return {
-          ...p,
-          mainImageUrl: p.id ? mainImageMap[String(p.id)] : undefined,
-          categoryName:
-            (customExt && categoryNameMap[String(customExt)]) ||
-            (p.category_id && categoryNameMap[String(p.category_id)]) ||
-            (p.category_external_id && categoryNameMap[String(p.category_external_id)]) ||
-            undefined,
-          supplierName:
-            (p.supplier_id != null && supplierNameMap[p.supplier_id]) ||
-            undefined,
-          linkedStoreIds: p.id ? (storeLinksByProduct[String(p.id)] || []) : [],
-        };
-      });
-
-      setProductsCached(() => augmented as ProductRow[]);
-    } catch (error) {
-      console.error("Failed to load products", error);
-    } finally {
-      setLoading(false);
-      onLoadingChange?.(false);
-    }
-  };
+  
 
   // Дублирование товара и обновление таблицы
   const handleDuplicate = async (product: Product) => {
@@ -789,6 +576,7 @@ export const ProductsTable = ({
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const [addingStores, setAddingStores] = useState(false);
   const [removingStores, setRemovingStores] = useState(false);
+  const [removingStoreId, setRemovingStoreId] = useState<string | null>(null);
 
   useEffect(() => {
     setColumnOrder((prev) => {
@@ -827,11 +615,16 @@ export const ProductsTable = ({
     );
   }
 
-  function ColumnFilterMenu({ column }: { column: any }) {
+  function ColumnFilterMenu({ column, extraOptions }: { column: any; extraOptions?: string[] }) {
     const { t } = useI18n();
     const [query, setQuery] = useState("");
     const faceted = column.getFacetedUniqueValues?.();
     const values = faceted ? Array.from(faceted.keys()) : [];
+    const extraCategoryOptions = column.id === "category" ? (extraOptions || []) : [];
+    const unionValues = Array.from(new Set([...
+      values.map((v: any) => (typeof v === "string" ? v : v == null ? "" : String(v))),
+      ...extraCategoryOptions,
+    ]));
     // Normalize current filter to an array for multi-select
     const currentFilter = column.getFilterValue?.();
     const selectedValues: string[] = Array.isArray(currentFilter)
@@ -839,7 +632,7 @@ export const ProductsTable = ({
       : currentFilter
       ? [String(currentFilter)]
       : [];
-    const filteredValues = values
+    const filteredValues = unionValues
       .map((v) => (typeof v === "string" ? v : v == null ? "" : String(v)))
       .filter((v) => (query ? v.toLowerCase().includes(query.toLowerCase()) : true))
       .sort((a, b) => a.localeCompare(b));
@@ -968,7 +761,7 @@ export const ProductsTable = ({
                 ? "indeterminate"
                 : false
             }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(value === true)}
             aria-label={t("select_all")}
           />
         </div>
@@ -977,7 +770,7 @@ export const ProductsTable = ({
         <div className="flex items-center justify-start">
           <Checkbox
             checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            onCheckedChange={(value) => row.toggleSelected(value === true)}
             aria-label={t("select_row")}
           />
         </div>
@@ -1205,7 +998,7 @@ export const ProductsTable = ({
           <span className="truncate">{t("category")}</span>
           <div className="flex items-center gap-0 ml-auto">
             <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
+            <ColumnFilterMenu column={column} extraOptions={storeId ? categoryFilterOptions : []} />
           </div>
         </div>
       ),
@@ -1459,7 +1252,7 @@ export const ProductsTable = ({
                     if (!remains) ShopService.bumpCategoriesCountInCache(storeChanged, -1);
                   }
                 }
-              } catch {}
+              } catch { void 0; }
               setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
             }}
           />
@@ -1541,6 +1334,16 @@ export const ProductsTable = ({
       setPagination(prev => ({ ...prev, pageIndex: Math.max(0, pageCount - 1) }));
     }
   }, [products.length, pagination.pageIndex, pagination.pageSize, pageInfo]);
+
+  useEffect(() => {
+    try {
+      const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
+      if (selected.length === 1) {
+        const ids = Array.from(new Set((selected[0].linkedStoreIds || []).map(String)));
+        setSelectedStoreIds(ids);
+      }
+    } catch { void 0; }
+  }, [rowSelection, table]);
 
   if (!loading && productsCount === 0) {
     return (
@@ -1745,7 +1548,7 @@ export const ProductsTable = ({
                             onSelect={(e) => {
                               e.preventDefault();
                             }}
-                            onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                            onCheckedChange={(value) => column.toggleVisibility(value === true)}
                           >
                             {translatedLabel}
                           </DropdownMenuCheckboxItem>
@@ -1774,6 +1577,8 @@ export const ProductsTable = ({
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
+                          disabled={(table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0)))}
+                          aria-disabled={(table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0)))}
                           aria-label={t("add_to_stores")}
                           data-testid="user_products_dataTable_addToStores"
                         >
@@ -1795,6 +1600,30 @@ export const ProductsTable = ({
                           (stores || []).map((s: any) => {
                             const id = String(s.id);
                             const checked = selectedStoreIds.includes(id);
+                            const countInStore = (items as ProductRow[]).reduce((acc, p) => {
+                              const links = (p.linkedStoreIds || []).map(String);
+                              return acc + (links.includes(id) ? 1 : 0);
+                            }, 0);
+                            const categoryCount = (() => {
+                              if (countInStore === 0) return 0;
+                              const set = new Set<string>();
+                              for (const p of (items as ProductRow[])) {
+                                const links = (p.linkedStoreIds || []).map(String);
+                                if (!links.includes(id)) continue;
+                                const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
+                                if (key) set.add(key);
+                              }
+                              if (set.size > 0) return set.size;
+                              try {
+                                const key = `rq:filters:categories:${id}`;
+                                const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+                                if (raw) {
+                                  const parsed = JSON.parse(raw) as { items?: string[] };
+                                  if (parsed && Array.isArray(parsed.items)) return parsed.items.length;
+                                }
+                              } catch { /* ignore */ }
+                              return 0;
+                            })();
                             return (
                               <DropdownMenuItem
                                 key={id}
@@ -1821,6 +1650,87 @@ export const ProductsTable = ({
                                   aria-label={t("select_store")}
                                 />
                                 <span className="truncate">{s.store_name || s.store_url || id}</span>
+                                <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Package className="h-3 w-3" />
+                                    <span className="tabular-nums">{countInStore}</span>
+                                  </span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <List className="h-3 w-3" />
+                                    <span className="tabular-nums">{categoryCount}</span>
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    disabled={removingStores || removingStoreId === id || !checked || countInStore === 0}
+                                    aria-disabled={removingStores || removingStoreId === id || !checked || countInStore === 0}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (countInStore === 0) return;
+                                      const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                                      const productIds = Array.from(new Set(selected
+                                        .filter((p) => (p.linkedStoreIds || []).map(String).includes(id))
+                                        .map((p) => String(p.id))
+                                        .filter(Boolean)));
+                                      setRemovingStoreId(id);
+                                      try {
+                                        const { deletedByStore } = await ProductService.bulkRemoveStoreProductLinks(productIds, [id]);
+                                        {
+                                          toast.success(t('product_removed_from_store'));
+                                          setProductsCached((prev) => {
+                                            if (productIds.length > 0) {
+                                              return prev.map((p) => {
+                                                const pid = String(p.id);
+                                                if (!productIds.includes(pid)) return p;
+                                                const nextIds = (p.linkedStoreIds || []).filter((sid) => String(sid) !== id);
+                                                return { ...p, linkedStoreIds: nextIds };
+                                              });
+                                            }
+                                            // mass remove for this store
+                                            return prev.map((p) => {
+                                              const nextIds = (p.linkedStoreIds || []).filter((sid) => String(sid) !== id);
+                                              return { ...p, linkedStoreIds: nextIds };
+                                            });
+                                          });
+                                          try {
+                                            const dec = deletedByStore?.[String(id)] ?? countInStore;
+                                            if (dec > 0) ShopService.bumpProductsCountInCache(String(id), -dec);
+                                            try {
+                                              await ProductService.recomputeStoreCategoryFilterCache(String(id));
+                                              try {
+                                                const key = `rq:filters:categories:${String(id)}`;
+                                                const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+                                                if (raw) {
+                                                  const parsed = JSON.parse(raw) as { items?: string[] };
+                                                  const cnt = Array.isArray(parsed?.items) ? parsed.items.length : 0;
+                                                  ShopService.setCategoriesCountInCache(String(id), cnt);
+                                                }
+                                              } catch { void 0; }
+                                            } catch { void 0; }
+                                          } catch { void 0; }
+                                          try {
+                                            const idStr = String(id);
+                                            const decUi = deletedByStore?.[idStr] ?? (productIds.length > 0 ? productIds.length : countInStore);
+                                            const nextCount = Math.max(0, countInStore - decUi);
+                                            if (nextCount === 0) setSelectedStoreIds((prev) => prev.filter((v) => v !== idStr));
+                                          } catch { void 0; }
+                                        }
+                                      } catch (e) {
+                                        toast.error(t('failed_remove_from_store'));
+                                      } finally {
+                                        setRemovingStoreId(null);
+                                        try { table.resetRowSelection(); } catch { /* ignore */ }
+                                      }
+                                    }}
+                                  >
+                                    {removingStoreId === id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </span>
                               </DropdownMenuItem>
                             );
                           })
@@ -1828,144 +1738,215 @@ export const ProductsTable = ({
                       </div>
                     </ScrollArea>
                     <DropdownMenuSeparator />
-                    <div className="flex items-center justify-center gap-2 w-full">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        disabled={removingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
-                        aria-disabled={removingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
-                        onClick={async () => {
+                    {(() => {
+                      const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
+                      const hasLinkedInSelectedStores = (() => {
+                        if (selectedStoreIds.length === 0 || selectedRows.length === 0) return false;
+                        const set = new Set(selectedStoreIds.map(String));
+                        for (const p of selectedRows) {
+                          const links = (p.linkedStoreIds || []).map(String);
+                          for (const sid of links) { if (set.has(sid)) return true; }
+                        }
+                        return false;
+                      })();
+                      const isAnyProductSelected = selectedRows.length > 0;
+                      const totalLinksInSelectedProducts = selectedRows.reduce((acc, p) => acc + ((p.linkedStoreIds || []).length), 0);
+                      const totalInSelectedStores = selectedStoreIds.reduce((acc, sid) => {
+                        const count = (items as ProductRow[]).reduce((inner, p) => {
+                          const links = (p.linkedStoreIds || []).map(String);
+                          return inner + (links.includes(String(sid)) ? 1 : 0);
+                        }, 0);
+                        return acc + count;
+                      }, 0);
+                      const effectiveStoreIds = selectedStoreIds.length > 0
+                        ? Array.from(new Set(selectedStoreIds))
+                        : Array.from(new Set(selectedRows.flatMap((p) => (p.linkedStoreIds || []).map(String))));
+                      const disableDelete = removingStores
+                        || (!isAnyProductSelected && selectedStoreIds.length === 0)
+                        || (effectiveStoreIds.length === 0)
+                        || (selectedStoreIds.length > 0 ? totalInSelectedStores === 0 : totalLinksInSelectedProducts === 0);
+                      return (
+                        <div className="flex items-center justify-center gap-2 w-full">
+                          {/* Add first */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
+                            aria-disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
+                            onClick={async () => {
+                              const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                              const storeIds = Array.from(new Set(selectedStoreIds));
+                              const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
+                              if (productIds.length === 0 || storeIds.length === 0) return;
+                              setAddingStores(true);
+                              try {
+                                const payload: any[] = [];
+                                for (const p of selected) {
+                                  const pid = String(p.id);
+                                  const linksSet = new Set((p.linkedStoreIds || []).map(String));
+                                  for (const sid of storeIds) {
+                                    if (linksSet.has(String(sid))) continue; // уже привязан — пропускаем
+                                    payload.push({
+                                      product_id: pid,
+                                      store_id: sid,
+                                      is_active: true,
+                                      custom_price: p.price ?? null,
+                                      custom_price_old: p.price_old ?? null,
+                                      custom_price_promo: p.price_promo ?? null,
+                                      custom_stock_quantity: p.stock_quantity ?? null,
+                                      custom_available: (p as any).available ?? true,
+                                    });
+                                  }
+                                }
+                                const toInsert = payload;
+                                const { inserted, addedByStore } = await ProductService.bulkAddStoreProductLinks(toInsert);
+                                if (inserted === 0) {
+                                  toast.success(t('products_already_linked'));
+                                } else {
+                                  {
+                                    toast.success(t('product_added_to_stores'));
+                                    setProductsCached((prev) => prev.map((p) => {
+                                      const pid = String(p.id);
+                                      if (!productIds.includes(pid)) return p;
+                                      const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));
+                                      return { ...p, linkedStoreIds: merged };
+                                    }));
+                                    try {
+                                      Object.entries(addedByStore).forEach(([sid, cnt]) => {
+                                        if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt);
+                                      });
+                                      const storesUnique = Array.from(new Set(storeIds.map(String)));
+                                      for (const sid of storesUnique) { try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; } }
+                                      queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+                                      try {
+                                        const latest = await ProductService.getUserStores();
+                                        setStores(latest || []);
+                                      } catch { /* ignore */ }
+                                    } catch {}
+                                  }
+                                }
+                              } catch (e) {
+                                toast.error(t('failed_add_product_to_stores'));
+                              } finally {
+                                setAddingStores(false);
+                                setStoresMenuOpen(false);
+                                setSelectedStoreIds([]);
+                                try { table.resetRowSelection(); } catch {}
+                                try { setLastSelectedProductIds(productIds); } catch {}
+                              }
+                            }}
+                            data-testid="user_products_addToStores_confirm"
+                          >
+                            {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                          </Button>
+
+                          {/* Delete second */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-8 w-8 ${isAnyProductSelected ? 'border border-green-500' : ''}`}
+                                disabled={disableDelete}
+                                aria-disabled={disableDelete}
+                                onClick={async () => {
                           const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
-                          const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter((v) => !!v)));
-                          const storeIds = Array.from(new Set(selectedStoreIds));
-                          if (productIds.length === 0 || storeIds.length === 0) return;
+                          const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
+                          const storeIds = effectiveStoreIds;
+                          if (storeIds.length === 0) return;
                           setRemovingStores(true);
                           try {
-                            const { error } = await (supabase as any)
-                              .from('store_product_links')
-                              .delete()
-                              .in('product_id', productIds)
-                              .in('store_id', storeIds);
-                            if (error) {
-                              toast.error(t('failed_remove_from_store'));
-                            } else {
+                            const { deletedByStore } = await ProductService.bulkRemoveStoreProductLinks(productIds, storeIds);
+                            {
                               toast.success(t('product_removed_from_store'));
-                              setProductsCached((prev) => prev.map((p) => {
-                                const pid = String(p.id);
-                                if (!productIds.includes(pid)) return p;
-                                const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.includes(String(sid)));
-                                return { ...p, linkedStoreIds: nextIds };
-                              }));
+                              setProductsCached((prev) => {
+                                if (productIds.length > 0) {
+                                  return prev.map((p) => {
+                                    const pid = String(p.id);
+                                    if (!productIds.includes(pid)) return p;
+                                    const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.includes(String(sid)));
+                                    return { ...p, linkedStoreIds: nextIds };
+                                  });
+                                }
+                                // mass removal: drop selected storeIds from all loaded products
+                                return prev.map((p) => {
+                                  const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.includes(String(sid)));
+                                  return { ...p, linkedStoreIds: nextIds };
+                                });
+                              });
                               try {
                                 const countsByStore: Record<string, number> = {};
-                                for (const sid of storeIds) {
-                                  countsByStore[String(sid)] = 0;
-                                  for (const p of selected) {
-                                    const ids = (p.linkedStoreIds || []).map(String);
-                                    if (ids.includes(String(sid))) countsByStore[String(sid)] += 1;
+                                if (productIds.length > 0) {
+                                  for (const sid of storeIds) {
+                                    countsByStore[String(sid)] = 0;
+                                    for (const p of selected) {
+                                      const ids = (p.linkedStoreIds || []).map(String);
+                                      if (ids.includes(String(sid))) countsByStore[String(sid)] += 1;
+                                    }
                                   }
+                                } else {
+                                  Object.assign(countsByStore, deletedByStore);
                                 }
                                 Object.entries(countsByStore).forEach(([sid, cnt]) => {
                                   if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), -cnt);
                                 });
+                                for (const sid of storeIds) { try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; } }
+                                try {
+                                  for (const sid of storeIds) {
+                                    const key = `rq:filters:categories:${String(sid)}`;
+                                    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+                                    if (raw) {
+                                      const parsed = JSON.parse(raw) as { items?: string[] };
+                                      const cnt = Array.isArray(parsed?.items) ? parsed.items.length : 0;
+                                      ShopService.setCategoriesCountInCache(String(sid), cnt);
+                                    }
+                                  }
+                                } catch { void 0; }
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                              } catch {}
+                                try {
+                                  const latest = await ProductService.getUserStores();
+                                  setStores(latest || []);
+                                } catch { /* ignore */ }
+                                try {
+                                  const prevCountMap: Record<string, number> = {};
+                                  for (const sid of storeIds) {
+                                    const s = String(sid);
+                                    prevCountMap[s] = (items as ProductRow[]).reduce((acc, p) => {
+                                      const links = (p.linkedStoreIds || []).map(String);
+                                      return acc + (links.includes(s) ? 1 : 0);
+                                    }, 0);
+                                  }
+                                  const nextSelected = selectedStoreIds.filter((s) => {
+                                    const removed = countsByStore[String(s)] || 0;
+                                    const nextCnt = Math.max(0, (prevCountMap[String(s)] || 0) - removed);
+                                    return nextCnt > 0;
+                                  });
+                                  setSelectedStoreIds(nextSelected);
+                                } catch { /* ignore */ }
+                              } catch { void 0; }
                             }
                           } catch (e) {
                             toast.error(t('failed_remove_from_store'));
                           } finally {
                             setRemovingStores(false);
                             setStoresMenuOpen(false);
-                            setSelectedStoreIds([]);
+                            try { table.resetRowSelection(); } catch { /* ignore */ }
+                            try { setLastSelectedProductIds([]); } catch {}
                           }
                         }}
                         data-testid="user_products_addToStores_delete"
                       >
                         {removingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </Button>
-                      <Button
-                        size="icon"
-                        className="h-8 w-8"
-                        disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
-                        aria-disabled={addingStores || selectedStoreIds.length === 0 || table.getSelectedRowModel().rows.length === 0}
-                        onClick={async () => {
-                          const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
-                          const storeIds = Array.from(new Set(selectedStoreIds));
-                          const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter((v) => !!v)));
-                          if (productIds.length === 0 || storeIds.length === 0) return;
-                          setAddingStores(true);
-                          try {
-                            const payload: any[] = [];
-                            for (const p of selected) {
-                              const pid = String(p.id);
-                              for (const sid of storeIds) {
-                                payload.push({
-                                  product_id: pid,
-                                  store_id: sid,
-                                  is_active: true,
-                                  custom_price: p.price ?? null,
-                                  custom_price_old: p.price_old ?? null,
-                                  custom_price_promo: p.price_promo ?? null,
-                                  custom_stock_quantity: p.stock_quantity ?? null,
-                                  custom_available: (p as any).available ?? true,
-                                });
-                              }
-                            }
-                            const { data: existing, error: selErr } = await (supabase as any)
-                              .from('store_product_links')
-                              .select('product_id,store_id')
-                              .in('product_id', productIds)
-                              .in('store_id', storeIds);
-                            if (selErr) {
-                              toast.error(t('failed_add_product_to_stores'));
-                              return;
-                            }
-                            const existingSet = new Set((existing || []).map((r: any) => `${r.product_id}__${r.store_id}`));
-                            const toInsert = payload.filter((r) => !existingSet.has(`${r.product_id}__${r.store_id}`));
-                            if (toInsert.length === 0) {
-                              toast.success(t('products_already_linked'));
-                            } else {
-                              const { error: insErr } = await (supabase as any)
-                                .from('store_product_links')
-                                .insert(toInsert)
-                                .select('*');
-                              if (insErr) {
-                                toast.error(t('failed_add_product_to_stores'));
-                              } else {
-                                toast.success(t('product_added_to_stores'));
-                                setProductsCached((prev) => prev.map((p) => {
-                                  const pid = String(p.id);
-                                  if (!productIds.includes(pid)) return p;
-                                  const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));
-                                  return { ...p, linkedStoreIds: merged };
-                                }));
-                                try {
-                                  const toInsertByStore: Record<string, number> = {};
-                                  for (const r of toInsert) {
-                                    const sid = String(r.store_id);
-                                    toInsertByStore[sid] = (toInsertByStore[sid] || 0) + 1;
-                                  }
-                                  Object.entries(toInsertByStore).forEach(([sid, cnt]) => {
-                                    if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt);
-                                  });
-                                  queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                                } catch {}
-                              }
-                            }
-                          } catch (e) {
-                            toast.error(t('failed_add_product_to_stores'));
-                          } finally {
-                            setAddingStores(false);
-                            setStoresMenuOpen(false);
-                            setSelectedStoreIds([]);
-                          }
-                        }}
-                        data-testid="user_products_addToStores_confirm"
-                      >
-                        {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      </Button>
-                    </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      {isAnyProductSelected ? 'Видалити виділені товари з вибраних магазинів' : 'Видалити всі товари з вибраних магазинів'}
+                    </TooltipContent>
+                  </Tooltip>
+                        </div>
+                      );
+                    })()}
                   </DropdownMenuContent>
                 </DropdownMenu>
                 )}

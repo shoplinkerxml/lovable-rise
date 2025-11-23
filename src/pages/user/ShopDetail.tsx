@@ -140,11 +140,7 @@ export const ShopDetail = () => {
           onEdit={(product: Product) => navigate(`/user/shops/${id}/products/edit/${product.id}`)}
           onDelete={async (product: Product) => {
             try {
-              await (supabase as any)
-                .from('store_product_links')
-                .delete()
-                .eq('product_id', product.id)
-                .eq('store_id', id!);
+              await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id!)]);
               setRefreshTrigger((p) => p + 1);
             } catch (e) {
               toast.error(t('failed_remove_from_store'));

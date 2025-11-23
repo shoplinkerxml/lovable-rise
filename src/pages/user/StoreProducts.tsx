@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";
 import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
 export const StoreProducts = () => {
   const { id } = useParams();
@@ -17,6 +18,7 @@ export const StoreProducts = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [shopName, setShopName] = useState("");
   const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export const StoreProducts = () => {
       await ProductService.removeStoreProductLink(product.id, storeId);
       setRefreshTrigger((p) => p + 1);
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-      try { ShopService.bumpProductsCountInCache(storeId, -1); } catch {}
+      try { ShopService.bumpProductsCountInCache(storeId, -1); } catch (e) { void e; }
     } catch (_) {
       toast.error(t("failed_remove_from_store"));
     }
@@ -60,6 +62,12 @@ export const StoreProducts = () => {
           { label: shopName || storeId, href: `/user/shops/${storeId}` },
           { label: t("products_title"), current: true },
         ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Товарів</span>
+            <Badge variant="outline" className="px-3 py-1 font-mono">{totalCount}</Badge>
+          </div>
+        }
       />
       <div className="relative" aria-busy={tableLoading}>
         {tableLoading && (
@@ -70,7 +78,7 @@ export const StoreProducts = () => {
         <ProductsTable
           onEdit={handleEdit}
           onDelete={handleDelete}
-          onProductsLoaded={() => {}}
+          onProductsLoaded={(cnt) => setTotalCount(cnt ?? 0)}
           onLoadingChange={setTableLoading}
           refreshTrigger={refreshTrigger}
           canCreate={true}

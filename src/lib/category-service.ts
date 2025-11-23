@@ -53,6 +53,19 @@ export const CategoryService = {
       supplier_id: String(r.supplier_id),
     };
   },
+
+  // 0a. Read category name by internal id (safe)
+  async getNameByIdSafe(id: number | string): Promise<string | null> {
+    const client = supabase as any;
+    const { data, error } = await client
+      .from('store_categories')
+      .select('name')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) return null;
+    const r: any = data;
+    return r?.name ?? null;
+  },
   // 4. Get all categories of supplier
   async listCategories(supplierId?: string | number): Promise<StoreCategory[]> {
     const client = supabase as any;

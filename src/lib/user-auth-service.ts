@@ -175,7 +175,7 @@ const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptions = {
 export class UserAuthService {
   private static authMeCache: { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] } } | null = null;
   private static authMeInFlight: Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> | null = null;
-  private static readonly AUTH_ME_TTL_MS = 15000;
+  private static readonly AUTH_ME_TTL_MS = 900000;
   /**
    * Register a new user with email confirmation flow
    * Following Supabase email confirmation workflow:
@@ -605,6 +605,16 @@ export class UserAuthService {
 
   static async fetchAuthMe(): Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> {
     const now = Date.now();
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('rq:authMe') : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }; expiresAt: number };
+        if (parsed && typeof parsed.expiresAt === 'number' && parsed.expiresAt > now && parsed.data) {
+          this.authMeCache = { timestamp: now, data: parsed.data };
+          return parsed.data;
+        }
+      }
+    } catch {}
     if (this.authMeCache && now - this.authMeCache.timestamp < this.AUTH_ME_TTL_MS) {
       return this.authMeCache.data;
     }
@@ -637,6 +647,12 @@ export class UserAuthService {
         menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
       };
       this.authMeCache = { timestamp: Date.now(), data: result };
+      try {
+        if (typeof window !== 'undefined') {
+          const payload = JSON.stringify({ data: result, expiresAt: Date.now() + this.AUTH_ME_TTL_MS });
+          window.localStorage.setItem('rq:authMe', payload);
+        }
+      } catch {}
       this.authMeInFlight = null;
       return result;
     })();
@@ -645,6 +661,7 @@ export class UserAuthService {
 
   static clearAuthMeCache(): void {
     this.authMeCache = null;
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:authMe'); } catch {}
   }
 
   /**

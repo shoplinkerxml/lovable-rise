@@ -66,32 +66,60 @@ Deno.serve(async (req) => {
       }
     }
 
-            const { data: linkRows } = await (supabase as any)
-              .from('store_product_links')
-              .select('store_id,is_active,custom_category_id,store_products(category_id,category_external_id)')
-              .in('store_id', storeIds)
+    const { data: maps } = await (supabase as any)
+      .from('store_store_categories')
+      .select('store_id,category_id,external_id,is_active')
+      .in('store_id', storeIds)
 
-            const productsCountMap: Record<string, number> = {}
-            const categoriesMap: Record<string, Set<string>> = {}
-            for (const r of linkRows || []) {
-              const sid = String((r as any).store_id)
-              const active = (r as any).is_active !== false
-              if (active) productsCountMap[sid] = (productsCountMap[sid] || 0) + 1
-              const linkCat = (r as any).custom_category_id != null ? String((r as any).custom_category_id) : null
-              const baseCatId = (r as any)?.store_products?.category_id != null ? String((r as any).store_products.category_id) : (r as any)?.store_products?.category_external_id ? String((r as any).store_products.category_external_id) : null
-              const catId = linkCat || baseCatId
-              if (catId) {
-                if (!categoriesMap[sid]) categoriesMap[sid] = new Set()
-                categoriesMap[sid].add(catId)
-              }
-            }
+    const byStoreCatId: Record<string, Record<string, string | null>> = {}
+    for (const m of maps || []) {
+      const active = (m as any)?.is_active !== false
+      if (!active) continue
+      const sid = String((m as any)?.store_id)
+      const cid = (m as any)?.category_id != null ? String((m as any).category_id) : null
+      const ext = (m as any)?.external_id != null ? String((m as any).external_id) : null
+      if (!sid || !cid) continue
+      if (!byStoreCatId[sid]) byStoreCatId[sid] = {}
+      byStoreCatId[sid][cid] = ext || null
+    }
 
-    const aggregated: ShopAggregated[] = shops.map(s => ({
-      ...s,
-      marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
-      productsCount: productsCountMap[s.id] || 0,
-      categoriesCount: (categoriesMap[s.id]?.size) || 0,
-    }))
+    const { data: linkRows } = await (supabase as any)
+      .from('store_product_links')
+      .select('product_id,store_id,is_active,custom_category_id,store_products!inner(id,category_id,category_external_id)')
+      .in('store_id', storeIds)
+      .eq('is_active', true)
+
+    const productsCountMap: Record<string, number> = {}
+    const productsSetMap: Record<string, Set<string>> = {}
+    const categoriesKeyMap: Record<string, Set<string>> = {}
+    for (const r of linkRows || []) {
+      const sid = String((r as any).store_id)
+      const active = (r as any).is_active !== false
+      if (active) {
+        const pid = String((r as any)?.product_id)
+        if (!productsSetMap[sid]) productsSetMap[sid] = new Set()
+        productsSetMap[sid].add(pid)
+      }
+      const linkExt = (r as any)?.custom_category_id != null ? String((r as any).custom_category_id) : null
+      const baseCid = (r as any)?.store_products?.category_id != null ? String((r as any).store_products.category_id) : null
+      const baseExt = (r as any)?.store_products?.category_external_id != null ? String((r as any).store_products.category_external_id) : null
+      const catKey = linkExt ? `ext:${linkExt}` : (baseCid ? `cid:${baseCid}` : (baseExt ? `ext:${baseExt}` : null))
+      if (catKey) {
+        if (!categoriesKeyMap[sid]) categoriesKeyMap[sid] = new Set()
+        categoriesKeyMap[sid].add(catKey)
+      }
+    }
+
+    const aggregated: ShopAggregated[] = shops.map(s => {
+      const products = (productsSetMap[s.id]?.size || 0)
+      const categories = (categoriesKeyMap[s.id]?.size || 0)
+      return {
+        ...s,
+        marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
+        productsCount: products,
+        categoriesCount: products === 0 ? 0 : categories,
+      }
+    })
 
     return new Response(JSON.stringify({ shops: aggregated }), { status: 200, headers: corsHeaders })
   } catch (e) {

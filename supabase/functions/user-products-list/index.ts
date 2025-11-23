@@ -76,12 +76,14 @@ Deno.serve(async (req) => {
 
     let products: Product[] = []
     let totalCount = 0
+    const customExtByPid: Record<string, string | null> = {}
 
     if (storeId) {
       const { count, error: countError } = await supabase
         .from('store_product_links')
         .select('product_id', { count: 'exact', head: true })
         .eq('store_id', storeId)
+        .eq('is_active', true)
 
       if (countError) {
         return new Response(JSON.stringify({ error: 'count_failed' }), {
@@ -94,11 +96,10 @@ Deno.serve(async (req) => {
 
       const { data, error } = await supabase
         .from('store_product_links')
-        .select(
-          'product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)',
-        )
+        .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,custom_category_id,store_products!inner(*)')
         .eq('store_id', storeId)
-        .order('product_id', { ascending: true })
+        .eq('is_active', true)
+        .order('created_at', { ascending: false, foreignTable: 'store_products' })
         .range(offset, offset + limit - 1)
 
       if (error) {
@@ -108,36 +109,38 @@ Deno.serve(async (req) => {
         })
       }
 
-      const rows = (data || []) as any[]
-
-      products = rows.map((r) => {
-        const base = r.store_products || {}
+      const linkRows = (data || []) as any[]
+      products = linkRows.map((row) => {
+        const base = (row as any)?.store_products || {}
+        const pid = String((base as any).id)
+        const ext = (row as any)?.custom_category_id != null ? String((row as any).custom_category_id) : null
+        if (pid && ext) customExtByPid[pid] = ext
         return {
-          id: String(base.id),
-          store_id: String(r.store_id || base.store_id),
-          supplier_id: base.supplier_id ?? null,
-          external_id: base.external_id ?? null,
-          name: r.custom_name ?? base.name ?? null,
-          name_ua: base.name_ua ?? null,
-          docket: base.docket ?? null,
-          docket_ua: base.docket_ua ?? null,
-          description: r.custom_description ?? base.description ?? null,
-          description_ua: base.description_ua ?? null,
-          vendor: base.vendor ?? null,
-          article: base.article ?? null,
-          category_id: base.category_id ?? null,
-          category_external_id: base.category_external_id ?? null,
-          currency_id: base.currency_id ?? null,
-          currency_code: base.currency_code ?? null,
-          price: r.custom_price ?? base.price ?? null,
-          price_old: base.price_old ?? null,
-          price_promo: r.custom_price_promo ?? base.price_promo ?? null,
-          stock_quantity: (r.custom_stock_quantity ?? base.stock_quantity ?? 0) as number,
-          available: (r.custom_available ?? base.available ?? true) as boolean,
-          state: base.state ?? 'new',
-          created_at: base.created_at ?? new Date().toISOString(),
-          updated_at: base.updated_at ?? new Date().toISOString(),
-          is_active: r.is_active === true,
+          id: pid,
+          store_id: String((base as any).store_id),
+          supplier_id: (base as any).supplier_id ?? null,
+          external_id: (base as any).external_id ?? null,
+          name: ((row as any)?.custom_name ?? (base as any).name) ?? null,
+          name_ua: (base as any).name_ua ?? null,
+          docket: (base as any).docket ?? null,
+          docket_ua: (base as any).docket_ua ?? null,
+          description: ((row as any)?.custom_description ?? (base as any).description) ?? null,
+          description_ua: (base as any).description_ua ?? null,
+          vendor: (base as any).vendor ?? null,
+          article: (base as any).article ?? null,
+          category_id: (base as any).category_id ?? null,
+          category_external_id: ((row as any)?.custom_category_id != null ? String((row as any).custom_category_id) : ((base as any).category_external_id ?? null)) as string | null,
+          currency_id: (base as any).currency_id ?? null,
+          currency_code: (base as any).currency_code ?? null,
+          price: ((row as any)?.custom_price ?? (base as any).price) ?? null,
+          price_old: (base as any).price_old ?? null,
+          price_promo: ((row as any)?.custom_price_promo ?? (base as any).price_promo) ?? null,
+          stock_quantity: (((row as any)?.custom_stock_quantity ?? (base as any).stock_quantity) ?? 0) as number,
+          available: (((row as any)?.custom_available ?? (base as any).available) ?? true) as boolean,
+          state: (base as any).state ?? 'new',
+          created_at: (base as any).created_at ?? new Date().toISOString(),
+          updated_at: (base as any).updated_at ?? new Date().toISOString(),
+          is_active: (row as any)?.is_active !== false,
         }
       })
     } else {
@@ -168,6 +171,31 @@ Deno.serve(async (req) => {
       }
 
       products = (data || []) as Product[]
+
+      // If a product has exactly one active store link with custom_category_id,
+      // prefer that category in global view to reflect store-specific mapping.
+      const pidList = products.map(p => String(p.id)).filter(Boolean)
+      if (pidList.length > 0) {
+        const { data: glinks } = await supabase
+          .from('store_product_links')
+          .select('product_id,is_active,custom_category_id,store_id')
+          .in('product_id', pidList)
+        const linksByPid: Record<string, Array<any>> = {}
+        for (const r of glinks || []) {
+          const pid = String((r as any)?.product_id)
+          const active = (r as any)?.is_active !== false
+          if (!linksByPid[pid]) linksByPid[pid] = []
+          if (active) linksByPid[pid].push(r)
+        }
+        for (const p of products) {
+          const pid = String(p.id)
+          const activeLinks = linksByPid[pid] || []
+          if (activeLinks.length === 1) {
+            const ext = (activeLinks[0] as any)?.custom_category_id != null ? String((activeLinks[0] as any).custom_category_id) : null
+            if (ext) (p as any).category_external_id = ext
+          }
+        }
+      }
     }
 
     const ids = products.map((p) => String(p.id)).filter((v) => !!v)
@@ -287,6 +315,7 @@ Deno.serve(async (req) => {
       const pid = String(p.id)
       const docket = p.docket ?? paramsMap[pid]?.['docket'] ?? null
       const docketUa = p.docket_ua ?? paramsMap[pid]?.['docket_ua'] ?? null
+      const overrideExt = customExtByPid[pid] || null
 
       return {
         ...p,
@@ -294,12 +323,9 @@ Deno.serve(async (req) => {
         docket_ua: docketUa,
         mainImageUrl: mainImageMap[pid],
         categoryName:
-          (p.category_id != null
-            ? categoryNameMap[String(p.category_id)]
-            : undefined) ||
-          (p.category_external_id
-            ? categoryNameMap[String(p.category_external_id)]
-            : undefined),
+          (overrideExt ? categoryNameMap[String(overrideExt)] : undefined) ||
+          (p.category_id != null ? categoryNameMap[String(p.category_id)] : undefined) ||
+          (p.category_external_id ? categoryNameMap[String(p.category_external_id)] : undefined),
         supplierName:
           p.supplier_id != null ? supplierNameMap[p.supplier_id] : undefined,
         linkedStoreIds: storeLinksByProduct[pid] || [],

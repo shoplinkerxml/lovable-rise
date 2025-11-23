@@ -35,8 +35,7 @@ export const Shops = () => {
     }));
   };
 
-
-
+  // No forced refresh on mount; React Query in ShopsList handles initial fetch
   const handleCreateNew = () => {
     if (!limitInfo.canCreate) {
       toast.error(t('shops_limit_reached') + '. ' + t('upgrade_plan'));
@@ -89,7 +88,7 @@ export const Shops = () => {
                   size="icon"
                   title={t('refresh') || 'Оновити'}
                   onClick={() => {
-                    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
+                    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
                     setRefreshTrigger(prev => prev + 1);
                   }}
                 >

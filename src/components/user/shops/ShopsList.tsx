@@ -13,12 +13,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
-import { Store, Edit, Trash2, Loader2, Package, List } from 'lucide-react';
+import { Store, Edit, Trash2, Package, List } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type ShopAggregated } from '@/lib/shop-service';
 import { supabase } from '@/integrations/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type ShopWithMarketplace = ShopAggregated;
 
@@ -44,42 +46,47 @@ export const ShopsList = ({
     shop: null
   });
 
-  const { data: shopsData, isLoading } = useQuery<ShopWithMarketplace[]>({
+  const { data: shopsData, isLoading, isFetching } = useQuery<ShopWithMarketplace[]>({
     queryKey: ['shopsList'],
     queryFn: async () => {
-      const cacheKey = 'rq:shopsList';
-      try {
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { items: ShopWithMarketplace[]; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            return parsed.items;
-          }
-        }
-      } catch {}
       const rows = await ShopService.getShopsAggregated();
       try {
-        const payload = JSON.stringify({ items: rows as ShopWithMarketplace[], expiresAt: Date.now() + 900_000 });
-        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-      } catch {}
+        const payload = JSON.stringify({ items: rows as ShopWithMarketplace[], expiresAt: Date.now() + 300_000 });
+        if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', payload);
+      } catch { void 0; }
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 900_000,
-    refetchOnMount: false,
+    staleTime: 0,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
-    placeholderData: (prev) => prev as ShopWithMarketplace[] | undefined,
+    refetchOnReconnect: false,
   });
   const shops: ShopWithMarketplace[] = shopsData ?? [];
-  useEffect(() => { onShopsLoaded?.(shops.length); }, [shops.length]);
-  useEffect(() => { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); }, [refreshTrigger]);
+  useEffect(() => { onShopsLoaded?.(shops.length); }, [shops.length, onShopsLoaded]);
   useEffect(() => {
-    const channel = (supabase as any).channel('shops_realtime').on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'stores' },
-      () => { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); }
-    ).subscribe();
-    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+    if ((refreshTrigger ?? 0) > 0) {
+      queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+    }
+  }, [refreshTrigger, queryClient]);
+  useEffect(() => {
+    let debounceTimer: number | null = null;
+    const scheduleInvalidate = () => {
+      if (debounceTimer != null) window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+        debounceTimer = null;
+      }, 150);
+    };
+
+    const ch = (supabase as SupabaseClient)
+      .channel('shops_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores' }, scheduleInvalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_links' }, scheduleInvalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_products' }, scheduleInvalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_store_categories' }, scheduleInvalidate)
+      .subscribe();
+    return () => { try { (supabase as SupabaseClient).removeChannel(ch); } catch { void 0; } };
   }, [queryClient]);
 
   const handleDeleteConfirm = async () => {
@@ -89,19 +96,13 @@ export const ShopsList = ({
       await onDelete?.(deleteDialog.shop.id);
       setDeleteDialog({ open: false, shop: null });
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-    } catch (error: any) {
-      console.error('Delete error:', error);
-      toast.error(error?.message || t('failed_delete_shop'));
+    } catch (error: unknown) {
+      const message = typeof (error as { message?: string }).message === 'string' ? (error as { message?: string }).message : '';
+      toast.error(message || t('failed_delete_shop'));
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
+  const showSkeletons = (isLoading || isFetching) && shops.length === 0;
 
   if (shops.length === 0) {
     return (
@@ -128,6 +129,35 @@ export const ShopsList = ({
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {showSkeletons && Array.from({ length: 6 }).map((_, idx) => (
+          <Card key={`skeleton_${idx}`} className="hover:shadow-none">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <div className="flex gap-1">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+              </div>
+              <Skeleton className="h-5 w-40 mt-2" />
+              <Skeleton className="h-4 w-24" />
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                  <Skeleton className="h-4 w-4 rounded" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Skeleton className="h-4 w-4 rounded" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
         {shops.map((shop) => (
           <Card 
             key={shop.id} 
@@ -163,12 +193,12 @@ export const ShopsList = ({
                 <div className="flex items-center gap-1" data-testid={`user_shop_item_products_${shop.id}`}>
                   <Package className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">{t('shop_products')}:</span>
-                  <span className="font-medium">{(shop as any).productsCount ?? 0}</span>
+                  <span className="font-medium">{shop.productsCount ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-1" data-testid={`user_shop_item_categories_${shop.id}`}>
                   <List className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">{t('shop_categories')}:</span>
-                  <span className="font-medium">{(shop as any).categoriesCount ?? 0}</span>
+                  <span className="font-medium">{(shop.productsCount ?? 0) === 0 ? 0 : (shop.categoriesCount ?? 0)}</span>
                 </div>
               </div>
             </CardContent>

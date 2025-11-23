@@ -33,8 +33,30 @@ const UserProtected = () => {
   useEffect(() => {
     const checkAuthentication = async () => {
       try {
-        setPrefetchOpen(true);
-        setPrefetchProgress(5);
+        const now = Date.now();
+        const readCache = (key: string) => {
+          try {
+            const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+            if (!raw) return null;
+            const parsed = JSON.parse(raw) as { items: unknown[]; expiresAt: number };
+            if (parsed && Array.isArray(parsed.items) && parsed.expiresAt > now) return parsed.items;
+            return null;
+          } catch { return null; }
+        };
+        const shopsCached = readCache('rq:shopsList');
+        const productsCached = readCache('rq:products:first:all');
+        const tariffsCached = readCache('rq:tariffs:list');
+        const suppliersCached = readCache('rq:suppliers:list');
+        const flagRaw = typeof window !== 'undefined' ? window.localStorage.getItem('rq:prefetch_done') : null;
+        const prefetchDone = flagRaw === '1';
+        const needsPrefetch = !shopsCached || !productsCached || !tariffsCached || !suppliersCached;
+        const showOverlay = !prefetchDone && needsPrefetch;
+        if (showOverlay) {
+          setPrefetchOpen(true);
+          setPrefetchProgress(5);
+        } else {
+          setPrefetchOpen(false);
+        }
         // First validate session with enhanced validation
         const sessionValidation = await SessionValidator.ensureValidSession();
         
@@ -50,7 +72,7 @@ const UserProtected = () => {
         // debug logging disabled to avoid extra requests during navigation
         
         const authMe = await UserAuthService.fetchAuthMe();
-        setPrefetchProgress(12);
+        if (showOverlay) setPrefetchProgress(12);
         const currentUser = authMe.user;
         const session = sessionValidation.isValid ? sessionValidation.session || null : null;
 
@@ -74,31 +96,10 @@ const UserProtected = () => {
             setSessionError(null);
             // Prefetch TTL caches so subsequent pages avoid network
             try {
-              const now = Date.now();
-              const readCache = (key: string) => {
-                try {
-                  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-                  if (!raw) return null;
-                  const parsed = JSON.parse(raw) as { items: unknown[]; expiresAt: number };
-                  if (parsed && Array.isArray(parsed.items) && parsed.expiresAt > now) return parsed.items;
-                  return null;
-                } catch { return null; }
-              };
-              const shopsCached = readCache('rq:shopsList');
-              const productsCached = readCache('rq:products:first:all');
-              const tariffsCached = readCache('rq:tariffs:list');
-              const suppliersCached = readCache('rq:suppliers:list');
-              if (!shopsCached || !productsCached || !tariffsCached || !suppliersCached) {
-                setPrefetchProgress(18);
+              if (needsPrefetch) {
+                if (showOverlay) setPrefetchProgress(18);
                 const tasks: Array<Promise<void>> = [];
-                if (!shopsCached) {
-                  tasks.push((async () => {
-                    const { ShopService } = await import('@/lib/shop-service');
-                    const shops = await ShopService.getShopsAggregated();
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', JSON.stringify({ items: shops, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
-                    setPrefetchProgress((p) => Math.max(p, 35));
-                  })());
-                }
+                // Do not prefetch shops to avoid duplicate requests when navigating to /user/Shops
                 if (!productsCached) {
                   tasks.push((async () => {
                     const { ProductService } = await import('@/lib/product-service');
@@ -112,8 +113,8 @@ const UserProtected = () => {
                         window.localStorage.setItem(keySized, payload);
                         window.localStorage.setItem(keyGeneric, payload);
                       }
-                    } catch (_e) { /* noop */ }
-                    setPrefetchProgress((p) => Math.max(p, 70));
+                    } catch (_e) { void 0; }
+                    if (showOverlay) setPrefetchProgress((p) => Math.max(p, 70));
                   })());
                 }
                 if (!tariffsCached) {
@@ -121,7 +122,7 @@ const UserProtected = () => {
                     const { TariffService } = await import('@/lib/tariff-service');
                     const tariffs = await TariffService.getTariffsAggregated(false);
                     try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
-                    setPrefetchProgress((p) => Math.max(p, 95));
+                    if (showOverlay) setPrefetchProgress((p) => Math.max(p, 95));
                   })());
                 }
                 if (!suppliersCached) {
@@ -129,12 +130,13 @@ const UserProtected = () => {
                     const { SupplierService } = await import('@/lib/supplier-service');
                     const suppliers = await SupplierService.getSuppliers();
                     try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:suppliers:list', JSON.stringify({ items: suppliers, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
-                    setPrefetchProgress((p) => Math.max(p, 98));
+                    if (showOverlay) setPrefetchProgress((p) => Math.max(p, 98));
                   })());
                 }
                 await Promise.allSettled(tasks);
+                try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:prefetch_done', '1'); } catch { void 0; }
               }
-            } catch { /* noop */ }
+            } catch { void 0; }
           } else {
             // If admin or manager, redirect to admin interface
             console.log('[UserProtected] Non-user role detected, redirecting to admin:', currentUser.role);
@@ -148,7 +150,7 @@ const UserProtected = () => {
           setSessionError('No session or user data');
         }
         
-        setPrefetchProgress(100);
+        if (showOverlay) setPrefetchProgress(100);
         setReady(true);
       } catch (error) {
         console.error('[UserProtected] Error checking authentication:', error);
@@ -170,7 +172,7 @@ const UserProtected = () => {
     return (
       <div className="min-h-screen">
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="w-[420px] rounded-lg border bg-background p-6 shadow-lg">
+          <div className="w-[420px] rounded-lg border-0 bg-background p-6 shadow-lg">
             <div className="space-y-3">
               <div className="font-medium">Завантажуємо кабінет</div>
               <div className="text-sm text-muted-foreground">Будь ласка, зачекайте. Йде підготовка даних.</div>
@@ -213,7 +215,7 @@ const UserProtected = () => {
     <div className="min-h-screen">
       {prefetchOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="w-[420px] rounded-lg border bg-background p-6 shadow-lg">
+          <div className="w-[420px] rounded-lg border-0 bg-background p-6 shadow-lg">
             <div className="space-y-3">
               <div className="font-medium">Завантажуємо кабінет</div>
               <div className="text-sm text-muted-foreground">Будь ласка, зачекайте. Йде підготовка даних.</div>
