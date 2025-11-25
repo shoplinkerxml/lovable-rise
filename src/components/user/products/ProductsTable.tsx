@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Store } from "lucide-react";
+import { Package, Columns as ColumnsIcon, Plus, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Store, Copy, Edit, Trash2 } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/providers/i18n-provider";
@@ -58,9 +58,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { ProductActionsDropdown } from "./ProductsTable/RowActionsDropdown";
+import { StoresBadgeCell } from "./ProductsTable/StoresBadgeCell";
+import { SortableHeader } from "./ProductsTable/SortableHeader";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -127,217 +130,24 @@ function ProductStatusBadge({ state }: { state?: string }) {
   );
 }
 
-function SortableHeader({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.7 : 1,
-  };
-  return (
-    <div ref={setNodeRef} style={style} className="flex items-center justify-between">
-      <div className="min-w-0 flex-1">{children}</div>
-      <button
-        type="button"
-        className="h-6 w-4 inline-flex items-center justify-center ml-1 rounded hover:bg-muted"
-        {...listeners}
-        {...attributes}
-        data-testid={`user_products_header_drag_${id}`}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-grip-vertical h-4 w-4 text-muted-foreground">
-          <circle cx="9" cy="5" r="1"></circle>
-          <circle cx="9" cy="12" r="1"></circle>
-          <circle cx="9" cy="19" r="1"></circle>
-          <circle cx="15" cy="5" r="1"></circle>
-          <circle cx="15" cy="12" r="1"></circle>
-          <circle cx="15" cy="19" r="1"></circle>
-        </svg>
-      </button>
-    </div>
-  );
-}
+ 
 
-function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void }) {
-  const { t } = useI18n();
-  const queryClient = useQueryClient();
-  const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
-  const [stores, setStores] = useState<any[]>([]);
-  const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
-  const [loadingStores, setLoadingStores] = useState(false);
-  const [loadingLinks, setLoadingLinks] = useState(false);
-
-  const loadStoresAndLinks = async () => {
-    try {
-      const cachedAgg = queryClient.getQueryData<any[]>(['shopsList']) || [];
-      if (cachedAgg.length > 0) {
-        setStores(cachedAgg);
-      } else {
-        setLoadingStores(true);
-        const data = await ShopService.getShopsAggregated();
-        setStores(data || []);
-        try { queryClient.setQueryData(['shopsList'], data || []); } catch { /* ignore */ }
-        setLoadingStores(false);
-      }
-      setLoadingLinks(true);
-      ProductService.invalidateStoreLinksCache(String(product.id));
-      const ids = await ProductService.getStoreLinksForProduct(product.id);
-      setLinkedStoreIds(ids);
-      // do not patch table while opening submenu; keep dropdown stable
-    } catch (_) {
-      setStores([]);
-      setLinkedStoreIds([]);
-    } finally {
-      setLoadingLinks(false);
-    }
-  };
-
-  const [actionsOpen, setActionsOpen] = useState(false);
-  return (
-    <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="h-8 w-8 p-0"
-          aria-label="Open row actions"
-          onClick={() => {
-            // При открытии меню действий считаем строку выбранной
-            onTrigger?.();
-          }}
-          data-testid="user_products_row_actions"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit} className="cursor-pointer" data-testid="user_products_row_edit">
-          <Edit className="mr-2 h-4 w-4" />
-          {t("edit")}
-        </DropdownMenuItem>
-        {hideDuplicate ? null : (
-          <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false}>
-            <Copy className="mr-2 h-4 w-4" />
-            {t("duplicate")}
-          </DropdownMenuItem>
-        )}
-        {storeId ? null : (
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} onClick={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
-            <Store className="h-4 w-4" />
-            {t("menu_stores")}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="p-1" data-testid={`user_products_row_stores_content_${product.id}`}>
-            {((stores || []).length === 0 && loadingStores) ? (
-              <DropdownMenuItem disabled>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("loading")}
-              </DropdownMenuItem>
-            ) : (
-              (stores || []).length === 0 ? (
-                <DropdownMenuItem disabled>—</DropdownMenuItem>
-              ) : (
-                (stores || []).map((s: any) => {
-                  const id = String(s.id);
-                  const initialLinked = Array.isArray(product.linkedStoreIds) ? (product.linkedStoreIds as string[]).map(String) : [];
-                  const checked = initialLinked.includes(id) || linkedStoreIds.includes(id);
-                  return (
-                    <DropdownMenuItem
-                      key={id}
-                      className="cursor-pointer pr-2 pl-2 hover:bg-muted/60 focus:bg-muted/60"
-                      onSelect={(e) => e.preventDefault()}
-                      data-testid={`user_products_row_store_item_${product.id}_${id}`}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={async (v) => {
-                          try {
-                            if (v) {
-                              await ProductService.bulkAddStoreProductLinks([
-                                {
-                                  product_id: String(product.id),
-                                  store_id: String(id),
-                                  is_active: true,
-                                  custom_price: (product as any).price ?? null,
-                                  custom_price_old: (product as any).price_old ?? null,
-                                  custom_price_promo: (product as any).price_promo ?? null,
-                                  custom_stock_quantity: (product as any).stock_quantity ?? null,
-                                  custom_available: (product as any).available ?? true,
-                                },
-                              ]);
-                              ProductService.invalidateStoreLinksCache(String(product.id));
-                              const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                              setLinkedStoreIds(fetched);
-                              {
-                                const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: true, categoryKey });
-                                toast.success(t('product_added_to_store'));
-                                ShopService.bumpProductsCountInCache(String(id), 1);
-                                try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
-                                try {
-                                  queryClient.setQueryData(['shopsList'], (prev: any[] | undefined) => {
-                                    const arr = Array.isArray(prev) ? prev : (stores || []);
-                                    return (arr || []).map((s: any) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) + 1)) } : s);
-                                  });
-                                  const updated = queryClient.getQueryData<any[]>(['shopsList']) || [];
-                                  setStores(updated as any[]);
-                                } catch { /* ignore */ }
-                              }
-                            } else {
-                              await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
-                              ProductService.invalidateStoreLinksCache(String(product.id));
-                              const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                              setLinkedStoreIds(fetched);
-                              {
-                                const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: false, categoryKey });
-                                toast.success(t('product_removed_from_store'));
-                                ShopService.bumpProductsCountInCache(String(id), -1);
-                                try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
-                                try {
-                                  queryClient.setQueryData(['shopsList'], (prev: any[] | undefined) => {
-                                    const arr = Array.isArray(prev) ? prev : (stores || []);
-                                    return (arr || []).map((s: any) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) - 1)) } : s);
-                                  });
-                                  const updated = queryClient.getQueryData<any[]>(['shopsList']) || [];
-                                  setStores(updated as any[]);
-                                } catch { /* ignore */ }
-                              }
-                            }
-                          } catch (_) {
-                            toast.error(t('operation_failed'));
-                          }
-                        }}
-                        className="mr-2 cursor-pointer"
-                        aria-label={t('select_store')}
-                      />
-                      <span className="truncate">{s.store_name || s.store_url || id}</span>
-                    </DropdownMenuItem>
-                  );
-                })
-              )
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="cursor-pointer focus:text-destructive" data-testid="user_products_row_delete">
-          <Trash2 className="mr-2 h-4 w-4" />
-          {t("delete")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+ 
 
 type ProductRow = Product & {
   mainImageUrl?: string;
   categoryName?: string;
   supplierName?: string;
   linkedStoreIds?: string[];
+  vendor?: string | null;
+  docket_ua?: string | null;
+  description_ua?: string | null;
+  available?: boolean;
 };
 
 type PageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
 type ResponseData = { products: ProductRow[]; page: PageInfo };
+type StoreAgg = { id: string; store_name?: string | null; store_url?: string | null; productsCount?: number; categoriesCount?: number };
 
 export const ProductsTable = ({
   onEdit,
@@ -352,26 +162,6 @@ export const ProductsTable = ({
 }: ProductsTableProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const setProductsCached = (updater: (prev: ProductRow[]) => ProductRow[]) => {
-    setItems((prev) => updater(prev));
-    queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
-    try {
-      const sizedKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: any; expiresAt: number };
-        if (parsed && Array.isArray(parsed.items)) {
-          const nextItems = updater(parsed.items as ProductRow[]);
-          const payload = JSON.stringify({ items: nextItems, page: parsed.page, expiresAt: parsed.expiresAt });
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(sizedKey, payload);
-          }
-        }
-      }
-      ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
-      ProductService.updateFirstPageCaches(null, (arr) => updater(arr as ProductRow[]));
-    } catch { void 0; }
-  };
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
     open: false,
@@ -388,6 +178,26 @@ export const ProductsTable = ({
   const [items, setItems] = useState<ProductRow[]>([]);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
+    setItems((prev) => updater(prev));
+    queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
+    try {
+      const sizedKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: PageInfo; expiresAt: number };
+        if (parsed && Array.isArray(parsed.items)) {
+          const nextItems = updater(parsed.items as ProductRow[]);
+          const payload = JSON.stringify({ items: nextItems, page: parsed.page, expiresAt: parsed.expiresAt });
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(sizedKey, payload);
+          }
+        }
+      }
+      ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
+      ProductService.updateFirstPageCaches(null, (arr) => updater(arr as ProductRow[]));
+    } catch { void 0; }
+  }, [queryClient, storeId, pagination.pageSize]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
   const requestedOffsets = useRef<Set<number>>(new Set());
   const loadingFirstRef = useRef(false);
@@ -475,23 +285,29 @@ export const ProductsTable = ({
   }, [products.length, pageInfo]);
   useEffect(() => {
     let scheduled = false;
-    let timeoutId: any = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const schedule = () => {
       if (scheduled) return;
       scheduled = true;
       timeoutId = setTimeout(() => {
         scheduled = false;
         queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
+        try { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); } catch { void 0; }
       }, 300);
     };
-    const channel = (supabase as any)
+    type RealtimeChannelApi = { on: (...args: unknown[]) => RealtimeChannelApi; subscribe: () => unknown };
+    const sb = supabase as unknown as {
+      channel: (name: string) => RealtimeChannelApi;
+      removeChannel: (ch: unknown) => void;
+    };
+    const channel = sb
       .channel(`products_${storeId ?? 'all'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'store_products', ...(storeId ? { filter: `store_id=eq.${storeId}` } : {}) }, () => schedule())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_links', ...(storeId ? { filter: `store_id=eq.${storeId}` } : {}) }, () => schedule())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_images' }, () => schedule())
       .subscribe();
     return () => {
-      try { (supabase as any).removeChannel(channel); } catch { void 0; }
+      try { sb.removeChannel(channel); } catch { void 0; }
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [queryClient, storeId]);
@@ -499,7 +315,7 @@ export const ProductsTable = ({
   
 
   // Дублирование товара и обновление таблицы
-  const handleDuplicate = async (product: Product) => {
+  const handleDuplicate = useCallback(async (product: Product) => {
     try {
       if (canCreate === false) {
         toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
@@ -511,7 +327,8 @@ export const ProductsTable = ({
       await loadFirstPage();
     } catch (error) {
       console.error("Duplicate product failed", error);
-      const msg = String((error as any)?.message || '');
+      const err = error as unknown as { message?: unknown };
+      const msg = typeof err.message === 'string' ? err.message : '';
       if (msg.toLowerCase().includes('ліміт') || msg.toLowerCase().includes('limit')) {
         toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
       } else {
@@ -520,7 +337,26 @@ export const ProductsTable = ({
     } finally {
       setCopyDialog({ open: false, name: null });
     }
-  };
+  }, [canCreate, t, loadFirstPage]);
+
+  const handleRemoveStoreLink = useCallback(async (productId: string, storeIdToRemove: string) => {
+    const pid = String(productId);
+    const sid = String(storeIdToRemove);
+    let reverted = false;
+    setProductsCached((prev) => prev.map((p) => p.id === pid ? { ...p, linkedStoreIds: (p.linkedStoreIds || []).filter((id) => String(id) !== sid) } : p));
+    try {
+      await ProductService.bulkRemoveStoreProductLinks([pid], [sid]);
+      try { ShopService.bumpProductsCountInCache(sid, -1); } catch { void 0; }
+      try { await ProductService.recomputeStoreCategoryFilterCache(sid); } catch { void 0; }
+      try { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); } catch { void 0; }
+      toast.success(t('product_removed_from_store'));
+    } catch (_) {
+      reverted = true;
+      setProductsCached((prev) => prev.map((p) => p.id === pid ? { ...p, linkedStoreIds: Array.from(new Set([...(p.linkedStoreIds || []), sid])) } : p));
+      toast.error(t('failed_remove_from_store'));
+    }
+    return !reverted;
+  }, [setProductsCached, queryClient, t]);
 
   const currentStart = pagination.pageIndex * pagination.pageSize;
   const currentEnd = currentStart + pagination.pageSize;
@@ -529,7 +365,7 @@ export const ProductsTable = ({
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   // Persisted column visibility (hide vendor/short name/description by default)
   const COLUMN_VIS_KEY = "user_products_columnVisibility";
-  const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  const DEFAULT_COLUMN_VISIBILITY = useMemo<VisibilityState>(() => ({
     select: true,
     created_at: false,
     supplier: true,
@@ -539,7 +375,7 @@ export const ProductsTable = ({
     description_ua: false,
     price_old: false,
     price_promo: false,
-  };
+  }), []);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY);
   useEffect(() => {
     try {
@@ -556,7 +392,7 @@ export const ProductsTable = ({
       // If parsing fails, keep defaults
       setColumnVisibility(DEFAULT_COLUMN_VISIBILITY);
     }
-  }, []);
+  }, [DEFAULT_COLUMN_VISIBILITY]);
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -590,17 +426,24 @@ export const ProductsTable = ({
   // Управляемое состояние открытия меню колонок: не закрывать по клику внутри
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [storesMenuOpen, setStoresMenuOpen] = useState(false);
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreAgg[]>([]);
+  const storeNames = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of stores || []) m[String(s.id)] = String(s.store_name || "");
+    return m;
+  }, [stores]);
+  const { data: shopsAgg } = useQuery({ queryKey: ['shopsList'], queryFn: ShopService.getShopsAggregated });
+  useEffect(() => { if (Array.isArray(shopsAgg)) setStores(shopsAgg as StoreAgg[]); }, [shopsAgg]);
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const loadStoresForMenu = useCallback(async () => {
-    const cachedAgg = queryClient.getQueryData<any[]>(['shopsList']);
+    const cachedAgg = queryClient.getQueryData<StoreAgg[]>(['shopsList']);
     if (Array.isArray(cachedAgg) && cachedAgg.length > 0) {
       setStores(cachedAgg);
       return;
     }
     const data = await ShopService.getShopsAggregated();
-    setStores(data || []);
-    try { queryClient.setQueryData(['shopsList'], data || []); } catch { /* ignore */ }
+    setStores((data || []) as StoreAgg[]);
+    try { queryClient.setQueryData<StoreAgg[]>(['shopsList'], (data || []) as StoreAgg[]); } catch { void 0; }
   }, [queryClient]);
   const [addingStores, setAddingStores] = useState(false);
   const [removingStores, setRemovingStores] = useState(false);
@@ -617,7 +460,7 @@ export const ProductsTable = ({
   }, [storeId]);
 
   // Toggle sort control rendered as native button with inline SVG icon
-  function SortToggle({ column, table }: { column: any; table: any }) {
+  function SortToggle({ column, table }: { column: import("@tanstack/react-table").Column<ProductRow, unknown>; table: import("@tanstack/react-table").Table<ProductRow> }) {
     const { t } = useI18n();
     const cur = column.getIsSorted?.(); // false | 'asc' | 'desc'
     const isActive = cur === "asc" || cur === "desc";
@@ -643,20 +486,20 @@ export const ProductsTable = ({
     );
   }
 
-  function ColumnFilterMenu({ column, extraOptions }: { column: any; extraOptions?: string[] }) {
+  function ColumnFilterMenu({ column, extraOptions }: { column: import("@tanstack/react-table").Column<ProductRow, unknown>; extraOptions?: string[] }) {
     const { t } = useI18n();
     const [query, setQuery] = useState("");
     const faceted = column.getFacetedUniqueValues?.();
     const values = faceted ? Array.from(faceted.keys()) : [];
     const extraCategoryOptions = column.id === "category" ? (extraOptions || []) : [];
     const unionValues = Array.from(new Set([...
-      values.map((v: any) => (typeof v === "string" ? v : v == null ? "" : String(v))),
+      values.map((v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v))),
       ...extraCategoryOptions,
     ]));
     // Normalize current filter to an array for multi-select
     const currentFilter = column.getFilterValue?.();
     const selectedValues: string[] = Array.isArray(currentFilter)
-      ? currentFilter.map((v: any) => (v == null ? "" : String(v)))
+      ? (currentFilter as unknown[]).map((v) => (v == null ? "" : String(v as unknown as string)))
       : currentFilter
       ? [String(currentFilter)]
       : [];
@@ -822,9 +665,13 @@ export const ProductsTable = ({
           .join("")
           .toUpperCase()
           .slice(0, 2);
+        const hasStores = Array.isArray(product.linkedStoreIds) && product.linkedStoreIds.length > 0;
+        const sizeCls = hasStores
+          ? "h-[clamp(2.25rem,4vw,3rem)] w-[clamp(2.25rem,4vw,3rem)]"
+          : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
         return (
           <div className="flex items-center justify-start" data-testid="user_products_photo">
-            <Avatar className="h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)] rounded-md">
+            <Avatar className={`${sizeCls} rounded-md`}>
               {img ? (
                 <AvatarImage src={img} alt={product.name_ua || product.name || ""} />
               ) : (
@@ -842,7 +689,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -873,7 +720,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -897,7 +744,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -910,7 +757,7 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => {
-        const name = (row.original as any).supplierName;
+        const name = row.original.supplierName;
         return name ? (
           <span className="text-sm" data-testid="user_products_supplier">{name}</span>
         ) : (
@@ -926,7 +773,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -939,8 +786,7 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => {
-        const p = row.original as any;
-        const currency = p.currency_code || "";
+        const currency = row.original.currency_code || "";
         const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
         return row.original.price != null ? (
           <span className="tabular-nums">{row.original.price} {symbol}</span>
@@ -956,7 +802,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -969,8 +815,7 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => {
-        const p = row.original as any;
-        const currency = p.currency_code || "";
+        const currency = row.original.currency_code || "";
         const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
         return row.original.price_old != null ? (
           <span className="tabular-nums" data-testid="user_products_priceOld">{row.original.price_old} {symbol}</span>
@@ -987,7 +832,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1000,8 +845,7 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => {
-        const p = row.original as any;
-        const currency = p.currency_code || "";
+        const currency = row.original.currency_code || "";
         const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
         return row.original.price_promo != null ? (
           <span className="tabular-nums" data-testid="user_products_pricePromo">{row.original.price_promo} {symbol}</span>
@@ -1018,7 +862,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1042,7 +886,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1075,7 +919,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1108,7 +952,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1129,7 +973,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1141,7 +985,7 @@ export const ProductsTable = ({
           </div>
         </div>
       ),
-      cell: ({ row }) => <span className="text-sm text-foreground">{(row.original as any).vendor || ""}</span>,
+      cell: ({ row }) => <span className="text-sm text-foreground">{row.original.vendor || ""}</span>,
       enableHiding: true,
     },
     {
@@ -1150,7 +994,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1163,7 +1007,7 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => {
-        const shortName = (row.original as any).docket_ua || "";
+        const shortName = row.original.docket_ua || "";
         return (
           <div
             className="text-sm text-foreground max-w-[clamp(8rem,20vw,16rem)] truncate"
@@ -1182,7 +1026,7 @@ export const ProductsTable = ({
         const rv = row.getValue(id);
         const str = rv == null ? "" : String(rv);
         if (value == null) return true;
-        if (Array.isArray(value)) return value.map((v: any) => String(v)).includes(str);
+        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
         return str.toLowerCase().includes(String(value).toLowerCase());
       },
       header: ({ column, table }) => (
@@ -1195,7 +1039,7 @@ export const ProductsTable = ({
         </div>
       ),
       cell: ({ row }) => {
-        const desc = (row.original as any).description_ua || "";
+        const desc = row.original.description_ua || "";
         return (
           <div
             className="text-sm text-foreground max-w-[clamp(10rem,22vw,18rem)] line-clamp-2 break-words"
@@ -1214,32 +1058,38 @@ export const ProductsTable = ({
       enableSorting: false,
       enableHiding: false,
       size: 72,
-      cell: ({ row }) => {
-        const ids = (row.original as any).linkedStoreIds || [];
-        const count = Array.isArray(ids) ? ids.length : 0;
-        const has = count > 0;
-        return (
-          <div className="flex items-center justify-center" data-testid={`user_products_stores_${row.original.id}`}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex items-center gap-[0.25rem]">
-                    <Store className={has ? "h-4 w-4 text-primary" : "h-4 w-4 text-muted-foreground"} />
-                    {has ? (
-                      <Badge variant="secondary" className="h-[clamp(1rem,2.5vw,1.125rem)] px-[0.25rem] text-[0.75rem] leading-none">
-                        {count}
-                      </Badge>
-                    ) : null}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-sm">
-                  {has ? (count === 1 ? t("product_added_to_store") : t("product_added_to_stores")) : t("no_active_stores")}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        );
-      },
+      cell: ({ row }) => (
+        <StoresBadgeCell
+          product={row.original}
+          storeNames={storeNames}
+          onRemove={handleRemoveStoreLink}
+          onStoresUpdate={(productId, ids, opts) => {
+            try {
+              const storeChanged = opts?.storeIdChanged ? String(opts.storeIdChanged) : null;
+              const categoryKey = opts?.categoryKey || null;
+              const added = !!opts?.added;
+              if (storeChanged && categoryKey) {
+                const matchesKey = (p: ProductRow) => {
+                  const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
+                  return key === categoryKey;
+                };
+                const hasOtherInCategory = items.some((p) => {
+                  if (String(p.id) === String(productId)) return false;
+                  const idsStr = (p.linkedStoreIds || []).map(String);
+                  return idsStr.includes(storeChanged) && matchesKey(p);
+                });
+                if (added) {
+                  if (!hasOtherInCategory) ShopService.bumpCategoriesCountInCache(storeChanged, 1);
+                } else {
+                  const remains = hasOtherInCategory;
+                  if (!remains) ShopService.bumpCategoriesCountInCache(storeChanged, -1);
+                }
+              }
+            } catch { void 0; }
+            setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
+          }}
+        />
+      ),
     }] : []),
     {
       id: "actions",
@@ -1296,7 +1146,7 @@ export const ProductsTable = ({
       cell: ({ row }) => (
         <div className="flex items-center justify-center">
           <Switch
-            checked={!!(row.original as any).available}
+            checked={!!row.original.available}
             onCheckedChange={async (checked) => {
               try {
                 setProductsCached((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: checked } : p));
@@ -1312,7 +1162,7 @@ export const ProductsTable = ({
         </div>
       ),
     }] : []),
-  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate]);
+  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate, categoryFilterOptions, items, setProductsCached, storeNames, handleRemoveStoreLink]);
 
   const table = useReactTable({
     data: rows,
@@ -1624,7 +1474,7 @@ export const ProductsTable = ({
                         {(stores || []).length === 0 ? (
                           <div className="text-xs text-muted-foreground px-2 py-1">{t("no_active_stores")}</div>
                         ) : (
-                          (stores || []).map((s: any) => {
+                          (stores || []).map((s: StoreAgg) => {
                             const id = String(s.id);
                             const checked = selectedStoreIds.includes(id);
                             const countInStore = (items as ProductRow[]).reduce((acc, p) => {
@@ -1646,18 +1496,24 @@ export const ProductsTable = ({
                                 }}
                                 data-testid={`user_products_addToStores_item_${id}`}
                               >
-                                <Checkbox
-                                  checked={checked}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onCheckedChange={(v) => {
-                                    const next = v
-                                      ? Array.from(new Set([...selectedStoreIds, id]))
-                                      : selectedStoreIds.filter((x) => x !== id);
-                                    setSelectedStoreIds(next);
-                                  }}
-                                  className="mr-2"
-                                  aria-label={t("select_store")}
-                                />
+                                <div className="relative mr-2 inline-flex items-center justify-center" aria-busy={removingStores || removingStoreId === id}>
+                                  <Checkbox
+                                    checked={checked}
+                                    disabled={removingStores || removingStoreId === id}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={(v) => {
+                                      const next = v
+                                        ? Array.from(new Set([...selectedStoreIds, id]))
+                                        : selectedStoreIds.filter((x) => x !== id);
+                                      setSelectedStoreIds(next);
+                                    }}
+                                    className="mr-2"
+                                    aria-label={t("select_store")}
+                                  />
+                                  {(removingStores || removingStoreId === id) ? (
+                                    <Loader2 className="absolute h-3 w-3 animate-spin text-emerald-600 pointer-events-none" />
+                                  ) : null}
+                                </div>
                                 <span className="truncate">{s.store_name || s.store_url || id}</span>
                                 <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
                                   <span className="inline-flex items-center gap-1">
@@ -1677,7 +1533,7 @@ export const ProductsTable = ({
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       if (countInStore === 0) return;
-                                      const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                                      const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
                                       const productIds = Array.from(new Set(selected
                                         .filter((p) => (p.linkedStoreIds || []).map(String).includes(id))
                                         .map((p) => String(p.id))
@@ -1714,8 +1570,27 @@ export const ProductsTable = ({
                                                   const parsed = JSON.parse(raw) as { items?: string[] };
                                                   const cnt = Array.isArray(parsed?.items) ? parsed.items.length : 0;
                                                   ShopService.setCategoriesCountInCache(String(id), cnt);
+                                                  try {
+                                                    queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                                                      const arr = Array.isArray(prev) ? prev : (stores || []);
+                                                      const idStr = String(id);
+                                                      return (arr || []).map((s0) => s0.id === idStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
+                                                    });
+                                                    const updatedCats = (queryClient.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
+                                                    setStores(updatedCats);
+                                                  } catch { void 0; }
                                                 }
                                               } catch { void 0; }
+                                            } catch { void 0; }
+                                            try {
+                                              queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                                                const arr = Array.isArray(prev) ? prev : (stores || []);
+                                                const idStr = String(id);
+                                                const nextDec = dec > 0 ? dec : 0;
+                                                return (arr || []).map((s0) => s0.id === idStr ? { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) - nextDec)) } : s0);
+                                              });
+                                              const updated = (queryClient.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
+                                              setStores(updated);
                                             } catch { void 0; }
                                           } catch { void 0; }
                                           try {
@@ -1784,13 +1659,13 @@ export const ProductsTable = ({
                             disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
                             aria-disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
                             onClick={async () => {
-                              const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                              const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
                               const storeIds = Array.from(new Set(selectedStoreIds));
                               const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
                               if (productIds.length === 0 || storeIds.length === 0) return;
                               setAddingStores(true);
                               try {
-                                const payload: any[] = [];
+                                const payload: Array<{ product_id: string; store_id: string; is_active?: boolean; custom_price?: number | null; custom_price_old?: number | null; custom_price_promo?: number | null; custom_stock_quantity?: number | null; custom_available?: boolean | null }> = [];
                                 for (const p of selected) {
                                   const pid = String(p.id);
                                   const linksSet = new Set((p.linkedStoreIds || []).map(String));
@@ -1804,7 +1679,7 @@ export const ProductsTable = ({
                                       custom_price_old: p.price_old ?? null,
                                       custom_price_promo: p.price_promo ?? null,
                                       custom_stock_quantity: p.stock_quantity ?? null,
-                                      custom_available: (p as any).available ?? true,
+                                      custom_available: p.available ?? true,
                                     });
                                   }
                                 }
@@ -1828,15 +1703,15 @@ export const ProductsTable = ({
                                       const storesUnique = Array.from(new Set(storeIds.map(String)));
                                       for (const sid of storesUnique) { try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; } }
                                       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                                    } catch {}
+                                    } catch { void 0; }
                                   }
                                 }
                               } catch (e) {
                                 toast.error(t('failed_add_product_to_stores'));
                               } finally {
                                 setAddingStores(false);
-                                try { table.resetRowSelection(); } catch {}
-                                try { setLastSelectedProductIds(productIds); } catch {}
+                                try { table.resetRowSelection(); } catch { void 0; }
+                                try { setLastSelectedProductIds(productIds); } catch { void 0; }
                               }
                             }}
                             data-testid="user_products_addToStores_confirm"
@@ -1854,7 +1729,7 @@ export const ProductsTable = ({
                                 disabled={disableDelete}
                                 aria-disabled={disableDelete}
                                 onClick={async () => {
-                          const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as any[];
+                          const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
                           const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
                           const storeIds = effectiveStoreIds;
                           if (storeIds.length === 0) return;
@@ -1903,8 +1778,27 @@ export const ProductsTable = ({
                                       const parsed = JSON.parse(raw) as { items?: string[] };
                                       const cnt = Array.isArray(parsed?.items) ? parsed.items.length : 0;
                                       ShopService.setCategoriesCountInCache(String(sid), cnt);
+                                      try {
+                                        queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                                          const arr = Array.isArray(prev) ? prev : (stores || []);
+                                          const sidStr = String(sid);
+                                          return (arr || []).map((s0) => s0.id === sidStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
+                                        });
+                                      } catch { void 0; }
                                     }
                                   }
+                                } catch { void 0; }
+                                try {
+                                  queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                                    const arr = Array.isArray(prev) ? prev : (stores || []);
+                                    const mapDec = new Map(Object.entries(countsByStore));
+                                    return (arr || []).map((s0) => {
+                                      const dec = Number(mapDec.get(String(s0.id)) ?? 0);
+                                      return dec > 0 ? { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) - dec)) } : s0;
+                                    });
+                                  });
+                                  const updated = (queryClient.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
+                                  setStores(updated);
                                 } catch { void 0; }
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
                                 
@@ -1930,8 +1824,8 @@ export const ProductsTable = ({
                             toast.error(t('failed_remove_from_store'));
                           } finally {
                             setRemovingStores(false);
-                            try { table.resetRowSelection(); } catch { /* ignore */ }
-                            try { setLastSelectedProductIds([]); } catch {}
+                            try { table.resetRowSelection(); } catch { void 0; }
+                            try { setLastSelectedProductIds([]); } catch { void 0; }
                           }
                         }}
                         data-testid="user_products_addToStores_delete"
@@ -2080,14 +1974,14 @@ export const ProductsTable = ({
                   if (productToDelete) {
                     await onDelete?.(productToDelete);
                   } else {
-                    const selected = table.getSelectedRowModel().rows.map((r) => r.original);
+                    const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
                     if (storeId) {
                       didBatch = true;
                       try {
                         await Promise.all(
                           selected
-                            .map((p: any) => p?.id)
-                            .filter((id: any) => !!id)
+                            .map((p) => p.id)
+                            .filter((id) => !!id)
                             .map((id: string) => ProductService.removeStoreProductLink(String(id), storeId))
                         );
                         toast.success(t('product_removed_from_store'));

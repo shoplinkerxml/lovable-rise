@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Package, RefreshCw } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -58,19 +58,20 @@ export const Products = () => {
       setDeletingName(nameForUi);
       setIsDeleteOpen(true);
 
-      const prev = (queryClient.getQueryData(key) as any[] | undefined) ?? [];
-      queryClient.setQueryData<any[]>(key, (old) => (old ?? []).filter((p) => String((p as any)?.id) !== String(product.id)));
+      const prev = (queryClient.getQueryData<Product[]>(key) ?? []);
+      queryClient.setQueryData<Product[]>(key, (old) => (old ?? []).filter((p) => String(p?.id) !== String(product.id)));
 
       await ProductService.deleteProduct(product.id);
       toast.success(t('product_deleted'));
       // Optional background revalidation to sync with server, does not block UI
       queryClient.invalidateQueries({ queryKey: key });
-    } catch (error: any) {
-      const prev = (queryClient.getQueryData(['products', 'all']) as any[] | undefined) ?? [];
+    } catch (error: unknown) {
+      const prev = (queryClient.getQueryData<Product[]>(['products', 'all']) ?? []);
       // Rollback UI if deletion failed
-      queryClient.setQueryData<any[]>(['products', 'all'], prev);
+      queryClient.setQueryData<Product[]>(['products', 'all'], prev);
       console.error('Delete error:', error);
-      toast.error(error?.message || t('failed_delete_product'));
+      const msg = typeof (error as { message?: unknown })?.message === 'string' ? (error as { message?: string }).message : t('failed_delete_product');
+      toast.error(msg);
     } finally {
       setIsDeleteOpen(false);
       setDeletingName(null);
@@ -89,13 +90,7 @@ export const Products = () => {
               <Package className="h-4 w-4" />
               <span>{limitInfo.current} / {limitInfo.max}</span>
             </Badge>
-            <Button variant="ghost" size="icon" title={t('refresh') || 'Оновити'} onClick={() => {
-              try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
-              queryClient.invalidateQueries({ queryKey: ['products', 'all'] });
-              setRefreshTrigger(prev => prev + 1);
-            }}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            
           </div>
         }
       />

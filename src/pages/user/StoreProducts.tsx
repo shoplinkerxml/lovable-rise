@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ProductsTable } from "@/components/user/products/ProductsTable";
-import { ProductService, type Product } from "@/lib/product-service";
+import { ProductService, type Product, type ProductLimitInfo } from "@/lib/product-service";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";
-import { Loader2 } from "lucide-react";
+import { Loader2, Package, List } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 
 export const StoreProducts = () => {
   const { id } = useParams();
@@ -19,7 +20,17 @@ export const StoreProducts = () => {
   const [shopName, setShopName] = useState("");
   const [tableLoading, setTableLoading] = useState<boolean>(true);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
   const queryClient = useQueryClient();
+  const { data: shopsAgg } = useQuery({ queryKey: ['shopsList'], queryFn: ShopService.getShopsAggregated });
+  const aggProducts = (() => {
+    const s = (shopsAgg || []).find((row) => String((row as { id: string }).id) === storeId);
+    return Number((s as { productsCount?: number } | undefined)?.productsCount ?? 0);
+  })();
+  const aggCategories = (() => {
+    const s = (shopsAgg || []).find((row) => String((row as { id: string }).id) === storeId);
+    return Number((s as { categoriesCount?: number } | undefined)?.categoriesCount ?? 0);
+  })();
 
   useEffect(() => {
     if (!storeId) {
@@ -32,6 +43,10 @@ export const StoreProducts = () => {
       } catch (_) {
         setShopName("");
       }
+      try {
+        const info = await ProductService.getProductLimit();
+        setLimitInfo(info);
+      } catch (_) { void 0; }
     })();
   }, [storeId, t]);
 
@@ -64,8 +79,17 @@ export const StoreProducts = () => {
         ]}
         actions={
           <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-sm flex items-center gap-1.5">
+              <Package className="h-4 w-4" />
+              <span>{limitInfo.current} / {limitInfo.max}</span>
+            </Badge>
             <span className="text-sm text-muted-foreground">Товарів</span>
-            <Badge variant="outline" className="px-3 py-1 font-mono">{totalCount}</Badge>
+            <Badge variant="outline" className="px-3 py-1 font-mono">{aggProducts}</Badge>
+            <span className="text-sm text-muted-foreground">Категорій</span>
+            <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
+              <List className="h-3 w-3" />
+              <span>{aggCategories}</span>
+            </Badge>
           </div>
         }
       />
