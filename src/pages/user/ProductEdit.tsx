@@ -95,6 +95,16 @@ export const ProductEdit = () => {
       });
       try {
         const cidNum = formData.category_id ? Number(formData.category_id) : null;
+        let catName = '';
+        try {
+          if (cidNum != null) {
+            const name = await CategoryService.getNameByIdSafe(cidNum);
+            catName = name || '';
+          } else if (formData.supplier_id && formData.category_external_id) {
+            const cat = await CategoryService.getByExternalId(String(formData.supplier_id), formData.category_external_id);
+            catName = cat?.name || '';
+          }
+        } catch {}
         const patch: Partial<Product> = {
           name: formData.name,
           name_ua: formData.name_ua || null,
@@ -104,14 +114,16 @@ export const ProductEdit = () => {
           price_old: typeof formData.price_old === 'number' ? formData.price_old : null,
           price_promo: typeof formData.price_promo === 'number' ? formData.price_promo : null,
           available: !!formData.available,
+          stock_quantity: Number(formData.stock_quantity) || 0,
           category_id: cidNum ?? null,
           category_external_id: formData.category_external_id || null,
         } as any;
-        const catName = formData.category_name || '';
         ProductService.patchProductCaches(String(id), { ...(patch as any), categoryName: catName || undefined });
         queryClient.setQueryData(['products', 'all'], (prev: any[] | undefined) => {
           const arr = prev || [];
-          return arr.map((p) => String((p as any)?.id) === String(id) ? { ...p, ...(patch as any), categoryName: catName || (p as any).categoryName } : p);
+          return arr.map((p) => String((p as any)?.id) === String(id)
+            ? { ...p, ...(patch as any), categoryName: (catName || (p as any).categoryName) }
+            : p);
         });
       } catch {}
       toast.success(t('product_updated'));

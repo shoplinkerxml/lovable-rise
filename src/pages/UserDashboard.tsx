@@ -1,6 +1,5 @@
 import { useOutletContext } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -30,8 +29,6 @@ import { AlertCircle } from "lucide-react";
  
 interface UserDashboardContextType {
   user: UserProfileType;
-  menuItems: UserMenuItem[];
-  onMenuUpdate: () => void;
   refetch: () => void;
   subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null;
   tariffLimits: TariffLimit[];
@@ -39,8 +36,6 @@ interface UserDashboardContextType {
 const UserDashboard = () => {
   const {
     user,
-    menuItems,
-    onMenuUpdate,
     subscription,
     tariffLimits
   } = useOutletContext<UserDashboardContextType>();
@@ -134,7 +129,6 @@ const UserDashboard = () => {
             </AlertDescription>
           </Alert> : null}
 
-      {/* Dashboard Grid */}
       
 
       {/* Recent Activity Section */}

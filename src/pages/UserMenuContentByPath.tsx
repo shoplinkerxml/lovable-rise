@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { toast } from "sonner";
 import TariffPage from "./TariffPage";
 import { ListPage } from "@/pages/page-types/ListPage";
+import { DashboardPage } from "@/pages/page-types/DashboardPage";
 
 interface UserDashboardContextType {
   user: UserProfile;
@@ -28,6 +29,17 @@ const UserMenuContentByPath = () => {
   // Get the full path including any nested routes
   const location = useLocation();
   const fullPath = location.pathname.replace('/user/', '');
+
+  const dashboardWidgets = useMemo(() => {
+    const cfg = (menuItem?.content_data || {}) as Record<string, unknown>;
+    const widgets = Array.isArray((cfg as { widgets?: unknown[] }).widgets) ? ((cfg as { widgets?: unknown[] }).widgets as unknown[]) : [];
+    return widgets as unknown[];
+  }, [menuItem?.content_data]);
+  const dashboardData = useMemo(() => {
+    const cfg = (menuItem?.content_data || {}) as Record<string, unknown>;
+    const dataObj = typeof (cfg as { data?: unknown }).data === 'object' && (cfg as { data?: unknown }).data !== null ? ((cfg as { data?: Record<string, unknown> }).data as Record<string, unknown>) : {};
+    return { lastUpdated: Date.now(), ...dataObj } as Record<string, unknown>;
+  }, [menuItem?.content_data]);
 
   useEffect(() => {
     const loadMenuItem = async () => {
@@ -175,9 +187,7 @@ const UserMenuContentByPath = () => {
               title={menuItem.title} 
             />
           ) : menuItem.page_type === 'dashboard' ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Dashboard content would be displayed here.</p>
-            </div>
+            <DashboardPage widgets={dashboardWidgets} title={menuItem.title} data={dashboardData} />
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Custom page content would be displayed here.</p>

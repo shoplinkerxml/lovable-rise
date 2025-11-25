@@ -1,5 +1,8 @@
-import { Navigate, Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigationRefetch } from "@/hooks/useNavigationRefetch";
+import { ProductService } from "@/lib/product-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
@@ -29,6 +32,31 @@ const UserProtected = () => {
   const [prefetchOpen, setPrefetchOpen] = useState(false);
   const [prefetchProgress, setPrefetchProgress] = useState(0);
   const ttlMs = 900_000;
+  const queryClient = useQueryClient();
+  const location = useLocation();
+  const navReadyRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
+
+  const refresh = useCallback(async () => {
+    try {
+      if (!user?.id) return;
+      const authMe = await UserAuthService.fetchAuthMe();
+      const sub = authMe.subscription as SubscriptionEntity | null;
+      const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
+      setHasAccess(valid);
+      setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
+      setTariffLimits(Array.isArray(authMe.tariffLimits) ? (authMe.tariffLimits as unknown as TariffLimit[]) : []);
+    } catch (_e) { void 0; }
+  }, [user?.id]);
+
+  useEffect(() => { navReadyRef.current = true; }, []);
+  useNavigationRefetch(refresh);
+
+  useEffect(() => {
+    if (authenticated) {
+      ProductService.getUserStores().catch(() => void 0);
+    }
+  }, [authenticated]);
 
   useEffect(() => {
     const checkAuthentication = async () => {
@@ -100,23 +128,7 @@ const UserProtected = () => {
                 if (showOverlay) setPrefetchProgress(18);
                 const tasks: Array<Promise<void>> = [];
                 // Do not prefetch shops to avoid duplicate requests when navigating to /user/Shops
-                if (!productsCached) {
-                  tasks.push((async () => {
-                    const { ProductService } = await import('@/lib/product-service');
-                    const limit = 10;
-                    const { products, page } = await ProductService.getProductsFirstPage(null, limit);
-                    try {
-                      if (typeof window !== 'undefined') {
-                        const keySized = `rq:products:first:${'all'}:${limit}`;
-                        const keyGeneric = `rq:products:first:${'all'}`;
-                        const payload = JSON.stringify({ items: products, page, expiresAt: Date.now() + ttlMs });
-                        window.localStorage.setItem(keySized, payload);
-                        window.localStorage.setItem(keyGeneric, payload);
-                      }
-                    } catch (_e) { void 0; }
-                    if (showOverlay) setPrefetchProgress((p) => Math.max(p, 70));
-                  })());
-                }
+                
                 if (!tariffsCached) {
                   tasks.push((async () => {
                     const { TariffService } = await import('@/lib/tariff-service');
@@ -198,18 +210,7 @@ const UserProtected = () => {
     return <Navigate to="/admin" replace />;
   }
 
-  const refresh = async () => {
-    try {
-      if (!user?.id) return;
-      UserAuthService.clearAuthMeCache();
-      const authMe = await UserAuthService.fetchAuthMe();
-      const sub = authMe.subscription as SubscriptionEntity | null;
-      const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
-      setHasAccess(valid);
-      setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
-            setTariffLimits(Array.isArray(authMe.tariffLimits) ? (authMe.tariffLimits as unknown as TariffLimit[]) : []);
-    } catch (_e) { void 0; }
-  };
+  
 
   return (
     <div className="min-h-screen">

@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Store } from "lucide-react";
+import { Edit, MoreHorizontal, Package, Trash2, Columns as ColumnsIcon, Plus, Copy, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Store } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/providers/i18n-provider";
@@ -164,25 +164,36 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
   const [stores, setStores] = useState<any[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
+  const [loadingLinks, setLoadingLinks] = useState(false);
 
   const loadStoresAndLinks = async () => {
-    if (loadingStores) return;
-    setLoadingStores(true);
     try {
-      const data = await ProductService.getUserStores();
-      setStores(data || []);
+      const cachedAgg = queryClient.getQueryData<any[]>(['shopsList']) || [];
+      if (cachedAgg.length > 0) {
+        setStores(cachedAgg);
+      } else {
+        setLoadingStores(true);
+        const data = await ShopService.getShopsAggregated();
+        setStores(data || []);
+        try { queryClient.setQueryData(['shopsList'], data || []); } catch { /* ignore */ }
+        setLoadingStores(false);
+      }
+      setLoadingLinks(true);
+      ProductService.invalidateStoreLinksCache(String(product.id));
       const ids = await ProductService.getStoreLinksForProduct(product.id);
       setLinkedStoreIds(ids);
+      // do not patch table while opening submenu; keep dropdown stable
     } catch (_) {
       setStores([]);
       setLinkedStoreIds([]);
     } finally {
-      setLoadingStores(false);
+      setLoadingLinks(false);
     }
   };
 
+  const [actionsOpen, setActionsOpen] = useState(false);
   return (
-    <DropdownMenu>
+    <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -210,12 +221,12 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
         )}
         {storeId ? null : (
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
+          <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} onClick={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
             <Store className="h-4 w-4" />
             {t("menu_stores")}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="p-1" data-testid={`user_products_row_stores_content_${product.id}`}>
-            {loadingStores ? (
+            {((stores || []).length === 0 && loadingStores) ? (
               <DropdownMenuItem disabled>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {t("loading")}
@@ -226,11 +237,12 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
               ) : (
                 (stores || []).map((s: any) => {
                   const id = String(s.id);
-                  const checked = linkedStoreIds.includes(id);
+                  const initialLinked = Array.isArray(product.linkedStoreIds) ? (product.linkedStoreIds as string[]).map(String) : [];
+                  const checked = initialLinked.includes(id) || linkedStoreIds.includes(id);
                   return (
                     <DropdownMenuItem
                       key={id}
-                      className="cursor-pointer pr-2 pl-2"
+                      className="cursor-pointer pr-2 pl-2 hover:bg-muted/60 focus:bg-muted/60"
                       onSelect={(e) => e.preventDefault()}
                       data-testid={`user_products_row_store_item_${product.id}_${id}`}
                     >
@@ -252,38 +264,50 @@ function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrig
                                   custom_available: (product as any).available ?? true,
                                 },
                               ]);
+                              ProductService.invalidateStoreLinksCache(String(product.id));
+                              const fetched = await ProductService.getStoreLinksForProduct(product.id);
+                              setLinkedStoreIds(fetched);
                               {
-                                setLinkedStoreIds((prev) => {
-                                  const next = Array.from(new Set([...prev, id]));
-                                  const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                  onStoresUpdate?.(product.id, next, { storeIdChanged: id, added: true, categoryKey });
-                                  return next;
-                                });
+                                const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                                onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: true, categoryKey });
                                 toast.success(t('product_added_to_store'));
                                 ShopService.bumpProductsCountInCache(String(id), 1);
                                 try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
-                                queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+                                try {
+                                  queryClient.setQueryData(['shopsList'], (prev: any[] | undefined) => {
+                                    const arr = Array.isArray(prev) ? prev : (stores || []);
+                                    return (arr || []).map((s: any) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) + 1)) } : s);
+                                  });
+                                  const updated = queryClient.getQueryData<any[]>(['shopsList']) || [];
+                                  setStores(updated as any[]);
+                                } catch { /* ignore */ }
                               }
                             } else {
                               await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
+                              ProductService.invalidateStoreLinksCache(String(product.id));
+                              const fetched = await ProductService.getStoreLinksForProduct(product.id);
+                              setLinkedStoreIds(fetched);
                               {
-                                setLinkedStoreIds((prev) => {
-                                  const next = prev.filter((x) => x !== id);
-                                  const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                  onStoresUpdate?.(product.id, next, { storeIdChanged: id, added: false, categoryKey });
-                                  return next;
-                                });
+                                const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                                onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: false, categoryKey });
                                 toast.success(t('product_removed_from_store'));
                                 ShopService.bumpProductsCountInCache(String(id), -1);
                                 try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
-                                queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+                                try {
+                                  queryClient.setQueryData(['shopsList'], (prev: any[] | undefined) => {
+                                    const arr = Array.isArray(prev) ? prev : (stores || []);
+                                    return (arr || []).map((s: any) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) - 1)) } : s);
+                                  });
+                                  const updated = queryClient.getQueryData<any[]>(['shopsList']) || [];
+                                  setStores(updated as any[]);
+                                } catch { /* ignore */ }
                               }
                             }
                           } catch (_) {
                             toast.error(t('operation_failed'));
                           }
                         }}
-                        className="mr-2"
+                        className="mr-2 cursor-pointer"
                         aria-label={t('select_store')}
                       />
                       <span className="truncate">{s.store_name || s.store_url || id}</span>
@@ -333,8 +357,7 @@ export const ProductsTable = ({
     queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
     try {
       const sizedKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
-      const genericKey = `rq:products:first:${storeId ?? 'all'}`;
-      const raw = typeof window !== 'undefined' ? (window.localStorage.getItem(sizedKey) || window.localStorage.getItem(genericKey)) : null;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) : null;
       if (raw) {
         const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: any; expiresAt: number };
         if (parsed && Array.isArray(parsed.items)) {
@@ -342,7 +365,6 @@ export const ProductsTable = ({
           const payload = JSON.stringify({ items: nextItems, page: parsed.page, expiresAt: parsed.expiresAt });
           if (typeof window !== 'undefined') {
             window.localStorage.setItem(sizedKey, payload);
-            window.localStorage.setItem(genericKey, payload);
           }
         }
       }
@@ -388,9 +410,6 @@ export const ProductsTable = ({
       setItems(products as ProductRow[]);
       setPageInfo(page);
       onProductsLoadedRef.current?.(page?.total ?? products.length);
-      if (page?.hasMore && page?.nextOffset != null) {
-        await loadNextPage({ limit: page.limit, offset: page.nextOffset });
-      }
     } finally {
       setLoading(false);
       onLoadingChangeRef.current?.(false);
@@ -400,7 +419,7 @@ export const ProductsTable = ({
 
   const loadNextPage = useCallback(async (override?: { limit: number; offset: number | null }) => {
     const nextOffset = override?.offset ?? pageInfo?.nextOffset ?? null;
-    const nextLimit = override?.limit ?? pageInfo?.limit ?? pagination.pageSize;
+    const nextLimit = override?.limit ?? pagination.pageSize;
     if (nextOffset == null) return;
     if (pageInfo && !pageInfo.hasMore) return;
     if (loadingNextRef.current) return;
@@ -440,13 +459,12 @@ export const ProductsTable = ({
     const requiredForPrefetch = (pagination.pageIndex + 2) * pagination.pageSize;
     const canLoad = pageInfo && pageInfo.hasMore && pageInfo.nextOffset != null;
     if (!canLoad) return;
+    if (loadingFirstRef.current) return;
     if (items.length < requiredForCurrent && !loadingNextRef.current && !requestedOffsets.current.has(pageInfo!.nextOffset!)) {
       loadNextPage();
       return;
     }
-    if (items.length >= requiredForCurrent && items.length < requiredForPrefetch && !loadingNextRef.current && !requestedOffsets.current.has(pageInfo!.nextOffset!)) {
-      loadNextPage();
-    }
+    
   }, [pagination.pageIndex, pagination.pageSize, items.length, pageInfo, loadNextPage]);
 
   const products: ProductRow[] = items;
@@ -490,7 +508,7 @@ export const ProductsTable = ({
       const nameForUi = product.name_ua || product.name || product.external_id || product.id;
       setCopyDialog({ open: true, name: nameForUi });
       await ProductService.duplicateProduct(product.id);
-      queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
+      await loadFirstPage();
     } catch (error) {
       console.error("Duplicate product failed", error);
       const msg = String((error as any)?.message || '');
@@ -574,6 +592,16 @@ export const ProductsTable = ({
   const [storesMenuOpen, setStoresMenuOpen] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
+  const loadStoresForMenu = useCallback(async () => {
+    const cachedAgg = queryClient.getQueryData<any[]>(['shopsList']);
+    if (Array.isArray(cachedAgg) && cachedAgg.length > 0) {
+      setStores(cachedAgg);
+      return;
+    }
+    const data = await ShopService.getShopsAggregated();
+    setStores(data || []);
+    try { queryClient.setQueryData(['shopsList'], data || []); } catch { /* ignore */ }
+  }, [queryClient]);
   const [addingStores, setAddingStores] = useState(false);
   const [removingStores, setRemovingStores] = useState(false);
   const [removingStoreId, setRemovingStoreId] = useState<string | null>(null);
@@ -1563,8 +1591,7 @@ export const ProductsTable = ({
                   setStoresMenuOpen(open);
                   if (open) {
                     try {
-                      const data = await ProductService.getUserStores();
-                      setStores(data || []);
+                      await loadStoresForMenu();
                     } catch (e) {
                       setStores([]);
                     }
@@ -1604,26 +1631,8 @@ export const ProductsTable = ({
                               const links = (p.linkedStoreIds || []).map(String);
                               return acc + (links.includes(id) ? 1 : 0);
                             }, 0);
-                            const categoryCount = (() => {
-                              if (countInStore === 0) return 0;
-                              const set = new Set<string>();
-                              for (const p of (items as ProductRow[])) {
-                                const links = (p.linkedStoreIds || []).map(String);
-                                if (!links.includes(id)) continue;
-                                const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
-                                if (key) set.add(key);
-                              }
-                              if (set.size > 0) return set.size;
-                              try {
-                                const key = `rq:filters:categories:${id}`;
-                                const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-                                if (raw) {
-                                  const parsed = JSON.parse(raw) as { items?: string[] };
-                                  if (parsed && Array.isArray(parsed.items)) return parsed.items.length;
-                                }
-                              } catch { /* ignore */ }
-                              return 0;
-                            })();
+                            const aggProducts = typeof s.productsCount === 'number' ? s.productsCount : 0;
+                            const aggCategories = typeof s.categoriesCount === 'number' ? (s.categoriesCount as number) : 0;
                             return (
                               <DropdownMenuItem
                                 key={id}
@@ -1653,11 +1662,11 @@ export const ProductsTable = ({
                                 <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
                                   <span className="inline-flex items-center gap-1">
                                     <Package className="h-3 w-3" />
-                                    <span className="tabular-nums">{countInStore}</span>
+                                    <span className="tabular-nums">{aggProducts}</span>
                                   </span>
                                   <span className="inline-flex items-center gap-1">
                                     <List className="h-3 w-3" />
-                                    <span className="tabular-nums">{categoryCount}</span>
+                                    <span className="tabular-nums">{aggCategories}</span>
                                   </span>
                                   <Button
                                     variant="ghost"
@@ -1819,10 +1828,6 @@ export const ProductsTable = ({
                                       const storesUnique = Array.from(new Set(storeIds.map(String)));
                                       for (const sid of storesUnique) { try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; } }
                                       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                                      try {
-                                        const latest = await ProductService.getUserStores();
-                                        setStores(latest || []);
-                                      } catch { /* ignore */ }
                                     } catch {}
                                   }
                                 }
@@ -1830,8 +1835,6 @@ export const ProductsTable = ({
                                 toast.error(t('failed_add_product_to_stores'));
                               } finally {
                                 setAddingStores(false);
-                                setStoresMenuOpen(false);
-                                setSelectedStoreIds([]);
                                 try { table.resetRowSelection(); } catch {}
                                 try { setLastSelectedProductIds(productIds); } catch {}
                               }
@@ -1904,10 +1907,7 @@ export const ProductsTable = ({
                                   }
                                 } catch { void 0; }
                                 queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-                                try {
-                                  const latest = await ProductService.getUserStores();
-                                  setStores(latest || []);
-                                } catch { /* ignore */ }
+                                
                                 try {
                                   const prevCountMap: Record<string, number> = {};
                                   for (const sid of storeIds) {
@@ -1930,7 +1930,6 @@ export const ProductsTable = ({
                             toast.error(t('failed_remove_from_store'));
                           } finally {
                             setRemovingStores(false);
-                            setStoresMenuOpen(false);
                             try { table.resetRowSelection(); } catch { /* ignore */ }
                             try { setLastSelectedProductIds([]); } catch {}
                           }
@@ -1951,24 +1950,7 @@ export const ProductsTable = ({
                 </DropdownMenu>
                 )}
 
-                {/* Refresh */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] })}
-                      aria-label={t("refresh")}
-                      data-testid="user_products_dataTable_refresh"
-                    >
-                      <RefreshCw className="h-4 w-4 text-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_refresh">
-                    {t("refresh")}
-                  </TooltipContent>
-                </Tooltip>
+                
               </div>
             </TooltipProvider>
           );

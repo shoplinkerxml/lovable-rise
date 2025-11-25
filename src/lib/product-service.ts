@@ -124,6 +124,8 @@ export interface ProductLimitInfo {
 }
 
 export class ProductService {
+  private static inFlightStores: Promise<Array<{ id: string; store_name: string; store_url: string | null; is_active: boolean; productsCount: number; categoriesCount: number }>> | null = null;
+  private static inFlightLinksByProduct: Map<string, Promise<string[]>> = new Map();
   private static castNullableNumber(value: unknown): number | null {
     if (value === undefined || value === null || value === "") return null;
     const n = Number(value);
@@ -165,71 +167,107 @@ export class ProductService {
   }
 
   /** Получение полной информации о магазинах пользователя */
-  static async getUserStores(): Promise<any[]> {
+  static async getUserStores(): Promise<Array<{ id: string; store_name: string; store_url: string | null; is_active: boolean; productsCount: number; categoriesCount: number }>> {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // 1) Попробовать взять из TTL‑кэша
     try {
-      const cacheKey = 'rq:shopsList';
+      const cacheKey = `rq:stores:active`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
       if (raw) {
-        const parsed = JSON.parse(raw) as { items: any[]; expiresAt: number };
+        const parsed = JSON.parse(raw) as { items: Array<{ id: string; store_name: string; store_url: string | null; is_active: boolean; productsCount?: number; categoriesCount?: number }>; expiresAt: number };
         if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-          return (parsed.items || []).map((s: any) => ({
+          return parsed.items.map((s) => ({
             id: String(s.id),
             store_name: String(s.store_name || ''),
-            store_url: String(s.store_url || ''),
+            store_url: s.store_url ? String(s.store_url) : null,
             is_active: !!s.is_active,
-            productsCount: Number((s as any).productsCount ?? 0),
-            categoriesCount: Number((s as any).categoriesCount ?? 0),
+            productsCount: Number(s.productsCount ?? 0),
+            categoriesCount: Number(s.categoriesCount ?? 0),
           }));
         }
       }
-    } catch {}
+    } catch { /* ignore */ }
 
-    // 2) Иначе — запрос к edge‑функции и запись в кэш
-    const { data: authData } = await (supabase as any).auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    try {
-      const { data, error } = await (supabase as any).functions.invoke('user-shops-list', {
-        body: {},
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      if (error) throw error;
-      const rows = (typeof data === 'string' ? JSON.parse(data) : (data as any)) as { shops?: any[] };
-      const shops = Array.isArray(rows?.shops) ? rows!.shops! : [];
-      try {
-        const payload = JSON.stringify({ items: shops, expiresAt: Date.now() + 900_000 });
-        if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', payload);
-      } catch {}
-      return shops.map((s: any) => ({
-        id: String(s.id),
-        store_name: String(s.store_name || ''),
-        store_url: String(s.store_url || ''),
-        is_active: !!s.is_active,
-        productsCount: Number((s as any).productsCount ?? 0),
-        categoriesCount: Number((s as any).categoriesCount ?? 0),
-      }));
-    } catch (_) {
-      const { data, error } = await (supabase as any)
-        .from('user_stores')
-        .select('id, user_id, store_name, store_url, template_id, custom_mapping, xml_config, is_active, created_at, updated_at, last_sync')
-        .eq('user_id', sessionValidation.user.id)
-        .eq('is_active', true)
-        .order('store_name');
-      if (error) return [];
-      return (data || []).map((s: any) => ({
-        id: String(s.id),
-        store_name: String(s.store_name || ''),
-        store_url: String(s.store_url || ''),
-        is_active: !!s.is_active,
-        productsCount: 0,
-        categoriesCount: 0,
-      }));
+    if (ProductService.inFlightStores) {
+      return ProductService.inFlightStores;
     }
+
+    const task = (async () => {
+      try {
+        const { ShopService } = await import('@/lib/shop-service');
+        const shops = await ShopService.getShopsAggregated();
+        const mapped = (shops || []).map((s) => ({
+          id: String((s as any).id),
+          store_name: String((s as any).store_name || ''),
+          store_url: (s as any).store_url ? String((s as any).store_url) : null,
+          is_active: !!(s as any).is_active,
+          productsCount: Number((s as any).productsCount ?? 0),
+          categoriesCount: Number((s as any).categoriesCount ?? 0),
+        }));
+        try {
+          if (typeof window !== 'undefined') {
+            const payload = JSON.stringify({ items: mapped, expiresAt: Date.now() + 900_000 });
+            window.localStorage.setItem('rq:stores:active', payload);
+          }
+        } catch { /* ignore */ }
+        return mapped;
+      } catch {
+        try {
+          const rawShops = typeof window !== 'undefined' ? window.localStorage.getItem('rq:shopsList') : null;
+          if (rawShops) {
+            const parsed = JSON.parse(rawShops) as { items: Array<{ id: string; store_name: string; store_url: string | null; is_active: boolean }>; expiresAt: number };
+            if (parsed && Array.isArray(parsed.items)) {
+              const rows = parsed.items.map((s) => ({
+                id: String(s.id),
+                store_name: String(s.store_name || ''),
+                store_url: s.store_url ? String(s.store_url) : null,
+                is_active: !!s.is_active,
+                productsCount: 0,
+                categoriesCount: 0,
+              }));
+              try {
+                if (typeof window !== 'undefined') {
+                  const payload = JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 });
+                  window.localStorage.setItem('rq:stores:active', payload);
+                }
+              } catch {}
+              return rows;
+            }
+          }
+        } catch {}
+        try {
+          const { data, error } = await (supabase as any)
+            .from('user_stores')
+            .select('id,store_name,store_url,is_active,user_id')
+            .eq('user_id', sessionValidation.user.id)
+            .eq('is_active', true)
+            .order('store_name');
+          if (error) throw error;
+          const rows = (data || []).map((s: any) => ({
+            id: String(s.id),
+            store_name: String(s.store_name || ''),
+            store_url: s.store_url ? String(s.store_url) : null,
+            is_active: !!s.is_active,
+            productsCount: 0,
+            categoriesCount: 0,
+          }));
+          try {
+            if (typeof window !== 'undefined') {
+              const payload = JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 });
+              window.localStorage.setItem('rq:stores:active', payload);
+            }
+          } catch {}
+          return rows;
+        } catch {}
+        return [];
+      }
+    })();
+
+    ProductService.inFlightStores = task;
+    try { return await task; } finally { ProductService.inFlightStores = null; }
   }
 
   /** Получение продуктов для конкретного магазина с учётом переопределений из store_product_links */
@@ -484,9 +522,8 @@ export class ProductService {
     }
 
     const sizedKey = `rq:products:first:${storeId ?? 'all'}:${limit}`;
-    const genericKey = `rq:products:first:${storeId ?? 'all'}`;
     try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) || window.localStorage.getItem(genericKey) : null;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) : null;
       if (raw) {
         const parsed = JSON.parse(raw) as { items: ProductAggregated[]; page: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number }; expiresAt: number };
         if (parsed && Array.isArray(parsed.items) && parsed.page && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
@@ -517,7 +554,6 @@ export class ProductService {
                     const payloadStore = JSON.stringify({ items: out.products, page: out.page, expiresAt: Date.now() + 900_000 });
                     if (typeof window !== 'undefined') {
                       window.localStorage.setItem(sizedKey, payloadStore);
-                      window.localStorage.setItem(genericKey, payloadStore);
                     }
                   } catch { void 0; }
                 }
@@ -544,7 +580,6 @@ export class ProductService {
       const payloadStore = JSON.stringify({ items: products, page, expiresAt: Date.now() + 900_000 });
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(sizedKey, payloadStore);
-        window.localStorage.setItem(genericKey, payloadStore);
       }
     } catch { void 0; }
     return { products, page };
@@ -719,15 +754,47 @@ export class ProductService {
   }
 
   static async getStoreLinksForProduct(productId: string): Promise<string[]> {
-    const { data: authData } = await (supabase as any).auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke('get-store-links-for-product', {
-      body: { product_id: productId },
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) throw new Error((error as any)?.message || 'links_fetch_failed');
-    const payload = (typeof data === 'string' ? JSON.parse(data) : (data as any)) as { store_ids?: string[] };
-    return Array.isArray(payload.store_ids) ? payload.store_ids.map(String) : [];
+    const cacheKey = `rq:links:product:${productId}`;
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { store_ids?: string[]; expiresAt?: number };
+        if (Array.isArray(parsed.store_ids) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+          return parsed.store_ids.map(String);
+        }
+      }
+    } catch { /* ignore */ }
+
+    const existing = ProductService.inFlightLinksByProduct.get(productId);
+    if (existing) return existing;
+
+    const task = (async () => {
+      const { data: authData } = await (supabase as any).auth.getSession();
+      const accessToken: string | null = authData?.session?.access_token || null;
+      const { data, error } = await (supabase as any).functions.invoke('get-store-links-for-product', {
+        body: { product_id: productId },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) throw new Error((error as any)?.message || 'links_fetch_failed');
+      const payload = (typeof data === 'string' ? JSON.parse(data) : (data as any)) as { store_ids?: string[] };
+      const ids = Array.isArray(payload.store_ids) ? payload.store_ids.map(String) : [];
+      try {
+        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, JSON.stringify({ store_ids: ids, expiresAt: Date.now() + 120_000 }));
+      } catch { /* ignore */ }
+      return ids;
+    })();
+
+    ProductService.inFlightLinksByProduct.set(productId, task);
+    try { return await task; } finally { ProductService.inFlightLinksByProduct.delete(productId); }
+  }
+
+  static invalidateStoreLinksCache(productId: string) {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(`rq:links:product:${productId}`);
+      }
+    } catch { /* ignore */ }
+    try { ProductService.inFlightLinksByProduct.delete(productId); } catch { /* ignore */ }
   }
 
   /** Получение только максимального лимита продуктов (без подсчета текущих) */
@@ -1027,6 +1094,7 @@ export class ProductService {
     const product = await this.getProductById(productId);
     if (!product) throw new Error('create_failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
+    try { ProductService.clearAllFirstPageCaches(); } catch {}
     return product;
   }
 
@@ -1040,6 +1108,7 @@ export class ProductService {
       throw new Error('duplicate_failed');
     }
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
+    try { ProductService.clearAllFirstPageCaches(); } catch {}
     return product;
   }
 
@@ -1098,6 +1167,7 @@ export class ProductService {
     const product = await this.getProductById(productId);
     if (!product) throw new Error('update_failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
+    try { ProductService.clearAllFirstPageCaches(); } catch {}
     return product;
   }
 
@@ -1115,5 +1185,21 @@ export class ProductService {
       throw new Error('delete_failed');
     }
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
+  }
+
+  static clearAllFirstPageCaches() {
+    try {
+      if (typeof window === 'undefined') return;
+      const prefix = 'rq:products:first:';
+      const keysToDelete: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith(prefix)) keysToDelete.push(k);
+      }
+      for (const key of keysToDelete) {
+        window.localStorage.removeItem(key);
+      }
+    } catch {}
   }
 }

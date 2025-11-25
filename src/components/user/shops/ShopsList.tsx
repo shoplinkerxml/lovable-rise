@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,12 +58,14 @@ export const ShopsList = ({
     },
     retry: false,
     staleTime: 0,
-    refetchOnMount: true,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
   const shops: ShopWithMarketplace[] = shopsData ?? [];
-  useEffect(() => { onShopsLoaded?.(shops.length); }, [shops.length, onShopsLoaded]);
+  const onShopsLoadedRef = useRef(onShopsLoaded);
+  useEffect(() => { onShopsLoadedRef.current = onShopsLoaded; }, [onShopsLoaded]);
+  useEffect(() => { onShopsLoadedRef.current?.(shops.length); }, [shops.length]);
   useEffect(() => {
     if ((refreshTrigger ?? 0) > 0) {
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
@@ -104,28 +106,6 @@ export const ShopsList = ({
 
   const showSkeletons = (isLoading || isFetching) && shops.length === 0;
 
-  if (shops.length === 0) {
-    return (
-      <div className="flex justify-center">
-        <Empty className="border max-w-md">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Store />
-            </EmptyMedia>
-            <EmptyTitle>{t('no_shops')}</EmptyTitle>
-            <EmptyDescription>
-              {t('no_shops_description')}
-            </EmptyDescription>
-          </EmptyHeader>
-          <Button onClick={onCreateNew} className="mt-4">
-            <Store className="h-4 w-4 mr-2" />
-            {t('add_shop')}
-          </Button>
-        </Empty>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -158,6 +138,25 @@ export const ShopsList = ({
             </CardContent>
           </Card>
         ))}
+        {!showSkeletons && shops.length === 0 && (
+          <div className="flex justify-center col-span-full">
+            <Empty className="border max-w-md">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Store />
+                </EmptyMedia>
+                <EmptyTitle>{t('no_shops')}</EmptyTitle>
+                <EmptyDescription>
+                  {t('no_shops_description')}
+                </EmptyDescription>
+              </EmptyHeader>
+              <Button onClick={onCreateNew} className="mt-4">
+                <Store className="h-4 w-4 mr-2" />
+                {t('add_shop')}
+              </Button>
+            </Empty>
+          </div>
+        )}
         {shops.map((shop) => (
           <Card 
             key={shop.id} 
