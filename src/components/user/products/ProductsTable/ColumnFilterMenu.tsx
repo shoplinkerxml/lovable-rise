@@ -2,8 +2,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/providers/i18n-provider";
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
-export function ColumnFilterMenu({ column, extraOptions }: { column: import("@tanstack/react-table").Column<any, unknown>; extraOptions?: string[] }) {
+export function ColumnFilterMenu<TData>({ column, extraOptions }: { column: import("@tanstack/react-table").Column<TData, unknown>; extraOptions?: string[] }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const hasAccessor = Boolean((column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorFn
@@ -28,8 +29,13 @@ export function ColumnFilterMenu({ column, extraOptions }: { column: import("@ta
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="h-8 w-24 text-xs border rounded-md ml-1" data-testid={`user_products_filter_${column.id}_trigger`}>
-          {t("filter")}
+        <button
+          type="button"
+          className="h-8 w-8 p-0 ml-1 inline-flex items-center justify-center"
+          aria-label={t("filter")}
+          data-testid={`user_products_filter_${column.id}_trigger`}
+        >
+          <ChevronDown className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[min(16rem,92vw)] p-2">

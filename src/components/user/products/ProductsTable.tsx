@@ -15,17 +15,7 @@ import {
 } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-} from "@/components/ui/dropdown-menu";
+// dropdown components moved to subcomponents
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -35,6 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -48,9 +40,9 @@ import {
 } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
-import { Package, Columns as ColumnsIcon, Plus, Loader2, ChevronDown, ChevronUp, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Store, Copy, Edit, Trash2 } from "lucide-react";
+import { Package, Plus, Loader2, Copy, Edit, Trash2, List, Store } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// ScrollArea used in subcomponents
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -61,6 +53,13 @@ import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "
 import { ProductActionsDropdown } from "./ProductsTable/RowActionsDropdown";
 import { StoresBadgeCell } from "./ProductsTable/StoresBadgeCell";
 import { SortableHeader } from "./ProductsTable/SortableHeader";
+import { LoadingSkeleton } from "./ProductsTable/LoadingSkeleton";
+import { ProductStatusBadge } from "./ProductsTable/ProductStatusBadge";
+import { SortToggle } from "./ProductsTable/SortToggle";
+import { ColumnFilterMenu } from "./ProductsTable/ColumnFilterMenu";
+import { ViewOptionsMenu } from "./ProductsTable/ViewOptionsMenu";
+import { AddToStoresMenu } from "./ProductsTable/AddToStoresMenu";
+import { PaginationFooter } from "./ProductsTable/PaginationFooter";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -77,58 +76,7 @@ type ProductsTableProps = {
   hideDuplicate?: boolean;
 };
 
-const LoadingSkeleton = () => (
-  <TableRow className="hover:bg-muted/50">
-    <TableCell>
-      <div className="flex items-center gap-3">
-        <div className="h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)] rounded-md bg-muted animate-pulse" />
-        <div className="min-w-0 flex-1">
-          <div className="h-4 w-[clamp(6rem,20vw,12rem)] bg-muted rounded animate-pulse"></div>
-          <div className="h-3 w-[clamp(8rem,24vw,14rem)] bg-muted rounded animate-pulse mt-1 hidden sm:block"></div>
-        </div>
-      </div>
-    </TableCell>
-    <TableCell>
-      <div className="h-6 w-16 bg-muted rounded-full animate-pulse"></div>
-    </TableCell>
-    <TableCell>
-      <div className="h-4 w-20 bg-muted rounded animate-pulse"></div>
-    </TableCell>
-    <TableCell>
-      <div className="h-4 w-16 bg-muted rounded animate-pulse"></div>
-    </TableCell>
-    <TableCell>
-      <div className="h-4 w-24 bg-muted rounded animate-pulse"></div>
-    </TableCell>
-    <TableCell className="text-right">
-      <div className="h-8 w-8 bg-muted rounded animate-pulse ml-auto"></div>
-    </TableCell>
-  </TableRow>
-);
-
-function ProductStatusBadge({ state }: { state?: string }) {
-  const { t } = useI18n();
-  const s = state || 'new';
-  const labelKey =
-    s === 'stock' ? 'status_stock' :
-    s === 'used' ? 'status_used' :
-    s === 'refurbished' ? 'status_refurbished' : 'status_new';
-
-  const cls =
-    s === 'new'
-      ? 'bg-emerald-200/60 text-emerald-700 border-emerald-300 shadow-sm'
-      : s === 'refurbished'
-      ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow'
-      : s === 'used'
-      ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-      : 'bg-emerald-50 text-emerald-500 border-neutral-300';
-
-  return (
-    <Badge variant="outline" className={cls} data-testid="user_products_statusBadge">
-      {t(labelKey)}
-    </Badge>
-  );
-}
+// moved to subcomponents: LoadingSkeleton, ProductStatusBadge
 
  
 
@@ -423,8 +371,7 @@ export const ProductsTable = ({
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
-  // Управляемое состояние открытия меню колонок: не закрывать по клику внутри
-  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  // ViewOptionsMenu manages its own open state
   const [storesMenuOpen, setStoresMenuOpen] = useState(false);
   const [stores, setStores] = useState<StoreAgg[]>([]);
   const storeNames = useMemo(() => {
@@ -460,141 +407,9 @@ export const ProductsTable = ({
   }, [storeId]);
 
   // Toggle sort control rendered as native button with inline SVG icon
-  function SortToggle({ column, table }: { column: import("@tanstack/react-table").Column<ProductRow, unknown>; table: import("@tanstack/react-table").Table<ProductRow> }) {
-    const { t } = useI18n();
-    const cur = column.getIsSorted?.(); // false | 'asc' | 'desc'
-    const isActive = cur === "asc" || cur === "desc";
-    return (
-      <button
-        type="button"
-        className={`h-8 w-4 p-0 inline-flex items-center justify-center rounded-md hover:bg-muted ${isActive ? "text-primary" : "text-foreground"}`}
-        aria-label={t("sort_asc")}
-        onClick={() => {
-          const next = cur === false ? "asc" : cur === "asc" ? "desc" : "asc";
-          table.setSorting([{ id: column.id, desc: next === "desc" }]);
-        }}
-        data-testid={`user_products_sort_${column.id}_toggle`}
-      >
-        {/* arrow-up-down icon (lucide) as inline SVG */}
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-up-down h-4 w-4">
-          <path d="m21 16-4 4-4-4"></path>
-          <path d="M17 20V4"></path>
-          <path d="m3 8 4-4 4 4"></path>
-          <path d="M7 4v16"></path>
-        </svg>
-      </button>
-    );
-  }
+  // legacy inline SortToggle removed (extracted to subcomponent)
 
-  function ColumnFilterMenu({ column, extraOptions }: { column: import("@tanstack/react-table").Column<ProductRow, unknown>; extraOptions?: string[] }) {
-    const { t } = useI18n();
-    const [query, setQuery] = useState("");
-    const hasAccessor = Boolean((column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorFn
-      || (column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorKey);
-    const canFilter = (column.getCanFilter?.() ?? false) && hasAccessor;
-    if (!canFilter) return null;
-    let faceted: Map<unknown, number> | undefined;
-    try {
-      faceted = column.getFacetedUniqueValues?.();
-    } catch {
-      faceted = undefined;
-    }
-    const values = faceted ? Array.from(faceted.keys()) : [];
-    const extraCategoryOptions = column.id === "category" ? (extraOptions || []) : [];
-    const unionValues = Array.from(new Set([...
-      values.map((v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v))),
-      ...extraCategoryOptions,
-    ]));
-    // Normalize current filter to an array for multi-select
-    const currentFilter = column.getFilterValue?.();
-    const selectedValues: string[] = Array.isArray(currentFilter)
-      ? (currentFilter as unknown[]).map((v) => (v == null ? "" : String(v as unknown as string)))
-      : currentFilter
-      ? [String(currentFilter)]
-      : [];
-    const filteredValues = unionValues
-      .map((v) => (typeof v === "string" ? v : v == null ? "" : String(v)))
-      .filter((v) => (query ? v.toLowerCase().includes(query.toLowerCase()) : true))
-      .sort((a, b) => a.localeCompare(b));
-
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-4 p-0"
-            aria-label={t("filter")}
-            data-testid={`user_products_filter_trigger_${column.id}`}
-          >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-[12rem] w-fit p-2"
-          data-testid={`user_products_filter_menu_${column.id}`}
-        >
-          <div className="mb-2">
-            <Input
-              placeholder={t("search_placeholder")}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full"
-              data-testid={`user_products_filter_search_${column.id}`}
-            />
-          </div>
-          <ScrollArea className="max-h-[clamp(12rem,40vh,20rem)]">
-            <div className="flex flex-col">
-              {filteredValues.length === 0 ? (
-                <div className="text-xs text-muted-foreground px-2 py-1">{t("no_results")}</div>
-              ) : (
-                filteredValues.map((val) => {
-                  const isChecked = selectedValues.includes(val);
-                  return (
-                    <DropdownMenuItem
-                      key={val}
-                      className="cursor-pointer pr-2 pl-2"
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        const next = isChecked
-                          ? selectedValues.filter((v) => v !== val)
-                          : Array.from(new Set([...selectedValues, val]));
-                        column.setFilterValue(next);
-                      }}
-                      data-testid={`user_products_filter_item_${column.id}_${val}`}
-                    >
-                      <Checkbox
-                        checked={isChecked}
-                        onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={(checked) => {
-                          const next = checked
-                            ? Array.from(new Set([...selectedValues, val]))
-                            : selectedValues.filter((v) => v !== val);
-                          column.setFilterValue(next);
-                        }}
-                        className="mr-2"
-                        aria-label={t("select_row")}
-                        data-testid={`user_products_filter_checkbox_${column.id}_${val}`}
-                      />
-                      <span className="truncate">{val || "—"}</span>
-                    </DropdownMenuItem>
-                  );
-                })
-              )}
-          </div>
-        </ScrollArea>
-          <DropdownMenuSeparator />
-          <Button
-            variant="outline"
-            className="w-full h-8 mt-2"
-            onClick={() => column.setFilterValue(undefined)}
-            data-testid={`user_products_filter_clear_${column.id}`}
-          >
-            {t("clear")}
-          </Button>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  }
+  // legacy inline ColumnFilterMenu removed (extracted to subcomponent)
 
   // Динамическая ширина колонки названия: уменьшается по мере добавления видимых столбцов
   const dynamicNameMaxVW = useMemo(() => {
@@ -1382,76 +1197,7 @@ export const ProductsTable = ({
                 </Tooltip>
 
                 {/* Columns toggle */}
-                <DropdownMenu open={columnsMenuOpen} onOpenChange={setColumnsMenuOpen}>
-                  <Tooltip>
-                    <DropdownMenuTrigger asChild>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          aria-label={t("columns_short")}
-                          data-testid="user_products_dataTable_viewOptions"
-                        >
-                          <ColumnsIcon className="h-4 w-4 text-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                    </DropdownMenuTrigger>
-                    <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_columns">
-                      {t("columns_short")}
-                    </TooltipContent>
-                  </Tooltip>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-56"
-                    onPointerLeave={() => setColumnsMenuOpen(false)}
-                    data-testid="user_products_columns_menu"
-                  >
-                    <DropdownMenuItem disabled className="text-sm">
-                      {t("toggle_columns")}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {table
-                      .getAllLeafColumns()
-                      .filter((column) => column.id !== "select" && column.id !== "actions")
-                      .map((column) => {
-                        const isVisible = column.getIsVisible();
-                        // Человеко‑читаемая метка для пункта меню (переводы вместо техничних ID)
-                        const labelMap: Record<string, string> = {
-                          photo: t("photo"),
-                          name_ua: t("table_product"),
-                          status: t("table_status"),
-                          supplier: t("supplier"),
-                          price: t("table_price"),
-                          price_old: t("old_price"),
-                          price_promo: t("promo_price"),
-                          category: t("category"),
-                          stock_quantity: t("table_stock"),
-                          created_at: t("table_created"),
-                          article: t("article"),
-                          vendor: t("vendor"),
-                          docket_ua: t("short_name_ua"),
-                          description_ua: t("product_description_ua"),
-                        };
-                        const translatedLabel = labelMap[column.id] ?? (typeof column.columnDef.header === "string" ? column.columnDef.header : column.id);
-                        return (
-                          <DropdownMenuCheckboxItem
-                            key={column.id}
-                            className="capitalize"
-                            checked={isVisible}
-                            data-testid={`user_products_columns_item_${column.id}`}
-                            // Не закрывать меню при выборе пункта
-                            onSelect={(e) => {
-                              e.preventDefault();
-                            }}
-                            onCheckedChange={(value) => column.toggleVisibility(value === true)}
-                          >
-                            {translatedLabel}
-                          </DropdownMenuCheckboxItem>
-                        );
-                      })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <ViewOptionsMenu table={table} />
 
                 {/* Add to stores */}
                 {storeId ? null : (
@@ -2030,112 +1776,7 @@ export const ProductsTable = ({
         </DialogNoOverlayContent>
       </DialogNoOverlay>
 
-      {/* Pagination (dashboard-01 style) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1 pt-2 border-t" data-testid="user_products_dataTable_pagination">
-        {/* Selection status */}
-        <div className="text-xs text-muted-foreground" data-testid="user_products_dataTable_selectionStatus">
-          {/* Localized dynamic text without interpolation support */}
-          {(() => {
-            const selected = table.getSelectedRowModel().rows.length;
-            const total = table.getFilteredRowModel().rows.length || 0;
-            // Ukrainian vs English
-            return t("rows_selected") === "Вибрано"
-              ? `Вибрано ${selected} з ${total} рядків.`
-              : `${selected} of ${total} row(s) selected.`;
-          })()}
-        </div>
-
-        {/* Rows per page (moved from toolbar) */}
-        <div className="flex items-center gap-2" data-testid="user_products_dataTable_rowsPerPage">
-          <div className="text-sm" data-testid="user_products_dataTable_rowsPerPageLabel">{t("page_size")}</div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2"
-                aria-label={t("page_size")}
-                data-testid="user_products_dataTable_pageSize"
-              >
-                <List className="h-4 w-4 mr-2" />
-                {table.getState().pagination.pageSize}
-                <ChevronDown className="ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              {[5, 10, 20, 50].map((size) => (
-                <DropdownMenuCheckboxItem
-                  key={size}
-                  checked={table.getState().pagination.pageSize === size}
-                  onCheckedChange={() => table.setPageSize(size)}
-                  data-testid={`user_products_dataTable_pageSize_${size}`}
-                >
-                  {size}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        
-        {/* Page indicator + controls */}
-        <div className="flex items-center gap-2" data-testid="user_products_dataTable_pageControls">
-          <div className="text-sm whitespace-nowrap" data-testid="user_products_dataTable_pageIndicator">
-            {t("page_of")} {pagination.pageIndex + 1} {t("page_of_connector")} {Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize)))}
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, pageIndex: 0 }))}
-              disabled={pagination.pageIndex === 0}
-              aria-label={t("first_page")}
-              data-testid="user_products_dataTable_firstPage"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, pageIndex: Math.max(0, prev.pageIndex - 1) }))}
-              disabled={pagination.pageIndex === 0}
-              aria-label={t("previous_page")}
-              data-testid="user_products_dataTable_prevPage"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, pageIndex: prev.pageIndex + 1 }))}
-              disabled={(pagination.pageIndex + 1) >= Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize)))}
-              aria-label={t("next_page")}
-              data-testid="user_products_dataTable_nextPage"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, pageIndex: Math.max(0, Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize))) - 1) }))}
-              disabled={(pagination.pageIndex + 1) >= Math.max(1, Math.ceil(((pageInfo?.total ?? rows.length) / pagination.pageSize)))}
-              aria-label={t("last_page")}
-              data-testid="user_products_dataTable_lastPage"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="ml-4 text-xs text-muted-foreground" data-testid="user_products_dataTable_rangeIndicator">
-            {(() => {
-              const total = pageInfo?.total ?? rows.length;
-              const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
-              const end = Math.min(total, start + pagination.pageSize - 1);
-              return t("rows_selected") === "Вибрано"
-                ? `Показано ${start}-${end} із ${total}`
-                : `Showing ${start}-${end} of ${total}`;
-            })()}
-          </div>
-        </div>
-      </div>
+      <PaginationFooter table={table} pagination={pagination} setPagination={setPagination} pageInfo={pageInfo} rows={rows} />
     </div>
   );
 };

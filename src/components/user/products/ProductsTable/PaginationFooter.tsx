@@ -5,18 +5,18 @@ import { useI18n } from "@/providers/i18n-provider";
 
 type PageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
 
-export function PaginationFooter({
+export function PaginationFooter<TData>({
   table,
   pagination,
   setPagination,
   pageInfo,
   rows,
 }: {
-  table: import("@tanstack/react-table").Table<any>;
+  table: import("@tanstack/react-table").Table<TData>;
   pagination: { pageIndex: number; pageSize: number };
   setPagination: (updater: (prev: { pageIndex: number; pageSize: number }) => { pageIndex: number; pageSize: number }) => void;
   pageInfo: PageInfo | null;
-  rows: any[];
+  rows: TData[];
 }) {
   const { t } = useI18n();
   return (
@@ -88,4 +88,3 @@ export function PaginationFooter({
     </div>
   );
 }
-

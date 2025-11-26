@@ -1205,6 +1205,7 @@ const toastDictionary = {
   select_all: { uk: "Вибрати все", en: "Select all" },
   select_row: { uk: "Вибрати рядок", en: "Select row" },
   filter: { uk: "Фільтр", en: "Filter" },
+  filter_values: { uk: "Значення фільтра", en: "Filter values" },
   search_placeholder: { uk: "Пошук за назвою", en: "Search by name" },
   delete_selected: { uk: "Видалити вибране", en: "Delete selected" },
   customize_columns: { uk: "Налаштувати колонки", en: "Customize Columns" },

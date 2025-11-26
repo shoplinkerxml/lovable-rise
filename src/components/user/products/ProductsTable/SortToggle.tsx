@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/providers/i18n-provider";
 
-export function SortToggle({ column, table }: { column: import("@tanstack/react-table").Column<any, unknown>; table: import("@tanstack/react-table").Table<any> }) {
+export function SortToggle<TData>({ column, table }: { column: import("@tanstack/react-table").Column<TData, unknown>; table: import("@tanstack/react-table").Table<TData> }) {
   const { t } = useI18n();
   const cur = column.getIsSorted?.();
   const isActive = cur === "asc" || cur === "desc";
@@ -26,4 +26,3 @@ export function SortToggle({ column, table }: { column: import("@tanstack/react-
     </Button>
   );
 }
-

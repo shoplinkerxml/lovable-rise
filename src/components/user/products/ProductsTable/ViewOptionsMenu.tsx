@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { Columns as ColumnsIcon } from "lucide-react";
 import { useI18n } from "@/providers/i18n-provider";
 
-export function ViewOptionsMenu({ table }: { table: import("@tanstack/react-table").Table<any> }) {
+export function ViewOptionsMenu<TData>({ table }: { table: import("@tanstack/react-table").Table<TData> }) {
   const { t } = useI18n();
   return (
     <TooltipProvider>
@@ -74,4 +74,3 @@ export function ViewOptionsMenu({ table }: { table: import("@tanstack/react-tabl
     </TooltipProvider>
   );
 }
-
