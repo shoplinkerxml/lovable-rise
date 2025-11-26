@@ -30,14 +30,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import {
-  DialogNoOverlay,
-  DialogNoOverlayContent,
-  DialogNoOverlayDescription,
-  DialogNoOverlayFooter,
-  DialogNoOverlayHeader,
-  DialogNoOverlayTitle,
-} from "@/components/ui/dialog-no-overlay";
+import { DialogNoOverlay } from "@/components/ui/dialog-no-overlay";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { format } from "date-fns";
 import { Package, Plus, Loader2, Copy, Edit, Trash2 } from "lucide-react";
@@ -61,6 +54,8 @@ import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
+import { useVirtualRows } from "@/hooks/useVirtualRows";
+import { CopyProgressDialog, DeleteDialog } from "./ProductsTable/Dialogs";
 
 const AddToStoresMenuLazy = React.lazy(() => import("./ProductsTable/AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
 const ProductActionsDropdownLazy = React.lazy(() => import("./ProductsTable/RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown })));
@@ -826,32 +821,9 @@ export const ProductsTable = ({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const tableElRef = useRef<HTMLTableElement | null>(null);
-  const [virtualStart, setVirtualStart] = useState(0);
-  const [virtualEnd, setVirtualEnd] = useState(rows.length);
   const rowHeight = 44;
   const enableVirtual = pagination.pageSize >= 50;
-  useEffect(() => {
-    if (!enableVirtual) return;
-    const tableEl = tableElRef.current;
-    const scroller = tableEl?.parentElement || null;
-    if (!scroller) return;
-    const handler = () => {
-      const h = scroller.clientHeight || 0;
-      const top = scroller.scrollTop || 0;
-      const start = Math.max(0, Math.floor(top / rowHeight) - 2);
-      const visible = Math.max(1, Math.ceil(h / rowHeight) + 4);
-      const end = Math.min(rows.length, start + visible);
-      setVirtualStart(start);
-      setVirtualEnd(end);
-    };
-    handler();
-    scroller.addEventListener("scroll", handler);
-    window.addEventListener("resize", handler);
-    return () => {
-      scroller.removeEventListener("scroll", handler);
-      window.removeEventListener("resize", handler);
-    };
-  }, [enableVirtual, rows.length]);
+  const { virtualStart, virtualEnd, topH, bottomH } = useVirtualRows(enableVirtual, rows.length, tableElRef, rowHeight);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -1148,110 +1120,51 @@ export const ProductsTable = ({
       </div>
 
       {/* Copying progress - non-modal top-right */}
-      <DialogNoOverlay
-        open={copyDialog.open}
-        onOpenChange={(open) => setCopyDialog((prev) => ({ ...prev, open }))}
-        modal={false}
-      >
-        <DialogNoOverlayContent
-          position="top-right"
-          variant="info"
-          className="p-4 w-[min(24rem,92vw)]"
-          onInteractOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-          data-testid="user_products_copy_progress"
-        >
-          <DialogNoOverlayHeader>
-            <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
-              <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />
-              {t('product_copying')}
-            </DialogNoOverlayTitle>
-            {copyDialog.name ? (
-              <DialogNoOverlayDescription className="text-xs text-muted-foreground">
-                {copyDialog.name}
-              </DialogNoOverlayDescription>
-            ) : null}
-          </DialogNoOverlayHeader>
-        </DialogNoOverlayContent>
-      </DialogNoOverlay>
+      <CopyProgressDialog open={copyDialog.open} name={copyDialog.name} t={t} />
 
-      <DialogNoOverlay
+      <DeleteDialog
         open={deleteDialog.open}
-        onOpenChange={(open) =>
-          setDeleteDialog((prev) => ({ open, product: open ? prev.product : null }))
-        }
-        modal={false}
-      >
-        <DialogNoOverlayContent
-          position="center"
-          className="p-6 w-[min(28rem,92vw)]"
-          onInteractOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <DialogNoOverlayHeader>
-            <DialogNoOverlayTitle>{t("delete_product_confirm")}</DialogNoOverlayTitle>
-            <DialogNoOverlayDescription>
-              {deleteDialog.product?.name ? (
-                <span>
-                  {t("delete")}: "{deleteDialog.product?.name}". {t("cancel")}? 
-                </span>
-              ) : (
-                <span>{t("delete_product_confirm")}</span>
-              )}
-            </DialogNoOverlayDescription>
-          </DialogNoOverlayHeader>
-          <DialogNoOverlayFooter>
-            <Button variant="outline" data-testid="user_products_delete_cancel" onClick={() => setDeleteDialog({ open: false, product: null })}>
-              {t("cancel")}
-            </Button>
-            <Button
-              data-testid="user_products_delete_confirm"
-              onClick={async () => {
-                const productToDelete = deleteDialog.product;
-                setDeleteDialog({ open: false, product: null });
-
+        product={deleteDialog.product}
+        t={t}
+        onOpenChange={(open) => setDeleteDialog((prev) => ({ open, product: open ? prev.product : null }))}
+        onConfirm={async () => {
+          const productToDelete = deleteDialog.product;
+          setDeleteDialog({ open: false, product: null });
+          try {
+            let didBatch = false;
+            if (productToDelete) {
+              await onDelete?.(productToDelete);
+            } else {
+              const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
+              if (storeId) {
+                didBatch = true;
                 try {
-                  let didBatch = false;
-                  if (productToDelete) {
-                    await onDelete?.(productToDelete);
-                  } else {
-                    const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
-                    if (storeId) {
-                      didBatch = true;
-                      try {
-                        await Promise.all(
-                          selected
-                            .map((p) => p.id)
-                            .filter((id) => !!id)
-                            .map((id: string) => ProductService.removeStoreProductLink(String(id), storeId))
-                        );
-                        toast.success(t('product_removed_from_store'));
-                      } catch (_) {
-                        toast.error(t('failed_remove_from_store'));
-                      }
-                      table.resetRowSelection();
-                    } else {
-                      for (const p of selected) {
-                        await onDelete?.(p);
-                      }
-                      table.resetRowSelection();
-                    }
-                  }
-
-                  if (didBatch || typeof refreshTrigger === 'undefined') {
-                    queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
-                  }
-                } catch (error) {
-                  console.error("Delete error:", error);
+                  await Promise.all(
+                    selected
+                      .map((p) => p.id)
+                      .filter((id) => !!id)
+                      .map((id: string) => ProductService.removeStoreProductLink(String(id), storeId))
+                  );
+                  toast.success(t('product_removed_from_store'));
+                } catch (_) {
+                  toast.error(t('failed_remove_from_store'));
                 }
-              }}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("delete")}
-            </Button>
-          </DialogNoOverlayFooter>
-        </DialogNoOverlayContent>
-      </DialogNoOverlay>
+                table.resetRowSelection();
+              } else {
+                for (const p of selected) {
+                  await onDelete?.(p);
+                }
+                table.resetRowSelection();
+              }
+            }
+            if (didBatch || typeof refreshTrigger === 'undefined') {
+              queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
+            }
+          } catch (error) {
+            console.error("Delete error:", error);
+          }
+        }}
+      />
 
       <PaginationFooter table={table} pagination={pagination} setPagination={setPagination} pageInfo={pageInfo} rows={rows} />
     </div>
