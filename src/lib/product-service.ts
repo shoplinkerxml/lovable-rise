@@ -1187,6 +1187,17 @@ export class ProductService {
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
   }
 
+  static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
+    let deleted = 0;
+    for (const id of ids) {
+      await ProductService.deleteProduct(String(id));
+      deleted += 1;
+    }
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
+    try { ProductService.clearAllFirstPageCaches(); } catch {}
+    return { deleted };
+  }
+
   static clearAllFirstPageCaches() {
     try {
       if (typeof window === 'undefined') return;
