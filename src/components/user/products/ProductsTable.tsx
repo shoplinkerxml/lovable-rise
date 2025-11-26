@@ -489,7 +489,16 @@ export const ProductsTable = ({
   function ColumnFilterMenu({ column, extraOptions }: { column: import("@tanstack/react-table").Column<ProductRow, unknown>; extraOptions?: string[] }) {
     const { t } = useI18n();
     const [query, setQuery] = useState("");
-    const faceted = column.getFacetedUniqueValues?.();
+    const hasAccessor = Boolean((column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorFn
+      || (column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorKey);
+    const canFilter = (column.getCanFilter?.() ?? false) && hasAccessor;
+    if (!canFilter) return null;
+    let faceted: Map<unknown, number> | undefined;
+    try {
+      faceted = column.getFacetedUniqueValues?.();
+    } catch {
+      faceted = undefined;
+    }
     const values = faceted ? Array.from(faceted.keys()) : [];
     const extraCategoryOptions = column.id === "category" ? (extraOptions || []) : [];
     const unionValues = Array.from(new Set([...
@@ -1054,7 +1063,16 @@ export const ProductsTable = ({
     },
     ...(!storeId ? [{
       id: "stores",
-      header: t("stores"),
+      header: ({ column }) => (
+        <div className="relative w-full flex items-center">
+          <span className="absolute left-0 right-0 w-full text-center pointer-events-none">
+            {t("stores")}
+          </span>
+          <div className="ml-auto flex items-center gap-0">
+            <ColumnFilterMenu column={column} />
+          </div>
+        </div>
+      ),
       enableSorting: false,
       enableHiding: false,
       size: 72,

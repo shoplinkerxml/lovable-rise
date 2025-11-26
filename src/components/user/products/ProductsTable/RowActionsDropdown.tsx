@@ -172,7 +172,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                 <Loader2 className="absolute h-3 w-3 animate-spin text-emerald-600 pointer-events-none" />
                               ) : null}
                             </div>
-                            <span className="truncate">{s.store_name || s.store_url || id}</span>
+                            <span className="truncate">{s.store_name || s.store_url || "—"}</span>
                           </DropdownMenuItem>
                         );
                       })

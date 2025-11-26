@@ -174,10 +174,10 @@ export function StoresBadgeCell({ product, storeNames, onRemove, onStoresUpdate 
   }
 
   return (
-    <div className="w-full flex flex-wrap gap-1">
+    <div className="w-full flex flex-col gap-1">
       {storeIds.map((id) => {
-        const name = storeNames[String(id)] || String(id);
-        const label = truncate(name);
+        const name = storeNames[String(id)] || "";
+        const label = name ? truncate(name) : "…";
         const isOpen = badgeOpenId === String(id);
         return (
           <div key={id} className="inline-flex items-center">
@@ -289,7 +289,7 @@ export function StoresBadgeCell({ product, storeNames, onRemove, onStoresUpdate 
                                 <Loader2 className="absolute h-3 w-3 animate-spin text-emerald-600 pointer-events-none" />
                               ) : null}
                             </div>
-                            <span className="truncate">{s.store_name || s.store_url || sid}</span>
+                            <span className="truncate">{s.store_name || s.store_url || "—"}</span>
                           </DropdownMenuItem>
                         );
                       })
