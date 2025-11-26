@@ -1750,9 +1750,7 @@ export function ProductFormTabs({
               </Card>
             </TabsContent>
           </Tabs>
-
-          <Separator className="my-6" />
-
+          
           <div className="flex flex-col sm:flex-row gap-4 justify-end">
             
             {readOnly ? null : <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
