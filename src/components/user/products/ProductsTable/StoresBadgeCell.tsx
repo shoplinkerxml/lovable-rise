@@ -64,7 +64,6 @@ export function StoresBadgeCell({ product, storeNames, onRemove, onStoresUpdate 
             className="h-6 w-6 p-0 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
             aria-label={t("menu_stores")}
             onClick={() => { setOpen(true); loadStoresAndLinks(); }}
-            onPointerEnter={loadStoresAndLinks}
             data-testid={`user_products_store_add_trigger_${product.id}`}
           >
             <Store className="h-3.5 w-3.5" />
@@ -192,7 +191,6 @@ export function StoresBadgeCell({ product, storeNames, onRemove, onStoresUpdate 
                     className="pl-1 pr-1 select-none"
                     title={name}
                     onClick={() => { setBadgeOpenId(String(id)); loadStoresAndLinks(); }}
-                    onPointerEnter={loadStoresAndLinks}
                     data-testid={`user_products_store_badge_trigger_${product.id}_${id}`}
                   >
                     {label}

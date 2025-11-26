@@ -74,7 +74,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
         )}
         {storeId ? null : (
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger onPointerEnter={loadStoresAndLinks} onClick={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
+            <DropdownMenuSubTrigger onClick={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
               <Store className="h-4 w-4" />
               {t("menu_stores")}
             </DropdownMenuSubTrigger>
