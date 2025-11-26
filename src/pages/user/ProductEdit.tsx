@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
@@ -21,13 +21,27 @@ export const ProductEdit = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryName, setCategoryName] = useState<string>('');
   const [imagesLoading, setImagesLoading] = useState<boolean>(false);
+  const aggSuppliersRef = useRef<Array<{ id: string; supplier_name: string }> | undefined>(undefined);
+  const aggCurrenciesRef = useRef<Array<{ id: number; name: string; code: string; status: boolean | null }> | undefined>(undefined);
+  const aggCategoriesRef = useRef<Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }> | undefined>(undefined);
+  const aggSupplierCategoriesMapRef = useRef<Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>> | undefined>(undefined);
+  const preloadedImagesRef = useRef<Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }> | undefined>(undefined);
+  const preloadedParamsRef = useRef<Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }> | undefined>(undefined);
 
   useEffect(() => {
-    const loadProduct = async () => {
+    const loadProductAgg = async () => {
       if (!id) return;
+      setLoading(true);
       try {
-        const p = await ProductService.getProduct(id);
-        setProduct(p);
+        const agg = await ProductService.getProductEditData(id);
+        setProduct(agg.product);
+        preloadedImagesRef.current = (agg.images || []) as any;
+        preloadedParamsRef.current = (agg.params || []) as any;
+        aggSuppliersRef.current = agg.suppliers;
+        aggCurrenciesRef.current = agg.currencies;
+        aggCategoriesRef.current = agg.categories;
+        aggSupplierCategoriesMapRef.current = agg.supplierCategoriesMap;
+        if (agg.categoryName) setCategoryName(agg.categoryName);
       } catch (error) {
         console.error('Failed to load product:', error);
         toast.error(t('failed_load_products'));
@@ -35,14 +49,14 @@ export const ProductEdit = () => {
         setLoading(false);
       }
     };
-    loadProduct();
+    loadProductAgg();
   }, [id, t]);
 
   useEffect(() => {
+    if (categoryName) return;
     const loadCategoryName = async () => {
       if (!product) return;
       try {
-        // Prefer internal category_id, fallback to supplier_id + external_id
         if (product.category_id) {
           const cat = await CategoryService.getById(product.category_id);
           setCategoryName(cat?.name || '');
@@ -57,7 +71,7 @@ export const ProductEdit = () => {
       }
     };
     loadCategoryName();
-  }, [product]);
+  }, [product, categoryName]);
 
   const handleCancel = () => {
     navigate('/user/products');
@@ -176,6 +190,12 @@ export const ProductEdit = () => {
             onSubmit={handleFormSubmit}
             onCancel={handleCancel}
             onImagesLoadingChange={setImagesLoading}
+            preloadedImages={preloadedImagesRef.current as any}
+            preloadedParams={preloadedParamsRef.current as any}
+            preloadedSuppliers={aggSuppliersRef.current}
+            preloadedCurrencies={aggCurrenciesRef.current}
+            preloadedCategories={aggCategoriesRef.current}
+            preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current as any}
           />
         )}
       </div>

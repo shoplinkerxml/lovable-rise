@@ -32,6 +32,12 @@ interface ProductFormTabsProps {
   onImagesLoadingChange?: (loading: boolean) => void;
   onParamsChange?: (params: ProductParam[]) => void;
   forceParamsEditable?: boolean;
+  preloadedSuppliers?: SupplierOption[];
+  preloadedCurrencies?: CurrencyOption[];
+  preloadedCategories?: CategoryOption[];
+  preloadedImages?: ProductImage[];
+  preloadedParams?: ProductParam[];
+  preloadedSupplierCategoriesMap?: Record<string, CategoryOption[]>;
 }
 interface ProductParam {
   id?: string;
@@ -100,7 +106,13 @@ export function ProductFormTabs({
   onChange,
   onImagesLoadingChange,
   onParamsChange,
-  forceParamsEditable
+  forceParamsEditable,
+  preloadedSuppliers,
+  preloadedCurrencies,
+  preloadedCategories,
+  preloadedImages,
+  preloadedParams,
+  preloadedSupplierCategoriesMap
 }: ProductFormTabsProps) {
   // 500px in rem (to avoid fixed px in CSS): 500 / 16 = 31.25
   const DEFAULT_PHOTO_SIZE_REM = 31.25;
@@ -523,12 +535,15 @@ export function ProductFormTabs({
   // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
 
   // Helper: fetch categories by supplier with minimized type inference to avoid deep instantiation
-  const fetchCategoriesBySupplier = async (supplierId: number): Promise<CategoryOption[]> => {
-    const {
-      data,
-      error
-    } = await (supabase as any).from('store_categories').select('id,name,external_id,supplier_id,parent_external_id').eq('supplier_id', supplierId).order('name');
-    return error ? [] : (data ?? []) as unknown as CategoryOption[];
+  const getCategoriesFromMap = (supplierId: number): CategoryOption[] => {
+    const list = preloadedSupplierCategoriesMap?.[String(supplierId)] || [];
+    return (list || []).map((c) => ({
+      ...c,
+      id: String(c.id),
+      external_id: String(c.external_id ?? ''),
+      supplier_id: String(c.supplier_id ?? ''),
+      parent_external_id: c.parent_external_id === null || c.parent_external_id === undefined ? null : String(c.parent_external_id)
+    }));
   };
 
   // Load initial data
@@ -540,33 +555,22 @@ export function ProductFormTabs({
   }, [product]);
   const loadLookupData = async () => {
     try {
-      // Load suppliers
-      const {
-        data: suppliersData
-      } = await supabase.from('user_suppliers').select('id,supplier_name').order('supplier_name').returns<SupplierOption[]>();
-
-      // Load categories filtered by supplier if selected
-      let categoriesData: any[] | null = null;
-      if (!formData.supplier_id) {
-        categoriesData = [];
-      } else {
+      if (preloadedSuppliers) setSuppliers(preloadedSuppliers);
+      if (preloadedCurrencies) setCurrencies(preloadedCurrencies);
+      if (preloadedCategories) {
+        setCategories(preloadedCategories.map((c) => ({
+          ...c,
+          id: String(c.id),
+          external_id: String(c.external_id ?? ''),
+          supplier_id: String(c.supplier_id ?? ''),
+          parent_external_id: c.parent_external_id === null || c.parent_external_id === undefined ? null : String(c.parent_external_id)
+        })));
+      } else if (formData.supplier_id) {
         const supplierId = Number(formData.supplier_id);
-        categoriesData = await fetchCategoriesBySupplier(supplierId);
+        setCategories(getCategoriesFromMap(supplierId));
+      } else {
+        setCategories([]);
       }
-
-      // Load currencies
-      const {
-        data: currenciesData
-      } = await supabase.from('currencies').select('id,name,code,status').eq('status', true).order('name').returns<CurrencyOption[]>();
-      setSuppliers(suppliersData || []);
-      setCategories((categoriesData || []).map((c: any) => ({
-        ...c,
-        id: String(c.id),
-        external_id: String(c.external_id ?? ''),
-        supplier_id: String(c.supplier_id ?? ''),
-        parent_external_id: c.parent_external_id === null || c.parent_external_id === undefined ? null : String(c.parent_external_id)
-      })));
-      setCurrencies(currenciesData || []);
     } catch (error) {
       console.error('Error loading lookup data:', error);
       toast.error(t('failed_load_data'));
@@ -616,41 +620,20 @@ export function ProductFormTabs({
     if (formData.category_id) return; // already selected
     if (!formData.category_external_id) return;
     if (!formData.supplier_id) return;
-    const resolveCategoryId = async () => {
-      try {
-        const {
-          data,
-          error
-        } = await (supabase as any).from('store_categories').select('id,external_id,name,supplier_id,parent_external_id').in('external_id', [String(formData.category_external_id), Number(formData.category_external_id)]).eq('supplier_id', Number(formData.supplier_id)).limit(1);
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const cat = data[0];
-          setFormData(prev => ({
-            ...prev,
-            category_id: String(cat.id)
-          }));
-          setSelectedCategoryName(cat.name || '');
-          // Hydration complete after fallback resolution
-          isHydratingRef.current = false;
-          isLoadingProductRef.current = false;
-          // Ensure the fetched category exists in the categories list so Select shows label
-          setCategories(prev => {
-            const exists = prev?.some(c => String(c.id) === String(cat.id));
-            if (exists) return prev;
-            const next = [...(prev || []), {
-              id: String(cat.id),
-              name: cat.name || '',
-              external_id: String(cat.external_id),
-              supplier_id: String(cat.supplier_id ?? formData.supplier_id),
-              parent_external_id: cat.parent_external_id ? String(cat.parent_external_id) : null
-            }];
-            return next;
-          });
-        }
-      } catch (e) {
-        // silently ignore; UI remains unchanged
-      }
-    };
-    resolveCategoryId();
+    if (preloadedCategories && preloadedCategories.length > 0) return;
+    const supplierId = Number(formData.supplier_id);
+    const list = getCategoriesFromMap(supplierId);
+    const cat = list.find(c => String(c.external_id) === String(formData.category_external_id));
+    if (cat) {
+      setFormData(prev => ({
+        ...prev,
+        category_id: String(cat.id)
+      }));
+      setSelectedCategoryName(cat.name || '');
+      isHydratingRef.current = false;
+      isLoadingProductRef.current = false;
+      setCategories(list);
+    }
   }, [product, formData.category_external_id, formData.supplier_id, formData.category_id]);
 
   // Track initial hydration to avoid clearing category on first population
@@ -663,8 +646,9 @@ export function ProductFormTabs({
   useEffect(() => {
     console.log('[ProductFormTabs] Supplier changed, isHydrating:', isHydratingRef.current, 'product exists:', !!product, 'isLoadingProduct:', isLoadingProductRef.current);
 
-    // Reload lookup data to refresh categories for the selected supplier
-    loadLookupData();
+    // Refresh categories from preloaded map when supplier changes
+    const supplierIdNum = Number(formData.supplier_id || 0);
+    if (supplierIdNum) setCategories(getCategoriesFromMap(supplierIdNum));
     const currentSupplier = String(formData.supplier_id || '');
     const initialSupplier = String(initialSupplierIdRef.current || '');
 
@@ -754,12 +738,9 @@ export function ProductFormTabs({
       });
       // Do not end hydration here; wait for category resolution/label sync
 
-      // Load images
-      const {
-        data: imagesData
-      } = await supabase.from('store_product_images').select('*').eq('product_id', product.id).order('order_index');
+      const imagesData: ProductImage[] | null = preloadedImages ?? null;
       if (imagesData) {
-        const resolved = await Promise.all(imagesData.map(async (img: any) => {
+        const resolved = await Promise.all(imagesData.map(async (img) => {
           let previewUrl: string = img.url;
           const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
           if (typeof previewUrl === 'string') {
@@ -789,18 +770,15 @@ export function ProductFormTabs({
         setImages(resolved);
       }
 
-      // Load parameters
-      const {
-        data: paramsData
-      } = await supabase.from('store_product_params').select('*').eq('product_id', product.id).order('order_index');
+      const paramsData: ProductParam[] | null = preloadedParams ?? null;
       if (paramsData) {
-        const mapped = paramsData.map(param => ({
-          id: String(param.id),
+        const mapped = paramsData.map((param) => ({
+          id: param.id ? String(param.id) : undefined,
           name: param.name,
           value: param.value,
           order_index: param.order_index,
-          paramid: (param as any).paramid || '',
-          valueid: (param as any).valueid || ''
+          paramid: param.paramid || '',
+          valueid: param.valueid || ''
         }));
         setParameters(mapped);
         onParamsChange?.(mapped);
@@ -1262,25 +1240,23 @@ export function ProductFormTabs({
                       <h3 className="text-lg font-semibold">{t('category_editor_title')}</h3>
                       <Separator className="flex-1" />
                     </div>
-                    <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
+                  <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} supplierCategoriesMap={preloadedSupplierCategoriesMap as any} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
                     ...prev,
                     supplier_id: id
                   }))} onCategoryCreated={async cat => {
-                    if (!formData.supplier_id) {
-                      setCategories([]);
-                      return;
-                    }
-                    const supplierId = Number(formData.supplier_id);
-                    const list = await fetchCategoriesBySupplier(supplierId);
-                    setCategories(list);
-                    const matched = list.find(c => c.external_id === cat.external_id);
-                    if (matched) {
-                      setFormData(prev => ({
-                        ...prev,
-                        category_id: matched.id,
-                        category_external_id: matched.external_id
-                      }));
-                    }
+                    // Update local categories; aggregator will sync on next open
+                    setCategories(prev => {
+                      const exists = prev?.some(c => String(c.external_id) === String(cat.external_id));
+                      if (exists) return prev;
+                      const next = [...(prev || []), {
+                        id: String(cat.external_id || `${Date.now()}`),
+                        name: cat.name || '',
+                        external_id: String(cat.external_id || ''),
+                        supplier_id: String(formData.supplier_id || ''),
+                        parent_external_id: null
+                      }];
+                      return next;
+                    });
                   }} />
                   </div>
 

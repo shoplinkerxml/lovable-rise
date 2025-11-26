@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useI18n } from "@/providers/i18n-provider";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
 type Supplier = {
   id: string;
@@ -34,6 +34,7 @@ interface CategoryTreeEditorProps {
   onCategoryCreated?: (category: StoreCategory) => void;
   showStoreSelect?: boolean;
   onSupplierChange?: (supplierId: string) => void;
+  supplierCategoriesMap?: Record<string, StoreCategory[]>;
 }
 export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   suppliers,
@@ -43,7 +44,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   defaultStoreId,
   onCategoryCreated,
   showStoreSelect = true,
-  onSupplierChange
+  onSupplierChange,
+  supplierCategoriesMap
 }) => {
   const {
     t
@@ -81,29 +83,19 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Fetch categories reactively
-  const {
-    data: catList,
-    isLoading,
-    isFetching
-  } = useQuery<StoreCategory[]>({
-    queryKey: ["categories", supplierId || "none"],
-    queryFn: () => CategoryService.listCategories(supplierId),
-    enabled: !!supplierId,
-    // Use categories from parent only for the currently selected supplier
-    initialData: (() => {
-      const sid = supplierId;
-      if (!sid) return undefined;
-      const filtered = (categories as any[]).filter(c => String((c as any).supplier_id) === String(sid));
-      if (!filtered.length) return undefined;
-      return filtered.map((c: any) => ({
-        external_id: c.external_id,
-        name: c.name,
-        parent_external_id: c.parent_external_id ?? null
-      }) satisfies StoreCategory);
-    })(),
-    staleTime: 20_000
-  });
+  const catList: StoreCategory[] = React.useMemo(() => {
+    const sid = supplierId;
+    if (!sid) return [];
+    const fromMap = supplierCategoriesMap?.[String(sid)];
+    if (Array.isArray(fromMap) && fromMap.length > 0) return fromMap;
+    const filtered = (categories as any[]).filter(c => String((c as any).supplier_id) === String(sid));
+    if (!filtered.length) return [];
+    return filtered.map((c: any) => ({
+      external_id: c.external_id,
+      name: c.name,
+      parent_external_id: c.parent_external_id ?? null
+    }) as StoreCategory);
+  }, [supplierId, supplierCategoriesMap, categories]);
   const buildTree = useCallback((items: StoreCategory[]): {
     id: string;
     name: string;
@@ -315,6 +307,8 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
     };
     return treeData.map(filterNode).filter(Boolean) as any[];
   }, [treeData, search]);
+  const isLoading = false;
+  const isFetching = false;
   return <Card className="border-0 shadow-none" data-testid="categoryTree_card">
       {/* Немодальне невелике вікно прогресу без затемнення */}
       <DialogNoOverlay modal={false} open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

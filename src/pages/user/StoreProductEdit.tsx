@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -63,72 +63,62 @@ export const StoreProductEdit = () => {
   const [lastCategoryId, setLastCategoryId] = useState<string | null>(null);
   const [storeCategories, setStoreCategories] = useState<Array<{ store_category_id: number; category_id: number; name: string; store_external_id: string | null; is_active: boolean }>>([]);
   const [selectedStoreCategoryId, setSelectedStoreCategoryId] = useState<number | null>(null);
+  const aggSuppliersRef = useRef<Array<{ id: string; supplier_name: string }> | undefined>(undefined);
+  const aggCurrenciesRef = useRef<Array<{ id: number; name: string; code: string; status: boolean | null }> | undefined>(undefined);
+  const aggCategoriesRef = useRef<Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }> | undefined>(undefined);
+  const aggSupplierCategoriesMapRef = useRef<Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>> | undefined>(undefined);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [productRes, linkRes, imagesRes, paramsRes, shopRes] = await Promise.allSettled([
-        ProductService.getProductById(pid),
-        ProductService.getStoreProductLink(pid, storeId),
-        ProductService.getProductImages(pid),
-        ProductService.getProductParams(pid),
-        ShopService.getShop(storeId),
-      ]);
-
-      if (productRes.status === "fulfilled") {
-        setBaseProduct(productRes.value);
-      } else {
-        setBaseProduct(null);
-      }
-
-      if (linkRes.status === "fulfilled") {
-        type StoreProductLinkDb = {
-          is_active?: boolean;
-          custom_price?: string | number | null;
-          custom_price_old?: string | number | null;
-          custom_price_promo?: string | number | null;
-          custom_stock_quantity?: string | number | null;
-          custom_available?: boolean | null;
-        };
-        const link = linkRes.value as StoreProductLinkDb | null;
-        if (link) {
+      try {
+        const agg = await ProductService.getProductEditData(pid, storeId);
+        setBaseProduct(agg.product);
+        if (agg.link) {
+          const link = agg.link as {
+            is_active?: boolean;
+            custom_price?: string | number | null;
+            custom_price_old?: string | number | null;
+            custom_price_promo?: string | number | null;
+            custom_stock_quantity?: string | number | null;
+            custom_available?: boolean | null;
+          };
           setForm({
             is_active: !!link.is_active,
             custom_price: link.custom_price == null ? "" : String(link.custom_price),
             custom_price_old: link.custom_price_old == null ? "" : String(link.custom_price_old),
             custom_price_promo: link.custom_price_promo == null ? "" : String(link.custom_price_promo),
             custom_stock_quantity: link.custom_stock_quantity == null ? "" : String(link.custom_stock_quantity),
-            custom_available: link.custom_available == null ? (productRes.status === "fulfilled" ? !!productRes.value?.available : true) : !!link.custom_available,
+            custom_available: link.custom_available == null ? (agg.product ? !!agg.product.available : true) : !!link.custom_available,
           });
         }
-      } else {
+        setImages(agg.images || []);
+        setParams(agg.params || []);
+        setShopName(agg.shop?.store_name || "");
+        if (agg.categoryName) setCategoryName(agg.categoryName);
+        aggSuppliersRef.current = agg.suppliers;
+        aggCurrenciesRef.current = agg.currencies;
+        aggCategoriesRef.current = agg.categories;
+        aggSupplierCategoriesMapRef.current = agg.supplierCategoriesMap;
+        if (Array.isArray(agg.storeCategories)) {
+          setStoreCategories(agg.storeCategories.map(r => ({
+            store_category_id: r.store_category_id,
+            category_id: r.category_id,
+            name: r.name,
+            store_external_id: r.store_external_id,
+            is_active: r.is_active,
+          })));
+        }
+      } catch (_) {
         toast.error(t("failed_load_products"));
+      } finally {
+        setLoading(false);
       }
-
-      if (imagesRes.status === "fulfilled") {
-        setImages(imagesRes.value || []);
-      } else {
-        setImages([]);
-      }
-
-      if (paramsRes.status === "fulfilled") {
-        setParams(paramsRes.value || []);
-      } else {
-        setParams([]);
-      }
-
-      if (shopRes.status === "fulfilled") {
-        const shop = shopRes.value as Shop;
-        setShopName(shop?.store_name || "");
-      } else {
-        setShopName("");
-      }
-
-      setLoading(false);
     })();
   }, [pid, storeId, t]);
 
   useEffect(() => {
+    if (storeCategories.length > 0) return;
     (async () => {
       try {
         const rows = await ShopService.getStoreCategories(storeId);
@@ -143,7 +133,7 @@ export const StoreProductEdit = () => {
         setStoreCategories([]);
       }
     })();
-  }, [storeId]);
+  }, [storeId, storeCategories.length]);
 
   useEffect(() => {
     const loadCategoryName = async () => {
@@ -274,6 +264,12 @@ export const StoreProductEdit = () => {
                     price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
                     stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
                   }}
+                  preloadedImages={images}
+                  preloadedParams={params}
+                  preloadedSuppliers={aggSuppliersRef.current}
+                  preloadedCurrencies={aggCurrenciesRef.current}
+                  preloadedCategories={aggCategoriesRef.current}
+                  preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current as any}
                   onChange={async (partial) => {
                     if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
                     if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));

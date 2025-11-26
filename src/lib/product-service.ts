@@ -47,6 +47,7 @@ export interface ProductImage {
   url: string;
   order_index: number;
   is_main?: boolean;
+  alt_text?: string;
 }
 
 export interface ProductAggregated extends Product {
@@ -1041,6 +1042,45 @@ export class ProductService {
     }
 
     return product as Product;
+  }
+
+  /** Агрегированная загрузка данных для страницы редактирования товара */
+  static async getProductEditData(productId: string, storeId?: string): Promise<{
+    product: Product | null;
+    link: any | null;
+    images: ProductImage[];
+    params: ProductParam[];
+    supplier?: { id: number; supplier_name: string } | null;
+    categoryName?: string | null;
+    shop?: { id: string; store_name: string } | null;
+    storeCategories?: Array<{ store_category_id: number; category_id: number; name: string; store_external_id: string | null; is_active: boolean }>;
+    suppliers?: Array<{ id: string; supplier_name: string }>;
+    currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+    categories?: Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>;
+    supplierCategoriesMap?: Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>>;
+  }> {
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const { data, error } = await (supabase as any).functions.invoke('product-edit-data', {
+      body: storeId ? { product_id: String(productId), store_id: String(storeId) } : { product_id: String(productId) },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) this.edgeError(error, 'failed_load_product_edit');
+    const resp = typeof data === 'string' ? JSON.parse(data) : (data as any);
+    return {
+      product: (resp?.product || null) as Product | null,
+      link: resp?.link || null,
+      images: (resp?.images || []) as ProductImage[],
+      params: (resp?.params || []) as ProductParam[],
+      supplier: (resp?.supplier || null) as { id: number; supplier_name: string } | null,
+      categoryName: (resp?.categoryName ?? null) as string | null,
+      shop: (resp?.shop ?? null) as { id: string; store_name: string } | null,
+      storeCategories: (resp?.storeCategories || []) as Array<{ store_category_id: number; category_id: number; name: string; store_external_id: string | null; is_active: boolean }>,
+      suppliers: (resp?.suppliers || []) as Array<{ id: string; supplier_name: string }>,
+      currencies: (resp?.currencies || []) as Array<{ id: number; name: string; code: string; status: boolean | null }>,
+      categories: (resp?.categories || []) as Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>,
+      supplierCategoriesMap: (resp?.supplierCategoriesMap || {}) as Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>>,
+    };
   }
 
   /** Получение одного продукта по ID - используем getProductById */
