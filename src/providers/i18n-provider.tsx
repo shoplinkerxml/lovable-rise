@@ -1169,6 +1169,7 @@ const toastDictionary = {
   promo_price: { uk: "Акційна ціна", en: "Promo Price" },
   stock_quantity: { uk: "Кількість", en: "Stock" },
   product_available: { uk: "Товар доступний", en: "Product Available" },
+  toggle_section: { uk: "Згорнути/розгорнути", en: "Toggle section" },
   product_images: { uk: "Зображення товару", en: "Product Images" },
   add_image_url: { uk: "Додати зображення по URL", en: "Add Image by URL" },
   image_url_placeholder: { uk: "Введіть URL зображення", en: "Enter image URL" },

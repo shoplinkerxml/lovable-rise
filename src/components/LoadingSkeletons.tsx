@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 
 // Enhanced loading skeleton for different content types
-export const ContentSkeleton = ({ type = 'default' }: { type?: 'default' | 'dashboard' | 'form' | 'list' }) => {
+export const ContentSkeleton = ({ type = 'default' }: { type?: 'default' | 'dashboard' | 'form' | 'list' | 'product-edit' }) => {
   switch (type) {
     case 'dashboard':
       return (
@@ -86,6 +86,70 @@ export const ContentSkeleton = ({ type = 'default' }: { type?: 'default' | 'dash
               </div>
             </CardContent>
           </Card>
+        </div>
+      );
+
+    case 'product-edit':
+      return (
+        <div className="p-2 sm:p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,0.9fr)_minmax(280px,1.1fr)] gap-6">
+            <div className="space-y-4">
+              <Card className="relative">
+                <CardContent className="p-3">
+                  <div className="relative w-full min-h-[clamp(18rem,42vh,28rem)] rounded-md border">
+                    <Skeleton className="absolute inset-0 rounded-md" />
+                    <Skeleton className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md" />
+                    <Skeleton className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md" />
+                    <Skeleton className="absolute right-3 bottom-3 h-4 w-4 rounded-sm" />
+                  </div>
+                </CardContent>
+              </Card>
+              <div className="flex items-center gap-3">
+                {[1,2,3].map((i) => (
+                  <div key={i} className="relative">
+                    <Skeleton className="h-16 w-16 rounded-md" />
+                    <Skeleton className="absolute -right-1 -bottom-1 h-3 w-3 rounded-sm" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-36" />
+                <div className="flex-1">
+                  <Skeleton className="h-px w-full" />
+                </div>
+                <Skeleton className="h-7 w-28 rounded-md" />
+              </div>
+              <div className="flex items-center gap-3">
+                {[1,2,3].map((i) => (
+                  <Skeleton key={i} className="h-8 w-24" />
+                ))}
+              </div>
+              <Skeleton className="h-10 w-full" />
+              <div className="space-y-2">
+                {[1,2,3,4,5].map((i) => (
+                  <div key={i} className="flex items-center justify-between px-2 py-2 rounded-md">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-5 w-5 rounded-md" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-2">
+            {[1,2,3].map((i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Skeleton className="h-5 w-32" />
+                <div className="flex-1">
+                  <Skeleton className="h-px w-full" />
+                </div>
+                <Skeleton className="h-6 w-6 rounded-md" />
+              </div>
+            ))}
+          </div>
         </div>
       );
 

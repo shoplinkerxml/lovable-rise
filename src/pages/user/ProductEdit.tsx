@@ -180,7 +180,7 @@ export const ProductEdit = () => {
         }
       />
 
-      <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="form" />} delay={100}>
+      <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="product-edit" />} delay={100}>
         <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
           <ProductFormTabs
             product={product || undefined}

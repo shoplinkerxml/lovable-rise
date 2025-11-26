@@ -1238,8 +1238,8 @@ export function ProductFormTabs({
                   maxHeight: photoBlockHeight ? `${photoBlockHeight}px` : undefined
                 }} data-testid="productFormTabs_categoryTreeEditorSection">
                     <Collapsible defaultOpen>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold">{t('category_editor_title')}</h3>
+                      <div className="flex items-center gap-2 h-9">
+                        <h3 className="text-sm font-semibold leading-none">{t('category_editor_title')}</h3>
                         <Separator className="flex-1" />
                         <CollapsibleTrigger asChild>
                           <Button
@@ -1284,10 +1284,10 @@ export function ProductFormTabs({
                 </div>
               </div>
               {/* Секция: Основні дані — перенесено ниже, на место редактора категорій */}
-              <div className="space-y-4" data-testid="productFormTabs_basicSection">
+              <div className="space-y-4 px-2 sm:px-3" data-testid="productFormTabs_basicSection">
                 <Collapsible defaultOpen>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold">{t('product_main_data')}</h3>
+                  <div className="flex items-center gap-2 h-9">
+                    <h3 className="text-sm font-semibold leading-none">{t('product_main_data')}</h3>
                     <Separator className="flex-1" />
                     <CollapsibleTrigger asChild>
                       <Button
@@ -1416,10 +1416,10 @@ export function ProductFormTabs({
               </div>
 
               {/* Блок назви та опис — вынесен ниже редактора категорій, на всю ширину */}
-              <div className="space-y-4 mt-2 w-full" data-testid="productFormTabs_namesDescriptionFullWidth">
+              <div className="space-y-4 mt-2 w-full px-2 sm:px-3" data-testid="productFormTabs_namesDescriptionFullWidth">
                 <Collapsible defaultOpen>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold">{t('product_names_description')}</h3>
+                  <div className="flex items-center gap-2 h-9">
+                    <h3 className="text-sm font-semibold leading-none">{t('product_names_description')}</h3>
                     <Separator className="flex-1" />
                     <CollapsibleTrigger asChild>
                       <Button
@@ -1509,10 +1509,10 @@ export function ProductFormTabs({
               </div>
 
               {/* Секция: Категорія та ціни — перемещено ниже назви та опис */}
-              <div className="space-y-4">
+              <div className="space-y-4 px-2 sm:px-3">
                 <Collapsible defaultOpen>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold">{t('category_prices')}</h3>
+                  <div className="flex items-center gap-2 h-9">
+                    <h3 className="text-sm font-semibold leading-none">{t('category_prices')}</h3>
                     <Separator className="flex-1" />
                     <CollapsibleTrigger asChild>
                       <Button
