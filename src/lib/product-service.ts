@@ -869,16 +869,27 @@ export class ProductService {
         throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
       }
 
-      const { count, error } = await (supabase as any)
-        .from('store_products')
-        .select('id', { count: 'exact', head: true })
-        // RLS should restrict rows to the current user's stores; no explicit user_id column
-        // Keep the query simple to avoid referencing non-existent columns
-        .order('id', { ascending: true });
+      try {
+        const { data: authData } = await (supabase as any).auth.getSession();
+        const accessToken: string | null = authData?.session?.access_token || null;
+        const { data, error } = await (supabase as any).functions.invoke('user-products-list', {
+          body: { store_id: null, limit: 1, offset: 0 },
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        });
+        if (!error) {
+          const resp = typeof data === 'string' ? JSON.parse(data) : (data as any);
+          const page = (resp?.page || {}) as { total?: number };
+          const total = typeof page.total === 'number' ? page.total : Array.isArray(resp?.products) ? resp.products.length : 0;
+          return total || 0;
+        }
+      } catch (_) { }
 
-      if (error) {
-        console.error('Get products count error:', error);
-        // Возвращаем 0 вместо выброса ошибки для случая пустой таблицы
+      const { count, error: headError } = await (supabase as any)
+        .from('store_products')
+        .select('id', { count: 'exact', head: true });
+
+      if (headError) {
+        console.error('Get products count error:', headError);
         return 0;
       }
 
