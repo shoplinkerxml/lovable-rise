@@ -79,13 +79,10 @@ export const StoreProducts = () => {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-sm flex items-center gap-1.5">
-              <Package className="h-4 w-4" />
-              <span>{limitInfo.current} / {limitInfo.max}</span>
+            <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
+              <Package className="h-3 w-3" />
+              <span>{aggProducts}</span>
             </Badge>
-            <span className="text-sm text-muted-foreground">Товарів</span>
-            <Badge variant="outline" className="px-3 py-1 font-mono">{aggProducts}</Badge>
-            <span className="text-sm text-muted-foreground">Категорій</span>
             <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
               <List className="h-3 w-3" />
               <span>{aggCategories}</span>

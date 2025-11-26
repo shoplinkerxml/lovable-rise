@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await supabase
         .from('store_product_links')
-        .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,custom_category_id,store_products!inner(*)')
+        .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_old,custom_price_promo,custom_stock_quantity,custom_available,custom_category_id,store_products!inner(*)')
         .eq('store_id', storeId)
         .eq('is_active', true)
         .order('created_at', { ascending: false, foreignTable: 'store_products' })
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
           currency_id: (base as any).currency_id ?? null,
           currency_code: (base as any).currency_code ?? null,
           price: ((row as any)?.custom_price ?? (base as any).price) ?? null,
-          price_old: (base as any).price_old ?? null,
+          price_old: (((row as any)?.custom_price_old ?? (base as any).price_old) ?? null),
           price_promo: ((row as any)?.custom_price_promo ?? (base as any).price_promo) ?? null,
           stock_quantity: (((row as any)?.custom_stock_quantity ?? (base as any).stock_quantity) ?? 0) as number,
           available: (((row as any)?.custom_available ?? (base as any).available) ?? true) as boolean,

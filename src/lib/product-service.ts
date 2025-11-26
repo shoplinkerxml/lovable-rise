@@ -279,7 +279,7 @@ export class ProductService {
 
     const { data, error } = await (supabase as any)
       .from('store_product_links')
-      .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)')
+      .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_old,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)')
       .eq('store_id', storeId);
 
     if (error) {
@@ -287,7 +287,19 @@ export class ProductService {
       return [];
     }
 
-    const rows = (data || []) as any[];
+    const rows = (data || []) as Array<{
+      product_id: string;
+      store_id: string;
+      is_active?: boolean | null;
+      custom_name?: string | null;
+      custom_description?: string | null;
+      custom_price?: number | null;
+      custom_price_old?: number | null;
+      custom_price_promo?: number | null;
+      custom_stock_quantity?: number | null;
+      custom_available?: boolean | null;
+      store_products?: Product | null;
+    }>;
     const mapped: Product[] = rows.map((r: any) => {
       const base = r.store_products || {};
       return {
@@ -308,7 +320,7 @@ export class ProductService {
         currency_id: base.currency_id ?? null,
         currency_code: base.currency_code ?? null,
         price: r.custom_price ?? base.price ?? null,
-        price_old: base.price_old ?? null,
+        price_old: r.custom_price_old ?? base.price_old ?? null,
         price_promo: r.custom_price_promo ?? base.price_promo ?? null,
         stock_quantity: (r.custom_stock_quantity ?? base.stock_quantity ?? 0) as number,
         available: (r.custom_available ?? base.available ?? true) as boolean,
@@ -346,7 +358,7 @@ export class ProductService {
         ? await (async () => {
             const { data, error } = await (supabase as any)
               .from('store_product_links')
-              .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)')
+              .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_old,custom_price_promo,custom_stock_quantity,custom_available,store_products(*)')
               .eq('store_id', storeId);
             if (error) return [] as Product[];
             const rows = (data || []) as Array<{
@@ -356,6 +368,7 @@ export class ProductService {
               custom_name?: string | null;
               custom_description?: string | null;
               custom_price?: number | null;
+              custom_price_old?: number | null;
               custom_price_promo?: number | null;
               custom_stock_quantity?: number | null;
               custom_available?: boolean | null;
@@ -381,7 +394,7 @@ export class ProductService {
                 currency_id: base.currency_id ?? null,
                 currency_code: base.currency_code ?? null,
                 price: r.custom_price ?? base.price ?? null,
-                price_old: base.price_old ?? null,
+                price_old: r.custom_price_old ?? base.price_old ?? null,
                 price_promo: r.custom_price_promo ?? base.price_promo ?? null,
                 stock_quantity: (r.custom_stock_quantity ?? base.stock_quantity ?? 0) as number,
                 available: (r.custom_available ?? base.available ?? true) as boolean,
