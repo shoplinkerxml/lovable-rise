@@ -13,6 +13,7 @@ import {
   getFacetedUniqueValues,
   useReactTable,
 } from "@tanstack/react-table";
+import type { Column, FilterFn, Table as TanTable } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 // dropdown components moved to subcomponents
@@ -56,11 +57,13 @@ import { ProductStatusBadge } from "./ProductsTable/ProductStatusBadge";
 import { SortToggle } from "./ProductsTable/SortToggle";
 import { ColumnFilterMenu } from "./ProductsTable/ColumnFilterMenu";
 import { ViewOptionsMenu } from "./ProductsTable/ViewOptionsMenu";
-import { AddToStoresMenu } from "./ProductsTable/AddToStoresMenu";
+ 
 import { PaginationFooter } from "./ProductsTable/PaginationFooter";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+
+const AddToStoresMenuLazy = React.lazy(() => import("./ProductsTable/AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -122,6 +125,8 @@ export const ProductsTable = ({
   let productsCount = 0;
 
   const [items, setItems] = useState<ProductRow[]>([]);
+  const itemsRef = useRef<ProductRow[]>([]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
@@ -285,6 +290,33 @@ export const ProductsTable = ({
     }
   }, [canCreate, t, loadFirstPage]);
 
+  const handleStoresUpdate = useCallback((productId: string, ids: string[], opts?: { storeIdChanged?: string | number; categoryKey?: string; added?: boolean }) => {
+    try {
+      const storeChanged = opts?.storeIdChanged ? String(opts.storeIdChanged) : null;
+      const categoryKey = opts?.categoryKey || null;
+      const added = !!opts?.added;
+      if (storeChanged && categoryKey) {
+        const matchesKey = (p: ProductRow) => {
+          const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
+          return key === categoryKey;
+        };
+        const arr = itemsRef.current || [];
+        const hasOtherInCategory = arr.some((p) => {
+          if (String(p.id) === String(productId)) return false;
+          const idsStr = (p.linkedStoreIds || []).map(String);
+          return idsStr.includes(storeChanged) && matchesKey(p);
+        });
+        if (added) {
+          if (!hasOtherInCategory) ShopService.bumpCategoriesCountInCache(storeChanged, 1);
+        } else {
+          const remains = hasOtherInCategory;
+          if (!remains) ShopService.bumpCategoriesCountInCache(storeChanged, -1);
+        }
+      }
+    } catch { void 0; }
+    setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
+  }, [setProductsCached]);
+
   const handleRemoveStoreLink = useCallback(async (productId: string, storeIdToRemove: string) => {
     const pid = String(productId);
     const sid = String(storeIdToRemove);
@@ -441,6 +473,24 @@ export const ProductsTable = ({
     return computed;
   }, [columnVisibility]);
 
+  const stringFilter: FilterFn<ProductRow> = (row, id, value) => {
+    const rv = row.getValue(id);
+    const str = rv == null ? "" : String(rv);
+    if (value == null) return true;
+    if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
+    return str.toLowerCase().includes(String(value).toLowerCase());
+  };
+
+  const renderHeader = (label: string, column: Column<ProductRow, unknown>, table: TanTable<ProductRow>, extra?: React.ReactNode) => (
+    <div className="flex items-center gap-2">
+      <span className="truncate">{label}</span>
+      <div className="flex items-center gap-0 ml-auto">
+        <SortToggle column={column} table={table} />
+        {extra ?? <ColumnFilterMenu column={column} />}
+      </div>
+    </div>
+  );
+
   const columns = useMemo<ColumnDef<ProductRow>[]>(() => [
     {
       id: "select",
@@ -507,22 +557,8 @@ export const ProductsTable = ({
     {
       id: "name_ua",
       accessorFn: (row) => row.name_ua ?? row.name ?? "",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("table_product")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("table_product"), column, table),
       cell: ({ row }) => {
         const product = row.original;
         const name = product.name_ua || product.name || "—";
@@ -538,22 +574,8 @@ export const ProductsTable = ({
     {
       id: "status",
       accessorFn: (row) => row.state ?? "",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("table_status")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("table_status"), column, table),
       cell: ({ row }) => (
         <ProductStatusBadge state={row.original.state} />
       ),
@@ -562,22 +584,8 @@ export const ProductsTable = ({
     {
       id: "supplier",
       accessorFn: (row) => row.supplierName ?? "",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("supplier")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("supplier"), column, table),
       cell: ({ row }) => {
         const name = row.original.supplierName;
         return name ? (
@@ -591,22 +599,8 @@ export const ProductsTable = ({
     {
       id: "price",
       accessorFn: (row) => (typeof row.price === "number" ? row.price : Number.NEGATIVE_INFINITY),
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("table_price")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("table_price"), column, table),
       cell: ({ row }) => {
         const currency = row.original.currency_code || "";
         const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
@@ -620,22 +614,8 @@ export const ProductsTable = ({
     {
       id: "price_old",
       accessorFn: (row) => (typeof row.price_old === "number" ? row.price_old : Number.NEGATIVE_INFINITY),
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("old_price")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("old_price"), column, table),
       cell: ({ row }) => {
         const currency = row.original.currency_code || "";
         const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
@@ -650,22 +630,8 @@ export const ProductsTable = ({
     {
       id: "price_promo",
       accessorFn: (row) => (typeof row.price_promo === "number" ? row.price_promo : Number.NEGATIVE_INFINITY),
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("promo_price")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("promo_price"), column, table),
       cell: ({ row }) => {
         const currency = row.original.currency_code || "";
         const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
@@ -680,22 +646,10 @@ export const ProductsTable = ({
     {
       id: "category",
       accessorFn: (row) => row.categoryName ?? "",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("category")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} extraOptions={storeId ? categoryFilterOptions : []} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("category"), column, table, (
+        <ColumnFilterMenu column={column} extraOptions={storeId ? categoryFilterOptions : []} />
+      )),
       cell: ({ row }) => {
         const name = row.original.categoryName;
         return name ? <span className="text-sm">{name}</span> : <span className="text-muted-foreground">—</span>;
@@ -704,22 +658,8 @@ export const ProductsTable = ({
     {
       id: "stock_quantity",
       accessorFn: (row) => (typeof row.stock_quantity === "number" ? row.stock_quantity : Number.NEGATIVE_INFINITY),
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("table_stock")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("table_stock"), column, table),
       cell: ({ row }) => (
         <div className="flex items-center justify-center">
           {row.original.stock_quantity != null ? (
@@ -737,22 +677,8 @@ export const ProductsTable = ({
         const v = row.created_at;
         try { return v ? new Date(v).getTime() : 0; } catch { return 0; }
       },
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("table_created")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("table_created"), column, table),
       cell: ({ row }) => (
         row.original.created_at ? (
           <div className="flex flex-col">
@@ -770,64 +696,22 @@ export const ProductsTable = ({
     // Дополнительные колонки (видимы по опциям) — ставим их ДО действий
     {
       accessorKey: "article",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("article")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("article"), column, table),
       cell: ({ row }) => <span className="text-sm text-foreground">{row.original.article || ""}</span>,
       enableHiding: true,
     },
     {
       accessorKey: "vendor",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("vendor")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("vendor"), column, table),
       cell: ({ row }) => <span className="text-sm text-foreground">{row.original.vendor || ""}</span>,
       enableHiding: true,
     },
     {
       accessorKey: "docket_ua",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("short_name_ua")}</span>
-          <div className="flex items-center gap-0 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("short_name_ua"), column, table),
       cell: ({ row }) => {
         const shortName = row.original.docket_ua || "";
         return (
@@ -844,22 +728,8 @@ export const ProductsTable = ({
     },
     {
       accessorKey: "description_ua",
-      filterFn: (row, id, value) => {
-        const rv = row.getValue(id);
-        const str = rv == null ? "" : String(rv);
-        if (value == null) return true;
-        if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-        return str.toLowerCase().includes(String(value).toLowerCase());
-      },
-      header: ({ column, table }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("product_description_ua")}</span>
-          <div className="flex items-center gap-1 ml-auto">
-            <SortToggle column={column} table={table} />
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
+      filterFn: stringFilter,
+      header: ({ column, table }) => renderHeader(t("product_description_ua"), column, table),
       cell: ({ row }) => {
         const desc = row.original.description_ua || "";
         return (
@@ -892,31 +762,7 @@ export const ProductsTable = ({
           product={row.original}
           storeNames={storeNames}
           onRemove={handleRemoveStoreLink}
-          onStoresUpdate={(productId, ids, opts) => {
-            try {
-              const storeChanged = opts?.storeIdChanged ? String(opts.storeIdChanged) : null;
-              const categoryKey = opts?.categoryKey || null;
-              const added = !!opts?.added;
-              if (storeChanged && categoryKey) {
-                const matchesKey = (p: ProductRow) => {
-                  const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
-                  return key === categoryKey;
-                };
-                const hasOtherInCategory = items.some((p) => {
-                  if (String(p.id) === String(productId)) return false;
-                  const idsStr = (p.linkedStoreIds || []).map(String);
-                  return idsStr.includes(storeChanged) && matchesKey(p);
-                });
-                if (added) {
-                  if (!hasOtherInCategory) ShopService.bumpCategoriesCountInCache(storeChanged, 1);
-                } else {
-                  const remains = hasOtherInCategory;
-                  if (!remains) ShopService.bumpCategoriesCountInCache(storeChanged, -1);
-                }
-              }
-            } catch { void 0; }
-            setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
-          }}
+          onStoresUpdate={handleStoresUpdate}
         />
       ),
     }] : []),
@@ -937,31 +783,7 @@ export const ProductsTable = ({
             canCreate={canCreate}
             hideDuplicate={hideDuplicate}
             storeId={storeId}
-            onStoresUpdate={(productId, ids, opts) => {
-              try {
-                const storeChanged = opts?.storeIdChanged ? String(opts.storeIdChanged) : null;
-                const categoryKey = opts?.categoryKey || null;
-                const added = !!opts?.added;
-                if (storeChanged && categoryKey) {
-                  const matchesKey = (p: ProductRow) => {
-                    const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
-                    return key === categoryKey;
-                  };
-                  const hasOtherInCategory = items.some((p) => {
-                    if (String(p.id) === String(productId)) return false;
-                    const idsStr = (p.linkedStoreIds || []).map(String);
-                    return idsStr.includes(storeChanged) && matchesKey(p);
-                  });
-                  if (added) {
-                    if (!hasOtherInCategory) ShopService.bumpCategoriesCountInCache(storeChanged, 1);
-                  } else {
-                    const remains = hasOtherInCategory;
-                    if (!remains) ShopService.bumpCategoriesCountInCache(storeChanged, -1);
-                  }
-                }
-              } catch { void 0; }
-              setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
-            }}
+            onStoresUpdate={handleStoresUpdate}
           />
         </div>
       ),
@@ -991,7 +813,7 @@ export const ProductsTable = ({
         </div>
       ),
     }] : []),
-  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate, categoryFilterOptions, items, setProductsCached, storeNames, handleRemoveStoreLink]);
+  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate, categoryFilterOptions, setProductsCached, storeNames, handleRemoveStoreLink, handleStoresUpdate]);
 
   const table = useReactTable({
     data: rows,
@@ -1197,7 +1019,8 @@ export const ProductsTable = ({
 
                 {/* Add to stores */}
                 {storeId ? null : (
-                  <AddToStoresMenu
+                  <React.Suspense fallback={null}>
+                  <AddToStoresMenuLazy
                     open={storesMenuOpen}
                     setOpen={setStoresMenuOpen}
                     loadStoresForMenu={loadStoresForMenu}
@@ -1217,6 +1040,7 @@ export const ProductsTable = ({
                     setProductsCached={setProductsCached}
                     setLastSelectedProductIds={setLastSelectedProductIds}
                   />
+                  </React.Suspense>
                 )}
 
                 
