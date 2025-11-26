@@ -513,6 +513,7 @@ export const ProductsTable = ({
         table={table}
         storeId={storeId}
         onCreateNew={onCreateNew}
+        onEdit={onEdit}
         canCreate={canCreate}
         hideDuplicate={hideDuplicate}
         setDeleteDialog={(v) => setDeleteDialog(v)}

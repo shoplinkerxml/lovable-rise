@@ -20,6 +20,7 @@ export function Toolbar({
   table,
   storeId,
   onCreateNew,
+  onEdit,
   canCreate,
   hideDuplicate,
   setDeleteDialog,
@@ -46,6 +47,7 @@ export function Toolbar({
   table: TTable;
   storeId?: string;
   onCreateNew?: () => void;
+  onEdit?: (p: ProductRow) => void;
   canCreate?: boolean;
   hideDuplicate?: boolean;
   setDeleteDialog: (v: { open: boolean; product: ProductRow | null }) => void;

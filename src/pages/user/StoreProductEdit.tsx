@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { ProductFormTabs } from "@/components/ProductFormTabs";
 import { type ProductParam, type ProductImage } from "@/lib/product-service";
 import { PageHeader } from "@/components/PageHeader";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { ShopService, type Shop } from "@/lib/shop-service";
 import { CategoryService } from "@/lib/category-service";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
@@ -248,10 +248,11 @@ export const StoreProductEdit = () => {
           <div className="text-lg">{t("edit_product")}</div>
           <Link
             to={`/user/shops/${storeId}/products`}
-            className="text-sm text-muted-foreground"
+            className="text-muted-foreground inline-flex items-center gap-1.5"
             data-testid="store_product_edit_back"
+            aria-label={t("back_to_products")}
           >
-            {t("back_to_products")}
+            <ArrowLeft className="h-4 w-4 text-foreground hover:text-emerald-600" />
           </Link>
         </div>
         <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
@@ -324,64 +325,6 @@ export const StoreProductEdit = () => {
               ) : null}
 
               <div className="space-y-3">
-                <div className="grid gap-2">
-                  <div className="space-y-1">
-                    <Label>Категория магазина</Label>
-                    <Select
-                      value={selectedStoreCategoryId != null ? String(selectedStoreCategoryId) : undefined}
-                      onValueChange={async (val) => {
-                        const idNum = Number(val);
-                        setSelectedStoreCategoryId(Number.isFinite(idNum) ? idNum : null);
-                        const sc = storeCategories.find(c => c.store_category_id === idNum);
-                        const extId = sc?.store_external_id ?? null;
-                        try {
-                          await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: extId });
-                          if (!extId) {
-                            toast.error(t('validation_error'));
-                          } else {
-                            toast.success(t('product_updated'));
-                          }
-                          try {
-                            ProductService.patchProductCaches(pid, { category_external_id: extId || null, categoryName: sc?.name || undefined }, storeId);
-                            
-                            queryClient.invalidateQueries({ queryKey: ["products", storeId] });
-                            queryClient.invalidateQueries({ queryKey: ["products", "all"] });
-                            queryClient.invalidateQueries({ queryKey: ["shopsList"] });
-                            try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
-                            await ProductService.recomputeStoreCategoryFilterCache(storeId);
-                          } catch { void 0; }
-                        } catch (_) {
-                          toast.error(t('failed_save_category'));
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-full max-w-sm">
-                        <SelectValue placeholder={"Выберите категорию магазина"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {storeCategories.map((c) => (
-                          <SelectItem key={c.store_category_id} value={String(c.store_category_id)}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="text-xs text-muted-foreground">Сохраняется external_id категории магазина для экспорта</div>
-                    {(() => {
-                      const sc = selectedStoreCategoryId ? storeCategories.find(c => c.store_category_id === selectedStoreCategoryId) : null;
-                      if (sc && !sc.store_external_id) {
-                        return (
-                          <Alert variant="destructive" className="mt-2">
-                            <AlertDescription>
-                              У выбранной категории отсутствует external_id. Заполните его в списке категорий магазина, иначе экспорт будет невозможен.
-                            </AlertDescription>
-                          </Alert>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
                   <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
