@@ -9,7 +9,7 @@ export function ColumnFilterMenu<TData>({ column, extraOptions }: { column: impo
   const [query, setQuery] = useState("");
   const hasAccessor = Boolean((column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorFn
     || (column as unknown as { columnDef?: { accessorFn?: unknown; accessorKey?: unknown } }).columnDef?.accessorKey);
-  const canFilter = (column.getCanFilter?.() ?? false) && hasAccessor;
+  const canFilter = (column.getCanFilter?.() ?? false) && (hasAccessor || ((extraOptions || []).length > 0));
   if (!canFilter) return null;
   let faceted: Map<unknown, number> | undefined;
   try {
@@ -18,10 +18,12 @@ export function ColumnFilterMenu<TData>({ column, extraOptions }: { column: impo
     faceted = undefined;
   }
   const values = faceted ? Array.from(faceted.keys()) : [];
-  const extraCategoryOptions = column.id === "category" ? (extraOptions || []) : [];
+  const providedOptions = Array.isArray(extraOptions) ? extraOptions : [];
+  const isStores = column.id === "stores";
+  const baseValues = isStores ? [] : values.map((v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v)));
   const unionValues = Array.from(new Set([
-    ...values.map((v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v))),
-    ...extraCategoryOptions,
+    ...baseValues,
+    ...providedOptions,
   ]));
   const current = column.getFilterValue?.();
   const currentArr = Array.isArray(current) ? (current as unknown[]).map((v) => String(v as unknown as string)) : ((current == null ? [] : [String(current)]) as string[]);

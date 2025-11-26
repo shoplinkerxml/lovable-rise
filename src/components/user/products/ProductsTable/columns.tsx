@@ -341,16 +341,24 @@ export function createColumns({
     },
     ...(!storeId ? [{
       id: "stores",
-      header: ({ column }) => (
-        <div className="flex items-center gap-2">
-          <span className="truncate">{t("stores")}</span>
-          <div className="ml-auto flex items-center gap-0">
-            <ColumnFilterMenu column={column} />
-          </div>
-        </div>
-      ),
-      enableSorting: false,
+      enableSorting: true,
       enableHiding: false,
+      enableColumnFilter: true,
+      sortingFn: (rowA, rowB) => {
+        const a = (rowA.original.linkedStoreIds || []).length > 0 ? 1 : 0;
+        const b = (rowB.original.linkedStoreIds || []).length > 0 ? 1 : 0;
+        return a - b;
+      },
+      filterFn: ((row, id, value) => {
+        const selected = Array.isArray(value) ? (value as unknown[]).map((v) => String(v as unknown as string)) : (value == null ? [] : [String(value)]);
+        if (selected.length === 0) return true;
+        const ids = (row.original.linkedStoreIds || []).map(String);
+        const names = ids.map((sid) => storeNames[sid] || sid);
+        return selected.some((name) => names.includes(name));
+      }) as FilterFn<ProductRow>,
+      header: ({ column, table }) => renderHeader(t("stores"), column, table, (
+        <ColumnFilterMenu column={column} extraOptions={Object.values(storeNames)} />
+      )),
       size: 96,
       cell: ({ row }) => (
         <StoresBadgeCell
