@@ -50,6 +50,9 @@ export class ShopService {
   private static shopsRefreshInFlight = false;
   private static shopsLastRefreshAt = 0;
   private static inFlightShopsAggregated: Promise<ShopAggregated[]> | null = null;
+  private static isOffline(): boolean {
+    try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch { return false; }
+  }
   static bumpProductsCountInCache(storeId: string, delta: number) {
     try {
       const cacheKey = 'rq:shopsList';
@@ -149,6 +152,9 @@ export class ShopService {
 
   /** Получение количества магазинов текущего пользователя */
   static async getShopsCount(): Promise<number> {
+    if (ShopService.isOffline()) {
+      return 0;
+    }
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
@@ -166,7 +172,6 @@ export class ShopService {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Get shops count error:', error);
       return 0;
     }
 
@@ -175,6 +180,9 @@ export class ShopService {
 
   /** Получение списка магазинов текущего пользователя */
   static async getShops(): Promise<Shop[]> {
+    if (ShopService.isOffline()) {
+      return [];
+    }
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
@@ -189,15 +197,11 @@ export class ShopService {
         .order('store_name', { ascending: true });
 
       if (error) {
-        console.error('Get shops error:', error);
-        // Return empty array instead of throwing error for empty table
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Get shops error:', error);
-      // Return empty array instead of throwing error
       return [];
     }
   }
@@ -206,6 +210,17 @@ export class ShopService {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
+    if (ShopService.isOffline()) {
+      try {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('rq:shopsList') : null;
+        if (raw) {
+          const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
+          if (Array.isArray(parsed?.items)) return parsed.items;
+        }
+      } catch {}
+      return [];
     }
 
     try {

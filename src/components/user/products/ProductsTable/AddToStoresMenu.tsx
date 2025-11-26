@@ -30,6 +30,10 @@ export function AddToStoresMenu({
   removingStoreId,
   setRemovingStoreId,
   queryClient,
+  addingStores,
+  setAddingStores,
+  setProductsCached,
+  setLastSelectedProductIds,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -45,6 +49,10 @@ export function AddToStoresMenu({
   removingStoreId: string | null;
   setRemovingStoreId: (v: string | null) => void;
   queryClient: QueryClient;
+  addingStores: boolean;
+  setAddingStores: (v: boolean) => void;
+  setProductsCached: (updater: (prev: ProductRow[]) => ProductRow[]) => void;
+  setLastSelectedProductIds?: (ids: string[]) => void;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -273,13 +281,14 @@ export function AddToStoresMenu({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                disabled={selectedStoreIds.length === 0 || !isAnyProductSelected}
-                aria-disabled={selectedStoreIds.length === 0 || !isAnyProductSelected}
+                disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
+                aria-disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
                 onClick={async () => {
                   const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
                   const storeIds = Array.from(new Set(selectedStoreIds));
                   const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
                   if (productIds.length === 0 || storeIds.length === 0) return;
+                  setAddingStores(true);
                   try {
                     const payload: Array<{ product_id: string; store_id: string; is_active?: boolean; custom_price?: number | null; custom_price_old?: number | null; custom_price_promo?: number | null; custom_stock_quantity?: number | null; custom_available?: boolean | null }> = [];
                     for (const p of selected) {
@@ -297,6 +306,12 @@ export function AddToStoresMenu({
                     } else {
                       {
                         toast.success(t('product_added_to_stores'));
+                        setProductsCached((prev) => prev.map((p) => {
+                          const pid = String(p.id);
+                          if (!productIds.includes(pid)) return p;
+                          const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));
+                          return { ...p, linkedStoreIds: merged };
+                        }));
                         try {
                           Object.entries(addedByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt); });
                           const storesUnique = Array.from(new Set(storeIds.map(String)));
@@ -308,12 +323,14 @@ export function AddToStoresMenu({
                   } catch (e) {
                     toast.error(t('failed_add_product_to_stores'));
                   } finally {
+                    setAddingStores(false);
                     try { table.resetRowSelection(); } catch { void 0; }
+                    try { setLastSelectedProductIds?.(productIds); } catch { void 0; }
                   }
                 }}
                 data-testid="user_products_addToStores_confirm"
               >
-                <Plus className="h-4 w-4" />
+                {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               </Button>
               <TooltipProvider>
                 <Tooltip>
