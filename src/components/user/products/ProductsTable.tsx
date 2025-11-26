@@ -49,21 +49,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { ProductActionsDropdown } from "./ProductsTable/RowActionsDropdown";
 import { StoresBadgeCell } from "./ProductsTable/StoresBadgeCell";
 import { SortableHeader } from "./ProductsTable/SortableHeader";
 import { LoadingSkeleton } from "./ProductsTable/LoadingSkeleton";
 import { ProductStatusBadge } from "./ProductsTable/ProductStatusBadge";
 import { SortToggle } from "./ProductsTable/SortToggle";
 import { ColumnFilterMenu } from "./ProductsTable/ColumnFilterMenu";
-import { ViewOptionsMenu } from "./ProductsTable/ViewOptionsMenu";
  
 import { PaginationFooter } from "./ProductsTable/PaginationFooter";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 
 const AddToStoresMenuLazy = React.lazy(() => import("./ProductsTable/AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
+const ProductActionsDropdownLazy = React.lazy(() => import("./ProductsTable/RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown })));
+const ViewOptionsMenuLazy = React.lazy(() => import("./ProductsTable/ViewOptionsMenu").then((m) => ({ default: m.ViewOptionsMenu })));
+type TTable = import("@tanstack/react-table").Table<ProductRow>;
+const ViewOptionsMenuLazyTyped = ViewOptionsMenuLazy as unknown as React.ComponentType<{ table: TTable }>;
+const AddToStoresMenuLazyTyped = AddToStoresMenuLazy as unknown as React.ComponentType<{ open: boolean; setOpen: (v: boolean) => void; loadStoresForMenu: () => Promise<void>; stores: StoreAgg[]; setStores: (v: StoreAgg[]) => void; selectedStoreIds: string[]; setSelectedStoreIds: React.Dispatch<React.SetStateAction<string[]>>; items: ProductRow[]; table: TTable; removingStores: boolean; setRemovingStores: (v: boolean) => void; removingStoreId: string | null; setRemovingStoreId: (v: string | null) => void; queryClient: import("@tanstack/react-query").QueryClient; addingStores: boolean; setAddingStores: (v: boolean) => void; setProductsCached: (updater: (prev: ProductRow[]) => ProductRow[]) => void; setLastSelectedProductIds?: (ids: string[]) => void }>;
 
 type ProductsTableProps = {
   onEdit?: (product: Product) => void;
@@ -234,34 +238,7 @@ export const ProductsTable = ({
     const total = pageInfo?.total ?? products.length;
     onProductsLoadedRef.current?.(total);
   }, [products.length, pageInfo]);
-  useEffect(() => {
-    let scheduled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
-      if (scheduled) return;
-      scheduled = true;
-      timeoutId = setTimeout(() => {
-        scheduled = false;
-        queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
-        try { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); } catch { void 0; }
-      }, 300);
-    };
-    type RealtimeChannelApi = { on: (...args: unknown[]) => RealtimeChannelApi; subscribe: () => unknown };
-    const sb = supabase as unknown as {
-      channel: (name: string) => RealtimeChannelApi;
-      removeChannel: (ch: unknown) => void;
-    };
-    const channel = sb
-      .channel(`products_${storeId ?? 'all'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_products', ...(storeId ? { filter: `store_id=eq.${storeId}` } : {}) }, () => schedule())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_links', ...(storeId ? { filter: `store_id=eq.${storeId}` } : {}) }, () => schedule())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_images' }, () => schedule())
-      .subscribe();
-    return () => {
-      try { sb.removeChannel(channel); } catch { void 0; }
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [queryClient, storeId]);
+  useProductsRealtime(storeId, queryClient);
 
   
 
@@ -316,6 +293,16 @@ export const ProductsTable = ({
     } catch { void 0; }
     setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
   }, [setProductsCached]);
+
+  const handleToggleAvailable = useCallback(async (productId: string, checked: boolean) => {
+    try {
+      setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, available: checked } : p));
+      await ProductService.updateStoreProductLink(productId, String(storeId), { custom_available: checked });
+    } catch (_) {
+      setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, available: !checked } : p));
+      toast.error(t("operation_failed"));
+    }
+  }, [storeId, setProductsCached, t]);
 
   const handleRemoveStoreLink = useCallback(async (productId: string, storeIdToRemove: string) => {
     const pid = String(productId);
@@ -774,7 +761,8 @@ export const ProductsTable = ({
       size: 96,
       cell: ({ row }) => (
         <div className="flex justify-center">
-          <ProductActionsDropdown
+          <React.Suspense fallback={null}>
+          <ProductActionsDropdownLazy
             product={row.original}
             onEdit={() => onEdit?.(row.original)}
             onDelete={() => setDeleteDialog({ open: true, product: row.original })}
@@ -785,6 +773,7 @@ export const ProductsTable = ({
             storeId={storeId}
             onStoresUpdate={handleStoresUpdate}
           />
+          </React.Suspense>
         </div>
       ),
     },
@@ -798,22 +787,14 @@ export const ProductsTable = ({
         <div className="flex items-center justify-center">
           <Switch
             checked={!!row.original.available}
-            onCheckedChange={async (checked) => {
-              try {
-                setProductsCached((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: checked } : p));
-                await ProductService.updateStoreProductLink(row.original.id, String(storeId), { custom_available: checked });
-              } catch (_) {
-                setProductsCached((prev) => prev.map((p) => p.id === row.original.id ? { ...p, available: !checked } : p));
-                toast.error(t("operation_failed"));
-              }
-            }}
+            onCheckedChange={(checked) => handleToggleAvailable(row.original.id, checked)}
             aria-label={t("table_active")}
             data-testid={`user_store_products_active_${row.original.id}`}
           />
         </div>
       ),
     }] : []),
-  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate, categoryFilterOptions, setProductsCached, storeNames, handleRemoveStoreLink, handleStoresUpdate]);
+  ], [onEdit, t, canCreate, hideDuplicate, storeId, handleDuplicate, categoryFilterOptions, setProductsCached, storeNames, handleRemoveStoreLink, handleStoresUpdate, handleToggleAvailable]);
 
   const table = useReactTable({
     data: rows,
@@ -843,6 +824,34 @@ export const ProductsTable = ({
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const tableElRef = useRef<HTMLTableElement | null>(null);
+  const [virtualStart, setVirtualStart] = useState(0);
+  const [virtualEnd, setVirtualEnd] = useState(rows.length);
+  const rowHeight = 44;
+  const enableVirtual = pagination.pageSize >= 50;
+  useEffect(() => {
+    if (!enableVirtual) return;
+    const tableEl = tableElRef.current;
+    const scroller = tableEl?.parentElement || null;
+    if (!scroller) return;
+    const handler = () => {
+      const h = scroller.clientHeight || 0;
+      const top = scroller.scrollTop || 0;
+      const start = Math.max(0, Math.floor(top / rowHeight) - 2);
+      const visible = Math.max(1, Math.ceil(h / rowHeight) + 4);
+      const end = Math.min(rows.length, start + visible);
+      setVirtualStart(start);
+      setVirtualEnd(end);
+    };
+    handler();
+    scroller.addEventListener("scroll", handler);
+    window.addEventListener("resize", handler);
+    return () => {
+      scroller.removeEventListener("scroll", handler);
+      window.removeEventListener("resize", handler);
+    };
+  }, [enableVirtual, rows.length]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -1015,12 +1024,14 @@ export const ProductsTable = ({
                 </Tooltip>
 
                 {/* Columns toggle */}
-                <ViewOptionsMenu table={table} />
+                <React.Suspense fallback={null}>
+                  <ViewOptionsMenuLazyTyped table={table} />
+                </React.Suspense>
 
                 {/* Add to stores */}
                 {storeId ? null : (
                   <React.Suspense fallback={null}>
-                  <AddToStoresMenuLazy
+                  <AddToStoresMenuLazyTyped
                     open={storesMenuOpen}
                     setOpen={setStoresMenuOpen}
                     loadStoresForMenu={loadStoresForMenu}
@@ -1053,7 +1064,8 @@ export const ProductsTable = ({
       {/* Table */}
       <div className="bg-background" data-testid="user_products_table">
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <Table>
+          <Table ref={tableElRef}
+          >
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => {
                 const ids = headerGroup.headers.map((h) => h.column.id).filter((id) => id !== "actions");
@@ -1086,13 +1098,43 @@ export const ProductsTable = ({
                 ))}
               </>
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"} className="hover:bg-muted/50">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
-                  ))}
-                </TableRow>
-              ))
+              (() => {
+                if (!enableVirtual) {
+                  return table.getRowModel().rows.map((row) => (
+                    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"} className="hover:bg-muted/50">
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                      ))}
+                    </TableRow>
+                  ));
+                }
+                const all = table.getRowModel().rows;
+                const slice = all.slice(virtualStart, virtualEnd);
+                const topH = virtualStart * rowHeight;
+                const bottomH = Math.max(0, (all.length - virtualEnd) * rowHeight);
+                const cellsCount = columns.length;
+                return (
+                  <>
+                    {topH > 0 ? (
+                      <TableRow style={{ height: topH }}>
+                        <TableCell colSpan={cellsCount} />
+                      </TableRow>
+                    ) : null}
+                    {slice.map((row) => (
+                      <TableRow key={row.id} data-state={row.getIsSelected() && "selected"} className="hover:bg-muted/50" style={{ height: rowHeight }}>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                    {bottomH > 0 ? (
+                      <TableRow style={{ height: bottomH }}>
+                        <TableCell colSpan={cellsCount} />
+                      </TableRow>
+                    ) : null}
+                  </>
+                );
+              })()
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
