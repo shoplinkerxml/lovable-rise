@@ -104,7 +104,7 @@ serve(async (req) => {
 
     const { data: productRow } = await supabase
       .from("store_products")
-      .select("id,store_id")
+      .select("id,store_id,category_id,category_external_id")
       .eq("id", productId)
       .maybeSingle();
     if (!productRow) {
@@ -136,7 +136,25 @@ serve(async (req) => {
     if (body.vendor !== undefined) updateBase.vendor = body.vendor;
     if (body.article !== undefined) updateBase.article = body.article;
     if (body.category_id !== undefined) updateBase.category_id = body.category_id != null ? Number(body.category_id) : null;
-    if (body.category_external_id !== undefined) updateBase.category_external_id = body.category_external_id;
+    if (body.category_external_id !== undefined) {
+      const raw = body.category_external_id;
+      let nextExt: string | null = null;
+      if (raw != null && String(raw).trim() !== "") {
+        nextExt = String(raw);
+      } else if (body.category_id != null) {
+        const { data: catRow } = await supabase
+          .from("store_categories")
+          .select("external_id")
+          .eq("id", Number(body.category_id))
+          .maybeSingle();
+        nextExt = (catRow as { external_id?: string } | null)?.external_id ?? null;
+      } else {
+        nextExt = (productRow as { category_external_id?: string } | null)?.category_external_id ?? null;
+      }
+      if (nextExt != null && String(nextExt).trim() !== "") {
+        updateBase.category_external_id = String(nextExt);
+      }
+    }
     if (body.currency_code !== undefined) updateBase.currency_code = body.currency_code;
     if (body.price !== undefined) updateBase.price = body.price;
     if (body.price_old !== undefined) updateBase.price_old = body.price_old;

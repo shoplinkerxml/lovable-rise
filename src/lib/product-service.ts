@@ -1228,7 +1228,13 @@ export class ProductService {
     });
     if (error) this.edgeError(error, 'failed_save_product');
     const productId = (data as unknown as { product_id?: string })?.product_id || id;
-    const product = await this.getProductById(productId);
+    const { data: aggData, error: aggErr } = await (supabase as any).functions.invoke('product-edit-data', {
+      body: { product_id: String(productId) },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (aggErr) this.edgeError(aggErr, 'failed_load_product_edit');
+    const resp = typeof aggData === 'string' ? JSON.parse(aggData) : (aggData as any);
+    const product = (resp?.product || null) as Product | null;
     if (!product) throw new Error('update_failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
     try { ProductService.clearAllFirstPageCaches(); } catch {}

@@ -244,7 +244,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           }} data-testid={`categoryTree_renameCancel_${node.external_id}`}>{t("btn_cancel")}</Button>
             </div> : <span
               title={node.name}
-              className={`${selected === node.external_id ? "font-semibold text-success" : "font-extralight"} flex-1 truncate text-sm hover:font-semibold hover:text-success`}
+              className={`${selected === node.external_id ? "font-semibold text-success" : "font-extralight"} flex-1 truncate text-xs hover:font-semibold hover:text-success`}
             >
               {node.name}
             </span>}
@@ -323,7 +323,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         </DialogNoOverlayContent>
       </DialogNoOverlay>
       <CardHeader className="flex flex-row items-center justify-between p-0 mb-2.5">
-        <CardTitle className="text-base" data-testid="categoryTree_title">{t("categories_title")}</CardTitle>
+        <CardTitle className="text-sm" data-testid="categoryTree_title">{t("categories_title")}</CardTitle>
         <Dialog open={isCreateOpen} onOpenChange={open => {
         setIsCreateOpen(open);
         if (!open) resetCreateState();

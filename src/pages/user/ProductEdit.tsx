@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
+import { ContentSkeleton, ProgressiveLoader } from "@/components/LoadingSkeletons";
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
@@ -83,7 +84,7 @@ export const ProductEdit = () => {
       await ProductService.updateProduct(id, {
         external_id: formData.external_id,
         category_id: formData.category_id || null,
-        category_external_id: formData.category_external_id || null,
+        category_external_id: formData.category_external_id ? String(formData.category_external_id) : undefined,
         supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
         currency_code: formData.currency_code || null,
         name: formData.name,
@@ -110,15 +111,16 @@ export const ProductEdit = () => {
       try {
         const cidNum = formData.category_id ? Number(formData.category_id) : null;
         let catName = '';
-        try {
-          if (cidNum != null) {
-            const name = await CategoryService.getNameByIdSafe(cidNum);
-            catName = name || '';
-          } else if (formData.supplier_id && formData.category_external_id) {
-            const cat = await CategoryService.getByExternalId(String(formData.supplier_id), formData.category_external_id);
-            catName = cat?.name || '';
-          }
-        } catch {}
+        if (cidNum != null) {
+          const list = aggCategoriesRef.current || [];
+          const found = list.find((c) => String((c as any).id) === String(cidNum));
+          catName = (found as any)?.name || '';
+        } else if (formData.supplier_id && formData.category_external_id) {
+          const map = aggSupplierCategoriesMapRef.current || {};
+          const arr = map[String(formData.supplier_id)] || [];
+          const found = arr.find((c) => String((c as any).external_id) === String(formData.category_external_id));
+          catName = (found as any)?.name || '';
+        }
         const patch: Partial<Product> = {
           name: formData.name,
           name_ua: formData.name_ua || null,
@@ -178,13 +180,8 @@ export const ProductEdit = () => {
         }
       />
 
-      <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
-        {loading && (
-          <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="product_edit_loader">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
-        {!loading && (
+      <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="form" />} delay={100}>
+        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
           <ProductFormTabs
             product={product || undefined}
             onSubmit={handleFormSubmit}
@@ -197,8 +194,8 @@ export const ProductEdit = () => {
             preloadedCategories={aggCategoriesRef.current}
             preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current as any}
           />
-        )}
-      </div>
+        </div>
+      </ProgressiveLoader>
     </div>
   );
 };

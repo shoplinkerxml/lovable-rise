@@ -377,7 +377,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button type="button" onClick={triggerImport} variant="ghost" size="icon" className="h-8 w-8" data-testid="parametersDataTable_import" aria-label={t('upload')}>
-                      <Upload className="h-4 w-4 text-foreground" />
+                      <Download className="h-4 w-4 text-foreground" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t('upload')}</TooltipContent>
@@ -390,7 +390,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button type="button" variant="ghost" size="icon" className="h-8 w-8" data-testid="parametersDataTable_export" aria-label={t('export_section')}>
-                          <Download className="h-4 w-4 text-foreground" />
+                          <Upload className="h-4 w-4 text-foreground" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
