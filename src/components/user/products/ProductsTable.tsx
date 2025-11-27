@@ -409,6 +409,8 @@ export const ProductsTable = ({
     storeId,
     categoryFilterOptions,
     storeNames,
+    stores,
+    loadStoresForMenu,
     handleRemoveStoreLink,
     handleStoresUpdate,
     onEdit,
@@ -417,7 +419,7 @@ export const ProductsTable = ({
     canCreate,
     hideDuplicate,
     handleToggleAvailable,
-  }), [t, storeId, categoryFilterOptions, storeNames, handleRemoveStoreLink, handleStoresUpdate, onEdit, handleDuplicate, canCreate, hideDuplicate, handleToggleAvailable]);
+  }), [t, storeId, categoryFilterOptions, storeNames, stores, loadStoresForMenu, handleRemoveStoreLink, handleStoresUpdate, onEdit, handleDuplicate, canCreate, hideDuplicate, handleToggleAvailable]);
 
   const table = useReactTable({
     data: rows,

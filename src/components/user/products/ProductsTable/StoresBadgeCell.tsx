@@ -15,11 +15,13 @@ type ProductRow = Product & { linkedStoreIds?: string[] };
 type Props = {
   product: ProductRow;
   storeNames: Record<string, string>;
+  storesList?: ShopAggregated[];
+  prefetchStores?: () => Promise<void>;
   onRemove?: (productId: string, storeId: string) => void;
   onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void;
 };
 
-export function StoresBadgeCell({ product, storeNames, onRemove, onStoresUpdate }: Props) {
+export function StoresBadgeCell({ product, storeNames, storesList, prefetchStores, onRemove, onStoresUpdate }: Props) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const storeIds = product.linkedStoreIds || [];
@@ -32,27 +34,39 @@ export function StoresBadgeCell({ product, storeNames, onRemove, onStoresUpdate 
   const truncate = (s: string) => (s.length > 12 ? `${s.slice(0, 12)}...` : s);
 
   const loadStoresAndLinks = useCallback(async () => {
+    let shops: ShopAggregated[] = [];
     try {
+      try { await prefetchStores?.(); } catch { void 0; }
       const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
       if (cachedAgg.length > 0) {
-        setStores(cachedAgg);
+        shops = cachedAgg;
       } else {
         setLoadingStores(true);
         const data = await ShopService.getShopsAggregated();
-        setStores(data || []);
-        try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], data || []); } catch { void 0; }
-        setLoadingStores(false);
+        shops = data || [];
+        try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], shops); } catch { void 0; }
       }
+    } catch {
+      shops = Array.isArray(storesList) && storesList.length > 0 ? storesList : Object.entries(storeNames).map(([id, name]) => ({ id: String(id), store_name: name })) as ShopAggregated[];
+    } finally {
+      const fallback = Array.isArray(storesList) && storesList.length > 0
+        ? storesList
+        : Object.entries(storeNames).map(([id, name]) => ({ id: String(id), store_name: name })) as ShopAggregated[];
+      setStores(shops.length > 0 ? shops : fallback);
+      setLoadingStores(false);
+    }
+    try {
       ProductService.invalidateStoreLinksCache(String(product.id));
       const ids = await ProductService.getStoreLinksForProduct(product.id);
       setLinkedStoreIds(ids);
     } catch {
-      setStores([]);
-      setLinkedStoreIds([]);
+      setLinkedStoreIds(product.linkedStoreIds || []);
     }
-  }, [queryClient, product.id]);
+  }, [queryClient, product.id, storesList, storeNames, product.linkedStoreIds, prefetchStores]);
 
   useEffect(() => { if (open) loadStoresAndLinks(); }, [open, loadStoresAndLinks]);
+  useEffect(() => { if (Array.isArray(storesList) && storesList.length > 0) setStores(storesList); }, [storesList]);
+  useEffect(() => { setLinkedStoreIds(product.linkedStoreIds || []); }, [product.linkedStoreIds]);
 
   if (storeIds.length === 0) {
     return (

@@ -11,6 +11,7 @@ import { StoresBadgeCell } from "./StoresBadgeCell";
 import { ProductStatusBadge } from "./ProductStatusBadge";
 const ProductActionsDropdownLazy = React.lazy(() => import("./RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown })));
 import type { Product } from "@/lib/product-service";
+import type { ShopAggregated } from "@/lib/shop-service";
 
 export type ProductRow = Product & {
   linkedStoreIds?: string[];
@@ -29,6 +30,8 @@ export function createColumns({
   storeId,
   categoryFilterOptions,
   storeNames,
+  stores,
+  loadStoresForMenu,
   handleRemoveStoreLink,
   handleStoresUpdate,
   onEdit,
@@ -42,6 +45,8 @@ export function createColumns({
   storeId?: string;
   categoryFilterOptions: string[];
   storeNames: Record<string, string>;
+  stores: ShopAggregated[];
+  loadStoresForMenu: () => Promise<void>;
   handleRemoveStoreLink: (productId: string, storeIdToRemove: string) => Promise<boolean> | boolean;
   handleStoresUpdate: (productId: string, ids: string[], opts?: { storeIdChanged?: string | number; categoryKey?: string | null; added?: boolean }) => void;
   onEdit?: (p: ProductRow) => void;
@@ -364,6 +369,8 @@ export function createColumns({
         <StoresBadgeCell
           product={row.original}
           storeNames={storeNames}
+          storesList={stores}
+          prefetchStores={loadStoresForMenu}
           onRemove={handleRemoveStoreLink}
           onStoresUpdate={handleStoresUpdate}
         />
