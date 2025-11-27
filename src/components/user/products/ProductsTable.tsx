@@ -104,7 +104,20 @@ export const ProductsTable = ({
   const itemsRef = useRef<ProductRow[]>([]);
   useEffect(() => { itemsRef.current = items; }, [items]);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = window.localStorage.getItem('user_products_pagination');
+        if (raw) {
+          const parsed = JSON.parse(raw) as { pageIndex?: number; pageSize?: number };
+          const pi = typeof parsed.pageIndex === 'number' ? Math.max(0, parsed.pageIndex) : 0;
+          const ps = typeof parsed.pageSize === 'number' ? Math.max(5, parsed.pageSize) : 10;
+          return { pageIndex: pi, pageSize: ps };
+        }
+      }
+    } catch { /* ignore */ }
+    return { pageIndex: 0, pageSize: 10 };
+  });
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
     setItems((prev) => updater(prev));
     queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
@@ -191,6 +204,14 @@ export const ProductsTable = ({
   }, [storeId]);
 
   useEffect(() => { loadFirstPage(); }, [loadFirstPage, refreshTrigger]);
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const payload = JSON.stringify({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize });
+        window.localStorage.setItem('user_products_pagination', payload);
+      }
+    } catch { /* ignore */ }
+  }, [pagination.pageIndex, pagination.pageSize]);
   useEffect(() => {
     const requiredForCurrent = (pagination.pageIndex + 1) * pagination.pageSize;
     const requiredForPrefetch = (pagination.pageIndex + 2) * pagination.pageSize;
