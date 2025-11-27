@@ -156,7 +156,8 @@ export const ProductsTable = ({
     loadingFirstRef.current = true;
     requestedOffsets.current.clear();
     try {
-      const { products, page } = await ProductService.getProductsFirstPage(storeId ?? null, pagination.pageSize);
+      const initialFetchSize = Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize);
+      const { products, page } = await ProductService.getProductsFirstPage(storeId ?? null, initialFetchSize);
       setItems(products as ProductRow[]);
       setPageInfo(page);
       onProductsLoadedRef.current?.(page?.total ?? products.length);
@@ -165,7 +166,7 @@ export const ProductsTable = ({
       onLoadingChangeRef.current?.(false);
       loadingFirstRef.current = false;
     }
-  }, [storeId, pagination.pageSize]);
+  }, [storeId, pagination.pageSize, pagination.pageIndex]);
 
   const loadNextPage = useCallback(async (override?: { limit: number; offset: number | null }) => {
     const nextOffset = override?.offset ?? pageInfo?.nextOffset ?? null;
@@ -191,17 +192,13 @@ export const ProductsTable = ({
   }, [pageInfo, storeId, items.length, pagination.pageSize]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        if (storeId) {
-          const names = await ProductService.getStoreCategoryFilterOptions(String(storeId));
-          setCategoryFilterOptions(names);
-        } else {
-          setCategoryFilterOptions([]);
-        }
-      } catch { setCategoryFilterOptions([]); }
-    })();
-  }, [storeId]);
+    if (storeId) {
+      const names = Array.from(new Set((items || []).map((p) => String(p.categoryName || '')).filter((v) => !!v)));
+      setCategoryFilterOptions(names);
+    } else {
+      setCategoryFilterOptions([]);
+    }
+  }, [storeId, items]);
 
   useEffect(() => { loadFirstPage(); }, [loadFirstPage, refreshTrigger]);
   useEffect(() => {

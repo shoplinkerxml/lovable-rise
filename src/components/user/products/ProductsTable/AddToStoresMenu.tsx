@@ -316,6 +316,30 @@ export function AddToStoresMenu({
                           Object.entries(addedByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt); });
                           const storesUnique = Array.from(new Set(storeIds.map(String)));
                           for (const sid of storesUnique) { try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; } }
+                          try {
+                            const addedMap = addedByStore || {};
+                            q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                              const arr = Array.isArray(prev) ? prev : (stores || []);
+                              return (arr || []).map((s0) => {
+                                const sidStr = String(s0.id);
+                                const inc = Number(addedMap[sidStr] || 0);
+                                let nextCats = s0.categoriesCount;
+                                try {
+                                  const key = `rq:filters:categories:${sidStr}`;
+                                  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+                                  if (raw) {
+                                    const parsed = JSON.parse(raw) as { items?: string[] };
+                                    const cntCats = Array.isArray(parsed?.items) ? parsed.items.length : 0;
+                                    ShopService.setCategoriesCountInCache(sidStr, cntCats);
+                                    nextCats = Math.max(0, Number(cntCats) || 0);
+                                  }
+                                } catch { /* ignore */ }
+                                return { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) + inc)), categoriesCount: typeof nextCats === 'number' ? nextCats : s0.categoriesCount };
+                              });
+                            });
+                            const updated = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
+                            setStores(updated);
+                          } catch { /* ignore */ }
                           q.invalidateQueries({ queryKey: ['shopsList'] });
                         } catch { void 0; }
                       }

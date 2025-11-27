@@ -7,6 +7,11 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 }
 
+type RequestBody = {
+  includeConfig?: boolean | null
+  store_id?: string | null
+}
+
 type Shop = {
   id: string
   user_id: string
@@ -33,17 +38,24 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization') || ''
     const token = authHeader.replace('Bearer ', '')
+    const body: RequestBody = await req.json().catch(() => ({}))
+    const storeId = body?.store_id ? String(body.store_id) : null
+    const includeConfig = (body?.includeConfig === true) || !!storeId
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_ANON_KEY') || '',
       { global: { headers: authHeader ? { Authorization: `Bearer ${token}` } : {} } }
     )
 
-    const { data: stores, error } = await (supabase as any)
+    const baseSelect = includeConfig
+      ? 'id,user_id,store_name,store_company,store_url,template_id,xml_config,custom_mapping,is_active,created_at,updated_at'
+      : 'id,user_id,store_name,store_company,store_url,template_id,is_active,created_at,updated_at'
+    let storesQuery = (supabase as any)
       .from('user_stores')
-      .select('id,user_id,store_name,store_company,store_url,template_id,xml_config,custom_mapping,is_active,created_at,updated_at')
+      .select(baseSelect)
       .eq('is_active', true)
-      .order('store_name', { ascending: true })
+    if (storeId) storesQuery = storesQuery.eq('id', storeId)
+    const { data: stores, error } = await storesQuery.order('store_name', { ascending: true })
 
     if (error) return new Response(JSON.stringify({ error: 'shops_fetch_failed' }), { status: 500, headers: corsHeaders })
 
@@ -66,64 +78,38 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { data: maps } = await (supabase as any)
-      .from('store_store_categories')
-      .select('store_id,category_id,external_id,is_active')
-      .in('store_id', storeIds)
-
-    const byStoreCatId: Record<string, Record<string, string | null>> = {}
-    for (const m of maps || []) {
-      const active = (m as any)?.is_active !== false
-      if (!active) continue
-      const sid = String((m as any)?.store_id)
-      const cid = (m as any)?.category_id != null ? String((m as any).category_id) : null
-      const ext = (m as any)?.external_id != null ? String((m as any).external_id) : null
-      if (!sid || !cid) continue
-      if (!byStoreCatId[sid]) byStoreCatId[sid] = {}
-      byStoreCatId[sid][cid] = ext || null
-    }
-
-    const { data: linkRows } = await (supabase as any)
+    const linksQuery = (supabase as any)
       .from('store_product_links')
-      .select('product_id,store_id,is_active,custom_category_id,store_products!inner(id,category_id,category_external_id)')
-      .in('store_id', storeIds)
-      .eq('is_active', true)
-
-    const productsCountMap: Record<string, number> = {}
-    const productsSetMap: Record<string, Set<string>> = {}
-    const categoriesKeyMap: Record<string, Set<string>> = {}
-    for (const r of linkRows || []) {
-      const sid = String((r as any).store_id)
-      const active = (r as any).is_active !== false
-      if (active) {
-        const pid = String((r as any)?.product_id)
-        if (!productsSetMap[sid]) productsSetMap[sid] = new Set()
-        productsSetMap[sid].add(pid)
-      }
-      const linkExt = (r as any)?.custom_category_id != null ? String((r as any).custom_category_id) : null
-      const baseCid = (r as any)?.store_products?.category_id != null ? String((r as any).store_products.category_id) : null
-      const baseExt = (r as any)?.store_products?.category_external_id != null ? String((r as any).store_products.category_external_id) : null
-      const catKey = linkExt ? `ext:${linkExt}` : (baseCid ? `cid:${baseCid}` : (baseExt ? `ext:${baseExt}` : null))
-      if (catKey) {
-        if (!categoriesKeyMap[sid]) categoriesKeyMap[sid] = new Set()
-        categoriesKeyMap[sid].add(catKey)
-      }
+      .select('store_id,is_active')
+    const catsQuery = (supabase as any)
+      .from('store_store_categories')
+      .select('store_id,is_active')
+    const linksPromise = storeId ? linksQuery.eq('store_id', storeId) : linksQuery.in('store_id', storeIds)
+    const catsPromise = storeId ? catsQuery.eq('store_id', storeId) : catsQuery.in('store_id', storeIds)
+    const [linksRes, catsRes] = await Promise.all([linksPromise, catsPromise])
+    const productsCountByStore: Record<string, number> = {}
+    for (const r of ((linksRes?.data as any[]) || [])) {
+      const sid = (r as any)?.store_id != null ? String((r as any).store_id) : ''
+      const active = (r as any)?.is_active !== false
+      if (sid && active) productsCountByStore[sid] = (productsCountByStore[sid] || 0) + 1
+    }
+    const categoriesCountByStore: Record<string, number> = {}
+    for (const r of ((catsRes?.data as any[]) || [])) {
+      const sid = (r as any)?.store_id != null ? String((r as any).store_id) : ''
+      const active = (r as any)?.is_active !== false
+      if (sid && active) categoriesCountByStore[sid] = (categoriesCountByStore[sid] || 0) + 1
     }
 
-    const aggregated: ShopAggregated[] = shops.map(s => {
-      const products = (productsSetMap[s.id]?.size || 0)
-      const categories = (categoriesKeyMap[s.id]?.size || 0)
-      return {
-        ...s,
-        marketplace: s.template_id ? templatesMap[String(s.template_id)] || 'Не вказано' : 'Не вказано',
-        productsCount: products,
-        categoriesCount: products === 0 ? 0 : categories,
-      }
-    })
+    const aggregated: ShopAggregated[] = shops.map((s) => ({
+      ...s,
+      marketplace: s.template_id ? (templatesMap[String(s.template_id)] || 'Не вказано') : 'Не вказано',
+      productsCount: productsCountByStore[String(s.id)] || 0,
+      categoriesCount: categoriesCountByStore[String(s.id)] || 0,
+    }))
 
     return new Response(JSON.stringify({ shops: aggregated }), { status: 200, headers: corsHeaders })
   } catch (e) {
-    const msg = (e as any)?.message || 'aggregation_failed'
+    const msg = (e as any)?.message || 'shops_aggregation_failed'
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders })
   }
 })

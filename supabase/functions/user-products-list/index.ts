@@ -79,24 +79,9 @@ Deno.serve(async (req) => {
     const customExtByPid: Record<string, string | null> = {}
 
     if (storeId) {
-      const { count, error: countError } = await supabase
+      const { data, error, count } = await supabase
         .from('store_product_links')
-        .select('product_id', { count: 'exact', head: true })
-        .eq('store_id', storeId)
-        .eq('is_active', true)
-
-      if (countError) {
-        return new Response(JSON.stringify({ error: 'count_failed' }), {
-          status: 500,
-          headers: corsHeaders,
-        })
-      }
-
-      totalCount = count ?? 0
-
-      const { data, error } = await supabase
-        .from('store_product_links')
-        .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_old,custom_price_promo,custom_stock_quantity,custom_available,custom_category_id,store_products!inner(*)')
+        .select('product_id,store_id,is_active,custom_name,custom_description,custom_price,custom_price_old,custom_price_promo,custom_stock_quantity,custom_available,custom_category_id,store_products!inner(*)', { count: 'exact' })
         .eq('store_id', storeId)
         .eq('is_active', true)
         .order('created_at', { ascending: false, foreignTable: 'store_products' })
@@ -108,6 +93,8 @@ Deno.serve(async (req) => {
           headers: corsHeaders,
         })
       }
+
+      totalCount = count ?? 0
 
       const linkRows = (data || []) as any[]
       products = linkRows.map((row) => {
@@ -144,22 +131,9 @@ Deno.serve(async (req) => {
         }
       })
     } else {
-      const { count, error: countError } = await supabase
+      const { data, error, count } = await supabase
         .from('store_products')
-        .select('id', { count: 'exact', head: true })
-
-      if (countError) {
-        return new Response(JSON.stringify({ error: 'count_failed' }), {
-          status: 500,
-          headers: corsHeaders,
-        })
-      }
-
-      totalCount = count ?? 0
-
-      const { data, error } = await supabase
-        .from('store_products')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1)
 
@@ -171,151 +145,120 @@ Deno.serve(async (req) => {
       }
 
       products = (data || []) as Product[]
-
-      // If a product has exactly one active store link with custom_category_id,
-      // prefer that category in global view to reflect store-specific mapping.
-      const pidList = products.map(p => String(p.id)).filter(Boolean)
-      if (pidList.length > 0) {
-        const { data: glinks } = await supabase
-          .from('store_product_links')
-          .select('product_id,is_active,custom_category_id,store_id')
-          .in('product_id', pidList)
-        const linksByPid: Record<string, Array<any>> = {}
-        for (const r of glinks || []) {
-          const pid = String((r as any)?.product_id)
-          const active = (r as any)?.is_active !== false
-          if (!linksByPid[pid]) linksByPid[pid] = []
-          if (active) linksByPid[pid].push(r)
-        }
-        for (const p of products) {
-          const pid = String(p.id)
-          const activeLinks = linksByPid[pid] || []
-          if (activeLinks.length === 1) {
-            const ext = (activeLinks[0] as any)?.custom_category_id != null ? String((activeLinks[0] as any).custom_category_id) : null
-            if (ext) (p as any).category_external_id = ext
-          }
-        }
-      }
+      totalCount = count ?? 0
     }
 
     const ids = products.map((p) => String(p.id)).filter((v) => !!v)
-    const categoryIds = products
-      .map((p) => p.category_id)
-      .filter((v) => v != null) as number[]
-    const externalCategoryIds = products
-      .map((p) => p.category_external_id)
-      .filter((v) => !!v) as string[]
-    const supplierIdsRaw = products
-      .map((p) => p.supplier_id)
-      .filter((v) => v != null) as number[]
+    const categoryIds = products.map((p) => p.category_id).filter((v) => v != null) as number[]
+    const externalCategoryIdsBase = products.map((p) => p.category_external_id).filter((v) => !!v) as string[]
+    const externalSet = new Set<string>(externalCategoryIdsBase)
+    for (const [pid, ext] of Object.entries(customExtByPid)) { if (ext) externalSet.add(ext) }
+    const externalCategoryIds = Array.from(externalSet)
+    const supplierIdsRaw = products.map((p) => p.supplier_id).filter((v) => v != null) as number[]
     const supplierIds = Array.from(new Set(supplierIdsRaw))
 
-    const mainImageMap: Record<string, string> = {}
-    if (ids.length > 0) {
-      const { data: imgRows } = await supabase
-        .from('store_product_images')
-        .select('product_id,url,is_main,order_index')
-        .in('product_id', ids)
+    const imgsMainPromise = ids.length > 0
+      ? supabase.from('store_product_images').select('product_id,url,is_main,order_index').in('product_id', ids).eq('is_main', true)
+      : Promise.resolve({ data: [], error: null } as any)
+    const categoriesIdPromise = categoryIds.length > 0
+      ? supabase.from('store_categories').select('id,name').in('id', categoryIds)
+      : Promise.resolve({ data: [], error: null } as any)
+    const categoriesExtPromise = externalCategoryIds.length > 0
+      ? supabase.from('store_categories').select('external_id,name').in('external_id', externalCategoryIds)
+      : Promise.resolve({ data: [], error: null } as any)
+    const suppliersPromise = supplierIds.length > 0
+      ? supabase.from('user_suppliers').select('id,supplier_name').in('id', supplierIds as any)
+      : Promise.resolve({ data: [], error: null } as any)
+    const paramsPromise = ids.length > 0
+      ? supabase.from('store_product_params').select('product_id,name,value').in('product_id', ids).in('name', ['docket', 'docket_ua'])
+      : Promise.resolve({ data: [], error: null } as any)
+    const linksPromise = (!storeId && ids.length > 0)
+      ? supabase.from('store_product_links').select('product_id,store_id,is_active,custom_category_id').in('product_id', ids)
+      : Promise.resolve({ data: [], error: null } as any)
 
+    const [imgsMainRes, catsIdRes, catsExtRes, supsRes, paramsRes, linksRes] = await Promise.all([imgsMainPromise, categoriesIdPromise, categoriesExtPromise, suppliersPromise, paramsPromise, linksPromise])
+
+    const mainImageMap: Record<string, string> = {}
+    const imgMainRows = (imgsMainRes as any)?.data || []
+    for (const r of imgMainRows) {
+      const pid = String((r as any).product_id)
+      const url = (r as any)?.url ? String((r as any).url) : ''
+      if (pid && url) mainImageMap[pid] = url
+    }
+    const missingMain = ids.filter((pid) => !mainImageMap[pid])
+    if (missingMain.length > 0) {
+      const { data: imgRows2 } = await supabase.from('store_product_images').select('product_id,url,order_index').in('product_id', missingMain)
       const grouped: Record<string, any[]> = {}
-      for (const r of imgRows || []) {
+      for (const r of imgRows2 || []) {
         const pid = String((r as any).product_id)
         if (!grouped[pid]) grouped[pid] = []
         grouped[pid].push(r)
       }
-
       for (const [pid, rows] of Object.entries(grouped)) {
-        const main =
-          (rows as any[]).find((x) => (x as any).is_main) ||
-          (rows as any[]).sort(
-            (a, b) =>
-              ((a as any).order_index ?? 999) - ((b as any).order_index ?? 999),
-          )[0]
-
-        if ((main as any)?.url) {
-          mainImageMap[pid] = String((main as any).url)
-        }
+        const sorted = (rows as any[]).sort((a, b) => (((a as any).order_index ?? 999) - ((b as any).order_index ?? 999)))
+        const first = sorted[0]
+        const url = (first as any)?.url ? String((first as any).url) : ''
+        if (url) mainImageMap[pid] = url
       }
     }
 
     const categoryNameMap: Record<string, string> = {}
-    if (categoryIds.length > 0) {
-      const { data: catRows } = await supabase
-        .from('store_categories')
-        .select('id,name')
-        .in('id', categoryIds)
-
-      for (const r of catRows || []) {
-        const id = (r as any).id
-        const name = (r as any).name
-        if (id != null && name) categoryNameMap[String(id)] = String(name)
-      }
+    for (const r of (((catsIdRes as any)?.data) || [])) {
+      const id = (r as any).id
+      const name = (r as any).name
+      if (id != null && name) categoryNameMap[String(id)] = String(name)
     }
-
-    if (externalCategoryIds.length > 0) {
-      const { data: extCatRows } = await supabase
-        .from('store_categories')
-        .select('external_id,name')
-        .in('external_id', externalCategoryIds)
-
-      for (const r of extCatRows || []) {
-        const eid = (r as any).external_id
-        const name = (r as any).name
-        if (eid && name) categoryNameMap[String(eid)] = String(name)
-      }
+    for (const r of (((catsExtRes as any)?.data) || [])) {
+      const eid = (r as any).external_id
+      const name = (r as any).name
+      if (eid && name) categoryNameMap[String(eid)] = String(name)
     }
 
     const supplierNameMap: Record<string | number, string> = {}
-    if (supplierIds.length > 0) {
-      const { data: supRows } = await supabase
-        .from('user_suppliers')
-        .select('id,supplier_name')
-        .in('id', supplierIds as any)
-
-      for (const r of supRows || []) {
-        const id = (r as any).id
-        const name = (r as any).supplier_name
-        if (id != null && name) supplierNameMap[id] = String(name)
-      }
+    for (const r of (((supsRes as any)?.data) || [])) {
+      const id = (r as any).id
+      const name = (r as any).supplier_name
+      if (id != null && name) supplierNameMap[id] = String(name)
     }
 
     const storeLinksByProduct: Record<string, string[]> = {}
-    if (!storeId && ids.length > 0) {
-      const { data: linkRows } = await supabase
-        .from('store_product_links')
-        .select('product_id,store_id,is_active')
-        .in('product_id', ids)
-
+    const extByPid: Record<string, string | null> = {}
+    for (const [pid, ext] of Object.entries(customExtByPid)) { if (ext) extByPid[pid] = ext }
+    if (!storeId) {
+      const linkRows = (((linksRes as any)?.data) || []) as any[]
+      const extListByPid: Record<string, string[]> = {}
       for (const r of linkRows || []) {
         const pid = String((r as any).product_id)
-        const sid =
-          (r as any)?.store_id != null ? String((r as any).store_id) : ''
+        const sid = (r as any)?.store_id != null ? String((r as any).store_id) : ''
         const active = (r as any)?.is_active !== false
-        if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = []
-        if (sid && active) storeLinksByProduct[pid].push(sid)
+        const ext = (r as any)?.custom_category_id != null ? String((r as any).custom_category_id) : ''
+        if (active) {
+          if (!storeLinksByProduct[pid]) storeLinksByProduct[pid] = []
+          if (sid) storeLinksByProduct[pid].push(sid)
+          if (ext) {
+            if (!extListByPid[pid]) extListByPid[pid] = []
+            extListByPid[pid].push(ext)
+          }
+        }
+      }
+      for (const [pid, arr] of Object.entries(extListByPid)) {
+        const uniq = Array.from(new Set(arr))
+        extByPid[pid] = uniq.length === 1 ? uniq[0] : null
       }
     }
 
     const paramsMap: Record<string, Record<string, string>> = {}
-    if (ids.length > 0) {
-      const { data: paramRows } = await supabase
-        .from('store_product_params')
-        .select('product_id,name,value')
-        .in('product_id', ids)
-        .in('name', ['docket', 'docket_ua'])
-
-      for (const pr of paramRows || []) {
-        const pid = String((pr as any).product_id)
-        if (!paramsMap[pid]) paramsMap[pid] = {}
-        paramsMap[pid][String((pr as any).name)] = String((pr as any).value)
-      }
+    for (const pr of (((paramsRes as any)?.data) || [])) {
+      const pid = String((pr as any).product_id)
+      if (!paramsMap[pid]) paramsMap[pid] = {}
+      paramsMap[pid][String((pr as any).name)] = String((pr as any).value)
     }
 
     const aggregated: ProductRow[] = products.map((p) => {
       const pid = String(p.id)
       const docket = p.docket ?? paramsMap[pid]?.['docket'] ?? null
       const docketUa = p.docket_ua ?? paramsMap[pid]?.['docket_ua'] ?? null
-      const overrideExt = customExtByPid[pid] || null
+      const overrideExt = (extByPid[pid] || customExtByPid[pid] || null)
 
       return {
         ...p,

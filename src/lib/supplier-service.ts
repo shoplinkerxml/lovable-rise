@@ -101,6 +101,16 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
+    try {
+      if (typeof window !== 'undefined') {
+        const p = window.location.pathname.toLowerCase();
+        const allowed = p.includes('/user/suppliers');
+        if (!allowed) {
+          return 0;
+        }
+      }
+    } catch { /* ignore */ }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error("User not authenticated");

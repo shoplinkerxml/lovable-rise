@@ -10,6 +10,7 @@ export interface Shop {
   template_id?: string | null;
   xml_config?: any;
   custom_mapping?: any;
+  marketplace?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -212,6 +213,21 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
+    try {
+      if (typeof window !== 'undefined') {
+        const p = window.location.pathname.toLowerCase();
+        const allowed = p.includes('/user/shops') || p.includes('/user/products');
+        if (!allowed) {
+          const raw = window.localStorage.getItem('rq:shopsList');
+          if (raw) {
+            const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
+            if (parsed && Array.isArray(parsed.items)) return parsed.items;
+          }
+          return [];
+        }
+      }
+    } catch { /* ignore */ }
+
     if (ShopService.isOffline()) {
       try {
         const raw = typeof window !== 'undefined' ? window.localStorage.getItem('rq:shopsList') : null;
@@ -302,23 +318,21 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
-      .from('user_stores')
-      .select('*')
-      .eq('id', id)
-      .single();
-
+    const { data: authData } = await supabase.auth.getSession();
+    const accessToken: string | null = (authData?.session?.access_token as string | null) || null;
+    const { data, error } = await (supabase as any).functions.invoke('user-shops-list', {
+      body: { store_id: id, includeConfig: true },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
     if (error) {
       console.error('Get shop error:', error);
-      throw new Error(error.message);
+      throw new Error((error as any)?.message || 'shop_fetch_failed');
     }
-
-    if (!data) {
-      throw new Error("Shop not found");
-    }
-
-    return data;
+    const payload = typeof data === 'string' ? JSON.parse(data) : (data as any);
+    const rows = Array.isArray(payload?.shops) ? payload.shops as Shop[] : [];
+    const shop = rows[0] as Shop | undefined;
+    if (!shop) throw new Error('Shop not found');
+    return shop;
   }
 
   /** Создание нового магазина */
@@ -646,5 +660,63 @@ export class ShopService {
       .delete()
       .eq('store_id', storeId)
       .eq('category_id', categoryId);
+  }
+
+  /** Валюты магазина */
+  static async getStoreCurrencies(storeId: string): Promise<Array<{ code: string; rate: number; is_base: boolean }>> {
+    const { data, error } = await supabase
+      .from('store_currencies')
+      .select('code,rate,is_base')
+      .eq('store_id', storeId);
+    if (error) throw new Error(error.message);
+    const rows = (data || []) as Array<{ code: string; rate?: number; is_base?: boolean }>;
+    return rows.map((r) => ({ code: String(r.code), rate: Number(r.rate ?? 1), is_base: !!r.is_base }));
+  }
+
+  static async addStoreCurrency(storeId: string, code: string, rate: number): Promise<void> {
+    const { error } = await supabase
+      .from('store_currencies')
+      .insert({ store_id: storeId, code, rate, is_base: false });
+    if (error) throw new Error(error.message);
+  }
+
+  static async updateStoreCurrencyRate(storeId: string, code: string, rate: number): Promise<void> {
+    const { error } = await supabase
+      .from('store_currencies')
+      .update({ rate })
+      .eq('store_id', storeId)
+      .eq('code', code);
+    if (error) throw new Error(error.message);
+  }
+
+  static async setBaseStoreCurrency(storeId: string, code: string): Promise<void> {
+    const { error: e1 } = await supabase
+      .from('store_currencies')
+      .update({ is_base: false })
+      .eq('store_id', storeId);
+    if (e1) throw new Error(e1.message);
+    const { error: e2 } = await supabase
+      .from('store_currencies')
+      .update({ is_base: true })
+      .eq('store_id', storeId)
+      .eq('code', code);
+    if (e2) throw new Error(e2.message);
+  }
+
+  static async deleteStoreCurrency(storeId: string, code: string): Promise<void> {
+    const { error } = await supabase
+      .from('store_currencies')
+      .delete()
+      .eq('store_id', storeId)
+      .eq('code', code);
+    if (error) throw new Error(error.message);
+  }
+
+  static async getStoreProductsCount(storeId: string): Promise<number> {
+    const { count } = await supabase
+      .from('store_products')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', storeId);
+    return count || 0;
   }
 }

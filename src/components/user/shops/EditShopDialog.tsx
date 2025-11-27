@@ -10,9 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Trash2, Plus, Star } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
 import { Save, X } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop, type UpdateShopData } from '@/lib/shop-service';
@@ -38,7 +37,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
   const [storeUrl, setStoreUrl] = useState<string>(shop.store_url ?? '');
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const [productsCount, setProductsCount] = useState(0);
-  const { marketplaces, isLoading: marketplacesLoading } = useMarketplaces();
+  const { marketplaces, isLoading: marketplacesLoading } = useMarketplaces(open);
   const [availableCurrencies, setAvailableCurrencies] = useState<Array<{ code: string; rate?: number }>>([]);
   const [storeCurrencies, setStoreCurrencies] = useState<Array<{ code: string; rate: number; is_base: boolean }>>([]);
   const [addCurrencyCode, setAddCurrencyCode] = useState<string>('');
@@ -57,58 +56,37 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
   const [activeTab, setActiveTab] = useState<'info' | 'currencies' | 'categories'>('info');
 
   useEffect(() => {
-    if (shop?.template_id) {
-      const loadTemplateMarketplace = async () => {
-        try {
-          // @ts-ignore - table not in generated types yet
-          const { data, error } = await (supabase as any)
-            .from('store_templates')
-            .select('marketplace')
-            .eq('id', shop.template_id)
-            .single();
-
-          if (!error && data?.marketplace) {
-            setSelectedMarketplace(data.marketplace);
-          }
-        } catch (err) {
-          console.error('Error loading template marketplace:', err);
-        }
-      };
-      loadTemplateMarketplace();
-    }
-  }, [shop?.template_id]);
+    if (shop?.marketplace) setSelectedMarketplace(String(shop.marketplace));
+  }, [shop?.marketplace]);
 
   // Проверка наличия товаров в магазине (store_products)
   useEffect(() => {
     const checkProducts = async () => {
       try {
-        const { count } = await (supabase as any)
-          .from('store_products')
-          .select('*', { count: 'exact', head: true })
-          .eq('store_id', shop.id);
-        setProductsCount(count || 0);
-      } catch (err) {
-        setProductsCount(0);
-      }
+        const cnt = await ShopService.getStoreProductsCount(shop.id);
+        setProductsCount(cnt);
+      } catch { setProductsCount(0); }
     };
-    if (open) {
-      checkProducts();
-    }
+    if (open) checkProducts();
   }, [shop.id, open]);
 
   useEffect(() => {
     const loadCurrencyData = async () => {
       try {
-        const { data: sysCurrencies } = await (supabase as any)
+        const { data: sysCurrencies } = await (supabase as unknown as { from: (t: string) => { select: (cols: string) => Promise<{ data: unknown[] | null }> } })
           .from('currencies')
           .select('code,rate');
-        setAvailableCurrencies((sysCurrencies || []).map((c: any) => ({ code: String(c.code), rate: c.rate as number | undefined })));
+        type CurrencyRow = { code: string; rate?: number };
+        const sysArr = ((sysCurrencies || []) as unknown[]).map((c) => c as CurrencyRow);
+        setAvailableCurrencies(sysArr.map((c) => ({ code: String(c.code), rate: c.rate != null ? Number(c.rate) : undefined })));
 
-        const { data: sc } = await (supabase as any)
+        const { data: sc } = await (supabase as unknown as { from: (t: string) => { select: (cols: string) => { eq: (c: string, v: unknown) => Promise<{ data: unknown[] | null }> } } })
           .from('store_currencies')
           .select('code,rate,is_base')
           .eq('store_id', shop.id);
-        setStoreCurrencies((sc || []).map((c: any) => ({ code: String(c.code), rate: Number(c.rate || 1), is_base: !!c.is_base })));
+        type StoreCurrencyRow = { code: string; rate?: number; is_base?: boolean };
+        const scArr = ((sc || []) as unknown[]).map((c) => c as StoreCurrencyRow);
+        setStoreCurrencies(scArr.map((c) => ({ code: String(c.code), rate: Number(c.rate || 1), is_base: !!c.is_base })));
       } catch (err) {
         console.error('Load currencies error:', err);
       }
@@ -129,11 +107,8 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
   }, [open, shop.id]);
 
   const refreshStoreCurrencies = async () => {
-    const { data: sc } = await (supabase as any)
-      .from('store_currencies')
-      .select('code,rate,is_base')
-      .eq('store_id', shop.id);
-    setStoreCurrencies((sc || []).map((c: any) => ({ code: String(c.code), rate: Number(c.rate || 1), is_base: !!c.is_base })));
+    const rows = await ShopService.getStoreCurrencies(shop.id);
+    setStoreCurrencies(rows);
   };
 
   const handleAddCurrency = async () => {
@@ -141,9 +116,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     try {
       const sys = availableCurrencies.find(c => c.code === addCurrencyCode);
       const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
-      await (supabase as any)
-        .from('store_currencies')
-        .insert({ store_id: shop.id, code: addCurrencyCode, rate: defaultRate, is_base: false });
+      await ShopService.addStoreCurrency(shop.id, addCurrencyCode, defaultRate);
       setAddCurrencyCode('');
       await refreshStoreCurrencies();
     } catch (err) {
@@ -154,11 +127,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
 
   const handleUpdateRate = async (code: string, rate: number) => {
     try {
-      await (supabase as any)
-        .from('store_currencies')
-        .update({ rate })
-        .eq('store_id', shop.id)
-        .eq('code', code);
+      await ShopService.updateStoreCurrencyRate(shop.id, code, rate);
       await refreshStoreCurrencies();
     } catch (err) {
       console.error('Update rate error:', err);
@@ -168,15 +137,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
 
   const handleSetBase = async (code: string) => {
     try {
-      await (supabase as any)
-        .from('store_currencies')
-        .update({ is_base: false })
-        .eq('store_id', shop.id);
-      await (supabase as any)
-        .from('store_currencies')
-        .update({ is_base: true })
-        .eq('store_id', shop.id)
-        .eq('code', code);
+      await ShopService.setBaseStoreCurrency(shop.id, code);
       await refreshStoreCurrencies();
     } catch (err) {
       console.error('Set base currency error:', err);
@@ -186,11 +147,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
 
   const handleDeleteCurrency = async (code: string) => {
     try {
-      await (supabase as any)
-        .from('store_currencies')
-        .delete()
-        .eq('store_id', shop.id)
-        .eq('code', code);
+      await ShopService.deleteStoreCurrency(shop.id, code);
       await refreshStoreCurrencies();
     } catch (err) {
       console.error('Delete currency error:', err);
@@ -214,28 +171,19 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     setSelectedMarketplace(marketplace);
     
     try {
-      // Get template by marketplace
-      // @ts-ignore
-      const { data: template, error } = await (supabase as any)
-        .from('store_templates')
-        .select('id, xml_structure, mapping_rules')
-        .eq('marketplace', marketplace)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.error('Error fetching template:', error);
-        return;
-      }
-
-      // Update shop with new template data
+      type InvokeArgs = { body?: unknown }
+      type InvokeResult<T> = Promise<{ data: T; error?: { message?: string } }>
+      const { data, error } = await (supabase as unknown as { functions: { invoke: <T = unknown>(name: string, args: InvokeArgs) => InvokeResult<T> } }).functions.invoke('get-template-by-marketplace', {
+        body: { marketplace },
+      });
+      if (error) { console.error('Error fetching template:', error); return; }
+      const payload = typeof data === 'string' ? JSON.parse(data) as { template?: { id: string; xml_structure: unknown; mapping_rules: unknown } } : (data as { template?: { id: string; xml_structure: unknown; mapping_rules: unknown } });
+      const template = payload?.template;
       if (template) {
         await ShopService.updateShop(shop.id, {
           template_id: template.id,
           xml_config: template.xml_structure,
-          custom_mapping: template.mapping_rules
+          custom_mapping: template.mapping_rules,
         });
       }
     } catch (err) {
@@ -265,9 +213,10 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
       toast.success(t('shop_updated'));
       onSuccess?.();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Shop update error:', error);
-      toast.error(error?.message || t('failed_save_shop'));
+      const msg = (error as { message?: string })?.message || t('failed_save_shop');
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -285,7 +234,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full" data-testid="editShopDialog_tabs">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'info' | 'currencies' | 'categories')} className="w-full" data-testid="editShopDialog_tabs">
             <TabsList className="flex w-full gap-2 h-9 overflow-x-auto whitespace-nowrap scroll-smooth no-scrollbar bg-transparent p-0 text-foreground rounded-none border-b border-border justify-start" data-testid="editShopDialog_tabsList">
               <TabsTrigger value="info" className="px-3 text-sm rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-primary" data-testid="editShopDialog_tab_info">Основна інформація</TabsTrigger>
               <TabsTrigger value="currencies" className="px-3 text-sm rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-primary" data-testid="editShopDialog_tab_currencies">Валюти</TabsTrigger>

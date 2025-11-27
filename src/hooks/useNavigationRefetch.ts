@@ -13,14 +13,10 @@ export function useNavigationRefetch(refreshAuth?: () => Promise<void> | void) {
     lastRunAtRef.current = now;
     const p = location.pathname.toLowerCase();
     const run = async () => {
-      if (p.includes("/user/shops")) {
+      if (p === "/user/shops") {
         await queryClient.refetchQueries({ queryKey: ["shopsList"], exact: false });
       }
       if (p.includes("/user/products")) {
-        try {
-          const stores = await ProductService.getUserStores();
-          queryClient.setQueryData(["stores:active"], stores || []);
-        } catch { /* ignore */ }
         await queryClient.refetchQueries({ queryKey: ["products"], exact: false });
       }
       if (p.includes("/user/tariffs")) {

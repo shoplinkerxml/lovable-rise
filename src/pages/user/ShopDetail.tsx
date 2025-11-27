@@ -56,16 +56,9 @@ export const ShopDetail = () => {
     }
   }, [id, isLoading, shopData, navigate]);
   useEffect(() => {
-    const applyMarketplace = async () => {
-      if (!shopData?.template_id) return;
-      const { data } = await (supabase as any)
-        .from('store_templates')
-        .select('marketplace')
-        .eq('id', shopData.template_id)
-        .single();
-      if (data?.marketplace) setMarketplace(data.marketplace);
-    };
-    applyMarketplace();
+    if (shopData?.marketplace) {
+      setMarketplace(String(shopData.marketplace));
+    }
   }, [shopData]);
   useEffect(() => {
     const channel = (supabase as any).channel('shop_detail_realtime').on(

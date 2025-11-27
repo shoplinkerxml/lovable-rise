@@ -94,12 +94,9 @@ export default function ShopSettings() {
     }
   }, [id, shopData, navigate]);
   useEffect(() => {
-    const applyMarketplace = async () => {
-      if (!shopData || !(shopData as any).template_id) return;
-      const { data: tpl } = await (supabase as any).from('store_templates').select('marketplace').eq('id', (shopData as any).template_id).maybeSingle();
-      if (tpl?.marketplace) setSelectedMarketplace(String(tpl.marketplace));
-    };
-    applyMarketplace();
+    if (shopData && (shopData as any).marketplace) {
+      setSelectedMarketplace(String((shopData as any).marketplace));
+    }
   }, [shopData]);
   const { data: rowsData, isLoading: loading } = useQuery<StoreCategoryRow[]>({
     queryKey: ['storeCategories', id!],

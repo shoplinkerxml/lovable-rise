@@ -1751,11 +1751,19 @@ export function ProductFormTabs({
             </TabsContent>
           </Tabs>
           
-          <div className="flex flex-col sm:flex-row gap-4 justify-end">
-            
-            {readOnly ? null : <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
-                {loading ? product ? t('loading_updating') : t('loading_creating') : product ? t('btn_update') : t('btn_create')}
-              </Button>}
+          <div className="mt-4 sm:mt-6 pt-1 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end">
+            {readOnly ? null : (
+              <>
+                {onCancel ? (
+                  <Button type="button" variant="outline" onClick={onCancel} data-testid="productFormTabs_cancelButton">
+                    {t('btn_cancel')}
+                  </Button>
+                ) : null}
+                <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
+                  {loading ? (product ? t('loading_updating') : t('loading_creating')) : (product ? t('btn_update') : t('btn_create'))}
+                </Button>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

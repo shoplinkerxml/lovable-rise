@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ProductFormTabs } from "@/components/ProductFormTabs";
-import { type ProductParam, type ProductImage } from "@/lib/product-service";
+import { type ProductParam } from "@/lib/product-service";
 import { PageHeader } from "@/components/PageHeader";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { ShopService, type Shop } from "@/lib/shop-service";
@@ -17,6 +17,7 @@ import { CategoryService } from "@/lib/category-service";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ContentSkeleton, ProgressiveLoader } from "@/components/LoadingSkeletons";
 
 type StoreProductLinkForm = {
   is_active: boolean;
@@ -41,6 +42,7 @@ export const StoreProductEdit = () => {
   const storeId = String(id || "");
   const pid = String(productId || "");
   const { t } = useI18n();
+  const showFailToast = useCallback(() => toast.error(t('failed_load_products')), [t]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [shopName, setShopName] = useState("");
@@ -57,7 +59,8 @@ export const StoreProductEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [baseProduct, setBaseProduct] = useState<Product | null>(null);
-  const [images, setImages] = useState<ProductImage[]>([]);
+  type FormImage = { id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string };
+  const [images, setImages] = useState<FormImage[]>([]);
   const [params, setParams] = useState<ProductParam[]>([]);
   const [imagesLoading, setImagesLoading] = useState<boolean>(false);
   const [lastCategoryId, setLastCategoryId] = useState<string | null>(null);
@@ -68,7 +71,11 @@ export const StoreProductEdit = () => {
   const aggCategoriesRef = useRef<Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }> | undefined>(undefined);
   const aggSupplierCategoriesMapRef = useRef<Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>> | undefined>(undefined);
 
+  const firstLoadRef = useRef<string | null>(null);
   useEffect(() => {
+    const key = `${pid}:${storeId}`;
+    if (firstLoadRef.current === key) return;
+    firstLoadRef.current = key;
     (async () => {
       setLoading(true);
       try {
@@ -92,7 +99,14 @@ export const StoreProductEdit = () => {
             custom_available: link.custom_available == null ? (agg.product ? !!agg.product.available : true) : !!link.custom_available,
           });
         }
-        setImages(agg.images || []);
+        const srcImages = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main?: boolean; alt_text?: string | null }>;
+        setImages(srcImages.map((img, index) => ({
+          id: img.id ? String(img.id) : undefined,
+          url: String(img.url || ''),
+          order_index: typeof img.order_index === 'number' ? img.order_index : index,
+          is_main: !!img.is_main,
+          alt_text: img.alt_text ?? undefined,
+        })));
         setParams(agg.params || []);
         setShopName(agg.shop?.store_name || "");
         if (agg.categoryName) setCategoryName(agg.categoryName);
@@ -110,50 +124,16 @@ export const StoreProductEdit = () => {
           })));
         }
       } catch (_) {
-        toast.error(t("failed_load_products"));
+        showFailToast();
       } finally {
         setLoading(false);
       }
     })();
-  }, [pid, storeId, t]);
+  }, [pid, storeId, showFailToast]);
 
-  useEffect(() => {
-    if (storeCategories.length > 0) return;
-    (async () => {
-      try {
-        const rows = await ShopService.getStoreCategories(storeId);
-        setStoreCategories(rows.map(r => ({
-          store_category_id: r.store_category_id,
-          category_id: r.category_id,
-          name: r.name,
-          store_external_id: r.store_external_id ?? null,
-          is_active: r.is_active,
-        })));
-      } catch (_) {
-        setStoreCategories([]);
-      }
-    })();
-  }, [storeId, storeCategories.length]);
+  // storeCategories получаем из функции product-edit-data; не выполняем прямые запросы
 
-  useEffect(() => {
-    const loadCategoryName = async () => {
-      if (!baseProduct) return;
-      try {
-        if (baseProduct.category_id) {
-          const cat = await CategoryService.getById(baseProduct.category_id);
-          setCategoryName(cat?.name || "");
-          return;
-        }
-        if (baseProduct.supplier_id && baseProduct.category_external_id) {
-          const cat = await CategoryService.getByExternalId(String(baseProduct.supplier_id), baseProduct.category_external_id);
-          setCategoryName(cat?.name || "");
-        }
-      } catch (_) {
-        setCategoryName("");
-      }
-    };
-    loadCategoryName();
-  }, [baseProduct]);
+  // categoryName приходит из product-edit-data; дублирующие запросы убраны
 
   const updateField = <K extends keyof StoreProductLinkForm>(key: K, value: StoreProductLinkForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -194,9 +174,18 @@ export const StoreProductEdit = () => {
         const num = Number(lastCategoryId);
         if (Number.isFinite(num)) {
           try {
-            const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
+            const storeExtId = (() => {
+              const row = storeCategories.find((r) => r.category_id === num);
+              return row?.store_external_id ?? null;
+            })();
             await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
-            const freshName = await CategoryService.getNameByIdSafe(num);
+            const freshName = (() => {
+              const fromStore = storeCategories.find((r) => r.category_id === num)?.name || '';
+              if (fromStore) return fromStore;
+              const cats = (aggCategoriesRef.current || []) as Array<{ id: string | number; name: string }>;
+              const found = cats.find((c) => String(c.id) === String(num));
+              return found?.name || '';
+            })();
             ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null, categoryName: freshName || undefined }, storeId);
             
             await ProductService.recomputeStoreCategoryFilterCache(storeId);
@@ -245,90 +234,82 @@ export const StoreProductEdit = () => {
             <ArrowLeft className="h-4 w-4 text-foreground hover:text-emerald-600" />
           </Link>
         </div>
-        <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
-          {loading && (
-            <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm" data-testid="store_product_edit_loader">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          )}
-          {!loading && (
-            <div className="space-y-6">
-              {baseProduct ? (
-                <ProductFormTabs
-                  product={baseProduct}
-                  readOnly
-                  editableKeys={["price", "price_old", "price_promo", "stock_quantity", "available"]}
-                  overrides={{
-                    price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
-                    price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
-                    price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
-                    stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
-                  }}
-                  preloadedImages={images}
-                  preloadedParams={params}
-                  preloadedSuppliers={aggSuppliersRef.current}
-                  preloadedCurrencies={aggCurrenciesRef.current}
-                  preloadedCategories={aggCategoriesRef.current}
-                  preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current as any}
-                  onChange={async (partial) => {
-                    if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
-                    if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
-                    if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
-                    if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
-                    if (typeof partial.available === "boolean") {
-                      updateField("custom_available", partial.available);
-                      try {
-                        await ProductService.updateStoreProductLink(pid, storeId, { custom_available: partial.available });
-                      } catch (_) {
-                        toast.error(t("operation_failed"));
-                      }
+        <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="product-edit" />} delay={100}>
+          <div className="space-y-6">
+            {baseProduct ? (
+              <ProductFormTabs
+                product={baseProduct}
+                readOnly
+                editableKeys={["price", "price_old", "price_promo", "stock_quantity", "available"]}
+                overrides={{
+                  price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
+                  price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
+                  price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
+                  stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
+                }}
+                preloadedImages={images}
+                preloadedParams={params}
+                preloadedSuppliers={aggSuppliersRef.current}
+                preloadedCurrencies={aggCurrenciesRef.current}
+                preloadedCategories={aggCategoriesRef.current}
+                preloadedSupplierCategoriesMap={Object.fromEntries(Object.entries(aggSupplierCategoriesMapRef.current || {}).map(([key, arr]) => [key, (arr || []).map((c) => ({ id: String(c.id), name: String(c.name || ''), external_id: String(c.external_id || ''), supplier_id: String(c.supplier_id || ''), parent_external_id: c.parent_external_id == null ? null : String(c.parent_external_id) }))]))}
+                onChange={async (partial) => {
+                  if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
+                  if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
+                  if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
+                  if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
+                  if (typeof partial.available === "boolean") {
+                    updateField("custom_available", partial.available);
+                    try {
+                      await ProductService.updateStoreProductLink(pid, storeId, { custom_available: partial.available });
+                    } catch (_) {
+                      toast.error(t("operation_failed"));
                     }
-                    if (typeof partial.category_id === "string" && partial.category_id.trim()) {
-                      const cid = partial.category_id.trim();
-                      if (cid !== lastCategoryId) {
-                        setLastCategoryId(cid);
-                        if (partial.category_name) setCategoryName(partial.category_name);
-                        const num = Number(cid);
-                        if (Number.isFinite(num)) {
-                          const prevNum = baseProduct?.category_id ?? null;
+                  }
+                  if (typeof partial.category_id === "string" && partial.category_id.trim()) {
+                    const cid = partial.category_id.trim();
+                    if (cid !== lastCategoryId) {
+                      setLastCategoryId(cid);
+                      if (partial.category_name) setCategoryName(partial.category_name);
+                      const num = Number(cid);
+                      if (Number.isFinite(num)) {
+                        const prevNum = baseProduct?.category_id ?? null;
+                        try {
+                          await ProductService.updateProduct(pid, { category_id: num });
+                          setBaseProduct((prev) => prev ? { ...prev, category_id: num } : prev);
+                          await ShopService.ensureStoreCategory(storeId, num, { external_id: partial.category_external_id || null });
+                          const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
+                          await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
+                          ProductService.patchProductCaches(pid, { category_id: num, category_external_id: partial.category_external_id || null, categoryName: partial.category_name || undefined }, storeId);
+                          await ProductService.recomputeStoreCategoryFilterCache(storeId);
                           try {
-                            await ProductService.updateProduct(pid, { category_id: num });
-                            setBaseProduct((prev) => prev ? { ...prev, category_id: num } : prev);
-                            await ShopService.ensureStoreCategory(storeId, num, { external_id: partial.category_external_id || null });
-                            const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
-                            await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
-                            ProductService.patchProductCaches(pid, { category_id: num, category_external_id: partial.category_external_id || null, categoryName: partial.category_name || undefined }, storeId);
-                            
-                            await ProductService.recomputeStoreCategoryFilterCache(storeId);
-                            try {
-                              queryClient.invalidateQueries({ queryKey: ["products", storeId] });
-                              queryClient.invalidateQueries({ queryKey: ["products", "all"] });
-                            } catch { void 0; }
-                            if (prevNum && Number.isFinite(prevNum) && prevNum !== num) {
-                              await ShopService.cleanupUnusedStoreCategory(storeId, prevNum);
-                            }
-                          } catch (_) {
-                            toast.error(t("failed_save_category"));
+                            queryClient.invalidateQueries({ queryKey: ["products", storeId] });
+                            queryClient.invalidateQueries({ queryKey: ["products", "all"] });
+                          } catch { void 0; }
+                          if (prevNum && Number.isFinite(prevNum) && prevNum !== num) {
+                            await ShopService.cleanupUnusedStoreCategory(storeId, prevNum);
                           }
+                        } catch (_) {
+                          toast.error(t("failed_save_category"));
                         }
                       }
                     }
-                  }}
-                  forceParamsEditable
-                  onParamsChange={(p) => setParams(p)}
-                  onImagesLoadingChange={setImagesLoading}
-                />
-              ) : null}
+                  }
+                }}
+                forceParamsEditable
+                onParamsChange={(p) => setParams(p)}
+                onImagesLoadingChange={setImagesLoading}
+              />
+            ) : null}
 
-              <div className="space-y-3">
-                <div className="flex gap-2 justify-end">
-                  <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
-                  <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
-                </div>
+            <div className="space-y-3">
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
+                <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        </ProgressiveLoader>
       </Card>
     </div>
   );
