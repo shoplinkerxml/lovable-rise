@@ -884,18 +884,18 @@ export function ProductFormTabs({
   // Image handling functions
   const addImageFromUrl = () => {
     if (!imageUrl.trim()) return;
-    const objectKey = R2Storage.extractObjectKeyFromUrl(imageUrl);
-    const newImage: ProductImage = {
-      url: imageUrl,
-      order_index: images.length,
-      is_main: images.length === 0,
-      object_key: objectKey || undefined
-    };
-    const nextImages = [...images, newImage];
-    setImages(nextImages);
-    // Синхронно оновлюємо ref, щоб очистка на unmount мала актуальні дані
-    imagesRef.current = nextImages;
-    setImageUrl('');
+    if (!product) return;
+    (async () => {
+      try {
+        const res = await R2Storage.uploadViaWorkerFromUrl(String((product as unknown as { id?: string }).id || ''), imageUrl.trim());
+        const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey };
+        const nextImages = [...images, newImage];
+        setImages(nextImages);
+        imagesRef.current = nextImages;
+        setImageUrl('');
+        toast.success(t('image_uploaded_successfully'));
+      } catch (e) { console.error(e); toast.error(t('operation_failed')); }
+    })();
   };
 
   // Drag and drop handlers
@@ -976,28 +976,14 @@ export function ProductFormTabs({
   const uploadFileDirect = async (file: File) => {
     setUploadingImage(true);
     try {
-      // Проверяем наличие сессии заранее, чтобы избежать 401 из Edge Function
-      const {
-        data: {
-          session
-        }
-      } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error(t('unauthorized_upload') || 'Ошибка авторизации при загрузке');
-        return;
-      }
-      // Привязываем загрузку к продукту через external_id, а не store_id
-      const response = await R2Storage.uploadFile(file, formData.external_id || '');
-      const newImage: ProductImage = {
-        url: response.viewUrl || response.publicUrl,
-        order_index: images.length,
-        is_main: images.length === 0,
-        object_key: response.objectKey
-      };
+      if (!product) { toast.error(t('failed_load_product_data')); return; }
+      const res = await R2Storage.uploadViaWorkerFromFile(String((product as unknown as { id?: string }).id || ''), file);
+      const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey };
       const nextImages = [...images, newImage];
       setImages(nextImages);
       imagesRef.current = nextImages;
       toast.success(t('image_uploaded_successfully'));
+      
     } catch (error) {
       console.error('Ошибка загрузки изображения в R2:', error);
 

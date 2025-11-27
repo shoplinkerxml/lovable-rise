@@ -8,6 +8,25 @@ export type UploadResponse = {
 };
 
 export const R2Storage = {
+  getWorkerUrl(): string {
+    try {
+      const env = import.meta as unknown as { env?: Record<string, string> };
+      const w = window as unknown as { __IMAGE_WORKER_URL__?: string };
+      const v = env?.env?.VITE_IMAGE_WORKER_URL || w.__IMAGE_WORKER_URL__ || '';
+      return v || 'http://localhost:8788';
+    } catch (e) { void e; return 'http://localhost:8788'; }
+  },
+  getPublicHost(): string {
+    try {
+      const env = import.meta as unknown as { env?: Record<string, string> };
+      const v = env?.env?.VITE_R2_PUBLIC_HOST || '';
+      return v || 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com';
+    } catch (e) { void e; return 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com'; }
+  },
+  makePublicUrl(objectKey: string, bucket = 'shop-linker'): string {
+    const host = R2Storage.getPublicHost();
+    return `https://${host}/${bucket}/${objectKey}`;
+  },
   /**
    * Загружает файл через Supabase proxy, избегая CORS проблем
    */
@@ -81,6 +100,35 @@ export const R2Storage = {
       localStorage.setItem(storageKey, JSON.stringify(list));
     }
     return resp;
+  },
+
+  async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
+    const base = R2Storage.getWorkerUrl();
+    const res = await fetch(`${base}/upload`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId, url }) });
+    if (!res.ok) throw new Error('upload_failed');
+    const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
+    const bucket = 'shop-linker';
+    const imageId = String(json.imageId || '');
+    const originalKey = String(json.originalKey || '');
+    const cardKey = String(json.cardKey || '');
+    const thumbKey = String(json.thumbKey || '');
+    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl: R2Storage.makePublicUrl(cardKey, bucket), publicThumbUrl: R2Storage.makePublicUrl(thumbKey, bucket) };
+  },
+
+  async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
+    const base = R2Storage.getWorkerUrl();
+    const fd = new FormData();
+    fd.append('productId', productId);
+    fd.append('file', file);
+    const res = await fetch(`${base}/upload`, { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('upload_failed');
+    const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
+    const bucket = 'shop-linker';
+    const imageId = String(json.imageId || '');
+    const originalKey = String(json.originalKey || '');
+    const cardKey = String(json.cardKey || '');
+    const thumbKey = String(json.thumbKey || '');
+    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl: R2Storage.makePublicUrl(cardKey, bucket), publicThumbUrl: R2Storage.makePublicUrl(thumbKey, bucket) };
   },
 
   async cleanupPendingUploads(): Promise<void> {

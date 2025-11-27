@@ -206,7 +206,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
 
         if (productImages) {
           const resolved = await Promise.all(productImages.map(async (img) => {
-            let previewUrl = img.url;
+            let previewUrl = img.r2_key_card ? R2Storage.makePublicUrl(String(img.r2_key_card)) : (img.url as string);
             const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
             if (typeof previewUrl === 'string') {
               let host = '';
