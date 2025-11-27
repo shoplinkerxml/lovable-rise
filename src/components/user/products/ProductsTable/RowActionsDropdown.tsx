@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +18,7 @@ type ProductRow = Product & {
   available?: boolean;
 };
 
-export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void }) {
+export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate, storesList, prefetchStores, storeNames }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void; storesList?: ShopAggregated[]; prefetchStores?: () => Promise<void>; storeNames?: Record<string, string>; }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [stores, setStores] = useState<ShopAggregated[]>([]);
@@ -28,24 +28,33 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
 
   const loadStoresAndLinks = async () => {
     try {
+      try { await prefetchStores?.(); } catch { void 0; }
       const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
       if (cachedAgg.length > 0) {
         setStores(cachedAgg);
       } else {
         setLoadingStores(true);
         const data = await ShopService.getShopsAggregated();
-        setStores(data || []);
-        try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], data || []); } catch { void 0; }
+        const arr = data || [];
+        setStores(arr);
+        try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], arr); } catch { void 0; }
         setLoadingStores(false);
       }
       ProductService.invalidateStoreLinksCache(String(product.id));
       const ids = await ProductService.getStoreLinksForProduct(product.id);
       setLinkedStoreIds(ids);
     } catch {
-      setStores([]);
-      setLinkedStoreIds([]);
+      const fallback = Array.isArray(storesList) && storesList.length > 0
+        ? storesList
+        : Object.entries(storeNames || {}).map(([id, name]) => ({ id: String(id), store_name: name })) as ShopAggregated[];
+      setStores(fallback);
+      setLinkedStoreIds(product.linkedStoreIds || []);
     }
   };
+
+  useEffect(() => {
+    if (Array.isArray(storesList) && storesList.length > 0) setStores(storesList);
+  }, [storesList]);
 
   const [actionsOpen, setActionsOpen] = useState(false);
   return (

@@ -87,6 +87,9 @@ export function createColumns({
           hideDuplicate={hideDuplicate}
           storeId={storeId}
           onStoresUpdate={handleStoresUpdate}
+          storesList={stores}
+          storeNames={storeNames}
+          prefetchStores={loadStoresForMenu}
         />
       </React.Suspense>
     </div>
