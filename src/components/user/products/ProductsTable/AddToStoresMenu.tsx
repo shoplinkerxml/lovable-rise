@@ -34,6 +34,7 @@ export function AddToStoresMenu({
   setAddingStores,
   setProductsCached,
   setLastSelectedProductIds,
+  disabled,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -53,6 +54,7 @@ export function AddToStoresMenu({
   setAddingStores: (v: boolean) => void;
   setProductsCached: (updater: (prev: ProductRow[]) => ProductRow[]) => void;
   setLastSelectedProductIds?: (ids: string[]) => void;
+  disabled?: boolean;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -79,8 +81,8 @@ export function AddToStoresMenu({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                disabled={(table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0)))}
-                aria-disabled={(table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0)))}
+                disabled={!!disabled || ((table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0))))}
+                aria-disabled={!!disabled || ((table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0))))}
                 aria-label={t("add_to_stores")}
                 data-testid="user_products_dataTable_addToStores"
               >

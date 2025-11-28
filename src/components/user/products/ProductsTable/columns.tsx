@@ -40,6 +40,7 @@ export function createColumns({
   canCreate,
   hideDuplicate,
   handleToggleAvailable,
+  duplicating,
 }: {
   t: (k: string) => string;
   storeId?: string;
@@ -55,6 +56,7 @@ export function createColumns({
   canCreate?: boolean;
   hideDuplicate?: boolean;
   handleToggleAvailable: (productId: string, checked: boolean) => void;
+  duplicating?: boolean;
 }): ColumnDef<ProductRow>[] {
   const stringFilter: FilterFn<ProductRow> = (row, id, value) => {
     const rv = row.getValue(id);
@@ -90,6 +92,7 @@ export function createColumns({
           storesList={stores}
           storeNames={storeNames}
           prefetchStores={loadStoresForMenu}
+          duplicating={duplicating}
         />
       </React.Suspense>
     </div>

@@ -18,7 +18,7 @@ type ProductRow = Product & {
   available?: boolean;
 };
 
-export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate, storesList, prefetchStores, storeNames }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void; storesList?: ShopAggregated[]; prefetchStores?: () => Promise<void>; storeNames?: Record<string, string>; }) {
+export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate, storesList, prefetchStores, storeNames, duplicating }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void; storesList?: ShopAggregated[]; prefetchStores?: () => Promise<void>; storeNames?: Record<string, string>; duplicating?: boolean; }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [stores, setStores] = useState<ShopAggregated[]>([]);
@@ -65,6 +65,8 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
           className="h-8 w-8 p-0"
           aria-label="Open row actions"
           onClick={() => { onTrigger?.(); }}
+          disabled={duplicating === true}
+          aria-disabled={duplicating === true}
           data-testid="user_products_row_actions"
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -76,7 +78,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
           {t("edit")}
         </DropdownMenuItem>
         {hideDuplicate ? null : (
-          <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false}>
+          <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false || duplicating === true} aria-disabled={canCreate === false || duplicating === true}>
             <Copy className="mr-2 h-4 w-4" />
             {t("duplicate")}
           </DropdownMenuItem>

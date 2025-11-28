@@ -1,11 +1,29 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database-types.ts'
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
-  'Content-Type': 'application/json'
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, accept',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Content-Type': 'application/json',
 }
+
+const jsonResponse = (body: unknown, init?: ResponseInit) =>
+  new Response(JSON.stringify(body), {
+    ...init,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers ?? {}),
+    },
+  })
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,129 +31,115 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Handle both authentication methods per Supabase recommendations
-    const authHeader = req.headers.get('Authorization');
-    const apiKey = req.headers.get('apikey');
+    const authHeader = req.headers.get('Authorization')
 
-    let supabaseClient;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Authenticated user request
-      supabaseClient = createClient<Database>(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        {
-          global: {
-            headers: { Authorization: authHeader },
-          },
-        }
-      );
-    } else if (apiKey) {
-      // Anonymous request
-      supabaseClient = createClient<Database>(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        apiKey,
-        {}
-      );
-    } else {
-      // No authentication provided
-      return new Response(
-        JSON.stringify({ error: 'Missing authentication' }),
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    // Enhanced logging for token debugging
-    console.log('Auth-me request received:', {
-      hasAuthHeader: !!authHeader,
-      hasApiKey: !!apiKey,
-      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'none',
-      timestamp: new Date().toISOString()
-    });
-    
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-    
-    if (userError || !user) {
-      console.log('User authentication failed:', {
-        error: userError,
-        hasUser: !!user,
-        timestamp: new Date().toISOString()
-      })
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders }
-        }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return jsonResponse(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
       )
     }
-    
-    console.log('User authenticated successfully:', {
+
+    const supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    })
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser()
+
+    if (userError || !user) {
+      console.log('User authentication failed', {
+        error: userError?.message,
+      })
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    console.log('User authenticated successfully', {
       userId: user.id,
       email: user.email,
-      timestamp: new Date().toISOString()
-    });
+    })
 
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
+    const [
+      { data: profile, error: profileError },
+      { data: subscription, error: subscriptionError },
+      { data: menuItems, error: menuItemsError },
+    ] = await Promise.all([
+      supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle(),
+      supabaseClient
+        .from('user_subscriptions')
+        .select('*, tariffs(*)')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabaseClient
+        .from('user_menu_items')
+        .select('*')
+        .eq('is_active', true)
+        .order('order_index', { ascending: true }),
+    ])
 
     if (profileError) {
-      console.log('Profile fetch error:', profileError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch profile' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders }
-        }
-      )
+      console.log('Profile fetch error', { error: profileError.message })
+      return jsonResponse({ error: 'Failed to fetch profile' }, { status: 500 })
     }
 
     if (!profile) {
-      console.log('Profile not found for user:', user.id)
-      return new Response(
-        JSON.stringify({ error: 'Profile not found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders }
-        }
-      )
+      console.log('Profile not found for user', { userId: user.id })
+      return jsonResponse({ error: 'Profile not found' }, { status: 404 })
     }
 
-    const { data: subscription } = await supabaseClient
-      .from('user_subscriptions')
-      .select('*, tariffs(*)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    if (subscriptionError) {
+      console.log('Subscription fetch error', {
+        error: subscriptionError.message,
+      })
+    }
 
-    const tariffId = subscription?.tariffs?.id ?? subscription?.tariff_id
+    if (menuItemsError) {
+      console.log('Menu items fetch error', {
+        error: menuItemsError.message,
+      })
+    }
+
+    const tariffId =
+      (subscription as any)?.tariffs?.id ?? (subscription as any)?.tariff_id
+
     let tariffLimits: Array<{ limit_name: string; value: number }> = []
+
     if (tariffId) {
-      const { data: limits } = await supabaseClient
+      const { data: limits, error: limitsError } = await supabaseClient
         .from('tariff_limits')
-        .select('limit_name,value')
+        .select('limit_name, value')
         .eq('tariff_id', tariffId)
         .eq('is_active', true)
-      tariffLimits = (limits || []).map((l: any) => ({ limit_name: String(l.limit_name), value: Number(l.value) }))
-    }
 
-    const { data: menuItems } = await supabaseClient
-      .from('user_menu_items')
-      .select('*')
-      .eq('is_active', true)
-      .order('order_index', { ascending: true })
+      if (limitsError) {
+        console.log('Tariff limits fetch error', {
+          error: limitsError.message,
+        })
+      } else if (limits) {
+        tariffLimits = limits.map((l: any) => ({
+          limit_name: String(l.limit_name),
+          value: Number(l.value),
+        }))
+      }
+    }
 
     return new Response(
       JSON.stringify({
         user: {
           id: user.id,
           email: user.email,
-          ...profile
+          ...(profile && typeof profile === 'object' ? profile : {})
         },
         subscription,
         tariffLimits,
@@ -145,15 +149,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders }
       }
     )
-
   } catch (error) {
     console.error('Unexpected error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders }
-      }
-    )
+    return jsonResponse({ error: 'Internal server error' }, { status: 500 })
   }
 })

@@ -1246,7 +1246,7 @@ export class ProductService {
     const { data: authData } = await (supabase as any).auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const { data, error } = await (supabase as any).functions.invoke('delete-product', {
-      body: { productId: id },
+      body: { product_ids: [String(id)] },
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     });
     if (error) this.edgeError(error, 'failed_delete_product');
@@ -1258,14 +1258,20 @@ export class ProductService {
   }
 
   static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
-    let deleted = 0;
-    for (const id of ids) {
-      await ProductService.deleteProduct(String(id));
-      deleted += 1;
-    }
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const validIds = Array.from(new Set(ids.map(String).filter(Boolean)));
+    if (validIds.length === 0) return { deleted: 0 };
+    const { data, error } = await (supabase as any).functions.invoke('delete-product', {
+      body: { product_ids: validIds },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) this.edgeError(error, 'failed_delete_product');
+    const ok = (data as unknown as { success?: boolean })?.success === true;
+    if (!ok) throw new Error('delete_failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:products:all'); } catch {}
     try { ProductService.clearAllFirstPageCaches(); } catch {}
-    return { deleted };
+    return { deleted: validIds.length };
   }
 
   static clearAllFirstPageCaches() {

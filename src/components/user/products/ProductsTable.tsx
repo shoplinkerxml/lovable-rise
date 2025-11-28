@@ -42,7 +42,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { useVirtualRows } from "@/hooks/useVirtualRows";
-import { CopyProgressDialog, DeleteDialog } from "./ProductsTable/Dialogs";
+import { CopyProgressDialog, DeleteDialog, DeleteProgressDialog } from "./ProductsTable/Dialogs";
 import { Toolbar } from "./ProductsTable/Toolbar";
 import { createColumns } from "./ProductsTable/columns";
 import type { ShopAggregated } from "@/lib/shop-service";
@@ -97,6 +97,8 @@ export const ProductsTable = ({
     open: false,
     name: null,
   });
+  const duplicatingRef = useRef<boolean>(false);
+  const [deleteProgress, setDeleteProgress] = useState<{ open: boolean }>({ open: false });
 
   let productsCount = 0;
 
@@ -235,12 +237,14 @@ export const ProductsTable = ({
   // Дублирование товара и обновление таблицы
   const handleDuplicate = useCallback(async (product: Product) => {
     try {
+      if (duplicatingRef.current) return;
       if (canCreate === false) {
         toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
         return;
       }
       const nameForUi = product.name_ua || product.name || product.external_id || product.id;
       setCopyDialog({ open: true, name: nameForUi });
+      duplicatingRef.current = true;
       await ProductService.duplicateProduct(product.id);
       await loadFirstPage();
     } catch (error) {
@@ -254,6 +258,7 @@ export const ProductsTable = ({
       }
     } finally {
       setCopyDialog({ open: false, name: null });
+      duplicatingRef.current = false;
     }
   }, [canCreate, t, loadFirstPage]);
 
@@ -437,7 +442,8 @@ export const ProductsTable = ({
     canCreate,
     hideDuplicate,
     handleToggleAvailable,
-  }), [t, storeId, categoryFilterOptions, storeNames, stores, loadStoresForMenu, handleRemoveStoreLink, handleStoresUpdate, onEdit, handleDuplicate, canCreate, hideDuplicate, handleToggleAvailable]);
+    duplicating: copyDialog.open,
+  }), [t, storeId, categoryFilterOptions, storeNames, stores, loadStoresForMenu, handleRemoveStoreLink, handleStoresUpdate, onEdit, handleDuplicate, canCreate, hideDuplicate, handleToggleAvailable, copyDialog.open]);
 
   const table = useReactTable({
     data: rows,
@@ -538,6 +544,7 @@ export const ProductsTable = ({
         hideDuplicate={hideDuplicate}
         setDeleteDialog={(v) => setDeleteDialog(v)}
         handleDuplicate={handleDuplicate}
+        duplicating={copyDialog.open}
         storesMenuOpen={storesMenuOpen}
         setStoresMenuOpen={setStoresMenuOpen}
         loadStoresForMenu={loadStoresForMenu}
@@ -645,6 +652,7 @@ export const ProductsTable = ({
 
       {/* Copying progress - non-modal top-right */}
       <CopyProgressDialog open={copyDialog.open} name={copyDialog.name} t={t} />
+      <DeleteProgressDialog open={deleteProgress.open} t={t} />
 
       <DeleteDialog
         open={deleteDialog.open}
@@ -675,17 +683,20 @@ export const ProductsTable = ({
                 }
                 table.resetRowSelection();
               } else {
-                if (onDelete) {
-                  for (const p of selected) {
-                    await onDelete(p);
-                  }
+                const ids = selected.map((p) => String(p.id));
+                if (onDelete && selected.length === 1) {
+                  await onDelete(selected[0]);
                 } else {
                   try {
-                    await ProductService.bulkDeleteProducts(selected.map((p) => String(p.id)));
-                    toast.success(t('deleted_successfully'));
+                    setDeleteProgress({ open: true });
+                    await ProductService.bulkDeleteProducts(ids);
+                    setProductsCached((prev) => prev.filter((p) => !ids.includes(String(p.id))));
+                    setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - ids.length) } : prev);
+                    didBatch = true;
+                    toast.success(t('products_deleted_successfully'));
                   } catch (_) {
                     toast.error(t('failed_delete_product'));
-                  }
+                  } finally { setDeleteProgress({ open: false }); }
                 }
                 table.resetRowSelection();
               }

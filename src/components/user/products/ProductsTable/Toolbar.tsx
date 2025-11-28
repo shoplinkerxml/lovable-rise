@@ -12,8 +12,8 @@ import type { ShopAggregated } from "@/lib/shop-service";
 const ViewOptionsMenuLazy = React.lazy(() => import("./ViewOptionsMenu").then((m) => ({ default: m.ViewOptionsMenu })));
 const AddToStoresMenuLazy = React.lazy(() => import("./AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
 type TTable = TanTable<ProductRow>;
-const ViewOptionsMenuLazyTyped = ViewOptionsMenuLazy as unknown as React.ComponentType<{ table: TTable }>;
-const AddToStoresMenuLazyTyped = AddToStoresMenuLazy as unknown as React.ComponentType<{ open: boolean; setOpen: (v: boolean) => void; loadStoresForMenu: () => Promise<void>; stores: ShopAggregated[]; setStores: (v: ShopAggregated[]) => void; selectedStoreIds: string[]; setSelectedStoreIds: React.Dispatch<React.SetStateAction<string[]>>; items: ProductRow[]; table: TTable; removingStores: boolean; setRemovingStores: (v: boolean) => void; removingStoreId: string | null; setRemovingStoreId: (v: string | null) => void; queryClient: QueryClient; addingStores: boolean; setAddingStores: (v: boolean) => void; setProductsCached: (updater: (prev: ProductRow[]) => ProductRow[]) => void; setLastSelectedProductIds?: (ids: string[]) => void }>;
+const ViewOptionsMenuLazyTyped = ViewOptionsMenuLazy as unknown as React.ComponentType<{ table: TTable; disabled?: boolean }>;
+const AddToStoresMenuLazyTyped = AddToStoresMenuLazy as unknown as React.ComponentType<{ open: boolean; setOpen: (v: boolean) => void; loadStoresForMenu: () => Promise<void>; stores: ShopAggregated[]; setStores: (v: ShopAggregated[]) => void; selectedStoreIds: string[]; setSelectedStoreIds: React.Dispatch<React.SetStateAction<string[]>>; items: ProductRow[]; table: TTable; removingStores: boolean; setRemovingStores: (v: boolean) => void; removingStoreId: string | null; setRemovingStoreId: (v: string | null) => void; queryClient: QueryClient; addingStores: boolean; setAddingStores: (v: boolean) => void; setProductsCached: (updater: (prev: ProductRow[]) => ProductRow[]) => void; setLastSelectedProductIds?: (ids: string[]) => void; disabled?: boolean }>;
 
 export function Toolbar({
   t,
@@ -25,6 +25,7 @@ export function Toolbar({
   hideDuplicate,
   setDeleteDialog,
   handleDuplicate,
+  duplicating,
   storesMenuOpen,
   setStoresMenuOpen,
   loadStoresForMenu,
@@ -52,6 +53,7 @@ export function Toolbar({
   hideDuplicate?: boolean;
   setDeleteDialog: (v: { open: boolean; product: ProductRow | null }) => void;
   handleDuplicate: (p: Product) => Promise<void>;
+  duplicating?: boolean;
   storesMenuOpen: boolean;
   setStoresMenuOpen: (v: boolean) => void;
   loadStoresForMenu: () => Promise<void>;
@@ -73,10 +75,10 @@ export function Toolbar({
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedCount = selectedRows.length;
   const selectedRow = selectedRows[0]?.original as ProductRow | undefined;
-  const canDuplicate = selectedCount === 1 && canCreate !== false && hideDuplicate !== true;
-  const canEditSelected = selectedCount === 1;
-  const canDeleteSelected = selectedCount >= 1;
-  const createDisabled = canCreate === false;
+  const canDuplicate = selectedCount === 1 && canCreate !== false && hideDuplicate !== true && !duplicating;
+  const canEditSelected = selectedCount === 1 && !duplicating;
+  const canDeleteSelected = selectedCount >= 1 && !duplicating;
+  const createDisabled = (canCreate === false) || !!duplicating;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
@@ -141,7 +143,7 @@ export function Toolbar({
           </Tooltip>
 
           <React.Suspense fallback={null}>
-            <ViewOptionsMenuLazyTyped table={table} />
+            <ViewOptionsMenuLazyTyped table={table} disabled={!!duplicating} />
           </React.Suspense>
 
           {storeId ? null : (
@@ -165,6 +167,7 @@ export function Toolbar({
                 setAddingStores={setAddingStores}
                 setProductsCached={setProductsCached}
                 setLastSelectedProductIds={setLastSelectedProductIds}
+                disabled={!!duplicating}
               />
             </React.Suspense>
           )}

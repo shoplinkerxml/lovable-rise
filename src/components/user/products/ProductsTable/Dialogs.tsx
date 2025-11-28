@@ -37,6 +37,28 @@ export function CopyProgressDialog({ open, name, t }: { open: boolean; name: str
   );
 }
 
+export function DeleteProgressDialog({ open, t }: { open: boolean; t: (k: string) => string }) {
+  return (
+    <DialogNoOverlay open={open} onOpenChange={() => void 0} modal={false}>
+      <DialogNoOverlayContent
+        position="top-right"
+        variant="info"
+        className="p-4 w-[min(24rem,92vw)]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        data-testid="user_products_delete_progress"
+      >
+        <DialogNoOverlayHeader>
+          <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
+            <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />
+            {t("products_deleting")}
+          </DialogNoOverlayTitle>
+        </DialogNoOverlayHeader>
+      </DialogNoOverlayContent>
+    </DialogNoOverlay>
+  );
+}
+
 export function DeleteDialog({
   open,
   product,
@@ -86,4 +108,3 @@ export function DeleteDialog({
     </DialogNoOverlay>
   );
 }
-
