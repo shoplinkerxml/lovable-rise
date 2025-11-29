@@ -40,9 +40,9 @@ export const ShopDetail = () => {
       return s;
     },
     enabled: !!id,
-    staleTime: 900_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     placeholderData: (prev) => prev as Shop | null | undefined,
   });
   useEffect(() => {

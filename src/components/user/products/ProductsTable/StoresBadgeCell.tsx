@@ -132,7 +132,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: id, added: true, categoryKey }); } catch { void 0; }
                               toast.success(t("product_added_to_store"));
                               ShopService.bumpProductsCountInCache(String(id), 1);
-                              try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
+                              try { await ProductService.refreshStoreCategoryFilterOptions([String(id)]); } catch { void 0; }
                               try {
                                 queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                   const arr = Array.isArray(prev) ? prev : (stores || []);
@@ -151,7 +151,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: id, added: false, categoryKey }); } catch { void 0; }
                               toast.success(t("product_removed_from_store"));
                               ShopService.bumpProductsCountInCache(String(id), -1);
-                              try { await ProductService.recomputeStoreCategoryFilterCache(String(id)); } catch { void 0; }
+                              try { await ProductService.refreshStoreCategoryFilterOptions([String(id)]); } catch { void 0; }
                               try {
                                 queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                   const arr = Array.isArray(prev) ? prev : (stores || []);
@@ -259,7 +259,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: sid, added: true, categoryKey }); } catch { void 0; }
                                       toast.success(t("product_added_to_store"));
                                       ShopService.bumpProductsCountInCache(String(sid), 1);
-                                      try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; }
+                                      try { await ProductService.refreshStoreCategoryFilterOptions([String(sid)]); } catch { void 0; }
                                       try {
                                         queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                           const arr = Array.isArray(prev) ? prev : (stores || []);
@@ -278,7 +278,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: sid, added: false, categoryKey }); } catch { void 0; }
                                       toast.success(t("product_removed_from_store"));
                                       ShopService.bumpProductsCountInCache(String(sid), -1);
-                                      try { await ProductService.recomputeStoreCategoryFilterCache(String(sid)); } catch { void 0; }
+                                      try { await ProductService.refreshStoreCategoryFilterOptions([String(sid)]); } catch { void 0; }
                                       try {
                                         queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                           const arr = Array.isArray(prev) ? prev : (stores || []);

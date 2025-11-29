@@ -124,6 +124,18 @@ export interface ProductLimitInfo {
   canCreate: boolean;
 }
 
+export interface StoreProductLinkPatchInput {
+  is_active?: boolean;
+  custom_price?: number | null;
+  custom_price_old?: number | null;
+  custom_price_promo?: number | null;
+  custom_stock_quantity?: number | null;
+  custom_available?: boolean | null;
+  custom_name?: string | null;
+  custom_description?: string | null;
+  custom_category_id?: string | null;
+}
+
 export class ProductService {
   private static inFlightStores: Promise<
     Array<{
@@ -747,6 +759,52 @@ export class ProductService {
       );
     }
     return (data as unknown as { link?: any })?.link ?? null;
+  }
+
+  static async saveStoreProductEdit(
+    productId: string,
+    storeId: string,
+    payload: {
+      supplier_id?: number | string | null;
+      category_id?: number | string | null;
+      category_external_id?: string | null;
+      currency_code?: string | null;
+      external_id?: string | null;
+      name?: string;
+      name_ua?: string | null;
+      vendor?: string | null;
+      article?: string | null;
+      available?: boolean;
+      stock_quantity?: number;
+      price?: number | null;
+      price_old?: number | null;
+      price_promo?: number | null;
+      description?: string | null;
+      description_ua?: string | null;
+      docket?: string | null;
+      docket_ua?: string | null;
+      state?: string;
+      images?: ProductImage[];
+      params?: ProductParam[];
+      linkPatch?: StoreProductLinkPatchInput;
+    },
+  ): Promise<{ product_id: string; link?: any } | null> {
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const { data, error } = await (supabase as any).functions.invoke(
+      "save-store-product-edit",
+      {
+        body: { product_id: productId, store_id: storeId, ...payload },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      },
+    );
+    if (error) this.edgeError(error, "failed_save_product");
+    const out =
+      (typeof data === "string" ? JSON.parse(data) : (data as any)) as {
+        product_id?: string;
+        link?: any;
+      };
+    return out?.product_id ? { product_id: out.product_id, link: out.link } : null;
   }
 
   static async removeStoreProductLink(

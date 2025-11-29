@@ -50,17 +50,13 @@ export const ShopsList = ({
     queryKey: ['shopsList'],
     queryFn: async () => {
       const rows = await ShopService.getShopsAggregated();
-      try {
-        const payload = JSON.stringify({ items: rows as ShopWithMarketplace[], expiresAt: Date.now() + 300_000 });
-        if (typeof window !== 'undefined') window.localStorage.setItem('rq:shopsList', payload);
-      } catch { void 0; }
       return rows as ShopWithMarketplace[];
     },
     retry: false,
     staleTime: 0,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
   const shops: ShopWithMarketplace[] = shopsData ?? [];
   const onShopsLoadedRef = useRef(onShopsLoaded);

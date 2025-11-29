@@ -35,6 +35,7 @@ type StoreProductLinkPatch = {
   custom_price_promo: number | null;
   custom_stock_quantity: number | null;
   custom_available: boolean | null;
+  custom_category_id: string | null;
 };
 
 export const StoreProductEdit = () => {
@@ -141,8 +142,9 @@ export const StoreProductEdit = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const productPayload: { params?: ProductParam[]; category_id?: number } = {};
       if (params && params.length >= 0) {
-        await ProductService.updateProduct(pid, { params });
+        productPayload.params = params;
       }
       const patch: StoreProductLinkPatch = {
         is_active: !!form.is_active,
@@ -151,6 +153,7 @@ export const StoreProductEdit = () => {
         custom_price_promo: null,
         custom_stock_quantity: null,
         custom_available: form.custom_available ? true : false,
+        custom_category_id: null,
       };
 
       const priceStr = form.custom_price.trim();
@@ -169,36 +172,31 @@ export const StoreProductEdit = () => {
       const stockNum = Number(stockStr);
       patch.custom_stock_quantity = stockStr ? (Number.isFinite(stockNum) ? stockNum : null) : null;
 
-      await ProductService.updateStoreProductLink(pid, storeId, patch);
+      let freshName: string | undefined = undefined;
       if (lastCategoryId) {
         const num = Number(lastCategoryId);
         if (Number.isFinite(num)) {
-          try {
-            const storeExtId = (() => {
-              const row = storeCategories.find((r) => r.category_id === num);
-              return row?.store_external_id ?? null;
-            })();
-            await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
-            const freshName = (() => {
-              const fromStore = storeCategories.find((r) => r.category_id === num)?.name || '';
-              if (fromStore) return fromStore;
-              const cats = (aggCategoriesRef.current || []) as Array<{ id: string | number; name: string }>;
-              const found = cats.find((c) => String(c.id) === String(num));
-              return found?.name || '';
-            })();
-            ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null, categoryName: freshName || undefined }, storeId);
-            
-            await ProductService.recomputeStoreCategoryFilterCache(storeId);
-            try {
-              queryClient.invalidateQueries({ queryKey: ["products", storeId] });
-              queryClient.invalidateQueries({ queryKey: ["products", "all"] });
-              queryClient.invalidateQueries({ queryKey: ["shopsList"] });
-              try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
-            } catch { void 0; }
-          } catch (_) {
-            // ignore
-          }
+          productPayload.category_id = num;
+          const storeExtId = (() => {
+            const row = storeCategories.find((r) => r.category_id === num);
+            return row?.store_external_id ?? null;
+          })();
+          patch.custom_category_id = storeExtId ?? null;
+          freshName = (() => {
+            const fromStore = storeCategories.find((r) => r.category_id === num)?.name || '';
+            if (fromStore) return fromStore;
+            const cats = (aggCategoriesRef.current || []) as Array<{ id: string | number; name: string }>;
+            const found = cats.find((c) => String(c.id) === String(num));
+            return found?.name || '';
+          })();
         }
+      }
+
+      await ProductService.saveStoreProductEdit(pid, storeId, { ...productPayload, linkPatch: patch });
+      if (productPayload.category_id != null) {
+        const num = Number(productPayload.category_id);
+        const storeExtId = String(patch.custom_category_id || "") || null;
+        ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null, categoryName: freshName || undefined }, storeId);
       }
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}/products`);
@@ -260,39 +258,12 @@ export const StoreProductEdit = () => {
                   if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
                   if (typeof partial.available === "boolean") {
                     updateField("custom_available", partial.available);
-                    try {
-                      await ProductService.updateStoreProductLink(pid, storeId, { custom_available: partial.available });
-                    } catch (_) {
-                      toast.error(t("operation_failed"));
-                    }
                   }
                   if (typeof partial.category_id === "string" && partial.category_id.trim()) {
                     const cid = partial.category_id.trim();
                     if (cid !== lastCategoryId) {
                       setLastCategoryId(cid);
                       if (partial.category_name) setCategoryName(partial.category_name);
-                      const num = Number(cid);
-                      if (Number.isFinite(num)) {
-                        const prevNum = baseProduct?.category_id ?? null;
-                        try {
-                          await ProductService.updateProduct(pid, { category_id: num });
-                          setBaseProduct((prev) => prev ? { ...prev, category_id: num } : prev);
-                          await ShopService.ensureStoreCategory(storeId, num, { external_id: partial.category_external_id || null });
-                          const storeExtId = await ShopService.getStoreCategoryExternalId(storeId, num);
-                          await ProductService.updateStoreProductLink(pid, storeId, { custom_category_id: storeExtId ?? null });
-                          ProductService.patchProductCaches(pid, { category_id: num, category_external_id: partial.category_external_id || null, categoryName: partial.category_name || undefined }, storeId);
-                          await ProductService.recomputeStoreCategoryFilterCache(storeId);
-                          try {
-                            queryClient.invalidateQueries({ queryKey: ["products", storeId] });
-                            queryClient.invalidateQueries({ queryKey: ["products", "all"] });
-                          } catch { void 0; }
-                          if (prevNum && Number.isFinite(prevNum) && prevNum !== num) {
-                            await ShopService.cleanupUnusedStoreCategory(storeId, prevNum);
-                          }
-                        } catch (_) {
-                          toast.error(t("failed_save_category"));
-                        }
-                      }
                     }
                   }
                 }}
