@@ -287,6 +287,7 @@ export const ProductsTable = ({
       }
     } catch { void 0; }
     setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
+    try { setSelectedStoreIds(ids.map(String)); } catch { /* ignore */ }
   }, [setProductsCached]);
 
   const handleToggleAvailable = useCallback(async (productId: string, checked: boolean) => {

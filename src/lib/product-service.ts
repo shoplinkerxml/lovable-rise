@@ -687,6 +687,34 @@ export class ProductService {
     return names;
   }
 
+  static async refreshStoreCategoryFilterOptions(storeIds: string[]): Promise<void> {
+    const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
+    if (unique.length === 0) return;
+    const { data: authData } = await (supabase as any).auth.getSession();
+    const accessToken: string | null = authData?.session?.access_token || null;
+    const { data, error } = await (supabase as any).functions.invoke(
+      "store-category-filter-options",
+      {
+        body: { store_ids: unique },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      },
+    );
+    if (error) {
+      const code = (error as unknown as { context?: { status?: number } })?.context?.status;
+      if (code === 403) throw new Error("Недостатньо прав");
+      throw new Error((error as unknown as { message?: string })?.message || "fetch_failed");
+    }
+    const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
+    const results: Record<string, string[]> = (resp?.results || {}) as Record<string, string[]>;
+    try {
+      for (const sid of unique) {
+        const names = Array.isArray(results[sid]) ? results[sid] : (resp?.names || []);
+        const payload = JSON.stringify({ items: names, expiresAt: Date.now() + 900_000 });
+        if (typeof window !== "undefined") window.localStorage.setItem(`rq:filters:categories:${sid}`, payload);
+      }
+    } catch {}
+  }
+
   /** Получить и обновить переопределения для пары (product_id, store_id) через product-edit-data */
   static async getStoreProductLink(
     productId: string,

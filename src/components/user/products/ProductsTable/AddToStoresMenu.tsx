@@ -185,7 +185,7 @@ export function AddToStoresMenu({
                                   return { ...p, linkedStoreIds: nextIds };
                                 });
                               };
-                              try { /* parent should handle setItems; noop here */ } catch { void 0; }
+                              try { setProductsCached(updateItems); } catch { void 0; }
                               try {
                                 const dec = deletedByStore?.[String(id)] ?? countInStore;
                                 if (dec > 0) ShopService.bumpProductsCountInCache(String(id), -dec);
@@ -316,7 +316,7 @@ export function AddToStoresMenu({
                         }));
                         try {
                           Object.entries(addedByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt); });
-                          await ProductService.recomputeStoreCategoryFilterCacheBatch(storeIds.map(String));
+                          await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
                           try {
                             const addedMap = addedByStore || {};
                             q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
@@ -377,6 +377,15 @@ export function AddToStoresMenu({
                           {
                             toast.success(t('product_removed_from_store'));
                             try {
+                              setProductsCached((prev) => prev.map((p) => {
+                                const pid = String(p.id);
+                                const isTarget = productIds.length > 0 ? productIds.includes(pid) : true;
+                                if (!isTarget) return p;
+                                const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.map(String).includes(String(sid)));
+                                return { ...p, linkedStoreIds: nextIds };
+                              }));
+                            } catch { void 0; }
+                            try {
                               const countsByStore: Record<string, number> = {};
                               if (productIds.length > 0) {
                                 for (const sid of storeIds) {
@@ -390,7 +399,7 @@ export function AddToStoresMenu({
                                 Object.assign(countsByStore, deletedByStore);
                               }
                               Object.entries(countsByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), -cnt); });
-                              await ProductService.recomputeStoreCategoryFilterCacheBatch(storeIds.map(String));
+                              await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
                               try {
                                 for (const sid of storeIds) {
                                   const key = `rq:filters:categories:${String(sid)}`;
@@ -429,6 +438,7 @@ export function AddToStoresMenu({
                         } finally {
                           setRemovingStores(false);
                           try { table.resetRowSelection(); } catch { void 0; }
+                          try { setSelectedStoreIds((prev) => prev.filter((sid) => !storeIds.map(String).includes(String(sid)))); } catch { void 0; }
                         }
                       }}
                       data-testid="user_products_addToStores_delete"
