@@ -1318,7 +1318,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
     }
     return value;
   };
-  const value = useMemo(() => ({ lang, t, setLang }), [lang]);
+  const value = useMemo(() => ({ lang, t, setLang }), [lang, t]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };
 

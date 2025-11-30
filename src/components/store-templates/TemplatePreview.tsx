@@ -12,7 +12,7 @@ interface TemplatePreviewProps {
   description: string;
   mappings: MappingRule[];
   systemFields: SystemField[];
-  sampleData?: any;
+  sampleData?: Record<string, unknown> | null;
 }
 
 export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
@@ -64,7 +64,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
   };
 
   // Отримати значення поля з sample data
-  const getFieldValue = (fieldId: string): any => {
+  const getFieldValue = (fieldId: string): unknown => {
     if (!sampleData) return null;
     
     const mapping = mappings.find(m => m.targetField === fieldId);
@@ -72,11 +72,12 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
 
     // Спрощене отримання значення за шляхом
     const pathParts = mapping.sourceField.split('.');
-    let value = sampleData;
+    let value: unknown = sampleData;
     
     for (const part of pathParts) {
       if (value && typeof value === 'object') {
-        value = value[part];
+        const obj = value as Record<string, unknown>;
+        value = obj[part];
       } else {
         return null;
       }

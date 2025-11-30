@@ -708,7 +708,7 @@ export class TariffService {
       }
       
       // 2. Get currency data to ensure we have both currency_id and currency_code
-      let currencyId = originalTariff.currency;
+      const currencyId = originalTariff.currency;
       let currencyCode = 'USD'; // Default
       
       if (currencyId && typeof currencyId === 'number') {

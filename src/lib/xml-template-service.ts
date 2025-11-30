@@ -17,12 +17,23 @@ export interface XMLField {
   order?: number; // Порядок в XML
 }
 
+export type TransformationType =
+  | 'direct'
+  | 'concat'
+  | 'split'
+  | 'custom'
+  | 'number'
+  | 'string'
+  | 'array'
+  | 'boolean'
+  | 'date';
+
 export interface MappingRule {
   sourceField: string; // XML path
   targetField: string; // System field
   transformation?: {
-    type: 'direct' | 'concat' | 'split' | 'custom';
-    params?: Record<string, any>;
+    type: TransformationType;
+    params?: Record<string, unknown>;
   };
 }
 
@@ -41,6 +52,12 @@ interface XMLFormat {
   categoryPath: string; // Путь к категориям
   paramPath: string; // Путь к характеристикам внутри товара
 }
+
+export type XMLParseResult = {
+  structure: XMLStructure;
+  data: unknown;
+  stats: ParseStats;
+};
 
 export class XMLTemplateService {
   private parser: XMLParser;
@@ -89,12 +106,16 @@ export class XMLTemplateService {
   }
 
   // Определение типа XML формата
-  private detectXMLFormat(data: any): XMLFormat {
+  private detectXMLFormat(data: unknown): XMLFormat {
     const dataStr = JSON.stringify(data).toLowerCase();
     
     // Google Shopping формат (RSS с namespace g: и элементами типа g:id, g:price)
-    if (data.rss && data.rss.channel && data.rss.channel.item) {
-      const firstItem = Array.isArray(data.rss.channel.item) ? data.rss.channel.item[0] : data.rss.channel.item;
+    const rootObj = (typeof data === 'object' && data !== null) ? (data as Record<string, unknown>) : undefined;
+    const rss = rootObj && (rootObj['rss'] as Record<string, unknown> | undefined);
+    const channel = rss && (rss['channel'] as Record<string, unknown> | undefined);
+    const channelItem = channel && (channel['item'] as unknown);
+    if (channelItem) {
+      const firstItem = Array.isArray(channelItem) ? (channelItem[0] as Record<string, unknown>) : (channelItem as Record<string, unknown>);
       // Проверяем наличие Google Shopping специфичных полей
       if (firstItem && (firstItem['g:id'] || firstItem['g:link'] || firstItem['g:price'])) {
         return {
@@ -127,7 +148,8 @@ export class XMLTemplateService {
     }
     
     // MMA формат (price.items.item с currency в корне)
-    if (data.price && data.price.items && data.price.currency) {
+    const price = rootObj && (rootObj['price'] as Record<string, unknown> | undefined);
+    if (price && price['items'] && price['currency']) {
       return {
         type: 'mma',
         productPath: 'items.item',
@@ -137,7 +159,7 @@ export class XMLTemplateService {
     }
     
     // Price формат (price.items.item)
-    if (data.price && data.price.items) {
+    if (price && price['items']) {
       return {
         type: 'price',
         productPath: 'items.item',
@@ -173,11 +195,7 @@ export class XMLTemplateService {
     categoryTag: string;
     currencyTag: string;
     paramTag: string;
-  }): Promise<{
-    structure: XMLStructure;
-    data: any;
-    stats: ParseStats;
-  }> {
+  }): Promise<XMLParseResult> {
     const startTime = performance.now();
     
     let xmlContent: string;
@@ -204,7 +222,7 @@ export class XMLTemplateService {
       console.log('Auto-detected XML format:', this.detectedFormat);
     }
     
-    const structure = this.extractStructure(parsed);
+    const structure = this.extractStructure(parsed as Record<string, unknown>);
     structure.originalXml = xmlContent; // Сохраняем оригинальный XML
     
     const stats = {
@@ -233,7 +251,7 @@ export class XMLTemplateService {
   }
 
   // Извлечение структуры XML с сохранением иерархии и порядка
-  private extractStructure(data: any, path = ''): XMLStructure {
+  private extractStructure(data: Record<string, unknown>, path = ''): XMLStructure {
     const fields: XMLField[] = [];
     let orderCounter = 0;
     
@@ -340,7 +358,7 @@ export class XMLTemplateService {
       return 'Інше';
     };
     
-    const traverse = (obj: any, currentPath: string, depth = 0) => {
+    const traverse = (obj: Record<string, unknown>, currentPath: string, depth = 0) => {
       if (depth > 10) return;
       
       for (const [key, value] of Object.entries(obj)) {
@@ -367,17 +385,17 @@ export class XMLTemplateService {
           
           if (typeof firstItem === 'object' && firstItem !== null) {
             // Проверяем есть ли @lang атрибут - это может быть <name lang="ru"> и <name lang="ua">
-            const hasLangAttr = value.some((item: any) => item['@lang'] !== undefined);
+            const hasLangAttr = value.some((item) => (item as Record<string, unknown>)['@lang'] !== undefined);
             
             if (hasLangAttr) {
               // Обрабатываем каждый элемент с lang как отдельное поле
-              value.forEach((item: any) => {
-                const lang = item['@lang'];
+              value.forEach((item) => {
+                const lang = (item as Record<string, unknown>)['@lang'] as string | undefined;
                 const langSuffix = lang ? `_${lang}` : '';
                 const pathWithLang = `${fieldPath}${langSuffix}`;
                 
                 // Добавляем атрибуты кроме @lang
-                Object.entries(item).forEach(([attrKey, attrValue]) => {
+                Object.entries(item as Record<string, unknown>).forEach(([attrKey, attrValue]) => {
                   if (attrKey.startsWith('@') && attrKey !== '@lang') {
                     fields.push({
                       path: `${pathWithLang}.${attrKey}`,
@@ -391,12 +409,12 @@ export class XMLTemplateService {
                 });
                 
                 // Добавляем текстовое значение
-                if (item._text !== undefined) {
+                if ((item as Record<string, unknown>)._text !== undefined) {
                   fields.push({
                     path: pathWithLang,
-                    type: this.detectType(item._text),
+                    type: this.detectType((item as Record<string, unknown>)._text),
                     required: false,
-                    sample: this.getSample(item._text),
+                    sample: this.getSample((item as Record<string, unknown>)._text),
                     category: getCategory(pathWithLang),
                     order: orderCounter++
                   });
@@ -416,12 +434,12 @@ export class XMLTemplateService {
               // Для param - специальная обработка с группировкой
               const isParamArray = cleanKey === 'param';
               
-              value.forEach((item: any, index: number) => {
+              value.forEach((item, index: number) => {
                 const indexedPath = `${fieldPath}[${index}]`;
                 
                 if (isParamArray && typeof item === 'object' && item !== null) {
                   // Специальная обработка param: @name → _text → @paramid → @valueid
-                  const itemObj = item as Record<string, any>;
+                  const itemObj = item as Record<string, unknown>;
                   
                   // 1. @name
                   if (itemObj['@name'] !== undefined) {
@@ -476,7 +494,7 @@ export class XMLTemplateService {
                     if (!['@name', '@paramid', '@valueid', '_text'].includes(key)) {
                       if (key === 'value' && typeof val === 'object' && val !== null) {
                         // Вложенные <value lang="uk"> и <value lang="ru">
-                        traverse(val, `${indexedPath}.value`, depth + 1);
+                        traverse(val as Record<string, unknown>, `${indexedPath}.value`, depth + 1);
                       } else {
                         fields.push({
                           path: `${indexedPath}.${key}`,
@@ -491,13 +509,13 @@ export class XMLTemplateService {
                   }
                 } else {
                   // Обычная обработка не-param массивов
-                  traverse(item, indexedPath, depth + 1);
+                  traverse(item as Record<string, unknown>, indexedPath, depth + 1);
                 }
               });
             }
           } else {
             // Массив простых значений - добавляем каждый элемент отдельно
-            value.forEach((item: any, index: number) => {
+            value.forEach((item, index: number) => {
               fields.push({
                 path: `${fieldPath}[${index}]`,
                 type: this.detectType(item),
@@ -510,7 +528,7 @@ export class XMLTemplateService {
           }
         } else if (typeof value === 'object' && value !== null) {
           // Для объектов с атрибутами и текстом (например, category или param)
-          const valueObj = value as Record<string, any>;
+          const valueObj = value as Record<string, unknown>;
           if (valueObj._text !== undefined) {
             // Сначала добавляем атрибуты (например, @name для param, @id для category)
             const attributes = Object.entries(valueObj).filter(([k]) => k.startsWith('@'));
@@ -557,7 +575,7 @@ export class XMLTemplateService {
             });
           } else {
             // Объект без _text - рекурсивно обходим
-            traverse(value, fieldPath, depth + 1);
+            traverse(value as Record<string, unknown>, fieldPath, depth + 1);
           }
         } else {
           // Простое значение
@@ -602,13 +620,13 @@ export class XMLTemplateService {
       }));
   }
 
-  private detectType(value: any): XMLField['type'] {
+  private detectType(value: unknown): XMLField['type'] {
     if (Array.isArray(value)) return 'array';
     if (value === null) return 'string';
     return typeof value as XMLField['type'];
   }
 
-  private getSample(value: any): string {
+  private getSample(value: unknown): string {
     if (Array.isArray(value)) {
       if (value.length === 0) return '[]';
       const firstItem = value[0];
@@ -623,15 +641,20 @@ export class XMLTemplateService {
     return String(value).substring(0, 100);
   }
 
-  private countItems(data: any): number {
+  private countItems(data: unknown): number {
     // Подсчет количества элементов (товаров)
-    const findArrays = (obj: any): number => {
+    const findArrays = (obj: unknown): number => {
       let count = 0;
-      for (const value of Object.values(obj)) {
-        if (Array.isArray(value)) {
-          count = Math.max(count, value.length);
-        } else if (typeof value === 'object' && value !== null) {
-          count = Math.max(count, findArrays(value));
+      if (Array.isArray(obj)) {
+        return obj.length;
+      }
+      if (obj && typeof obj === 'object') {
+        for (const value of Object.values(obj as Record<string, unknown>)) {
+          if (Array.isArray(value)) {
+            count = Math.max(count, value.length);
+          } else if (typeof value === 'object' && value !== null) {
+            count = Math.max(count, findArrays(value));
+          }
         }
       }
       return count;

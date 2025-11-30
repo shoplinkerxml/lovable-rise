@@ -200,7 +200,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     } else {
       setCategories([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [formData.supplier_id]);
 
   const addParam = () => {

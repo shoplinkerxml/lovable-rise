@@ -61,12 +61,12 @@ export const ShopDetail = () => {
     }
   }, [shopData]);
   useEffect(() => {
-    const channel = (supabase as any).channel('shop_detail_realtime').on(
+    const channel = supabase.channel('shop_detail_realtime').on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'stores', filter: `id=eq.${id}` },
       () => queryClient.invalidateQueries({ queryKey: ['shopDetail', id!] })
     ).subscribe();
-    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+    return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
   }, [id, queryClient]);
 
   // Add marketplace type to breadcrumbs

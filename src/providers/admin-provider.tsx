@@ -165,9 +165,9 @@ export interface MenuItemData {
   title: string;
   path: string;
   page_type: 'content' | 'form' | 'dashboard' | 'list' | 'custom';
-  content_data?: any;
+  content_data?: Record<string, unknown>;
   template_name?: string;
-  meta_data?: any;
+  meta_data?: Record<string, unknown>;
   parent_id?: number | null;
   order_index: number;
   is_active: boolean;
@@ -203,7 +203,7 @@ export interface AdminContextState {
   contentError: string | null;
   
   // Cache for content data
-  contentCache: Record<string, any>;
+  contentCache: Record<string, unknown>;
   
   // Actions
   setActiveMenuItem: (item: MenuItemData | null) => void;
@@ -233,7 +233,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   const [menuLoading, setMenuLoading] = useState(true);
   const [contentLoading, setContentLoading] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
-  const [contentCache, setContentCache] = useState<Record<string, any>>({});
+  const [contentCache, setContentCache] = useState<Record<string, unknown>>({});
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -249,8 +249,9 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
     
     // Sort by order_index
-    for (const key in map) {
-      map[key as any].sort((a, b) => a.order_index - b.order_index);
+    const keys = Object.keys(map) as Array<keyof typeof map>;
+    for (const key of keys) {
+      map[key].sort((a, b) => a.order_index - b.order_index);
     }
     
     return map;
@@ -345,7 +346,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     const cacheKey = `content_${item.id}`;
     
     // Don't preload if already cached
-    if (contentCache[cacheKey]) {
+    if (cacheKey in contentCache) {
       return;
     }
 
@@ -354,7 +355,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
       if (item.page_type === 'content' || item.content_data) {
         setContentCache(prev => ({
           ...prev,
-          [cacheKey]: item.content_data || {}
+          [cacheKey]: (item.content_data ?? {}) as Record<string, unknown>
         }));
       }
     } catch (error) {

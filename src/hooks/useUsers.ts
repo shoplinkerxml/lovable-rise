@@ -134,7 +134,7 @@ export function useDeleteUser() {
       queryClient.removeQueries({ queryKey: userQueries.detail(userId) });
       
       // Show success message based on what was actually deleted
-      let message = t("user_deleted_success");
+      const message = t("user_deleted_success");
       let description = "";
       
       if (data.deletedAuth && data.deletedProfile) {

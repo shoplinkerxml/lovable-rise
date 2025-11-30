@@ -392,7 +392,14 @@ export const ProductsTable = ({
     for (const s of stores || []) m[String(s.id)] = String(s.store_name || "");
     return m;
   }, [stores]);
-  const { data: shopsAgg } = useQuery({ queryKey: ['shopsList'], queryFn: ShopService.getShopsAggregated });
+  const { data: shopsAgg } = useQuery({
+    queryKey: ['shopsList'],
+    queryFn: ShopService.getShopsAggregated,
+    staleTime: 900_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   useEffect(() => { if (Array.isArray(shopsAgg)) setStores(shopsAgg as ShopAggregated[]); }, [shopsAgg]);
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const loadStoresForMenu = useCallback(async () => {

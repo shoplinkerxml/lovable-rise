@@ -518,7 +518,7 @@ console.log("Права доступа обновлены:", responseData);`
     curlCmd += ` \\\n  -H "Content-Type: application/json"`;
     
     if (endpoint.body) {
-      let body = { ...endpoint.body };
+      const body = { ...endpoint.body };
       
       // Подставляем admin email и password для auth токена
       if (endpoint.name === 'Get Auth Token') {
@@ -600,7 +600,7 @@ console.log("Права доступа обновлены:", responseData);`
             body: {
               mode: 'raw',
               raw: (() => {
-                let body = { ...endpoint.body };
+                const body = { ...endpoint.body };
                 
                 // Подставляем admin email и password для auth токена
                 if (endpoint.name === 'Get Auth Token') {

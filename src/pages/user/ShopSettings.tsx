@@ -66,7 +66,7 @@ export default function ShopSettings() {
       document.querySelectorAll('[aria-hidden="true"]').forEach(el => {
         el.removeAttribute('aria-hidden');
       });
-    } catch {}
+    } catch { void 0; }
   };
   const [editExternalId, setEditExternalId] = useState<string>("");
   const [editRzIdValue, setEditRzIdValue] = useState<string>("");
@@ -89,13 +89,13 @@ export default function ShopSettings() {
     }
     if (shopData) {
       setShopName(shopData.store_name);
-      setStoreCompany(String((shopData as any).store_company || ''));
-      setStoreUrl(String((shopData as any).store_url || ''));
+      setStoreCompany(String(shopData.store_company || ''));
+      setStoreUrl(String(shopData.store_url || ''));
     }
   }, [id, shopData, navigate]);
   useEffect(() => {
-    if (shopData && (shopData as any).marketplace) {
-      setSelectedMarketplace(String((shopData as any).marketplace));
+    if (shopData && shopData.marketplace) {
+      setSelectedMarketplace(String(shopData.marketplace));
     }
   }, [shopData]);
   const { data: rowsData, isLoading: loading } = useQuery<StoreCategoryRow[]>({
@@ -110,24 +110,24 @@ export default function ShopSettings() {
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev as StoreCategoryRow[] | undefined,
   });
-  const rows: StoreCategoryRow[] = rowsData ?? [];
+  const rows: StoreCategoryRow[] = useMemo(() => rowsData ?? [], [rowsData]);
   useEffect(() => {
     const checkProducts = async () => {
-      const { count } = await (supabase as any).from('store_products').select('*', { count: 'exact' }).eq('store_id', id!).limit(1);
+      const count = await ShopService.getStoreProductsCount(id!);
       setProductsCount(count || 0);
     };
     if (id) checkProducts();
   }, [id]);
   useEffect(() => {
     if (!id) return;
-    const channel = (supabase as any).channel(`store_categories_${id}`).on(
+    const channel = supabase.channel(`store_categories_${id}`).on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'store_categories', filter: `store_id=eq.${id}` },
       () => {
         queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
       }
     ).subscribe();
-    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+    return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
   }, [id, queryClient]);
   const filtered = useMemo(() => rows.filter(r => r.name.toLowerCase().includes(search.toLowerCase())), [rows, search]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -172,39 +172,36 @@ export default function ShopSettings() {
   const [addCurrencyCode, setAddCurrencyCode] = useState<string>('');
   useEffect(() => {
     const loadCurrencyData = async () => {
-      const {
-        data: sysCurrencies
-      } = await (supabase as any).from('currencies').select('code,rate');
-      setAvailableCurrencies((sysCurrencies || []).map((c: any) => ({
-        code: String(c.code),
-        rate: c.rate as number | undefined
+      const { data: sysCurrencies } = await supabase.from('currencies').select('code,rate');
+      const sys = (sysCurrencies || []) as Array<{ code: unknown; rate?: unknown }>;
+      setAvailableCurrencies(sys.map((c) => ({
+        code: String(c.code as string),
+        rate: typeof c.rate === 'number' ? (c.rate as number) : undefined
       })));
-      const {
-        data: sc
-      } = await (supabase as any).from('store_currencies').select('code,rate,is_base').eq('store_id', id!);
-      setStoreCurrencies((sc || []).map((c: any) => ({
-        code: String(c.code),
-        rate: Number(c.rate || 1),
-        is_base: !!c.is_base
+      const { data: sc } = await supabase.from('store_currencies').select('code,rate,is_base').eq('store_id', id!);
+      const rows = (sc || []) as Array<{ code: unknown; rate?: unknown; is_base?: unknown }>;
+      setStoreCurrencies(rows.map((c) => ({
+        code: String(c.code as string),
+        rate: Number((c.rate as number | undefined) ?? 1),
+        is_base: !!(c.is_base as boolean | undefined)
       })));
     };
     if (id) loadCurrencyData();
   }, [id]);
   const refreshStoreCurrencies = async () => {
-    const {
-      data: sc
-    } = await (supabase as any).from('store_currencies').select('code,rate,is_base').eq('store_id', id!);
-    setStoreCurrencies((sc || []).map((c: any) => ({
-      code: String(c.code),
-      rate: Number(c.rate || 1),
-      is_base: !!c.is_base
+    const { data: sc } = await supabase.from('store_currencies').select('code,rate,is_base').eq('store_id', id!);
+    const rows = (sc || []) as Array<{ code: unknown; rate?: unknown; is_base?: unknown }>;
+    setStoreCurrencies(rows.map((c) => ({
+      code: String(c.code as string),
+      rate: Number((c.rate as number | undefined) ?? 1),
+      is_base: !!(c.is_base as boolean | undefined)
     })));
   };
   const handleAddCurrency = async () => {
     if (!addCurrencyCode) return;
     const sys = availableCurrencies.find(c => c.code === addCurrencyCode);
     const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
-    await (supabase as any).from('store_currencies').insert({
+    await supabase.from('store_currencies').insert({
       store_id: id!,
       code: addCurrencyCode,
       rate: defaultRate,
@@ -214,29 +211,29 @@ export default function ShopSettings() {
     await refreshStoreCurrencies();
   };
   const handleUpdateRate = async (code: string, rate: number) => {
-    await (supabase as any).from('store_currencies').update({
+    await supabase.from('store_currencies').update({
       rate
     }).eq('store_id', id!).eq('code', code);
     await refreshStoreCurrencies();
   };
   const handleSetBase = async (code: string) => {
-    await (supabase as any).from('store_currencies').update({
+    await supabase.from('store_currencies').update({
       is_base: false
     }).eq('store_id', id!);
-    await (supabase as any).from('store_currencies').update({
+    await supabase.from('store_currencies').update({
       is_base: true
     }).eq('store_id', id!).eq('code', code);
     await refreshStoreCurrencies();
   };
   const handleDeleteCurrency = async (code: string) => {
-    await (supabase as any).from('store_currencies').delete().eq('store_id', id!).eq('code', code);
+    await supabase.from('store_currencies').delete().eq('store_id', id!).eq('code', code);
     await refreshStoreCurrencies();
   };
   return <div className="p-6 space-y-6" data-testid="shop_settings_page">
       <PageHeader title={shopName} description={t('breadcrumb_settings')} breadcrumbItems={shopBreadcrumbs} />
 
       <Card>
-        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'info' | 'currencies' | 'categories')} className="w-full">
           <CardHeader className="pb-0">
             <TabsList className="flex w-full gap-2 h-9 overflow-x-auto whitespace-nowrap bg-transparent p-0 text-foreground rounded-none border-b border-border justify-start">
               <TabsTrigger value="info" className="px-3 text-sm rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-primary">{t('product_tab_main') || 'Основні дані'}</TabsTrigger>
@@ -265,7 +262,7 @@ export default function ShopSettings() {
                 if (productsCount > 0) return;
                 const {
                   data: template
-                } = await (supabase as any).from('store_templates').select('id, xml_structure, mapping_rules').eq('marketplace', marketplace).eq('is_active', true).order('created_at', {
+                } = await supabase.from('store_templates').select('id, xml_structure, mapping_rules').eq('marketplace', marketplace).eq('is_active', true).order('created_at', {
                   ascending: false
                 }).limit(1).single();
                 if (template) {
@@ -385,7 +382,7 @@ export default function ShopSettings() {
                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground"> 
                       <div className="flex items-center justify-center">
                         <Checkbox checked={selectedRowIds.length === pageRows.length && pageRows.length > 0 ? true : selectedRowIds.length > 0 ? "indeterminate" : false} onCheckedChange={value => {
-                              if (!!value) setSelectedRowIds(pageRows.map(r => r.store_category_id));else setSelectedRowIds([]);
+                              if (value) setSelectedRowIds(pageRows.map(r => r.store_category_id));else setSelectedRowIds([]);
                             }} aria-label={t('select_all') || 'Вибрати все'} />
                       </div>
                     </th>
@@ -403,7 +400,7 @@ export default function ShopSettings() {
                         <td className="p-2 align-middle">
                           <div className="flex items-center justify-center">
                             <Checkbox checked={selectedRowIds.includes(cat.store_category_id)} onCheckedChange={value => {
-                              setSelectedRowIds(prev => !!value ? [...prev, cat.store_category_id] : prev.filter(id => id !== cat.store_category_id));
+                              setSelectedRowIds(prev => value ? [...prev, cat.store_category_id] : prev.filter(id => id !== cat.store_category_id));
                             }} aria-label={t('select_row') || 'Вибрати рядок'} />
                           </div>
                         </td>

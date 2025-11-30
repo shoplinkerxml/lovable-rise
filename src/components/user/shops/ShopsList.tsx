@@ -53,10 +53,10 @@ export const ShopsList = ({
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
+    staleTime: 900_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const shops: ShopWithMarketplace[] = shopsData ?? [];
   const onShopsLoadedRef = useRef(onShopsLoaded);

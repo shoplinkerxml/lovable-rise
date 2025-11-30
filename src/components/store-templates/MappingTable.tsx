@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, AlertCircle, CheckCircle2, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { XMLField, MappingRule } from '@/lib/xml-template-service';
+import { XMLField, MappingRule, type TransformationType } from '@/lib/xml-template-service';
 
 interface MappingTableProps {
   xmlFields: XMLField[];
@@ -83,8 +83,8 @@ export const MappingTable: React.FC<MappingTableProps> = ({
   };
 
   // Оновити маппінг
-  const updateMapping = (xmlPath: string, systemFieldId: string | null, transformation?: string) => {
-    let newMappings = [...mappings];
+  const updateMapping = (xmlPath: string, systemFieldId: string | null, transformation?: TransformationType | string) => {
+    const newMappings = [...mappings];
     const existingIndex = newMappings.findIndex(m => m.sourceField === xmlPath);
     
     if (systemFieldId === null) {
@@ -100,7 +100,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
         sourceField: xmlPath,
         targetField: systemFieldId,
         transformation: transformation ? {
-          type: transformation as any,
+          type: (transformation as TransformationType),
           params: {}
         } : { type: 'direct', params: {} }
       };

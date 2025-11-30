@@ -124,6 +124,33 @@ export interface ProductLimitInfo {
   canCreate: boolean;
 }
 
+type ProductListPage = {
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  nextOffset: number | null;
+  total: number;
+};
+
+type ProductListResponseObj = {
+  products?: ProductAggregated[];
+  page?: ProductListPage;
+};
+
+type ImageInput = ProductImage & { object_key?: string };
+
+export interface StoreProductLink {
+  is_active?: boolean;
+  custom_price?: number | null;
+  custom_price_old?: number | null;
+  custom_price_promo?: number | null;
+  custom_stock_quantity?: number | null;
+  custom_available?: boolean | null;
+  custom_name?: string | null;
+  custom_description?: string | null;
+  custom_category_id?: string | null;
+}
+
 export interface StoreProductLinkPatchInput {
   is_active?: boolean;
   custom_price?: number | null;
@@ -157,7 +184,10 @@ export class ProductService {
     return Number.isFinite(n) ? n : null;
   }
 
-  private static edgeError(error: any, fallbackKey: string): never {
+  private static edgeError(
+    error: { context?: { status?: number }; status?: number; statusCode?: number; message?: string } | null,
+    fallbackKey: string,
+  ): never {
     const status = (error?.context?.status ?? error?.status ?? error?.statusCode) as number | undefined;
     const message = (error?.message as string | undefined) || undefined;
     if (status === 403) throw new ApiError("permission_denied", 403, "PERMISSION_DENIED");
@@ -219,7 +249,7 @@ export class ProductService {
           }));
         }
       }
-    } catch {}
+    } catch { void 0; }
 
     if (ProductService.inFlightStores) {
       return ProductService.inFlightStores;
@@ -229,7 +259,7 @@ export class ProductService {
       try {
         const { ShopService } = await import("@/lib/shop-service");
         const shops = await ShopService.getShopsAggregated();
-        const mapped = (shops || []).map((s: any) => ({
+        const mapped = (shops || []).map((s) => ({
           id: String(s.id),
           store_name: String(s.store_name || ""),
           store_url: s.store_url ? String(s.store_url) : null,
@@ -245,7 +275,7 @@ export class ProductService {
             });
             window.localStorage.setItem("rq:stores:active", payload);
           }
-        } catch {}
+        } catch { void 0; }
         return mapped;
       } catch {
         try {
@@ -278,11 +308,11 @@ export class ProductService {
                   });
                   window.localStorage.setItem("rq:stores:active", payload);
                 }
-              } catch {}
+              } catch { void 0; }
               return rows;
             }
           }
-        } catch {}
+        } catch { void 0; }
         return [];
       }
     })();
@@ -308,19 +338,19 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const payload: Record<string, unknown> = { store_id: storeId ?? null };
 
-    const { data, error } = await (supabase as any).functions.invoke("user-products-list", {
+    const { data, error } = await supabase.functions.invoke<ProductListResponseObj | string>("user-products-list", {
       body: payload,
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     });
 
     if (error) ProductService.edgeError(error, "user-products-list");
 
-    const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
-    const rows = (resp?.products || []) as ProductAggregated[];
+    const resp = typeof data === "string" ? (JSON.parse(data) as ProductListResponseObj) : (data as ProductListResponseObj);
+    const rows = Array.isArray(resp?.products) ? resp!.products! : [];
     return rows;
   }
 
@@ -370,7 +400,7 @@ export class ProductService {
           if (timeLeft < threshold) {
             (async () => {
               try {
-                const { data: authData } = await (supabase as any).auth.getSession();
+                const { data: authData } = await supabase.auth.getSession();
                 const accessToken: string | null = authData?.session?.access_token || null;
                 const payloadN: Record<string, unknown> = {
                   store_id: storeId ?? null,
@@ -378,7 +408,7 @@ export class ProductService {
                   offset: 0,
                 };
                 const timeoutMs = 4000;
-                const invokePromise = (supabase as any).functions.invoke(
+                const invokePromise = supabase.functions.invoke<ProductListResponseObj | string>(
                   "user-products-list",
                   {
                     body: payloadN,
@@ -407,28 +437,20 @@ export class ProductService {
                   respAny &&
                   typeof respAny === "object" &&
                   respAny !== null &&
-                  !(respAny as any).error
+                  !("error" in respAny && respAny.error)
                 ) {
                   const respData =
-                    typeof (respAny as any).data === "string"
-                      ? JSON.parse((respAny as any).data)
-                      : ((respAny as any).data as any);
-                  const productsN =
-                    (respData?.products || []) as ProductAggregated[];
-                  const pageN =
-                    (respData?.page || {
-                      limit,
-                      offset: 0,
-                      hasMore: false,
-                      nextOffset: null,
-                      total: productsN.length,
-                    }) as {
-                      limit: number;
-                      offset: number;
-                      hasMore: boolean;
-                      nextOffset: number | null;
-                      total: number;
-                    };
+                    typeof (respAny as { data?: unknown }).data === "string"
+                      ? (JSON.parse((respAny as { data?: string }).data as string) as ProductListResponseObj)
+                      : ((respAny as { data?: unknown }).data as ProductListResponseObj);
+                  const productsN = Array.isArray(respData?.products) ? respData.products! : [];
+                  const pageN: ProductListPage = {
+                    limit,
+                    offset: 0,
+                    hasMore: !!respData?.page?.hasMore,
+                    nextOffset: respData?.page?.nextOffset ?? null,
+                    total: respData?.page?.total ?? productsN.length,
+                  };
                   out = { products: productsN, page: pageN };
                 }
                 if (out) {
@@ -441,24 +463,24 @@ export class ProductService {
                     if (typeof window !== "undefined") {
                       window.localStorage.setItem(sizedKey, payloadStore);
                     }
-                  } catch {}
+                  } catch { void 0; }
                 }
-              } catch {}
+              } catch { void 0; }
             })();
           }
           return { products: parsed.items, page: parsed.page };
         }
       }
-    } catch {}
+    } catch { void 0; }
 
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const payload: Record<string, unknown> = {
       store_id: storeId ?? null,
       limit,
       offset: 0,
     };
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<ProductListResponseObj | string>(
       "user-products-list",
       {
         body: payload,
@@ -466,22 +488,15 @@ export class ProductService {
       },
     );
     if (error) ProductService.edgeError(error, "user-products-list");
-    const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
-    const products = (resp?.products || []) as ProductAggregated[];
-    const page =
-      (resp?.page || {
-        limit,
-        offset: 0,
-        hasMore: false,
-        nextOffset: null,
-        total: products.length,
-      }) as {
-        limit: number;
-        offset: number;
-        hasMore: boolean;
-        nextOffset: number | null;
-        total: number;
-      };
+    const resp = typeof data === "string" ? (JSON.parse(data) as ProductListResponseObj) : (data as ProductListResponseObj);
+    const products = Array.isArray(resp?.products) ? resp!.products! : [];
+    const page: ProductListPage = {
+      limit,
+      offset: 0,
+      hasMore: !!resp?.page?.hasMore,
+      nextOffset: resp?.page?.nextOffset ?? null,
+      total: resp?.page?.total ?? products.length,
+    };
     try {
       const payloadStore = JSON.stringify({
         items: products,
@@ -491,7 +506,7 @@ export class ProductService {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(sizedKey, payloadStore);
       }
-    } catch {}
+    } catch { void 0; }
     return { products, page };
   }
 
@@ -514,14 +529,14 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const payload: Record<string, unknown> = {
       store_id: storeId ?? null,
       limit,
       offset,
     };
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<ProductListResponseObj | string>(
       "user-products-list",
       {
         body: payload,
@@ -529,22 +544,15 @@ export class ProductService {
       },
     );
     if (error) ProductService.edgeError(error, "user-products-list");
-    const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
-    const products = (resp?.products || []) as ProductAggregated[];
-    const page =
-      (resp?.page || {
-        limit,
-        offset,
-        hasMore: false,
-        nextOffset: null,
-        total: products.length,
-      }) as {
-        limit: number;
-        offset: number;
-        hasMore: boolean;
-        nextOffset: number | null;
-        total: number;
-      };
+    const resp = typeof data === "string" ? (JSON.parse(data) as ProductListResponseObj) : (data as ProductListResponseObj);
+    const products = Array.isArray(resp?.products) ? resp!.products! : [];
+    const page: ProductListPage = {
+      limit,
+      offset,
+      hasMore: !!resp?.page?.hasMore,
+      nextOffset: resp?.page?.nextOffset ?? null,
+      total: resp?.page?.total ?? products.length,
+    };
     return { products, page };
   }
 
@@ -578,7 +586,7 @@ export class ProductService {
         });
         window.localStorage.setItem(key, payload);
       }
-    } catch {}
+    } catch { void 0; }
   }
 
   static patchProductCaches(
@@ -619,7 +627,7 @@ export class ProductService {
           }
         }
       }
-    } catch {}
+    } catch { void 0; }
   }
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
@@ -631,7 +639,7 @@ export class ProductService {
       });
       if (typeof window !== "undefined")
         window.localStorage.setItem(`rq:filters:categories:${storeId}`, payload);
-    } catch {}
+    } catch { void 0; }
   }
 
   static async recomputeStoreCategoryFilterCacheBatch(storeIds: string[]): Promise<void> {
@@ -667,11 +675,11 @@ export class ProductService {
           return parsed.items;
         }
       }
-    } catch {}
+    } catch { void 0; }
 
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ names?: string[] } | string>(
       "store-category-filter-options",
       {
         body: { store_id: storeId },
@@ -679,32 +687,31 @@ export class ProductService {
       },
     );
     if (error) {
-      const code = (error as unknown as { context?: { status?: number } })?.context
-        ?.status;
+      const code = (error as { context?: { status?: number } } | null)?.context?.status;
       if (code === 403) throw new Error("Недостатньо прав");
-      throw new Error(
-        (error as unknown as { message?: string })?.message || "fetch_failed",
-      );
+      throw new Error((error as { message?: string } | null)?.message || "fetch_failed");
     }
-    const names = ((data as unknown as { names?: string[] })?.names || []).filter(
-      (v) => typeof v === "string",
-    );
+    const respNames = typeof data === "string" ? (JSON.parse(data) as { names?: string[] }) : (data as { names?: string[] });
+    const names = (respNames?.names || []).filter((v) => typeof v === "string");
     try {
       const payload = JSON.stringify({
         items: names,
         expiresAt: Date.now() + 900_000,
       });
       if (typeof window !== "undefined") window.localStorage.setItem(key, payload);
-    } catch {}
+    } catch { void 0; }
     return names;
   }
 
   static async refreshStoreCategoryFilterOptions(storeIds: string[]): Promise<void> {
     const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
     if (unique.length === 0) return;
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{
+      results?: Record<string, string[]>;
+      names?: string[];
+    } | string>(
       "store-category-filter-options",
       {
         body: { store_ids: unique },
@@ -712,26 +719,26 @@ export class ProductService {
       },
     );
     if (error) {
-      const code = (error as unknown as { context?: { status?: number } })?.context?.status;
+      const code = (error as { context?: { status?: number } } | null)?.context?.status;
       if (code === 403) throw new Error("Недостатньо прав");
-      throw new Error((error as unknown as { message?: string })?.message || "fetch_failed");
+      throw new Error((error as { message?: string } | null)?.message || "fetch_failed");
     }
-    const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
-    const results: Record<string, string[]> = (resp?.results || {}) as Record<string, string[]>;
+    const resp = typeof data === "string" ? (JSON.parse(data) as { results?: Record<string, string[]>; names?: string[] }) : (data as { results?: Record<string, string[]>; names?: string[] });
+    const results: Record<string, string[]> = resp?.results || {};
     try {
       for (const sid of unique) {
         const names = Array.isArray(results[sid]) ? results[sid] : (resp?.names || []);
         const payload = JSON.stringify({ items: names, expiresAt: Date.now() + 900_000 });
         if (typeof window !== "undefined") window.localStorage.setItem(`rq:filters:categories:${sid}`, payload);
       }
-    } catch {}
+    } catch { void 0; }
   }
 
   /** Получить и обновить переопределения для пары (product_id, store_id) через product-edit-data */
   static async getStoreProductLink(
     productId: string,
     storeId: string,
-  ): Promise<any | null> {
+  ): Promise<StoreProductLink | null> {
     const edit = await ProductService.getProductEditData(productId, storeId);
     return edit.link || null;
   }
@@ -739,11 +746,11 @@ export class ProductService {
   static async updateStoreProductLink(
     productId: string,
     storeId: string,
-    patch: any,
-  ): Promise<any> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    patch: Partial<StoreProductLinkPatchInput>,
+  ): Promise<StoreProductLink | null> {
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ link?: StoreProductLink | null } | string>(
       "update-store-product-link",
       {
         body: { product_id: productId, store_id: storeId, patch },
@@ -751,14 +758,12 @@ export class ProductService {
       },
     );
     if (error) {
-      const code = (error as unknown as { context?: { status?: number } })?.context
-        ?.status;
+      const code = (error as { context?: { status?: number } } | null)?.context?.status;
       if (code === 403) throw new Error("Недостатньо прав");
-      throw new Error(
-        (error as unknown as { message?: string })?.message || "update_failed",
-      );
+      throw new Error((error as { message?: string } | null)?.message || "update_failed");
     }
-    return (data as unknown as { link?: any })?.link ?? null;
+    const resp = typeof data === "string" ? (JSON.parse(data) as { link?: StoreProductLink | null }) : (data as { link?: StoreProductLink | null });
+    return resp?.link ?? null;
   }
 
   static async saveStoreProductEdit(
@@ -788,10 +793,13 @@ export class ProductService {
       params?: ProductParam[];
       linkPatch?: StoreProductLinkPatchInput;
     },
-  ): Promise<{ product_id: string; link?: any } | null> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+  ): Promise<{ product_id: string; link?: StoreProductLink | null } | null> {
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{
+      product_id?: string;
+      link?: StoreProductLink | null;
+    } | string>(
       "save-store-product-edit",
       {
         body: { product_id: productId, store_id: storeId, ...payload },
@@ -800,10 +808,9 @@ export class ProductService {
     );
     if (error) this.edgeError(error, "failed_save_product");
     const out =
-      (typeof data === "string" ? JSON.parse(data) : (data as any)) as {
-        product_id?: string;
-        link?: any;
-      };
+      (typeof data === "string"
+        ? (JSON.parse(data) as { product_id?: string; link?: StoreProductLink | null })
+        : (data as { product_id?: string; link?: StoreProductLink | null }));
     return out?.product_id ? { product_id: out.product_id, link: out.link } : null;
   }
 
@@ -811,39 +818,39 @@ export class ProductService {
     productId: string,
     storeId: string,
   ): Promise<void> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { error } = await (supabase as any).functions.invoke(
+    const { error } = await supabase.functions.invoke<unknown>(
       "bulk-remove-store-product-links",
       {
         body: { product_ids: [productId], store_ids: [storeId] },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       },
     );
-    if (error) throw new Error((error as any)?.message || "delete_failed");
+    if (error) throw new Error((error as { message?: string } | null)?.message || "delete_failed");
   }
 
   static async bulkRemoveStoreProductLinks(
     productIds: string[],
     storeIds: string[],
   ): Promise<{ deleted: number; deletedByStore: Record<string, number> }> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{
+      deleted?: number;
+      deletedByStore?: Record<string, number>;
+    } | string>(
       "bulk-remove-store-product-links",
       {
         body: { product_ids: productIds, store_ids: storeIds },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       },
     );
-    if (error) throw new Error((error as any)?.message || "bulk_delete_failed");
+    if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_delete_failed");
     const out =
       (typeof data === "string"
-        ? JSON.parse(data)
-        : (data as any)) as {
-        deleted?: number;
-        deletedByStore?: Record<string, number>;
-      };
+        ? (JSON.parse(data) as { deleted?: number; deletedByStore?: Record<string, number> })
+        : (data as { deleted?: number; deletedByStore?: Record<string, number> }));
     return { deleted: out.deleted ?? 0, deletedByStore: out.deletedByStore ?? {} };
   }
 
@@ -857,23 +864,23 @@ export class ProductService {
     custom_stock_quantity?: number | null;
     custom_available?: boolean | null;
   }>): Promise<{ inserted: number; addedByStore: Record<string, number> }> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{
+      inserted?: number;
+      addedByStore?: Record<string, number>;
+    } | string>(
       "bulk-add-store-product-links",
       {
         body: { links: payload },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       },
     );
-    if (error) throw new Error((error as any)?.message || "bulk_insert_failed");
+    if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_insert_failed");
     const out =
       (typeof data === "string"
-        ? JSON.parse(data)
-        : (data as any)) as {
-        inserted?: number;
-        addedByStore?: Record<string, number>;
-      };
+        ? (JSON.parse(data) as { inserted?: number; addedByStore?: Record<string, number> })
+        : (data as { inserted?: number; addedByStore?: Record<string, number> }));
     return { inserted: out.inserted ?? 0, addedByStore: out.addedByStore ?? {} };
   }
 
@@ -895,26 +902,26 @@ export class ProductService {
           return parsed.store_ids.map(String);
         }
       }
-    } catch {}
+    } catch { void 0; }
 
     const existing = ProductService.inFlightLinksByProduct.get(productId);
     if (existing) return existing;
 
     const task = (async () => {
-      const { data: authData } = await (supabase as any).auth.getSession();
+      const { data: authData } = await supabase.auth.getSession();
       const accessToken: string | null = authData?.session?.access_token || null;
-      const { data, error } = await (supabase as any).functions.invoke(
+      const { data, error } = await supabase.functions.invoke<{ store_ids?: string[] } | string>(
         "get-store-links-for-product",
         {
           body: { product_id: productId },
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
         },
       );
-      if (error) throw new Error((error as any)?.message || "links_fetch_failed");
+      if (error) throw new Error((error as { message?: string } | null)?.message || "links_fetch_failed");
       const payload =
         (typeof data === "string"
-          ? JSON.parse(data)
-          : (data as any)) as { store_ids?: string[] };
+          ? (JSON.parse(data) as { store_ids?: string[] })
+          : (data as { store_ids?: string[] }));
       const ids = Array.isArray(payload.store_ids)
         ? payload.store_ids.map(String)
         : [];
@@ -924,7 +931,7 @@ export class ProductService {
             cacheKey,
             JSON.stringify({ store_ids: ids, expiresAt: Date.now() + 120_000 }),
           );
-      } catch {}
+      } catch { void 0; }
       return ids;
     })();
 
@@ -941,10 +948,10 @@ export class ProductService {
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(`rq:links:product:${productId}`);
       }
-    } catch {}
+    } catch { void 0; }
     try {
       ProductService.inFlightLinksByProduct.delete(productId);
-    } catch {}
+    } catch { void 0; }
   }
 
   /** Максимальный лимит продуктов: через отдельную функцию get-product-limit-only */
@@ -972,7 +979,7 @@ export class ProductService {
       return 0;
     }
 
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ value?: number; max?: number } | string>(
       "get-product-limit-only",
       {
         body: { tariff_id: tariffId },
@@ -983,10 +990,7 @@ export class ProductService {
       return 0;
     }
     const resp =
-      (typeof data === "string" ? JSON.parse(data) : (data as any)) as {
-        value?: number;
-        max?: number;
-      };
+      (typeof data === "string" ? (JSON.parse(data) as { value?: number; max?: number }) : (data as { value?: number; max?: number }));
     const v = Number(resp?.value ?? resp?.max ?? 0);
     return Number.isFinite(v) ? v : 0;
   }
@@ -1013,9 +1017,9 @@ export class ProductService {
         );
       }
 
-      const { data: authData } = await (supabase as any).auth.getSession();
+      const { data: authData } = await supabase.auth.getSession();
       const accessToken: string | null = authData?.session?.access_token || null;
-      const { data, error } = await (supabase as any).functions.invoke(
+      const { data, error } = await supabase.functions.invoke<ProductListResponseObj | string>(
         "user-products-list",
         {
           body: { store_id: null, limit: 1, offset: 0 },
@@ -1026,7 +1030,7 @@ export class ProductService {
         console.error("Get products count via function error:", error);
         return 0;
       }
-      const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
+      const resp = typeof data === "string" ? (JSON.parse(data) as ProductListResponseObj) : (data as ProductListResponseObj);
       const page = (resp?.page || {}) as { total?: number };
       const total =
         typeof page.total === "number"
@@ -1067,9 +1071,9 @@ export class ProductService {
             return (parsed.items as ProductAggregated[]) as unknown as Product[];
           }
         }
-      } catch {}
+      } catch { void 0; }
 
-      const { data: authData } = await (supabase as any).auth.getSession();
+      const { data: authData } = await supabase.auth.getSession();
       const accessToken: string | null = authData?.session?.access_token || null;
 
       const limit = 50;
@@ -1078,7 +1082,7 @@ export class ProductService {
       let hasMore = true;
 
       while (hasMore) {
-        const { data, error } = await (supabase as any).functions.invoke(
+        const { data, error } = await supabase.functions.invoke<ProductListResponseObj | string>(
           "user-products-list",
           {
             body: { store_id: null, limit, offset },
@@ -1088,26 +1092,20 @@ export class ProductService {
           },
         );
         if (error) ProductService.edgeError(error, "user-products-list");
-        const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
-        const products = (resp?.products || []) as ProductAggregated[];
-        const page =
-          (resp?.page || {
-            limit,
-            offset,
-            hasMore: false,
-            nextOffset: null,
-            total: products.length,
-          }) as {
-            limit: number;
-            offset: number;
-            hasMore: boolean;
-            nextOffset: number | null;
-            total: number;
-          };
+        const resp = typeof data === "string" ? (JSON.parse(data) as ProductListResponseObj) : (data as ProductListResponseObj);
+        const products = Array.isArray(resp?.products) ? resp!.products! : [];
+        const page: ProductListPage = {
+          limit,
+          offset,
+          hasMore: !!resp?.page?.hasMore,
+          nextOffset: resp?.page?.nextOffset ?? null,
+          total: resp?.page?.total ?? products.length,
+        };
         all = [...all, ...products];
         hasMore = !!page.hasMore;
-        offset = (page.nextOffset ?? null) as any;
-        if (offset == null) break;
+        const nextOffset = page.nextOffset;
+        if (nextOffset == null) break;
+        offset = nextOffset;
         if (all.length >= 1000) break;
       }
 
@@ -1118,12 +1116,10 @@ export class ProductService {
         });
         if (typeof window !== "undefined")
           window.localStorage.setItem(cacheKey, payload);
-      } catch {}
+      } catch { void 0; }
 
       return all as unknown as Product[];
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   /** Параметры товара: через product-edit-data */
@@ -1165,7 +1161,7 @@ export class ProductService {
     storeId?: string,
   ): Promise<{
     product: Product | null;
-    link: any | null;
+    link: StoreProductLink | null;
     images: ProductImage[];
     params: ProductParam[];
     supplier?: { id: number; supplier_name: string } | null;
@@ -1203,9 +1199,43 @@ export class ProductService {
       }>
     >;
   }> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<
+      | {
+          product?: Product | null;
+          link?: StoreProductLink | null;
+          images?: ProductImage[];
+          params?: ProductParam[];
+          supplier?: { id: number; supplier_name: string } | null;
+          categoryName?: string | null;
+          shop?: { id: string; store_name: string } | null;
+          storeCategories?: Array<{
+            store_category_id: number;
+            category_id: number;
+            name: string;
+            store_external_id: string | null;
+            is_active: boolean;
+          }>;
+          suppliers?: Array<{ id: string; supplier_name: string }>;
+          currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+          categories?: Array<{
+            id: string;
+            name: string;
+            external_id: string;
+            supplier_id: string;
+            parent_external_id: string | null;
+          }>;
+          supplierCategoriesMap?: Record<string, Array<{
+            id: string;
+            name: string;
+            external_id: string;
+            supplier_id: string;
+            parent_external_id: string | null;
+          }>>;
+        }
+      | string
+    >(
       "product-edit-data",
       {
         body: storeId
@@ -1215,10 +1245,72 @@ export class ProductService {
       },
     );
     if (error) this.edgeError(error, "failed_load_product_edit");
-    const resp = typeof data === "string" ? JSON.parse(data) : (data as any);
+    const resp = typeof data === "string" ? (JSON.parse(data) as {
+      product?: Product | null;
+      link?: StoreProductLink | null;
+      images?: ProductImage[];
+      params?: ProductParam[];
+      supplier?: { id: number; supplier_name: string } | null;
+      categoryName?: string | null;
+      shop?: { id: string; store_name: string } | null;
+      storeCategories?: Array<{
+        store_category_id: number;
+        category_id: number;
+        name: string;
+        store_external_id: string | null;
+        is_active: boolean;
+      }>;
+      suppliers?: Array<{ id: string; supplier_name: string }>;
+      currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+      categories?: Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>;
+      supplierCategoriesMap?: Record<string, Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>>;
+    }) : (data as {
+      product?: Product | null;
+      link?: StoreProductLink | null;
+      images?: ProductImage[];
+      params?: ProductParam[];
+      supplier?: { id: number; supplier_name: string } | null;
+      categoryName?: string | null;
+      shop?: { id: string; store_name: string } | null;
+      storeCategories?: Array<{
+        store_category_id: number;
+        category_id: number;
+        name: string;
+        store_external_id: string | null;
+        is_active: boolean;
+      }>;
+      suppliers?: Array<{ id: string; supplier_name: string }>;
+      currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+      categories?: Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>;
+      supplierCategoriesMap?: Record<string, Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>>;
+    });
     return {
       product: (resp?.product || null) as Product | null,
-      link: resp?.link || null,
+      link: (resp?.link || null) as StoreProductLink | null,
       images: (resp?.images || []) as ProductImage[],
       params: (resp?.params || []) as ProductParam[],
       supplier: (resp?.supplier || null) as {
@@ -1290,7 +1382,7 @@ export class ProductService {
       }
     }
 
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
 
     const payload: Record<string, unknown> = {
@@ -1315,15 +1407,15 @@ export class ProductService {
       docket: productData.docket ?? null,
       docket_ua: productData.docket_ua ?? null,
       state: productData.state ?? "new",
-      images: (productData.images || []).map((img, index) => ({
-        key: (img as any)?.object_key || undefined,
-        url: img.url,
-        order_index:
-          typeof (img as any).order_index === "number"
-            ? (img as any).order_index
-            : index,
-        is_main: !!(img as any).is_main,
-      })),
+      images: (productData.images || []).map((img, index) => {
+        const input = img as ImageInput;
+        return {
+          key: input.object_key || undefined,
+          url: input.url,
+          order_index: typeof input.order_index === "number" ? input.order_index : index,
+          is_main: !!input.is_main,
+        };
+      }),
       params: (productData.params || []).map((p, index) => ({
         name: p.name,
         value: p.value,
@@ -1332,10 +1424,10 @@ export class ProductService {
         paramid: p.paramid ?? null,
         valueid: p.valueid ?? null,
       })),
-      links: (productData as any).links || undefined,
+      links: productData.links || undefined,
     };
 
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ product_id?: string } | string>(
       "create-product",
       {
         body: payload,
@@ -1343,23 +1435,24 @@ export class ProductService {
       },
     );
     if (error) this.edgeError(error, "failed_create_product");
-    const productId = (data as unknown as { product_id?: string })?.product_id;
+    const respCreate = typeof data === "string" ? (JSON.parse(data) as { product_id?: string }) : (data as { product_id?: string });
+    const productId = respCreate?.product_id;
     if (!productId) throw new Error("create_failed");
     const product = await this.getProductById(productId);
     if (!product) throw new Error("create_failed");
     try {
       if (typeof window !== "undefined") window.localStorage.removeItem("rq:products:all");
-    } catch {}
+    } catch { void 0; }
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch {}
+    } catch { void 0; }
     return product;
   }
 
   static async duplicateProduct(id: string): Promise<Product> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ product?: Product } | string>(
       "duplicate-product",
       {
         body: { productId: id },
@@ -1367,16 +1460,17 @@ export class ProductService {
       },
     );
     if (error) this.edgeError(error, "failed_duplicate_product");
-    const product = (data as any)?.product as Product;
+    const respDup = typeof data === "string" ? (JSON.parse(data) as { product?: Product }) : (data as { product?: Product });
+    const product = respDup?.product as Product | undefined;
     if (!product) {
       throw new Error("duplicate_failed");
     }
     try {
       if (typeof window !== "undefined") window.localStorage.removeItem("rq:products:all");
-    } catch {}
+    } catch { void 0; }
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch {}
+    } catch { void 0; }
     return product;
   }
 
@@ -1387,7 +1481,7 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
 
     const payload: Record<string, unknown> = {
@@ -1437,15 +1531,15 @@ export class ProductService {
       state: productData.state !== undefined ? productData.state : undefined,
       images:
         productData.images !== undefined
-          ? (productData.images || []).map((img, index) => ({
-              key: (img as any)?.object_key || undefined,
-              url: (img as any)?.url,
-              order_index:
-                typeof (img as any).order_index === "number"
-                  ? (img as any).order_index
-                  : index,
-              is_main: !!(img as any).is_main,
-            }))
+          ? (productData.images || []).map((img, index) => {
+              const input = img as ImageInput;
+              return {
+                key: input.object_key || undefined,
+                url: input.url,
+                order_index: typeof input.order_index === "number" ? input.order_index : index,
+                is_main: !!input.is_main,
+              };
+            })
           : undefined,
       params:
         productData.params !== undefined
@@ -1460,7 +1554,7 @@ export class ProductService {
           : undefined,
     };
 
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ product_id?: string } | string>(
       "update-product",
       {
         body: payload,
@@ -1468,22 +1562,23 @@ export class ProductService {
       },
     );
     if (error) this.edgeError(error, "failed_save_product");
-    const productId = (data as unknown as { product_id?: string })?.product_id || id;
+    const respUpdate = typeof data === "string" ? (JSON.parse(data) as { product_id?: string }) : (data as { product_id?: string });
+    const productId = respUpdate?.product_id || id;
     try {
       if (typeof window !== "undefined") window.localStorage.removeItem("rq:products:all");
-    } catch {}
+    } catch { void 0; }
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch {}
+    } catch { void 0; }
     void productId;
     return;
   }
 
   /** Удаление товара */
   static async deleteProduct(id: string): Promise<void> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ success?: boolean } | string>(
       "delete-product",
       {
         body: { product_ids: [String(id)] },
@@ -1491,21 +1586,22 @@ export class ProductService {
       },
     );
     if (error) this.edgeError(error, "failed_delete_product");
-    const ok = (data as unknown as { success?: boolean })?.success === true;
+    const respDel = typeof data === "string" ? (JSON.parse(data) as { success?: boolean }) : (data as { success?: boolean });
+    const ok = respDel?.success === true;
     if (!ok) {
       throw new Error("delete_failed");
     }
     try {
       if (typeof window !== "undefined") window.localStorage.removeItem("rq:products:all");
-    } catch {}
+    } catch { void 0; }
   }
 
   static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
-    const { data: authData } = await (supabase as any).auth.getSession();
+    const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const validIds = Array.from(new Set(ids.map(String).filter(Boolean)));
     if (validIds.length === 0) return { deleted: 0 };
-    const { data, error } = await (supabase as any).functions.invoke(
+    const { data, error } = await supabase.functions.invoke<{ success?: boolean } | string>(
       "delete-product",
       {
         body: { product_ids: validIds },
@@ -1513,14 +1609,15 @@ export class ProductService {
       },
     );
     if (error) this.edgeError(error, "failed_delete_product");
-    const ok = (data as unknown as { success?: boolean })?.success === true;
+    const respDel2 = typeof data === "string" ? (JSON.parse(data) as { success?: boolean }) : (data as { success?: boolean });
+    const ok = respDel2?.success === true;
     if (!ok) throw new Error("delete_failed");
     try {
       if (typeof window !== "undefined") window.localStorage.removeItem("rq:products:all");
-    } catch {}
+    } catch { void 0; }
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch {}
+    } catch { void 0; }
     return { deleted: validIds.length };
   }
 
@@ -1537,6 +1634,6 @@ export class ProductService {
       for (const key of keysToDelete) {
         window.localStorage.removeItem(key);
       }
-    } catch {}
+    } catch { void 0; }
   }
 }

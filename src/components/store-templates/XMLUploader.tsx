@@ -9,8 +9,9 @@ import { XMLTemplateService } from '@/lib/xml-template-service';
 import { toast } from 'sonner';
 import { useI18n } from '@/providers/i18n-provider';
 import { XMLStructureDialog, type XMLStructureMapping } from './XMLStructureDialog';
+import type { XMLParseResult } from '@/lib/xml-template-service';
 
-export const XMLUploader = ({ onParsed }: { onParsed?: (result: any) => void }) => {
+export const XMLUploader = ({ onParsed }: { onParsed?: (result: XMLParseResult) => void }) => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [url, setUrl] = useState('');

@@ -505,7 +505,7 @@ export class UserMenuService {
       const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
       
       // First try exact match
-      let { data, error } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('user_menu_items')
         .select('*')
         .eq('path', normalizedPath)

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { SessionValidator } from "./session-validation";
 
 export interface Shop {
@@ -8,8 +9,8 @@ export interface Shop {
   store_company?: string | null;
   store_url?: string | null;
   template_id?: string | null;
-  xml_config?: any;
-  custom_mapping?: any;
+  xml_config?: Json | null;
+  custom_mapping?: Json | null;
   marketplace?: string;
   is_active: boolean;
   created_at: string;
@@ -21,8 +22,8 @@ export interface CreateShopData {
   store_company?: string | null;
   store_url?: string | null;
   template_id?: string | null;
-  xml_config?: any;
-  custom_mapping?: any;
+  xml_config?: Json | null;
+  custom_mapping?: Json | null;
 }
 
 export interface UpdateShopData {
@@ -30,8 +31,8 @@ export interface UpdateShopData {
   store_company?: string | null;
   store_url?: string | null;
   template_id?: string | null;
-  xml_config?: any;
-  custom_mapping?: any;
+  xml_config?: Json | null;
+  custom_mapping?: Json | null;
   is_active?: boolean;
 }
 
@@ -61,10 +62,10 @@ export class ShopService {
       if (!raw) return;
       const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
       if (!parsed || !Array.isArray(parsed.items)) return;
-      const nextItems = parsed.items.map((s) => s.id === storeId ? { ...s, productsCount: Math.max(0, ((s as any).productsCount ?? 0) + delta) } : s);
+      const nextItems = parsed.items.map((s) => s.id === storeId ? { ...s, productsCount: Math.max(0, (s.productsCount ?? 0) + delta) } : s);
       const payload = JSON.stringify({ items: nextItems, expiresAt: parsed.expiresAt });
       if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-    } catch {}
+    } catch { void 0; }
   }
   static bumpCategoriesCountInCache(storeId: string, delta: number) {
     try {
@@ -73,10 +74,10 @@ export class ShopService {
       if (!raw) return;
       const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
       if (!parsed || !Array.isArray(parsed.items)) return;
-      const nextItems = parsed.items.map((s) => s.id === storeId ? { ...s, categoriesCount: Math.max(0, ((s as any).categoriesCount ?? 0) + delta) } : s);
+      const nextItems = parsed.items.map((s) => s.id === storeId ? { ...s, categoriesCount: Math.max(0, (s.categoriesCount ?? 0) + delta) } : s);
       const payload = JSON.stringify({ items: nextItems, expiresAt: parsed.expiresAt });
       if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-    } catch {}
+    } catch { void 0; }
   }
   static setCategoriesCountInCache(storeId: string, nextCount: number) {
     try {
@@ -87,13 +88,13 @@ export class ShopService {
       if (!parsed || !Array.isArray(parsed.items)) return;
       const nextItems = parsed.items.map((s) => {
         if (s.id !== storeId) return s;
-        const products = (s as any).productsCount ?? 0;
+        const products = s.productsCount ?? 0;
         const guarded = products === 0 ? 0 : Math.max(0, Number(nextCount) || 0);
         return { ...s, categoriesCount: guarded };
       });
       const payload = JSON.stringify({ items: nextItems, expiresAt: parsed.expiresAt });
       if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-    } catch {}
+    } catch { void 0; }
   }
   /** Получение только максимального лимита магазинов (без подсчета текущих) */
   static async getShopLimitOnly(): Promise<number> {
@@ -166,8 +167,8 @@ export class ShopService {
       throw new Error("User not authenticated");
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { count, error } = await (supabase as any)
+    
+    const { count, error } = await supabase
       .from('user_stores')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
@@ -190,8 +191,8 @@ export class ShopService {
     }
 
     try {
-      // @ts-ignore - table not in generated types yet
-      const { data, error } = await (supabase as any)
+      
+      const { data, error } = await supabase
         .from('user_stores')
         .select('*')
         .eq('is_active', true)
@@ -235,7 +236,7 @@ export class ShopService {
           const parsed = JSON.parse(raw) as { items: ShopAggregated[]; expiresAt: number };
           if (Array.isArray(parsed?.items)) return parsed.items;
         }
-      } catch {}
+      } catch { void 0; }
       return [];
     }
 
@@ -290,11 +291,11 @@ export class ShopService {
     const templateIds = Array.from(new Set(baseShops.map((s) => s.template_id).filter((v) => !!v))) as string[];
     const [templates] = await Promise.all([
       templateIds.length
-        ? (supabase as any)
+        ? supabase
             .from('store_templates')
             .select('id,marketplace')
             .in('id', templateIds)
-            .then((r: any) => r.data || [])
+            .then((r) => r.data || [])
         : Promise.resolve([]),
     ]);
     const templatesMap: Record<string, string> = {};
@@ -320,16 +321,16 @@ export class ShopService {
 
     const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = (authData?.session?.access_token as string | null) || null;
-    const { data, error } = await (supabase as any).functions.invoke('user-shops-list', {
+    const { data, error } = await supabase.functions.invoke('user-shops-list', {
       body: { store_id: id, includeConfig: true },
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     });
     if (error) {
       console.error('Get shop error:', error);
-      throw new Error((error as any)?.message || 'shop_fetch_failed');
+      throw new Error((error && (error as { message?: string }).message) || 'shop_fetch_failed');
     }
-    const payload = typeof data === 'string' ? JSON.parse(data) : (data as any);
-    const rows = Array.isArray(payload?.shops) ? payload.shops as Shop[] : [];
+    const payload = typeof data === 'string' ? JSON.parse(data) : (data as Record<string, unknown>);
+    const rows = Array.isArray((payload as { shops?: Shop[] }).shops) ? (payload as { shops?: Shop[] }).shops! : [];
     const shop = rows[0] as Shop | undefined;
     if (!shop) throw new Error('Shop not found');
     return shop;
@@ -357,8 +358,8 @@ export class ShopService {
       throw new Error(`Досягнуто ліміту магазинів (${limitInfo.max}). Оновіть тарифний план.`);
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+   
+    const { data, error } = await supabase
       .from('user_stores')
       .insert({
         id: crypto.randomUUID(),
@@ -377,7 +378,7 @@ export class ShopService {
       throw new Error(error.message);
     }
 
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
     return data;
   }
 
@@ -390,7 +391,7 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const cleanData: any = {};
+    const cleanData: Record<string, unknown> = {};
     if (shopData.store_name !== undefined) {
       if (!shopData.store_name.trim()) {
         throw new Error("Назва магазину обов'язкова");
@@ -422,8 +423,8 @@ export class ShopService {
 
     cleanData.updated_at = new Date().toISOString();
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+   
+    const { data, error } = await supabase
       .from('user_stores')
       .update(cleanData)
       .eq('id', id)
@@ -435,7 +436,7 @@ export class ShopService {
       throw new Error(error.message);
     }
 
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
     return data;
   }
 
@@ -448,8 +449,8 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { error } = await (supabase as any)
+   
+    const { error } = await supabase
       .from('user_stores')
       .delete()
       .eq('id', id);
@@ -458,7 +459,7 @@ export class ShopService {
       console.error('Delete shop error:', error);
       throw new Error(error.message);
     }
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch {}
+    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
   }
 
   /** Категории магазина: объединённые данные ssc + sc */
@@ -481,7 +482,7 @@ export class ShopService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const { data: storeOwner, error: storeOwnerErr } = await (supabase as any)
+    const { data: storeOwner, error: storeOwnerErr } = await supabase
       .from('user_stores')
       .select('id,user_id')
       .eq('id', storeId)
@@ -492,7 +493,7 @@ export class ShopService {
       throw new Error("store_not_owned_by_user");
     }
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('store_store_categories')
       .select('id,store_id,category_id,custom_name,is_active,external_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)')
       .eq('store_id', storeId)
@@ -500,20 +501,20 @@ export class ShopService {
 
     if (error) throw new Error(error.message);
 
-    const rows = (data || []) as Array<any>;
+    const rows = (data || []) as Array<Record<string, unknown>>;
     return rows.map((r) => {
-      const sc = r.store_categories || {};
+      const sc = (r as Record<string, unknown>).store_categories as Record<string, unknown> | undefined || {};
       return {
-        store_category_id: Number(r.id),
-        store_id: String(r.store_id),
-        category_id: Number(r.category_id),
-        name: String(r.custom_name ?? sc.name ?? ''),
-        base_external_id: sc.external_id ?? null,
-        parent_external_id: sc.parent_external_id ?? null,
-        base_rz_id: sc.rz_id ?? null,
-        store_external_id: r.external_id ?? null,
-        store_rz_id_value: r.rz_id_value ?? null,
-        is_active: !!r.is_active,
+        store_category_id: Number((r as Record<string, unknown>).id),
+        store_id: String((r as Record<string, unknown>).store_id),
+        category_id: Number((r as Record<string, unknown>).category_id),
+        name: String(((r as Record<string, unknown>).custom_name ?? sc['name'] ?? '')),
+        base_external_id: (sc['external_id'] as string | null) ?? null,
+        parent_external_id: (sc['parent_external_id'] as string | null) ?? null,
+        base_rz_id: (sc['rz_id'] as string | null) ?? null,
+        store_external_id: ((r as Record<string, unknown>).external_id as string | null) ?? null,
+        store_rz_id_value: ((r as Record<string, unknown>).rz_id_value as string | null) ?? null,
+        is_active: !!(r as Record<string, unknown>).is_active,
       };
     });
   }
@@ -527,13 +528,13 @@ export class ShopService {
     external_id?: string | null;
   }): Promise<void> {
     if (!payload?.id) throw new Error('Category row id is required');
-    const clean: any = {};
+    const clean: Record<string, unknown> = {};
     if (payload.rz_id_value !== undefined) clean.rz_id_value = payload.rz_id_value;
     if (payload.is_active !== undefined) clean.is_active = !!payload.is_active;
     if (payload.custom_name !== undefined) clean.custom_name = payload.custom_name ?? null;
     if (payload.external_id !== undefined) clean.external_id = payload.external_id ?? null;
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('store_store_categories')
       .update(clean)
       .eq('id', payload.id);
@@ -543,14 +544,14 @@ export class ShopService {
   /** Удаление категории магазина и всех её товаров в магазине */
   static async deleteStoreCategoryWithProducts(storeId: string, categoryId: number): Promise<void> {
     if (!storeId || !categoryId) throw new Error('storeId and categoryId required');
-    const { error: prodErr } = await (supabase as any)
+    const { error: prodErr } = await supabase
       .from('store_products')
       .delete()
       .eq('store_id', storeId)
       .eq('category_id', categoryId);
     if (prodErr) throw new Error(prodErr.message);
 
-    const { error: catErr } = await (supabase as any)
+    const { error: catErr } = await supabase
       .from('store_store_categories')
       .delete()
       .eq('store_id', storeId)
@@ -562,14 +563,14 @@ export class ShopService {
   static async deleteStoreCategoriesWithProducts(storeId: string, categoryIds: number[]): Promise<void> {
     if (!storeId || !Array.isArray(categoryIds) || categoryIds.length === 0) return;
     const ids = categoryIds;
-    const { error: prodErr } = await (supabase as any)
+    const { error: prodErr } = await supabase
       .from('store_products')
       .delete()
       .eq('store_id', storeId)
       .in('category_id', ids);
     if (prodErr) throw new Error(prodErr.message);
 
-    const { error: catErr } = await (supabase as any)
+    const { error: catErr } = await supabase
       .from('store_store_categories')
       .delete()
       .eq('store_id', storeId)
@@ -586,7 +587,7 @@ export class ShopService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { data: storeOwner, error: storeOwnerErr } = await (supabase as any)
+    const { data: storeOwner, error: storeOwnerErr } = await supabase
       .from('user_stores')
       .select('id,user_id')
       .eq('id', storeId)
@@ -595,7 +596,7 @@ export class ShopService {
     if (!storeOwner) throw new Error('Store not found');
     if (String(storeOwner.user_id) !== String(user.id)) throw new Error('store_not_owned_by_user');
 
-    const { data: existing, error: selErr } = await (supabase as any)
+    const { data: existing, error: selErr } = await supabase
       .from('store_store_categories')
       .select('id,is_active,external_id')
       .eq('store_id', storeId)
@@ -604,10 +605,10 @@ export class ShopService {
     if (selErr) throw new Error(selErr.message);
 
     if (existing?.id) {
-      const patch: any = { is_active: true };
+      const patch: Record<string, unknown> = { is_active: true };
       if (options?.external_id !== undefined) patch.external_id = options.external_id;
       if (options?.custom_name !== undefined) patch.custom_name = options.custom_name;
-      const { error: updErr } = await (supabase as any)
+      const { error: updErr } = await supabase
         .from('store_store_categories')
         .update(patch)
         .eq('id', existing.id);
@@ -615,16 +616,16 @@ export class ShopService {
       return Number(existing.id);
     }
 
-    const payload: any = {
+    const payload = {
       store_id: storeId,
       category_id: Number(categoryId),
       is_active: true,
       external_id: options?.external_id ?? null,
       custom_name: options?.custom_name ?? null,
     };
-    const { data: inserted, error: insErr } = await (supabase as any)
+    const { data: inserted, error: insErr } = await supabase
       .from('store_store_categories')
-      .insert([payload])
+      .insert(payload)
       .select('id')
       .single();
     if (insErr) throw new Error(insErr.message);
@@ -634,19 +635,19 @@ export class ShopService {
   /** Получить внешний ID категории магазина для пары (store_id, category_id) */
   static async getStoreCategoryExternalId(storeId: string, categoryId: number): Promise<string | null> {
     if (!storeId || !Number.isFinite(categoryId)) throw new Error('storeId and categoryId required');
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('store_store_categories')
       .select('external_id')
       .eq('store_id', storeId)
       .eq('category_id', categoryId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return (data as any)?.external_id ?? null;
+    return (data ? (data as { external_id?: string | null }).external_id ?? null : null);
   }
 
   static async cleanupUnusedStoreCategory(storeId: string, categoryId: number): Promise<void> {
     if (!storeId || !Number.isFinite(categoryId)) return;
-    const { data: prod, error: prodErr } = await (supabase as any)
+    const { data: prod, error: prodErr } = await supabase
       .from('store_products')
       .select('id')
       .eq('store_id', storeId)
@@ -655,7 +656,7 @@ export class ShopService {
     if (prodErr) return;
     const used = Array.isArray(prod) && prod.length > 0;
     if (used) return;
-    await (supabase as any)
+    await supabase
       .from('store_store_categories')
       .delete()
       .eq('store_id', storeId)

@@ -22,7 +22,14 @@ export const StoreProducts = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [limitInfo] = useState<{ current: number; max: number; canCreate: boolean }>({ current: 0, max: 0, canCreate: true });
   const queryClient = useQueryClient();
-  const { data: shopsAgg } = useQuery({ queryKey: ['shopsList'], queryFn: ShopService.getShopsAggregated });
+  const { data: shopsAgg } = useQuery({
+    queryKey: ['shopsList'],
+    queryFn: ShopService.getShopsAggregated,
+    staleTime: 900_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const aggProducts = (() => {
     const s = (shopsAgg || []).find((row) => String((row as { id: string }).id) === storeId);
     return Number((s as { productsCount?: number } | undefined)?.productsCount ?? 0);
