@@ -710,38 +710,41 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error("User not authenticated");
     }
 
-    const subscription = await SubscriptionValidationService.getValidSubscription(
-      user.id,
-    );
-    if (!subscription) {
-      return 0;
-    }
-    const tariffId = subscription.tariffs?.id ?? subscription.tariff_id;
-    if (!tariffId) {
+    // Получаем активную подписку пользователя (как в Shop/Supplier сервисах)
+    const { data: subscriptions, error: subscriptionError } = await supabase
+      .from('user_subscriptions')
+      .select('tariff_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('start_date', { ascending: false })
+      .limit(1);
+
+    if (subscriptionError || !subscriptions?.[0]) {
       return 0;
     }
 
-    const { data, error } = await supabase.functions.invoke<{ value?: number; max?: number } | string>(
-      "get-product-limit-only",
-      {
-        body: { tariff_id: tariffId },
-      },
-    );
-    if (error) {
-      console.error("Error fetching product limit via function:", error);
+    const subscription = subscriptions[0];
+
+    // Берём лимит по товарам из tariff_limits (активное ограничение по имени)
+    const { data: limitData, error: limitError } = await supabase
+      .from('tariff_limits')
+      .select('value')
+      .eq('tariff_id', subscription.tariff_id)
+      .ilike('limit_name', '%товар%')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (limitError) {
+      console.error('Error fetching product tariff limit:', limitError);
       return 0;
     }
-    const resp =
-      (typeof data === "string" ? (JSON.parse(data) as { value?: number; max?: number }) : (data as { value?: number; max?: number }));
-    const v = Number(resp?.value ?? resp?.max ?? 0);
-    return Number.isFinite(v) ? v : 0;
+
+    return Number(limitData?.value ?? 0) || 0;
   }
 
   /** Лимит продуктов для текущего пользователя */
