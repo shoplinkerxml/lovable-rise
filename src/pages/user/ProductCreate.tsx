@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
-import { ProductService, type ProductLimitInfo } from '@/lib/product-service';
+import { ProductService, type ProductLimitInfo, type ProductImage, type ProductParam } from '@/lib/product-service';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -17,8 +17,19 @@ export const ProductCreate = () => {
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
 
   useEffect(() => {
-    loadLimitInfo();
-  }, []);
+    (async () => {
+      try {
+        const info = await ProductService.getProductLimit();
+        setLimitInfo(info);
+        if (!info.canCreate) {
+          toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
+        }
+      } catch {
+        setLimitInfo({ current: 0, max: 0, canCreate: false });
+        toast.error(t('failed_load_limit'));
+      }
+    })();
+  }, [t]);
 
   // Убрана страничная очистка временных загрузок, чтобы не путаться
 
@@ -26,14 +37,10 @@ export const ProductCreate = () => {
     try {
       const info = await ProductService.getProductLimit();
       setLimitInfo(info);
-      
-      // Если лимит превышен, показываем предупреждение, но не перенаправляем
       if (!info.canCreate) {
         toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
       }
-    } catch (error: any) {
-      console.error('Load limit info error:', error);
-      // Устанавливаем значения по умолчанию вместо перенаправления
+    } catch {
       setLimitInfo({ current: 0, max: 0, canCreate: false });
       toast.error(t('failed_load_limit'));
     }
@@ -49,7 +56,28 @@ export const ProductCreate = () => {
   };
 
   // Восстанавливаем старый интерфейс: onSubmit получает formData, images, parameters
-  const handleFormSubmit = async ({ formData, images, parameters }: any) => {
+  type FormDataInput = {
+    external_id: string;
+    category_id?: number | string | null;
+    category_external_id?: string | null;
+    supplier_id?: number | string | null;
+    currency_code?: string | null;
+    name: string;
+    name_ua?: string | null;
+    docket?: string | null;
+    docket_ua?: string | null;
+    vendor?: string | null;
+    article?: string | null;
+    available?: boolean;
+    stock_quantity?: number | string;
+    price?: number;
+    price_old?: number;
+    price_promo?: number;
+    description?: string | null;
+    description_ua?: string | null;
+    state?: string;
+  };
+  const handleFormSubmit = async ({ formData, images, parameters }: { formData: FormDataInput; images: (ProductImage & { object_key?: string })[]; parameters: ProductParam[] }) => {
     try {
       await ProductService.createProduct({
         external_id: formData.external_id,
@@ -72,7 +100,7 @@ export const ProductCreate = () => {
         description_ua: formData.description_ua || null,
         state: formData.state || 'new',
         params: parameters || [],
-        images: (images || []).map((img: any, index: number) => ({
+        images: (images || []).map((img, index: number) => ({
           url: img.url,
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: !!img.is_main
@@ -80,10 +108,8 @@ export const ProductCreate = () => {
       });
       toast.success(t('product_created'));
       navigate('/user/products');
-    } catch (error: any) {
-      console.error('Error creating product:', error);
-      const key = (error?.message as string) || 'failed_create_product';
-      toast.error(t(key as any));
+    } catch {
+      toast.error(t('failed_create_product'));
     }
   };
 

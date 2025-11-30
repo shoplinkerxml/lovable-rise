@@ -32,6 +32,7 @@ import { ShopService } from "@/lib/shop-service";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
+import { readCache, writeCache, CACHE_TTL } from "@/lib/cache-utils";
  
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableHeader } from "./ProductsTable/SortableHeader";
@@ -107,17 +108,24 @@ export const ProductsTable = ({
   useEffect(() => { itemsRef.current = items; }, [items]);
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [pagination, setPagination] = useState(() => {
+    const env = readCache<{ pageIndex?: number; pageSize?: number }>("user_products_pagination", true);
+    if (env?.data) {
+      const pi = typeof env.data.pageIndex === "number" ? Math.max(0, env.data.pageIndex) : 0;
+      const ps = typeof env.data.pageSize === "number" ? Math.max(5, env.data.pageSize) : 10;
+      return { pageIndex: pi, pageSize: ps };
+    }
     try {
-      if (typeof window !== 'undefined') {
-        const raw = window.localStorage.getItem('user_products_pagination');
+      if (typeof window !== "undefined") {
+        const raw = window.localStorage.getItem("user_products_pagination");
         if (raw) {
           const parsed = JSON.parse(raw) as { pageIndex?: number; pageSize?: number };
-          const pi = typeof parsed.pageIndex === 'number' ? Math.max(0, parsed.pageIndex) : 0;
-          const ps = typeof parsed.pageSize === 'number' ? Math.max(5, parsed.pageSize) : 10;
+          const pi = typeof parsed.pageIndex === "number" ? Math.max(0, parsed.pageIndex) : 0;
+          const ps = typeof parsed.pageSize === "number" ? Math.max(5, parsed.pageSize) : 10;
+          writeCache("user_products_pagination", { pageIndex: pi, pageSize: ps }, CACHE_TTL.uiPrefs);
           return { pageIndex: pi, pageSize: ps };
         }
       }
-    } catch { /* ignore */ }
+    } catch {}
     return { pageIndex: 0, pageSize: 10 };
   });
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
@@ -125,16 +133,10 @@ export const ProductsTable = ({
     queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
     try {
       const sizedKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(sizedKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as { items: ProductRow[]; page?: PageInfo; expiresAt: number };
-        if (parsed && Array.isArray(parsed.items)) {
-          const nextItems = updater(parsed.items as ProductRow[]);
-          const payload = JSON.stringify({ items: nextItems, page: parsed.page, expiresAt: parsed.expiresAt });
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(sizedKey, payload);
-          }
-        }
+      const env = readCache<{ items: ProductRow[]; page?: PageInfo }>(sizedKey, true);
+      if (env?.data && Array.isArray(env.data.items)) {
+        const nextItems = updater(env.data.items as ProductRow[]);
+        writeCache(sizedKey, { items: nextItems, page: env.data.page }, CACHE_TTL.productsPage);
       }
       ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
       ProductService.updateFirstPageCaches(null, (arr) => updater(arr as ProductRow[]));
@@ -205,11 +207,8 @@ export const ProductsTable = ({
   useEffect(() => { loadFirstPage(); }, [loadFirstPage, refreshTrigger]);
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const payload = JSON.stringify({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize });
-        window.localStorage.setItem('user_products_pagination', payload);
-      }
-    } catch { /* ignore */ }
+      writeCache('user_products_pagination', { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }, CACHE_TTL.uiPrefs);
+    } catch {}
   }, [pagination.pageIndex, pagination.pageSize]);
   useEffect(() => {
     const requiredForCurrent = (pagination.pageIndex + 1) * pagination.pageSize;
@@ -340,28 +339,27 @@ export const ProductsTable = ({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(DEFAULT_COLUMN_VISIBILITY);
   useEffect(() => {
     try {
+      const env = readCache<VisibilityState>(COLUMN_VIS_KEY, true);
+      if (env?.data) {
+        setColumnVisibility((prev) => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(env.data || {}) }));
+        return;
+      }
       const saved = typeof window !== "undefined" ? localStorage.getItem(COLUMN_VIS_KEY) : null;
       if (saved) {
-        const parsed = JSON.parse(saved);
-        // Merge to ensure newly added defaults are respected
+        const parsed = JSON.parse(saved) as VisibilityState;
         setColumnVisibility((prev) => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(parsed || {}) }));
+        writeCache(COLUMN_VIS_KEY, parsed, CACHE_TTL.uiPrefs);
       } else {
-        // Ensure defaults applied when nothing persisted
         setColumnVisibility(DEFAULT_COLUMN_VISIBILITY);
       }
-    } catch (_) {
-      // If parsing fails, keep defaults
+    } catch {
       setColumnVisibility(DEFAULT_COLUMN_VISIBILITY);
     }
   }, [DEFAULT_COLUMN_VISIBILITY]);
   useEffect(() => {
     try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(COLUMN_VIS_KEY, JSON.stringify(columnVisibility));
-      }
-    } catch (_) {
-      // ignore write errors
-    }
+      writeCache(COLUMN_VIS_KEY, columnVisibility, CACHE_TTL.uiPrefs);
+    } catch {}
   }, [columnVisibility]);
   // Default column order: photo → article → category → name → price → quantity → status → actions
   const [columnOrder, setColumnOrder] = useState<string[]>([

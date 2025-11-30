@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
-import { ProductService, type Product } from '@/lib/product-service';
+import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,8 +36,8 @@ export const ProductEdit = () => {
       try {
         const agg = await ProductService.getProductEditData(id);
         setProduct(agg.product);
-        preloadedImagesRef.current = (agg.images || []) as any;
-        preloadedParamsRef.current = (agg.params || []) as any;
+        preloadedImagesRef.current = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }>;
+        preloadedParamsRef.current = (agg.params || []) as Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }>;
         aggSuppliersRef.current = agg.suppliers;
         aggCurrenciesRef.current = agg.currencies;
         aggCategoriesRef.current = agg.categories;
@@ -78,7 +78,28 @@ export const ProductEdit = () => {
     navigate('/user/products');
   };
 
-  const handleFormSubmit = async ({ formData, images, parameters }: any) => {
+  type FormDataInput = {
+    external_id: string;
+    category_id?: number | string | null;
+    category_external_id?: string | null;
+    supplier_id?: number | string | null;
+    currency_code?: string | null;
+    name: string;
+    name_ua?: string | null;
+    docket?: string | null;
+    docket_ua?: string | null;
+    vendor?: string | null;
+    article?: string | null;
+    available?: boolean;
+    stock_quantity?: number | string;
+    price?: number;
+    price_old?: number;
+    price_promo?: number;
+    description?: string | null;
+    description_ua?: string | null;
+    state?: string;
+  };
+  const handleFormSubmit = async ({ formData, images, parameters }: { formData: FormDataInput; images: Array<{ url: string; order_index: number; is_main: boolean; object_key?: string }>; parameters: ProductParam[] }) => {
     if (!id) return;
     try {
       await ProductService.updateProduct(id, {
@@ -102,7 +123,7 @@ export const ProductEdit = () => {
         description_ua: formData.description_ua || null,
         state: formData.state || 'new',
         params: parameters || [],
-        images: (images || []).map((img: any, index: number) => ({
+        images: (images || []).map((img, index: number) => ({
           url: img.url,
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: !!img.is_main
@@ -113,13 +134,13 @@ export const ProductEdit = () => {
         let catName = '';
         if (cidNum != null) {
           const list = aggCategoriesRef.current || [];
-          const found = list.find((c) => String((c as any).id) === String(cidNum));
-          catName = (found as any)?.name || '';
+          const found = list.find((c) => String(c.id) === String(cidNum));
+          catName = found?.name || '';
         } else if (formData.supplier_id && formData.category_external_id) {
           const map = aggSupplierCategoriesMapRef.current || {};
           const arr = map[String(formData.supplier_id)] || [];
-          const found = arr.find((c) => String((c as any).external_id) === String(formData.category_external_id));
-          catName = (found as any)?.name || '';
+          const found = arr.find((c) => String(c.external_id) === String(formData.category_external_id));
+          catName = found?.name || '';
         }
         const patch: Partial<Product> = {
           name: formData.name,
@@ -133,21 +154,19 @@ export const ProductEdit = () => {
           stock_quantity: Number(formData.stock_quantity) || 0,
           category_id: cidNum ?? null,
           category_external_id: formData.category_external_id || null,
-        } as any;
-        ProductService.patchProductCaches(String(id), { ...(patch as any), categoryName: catName || undefined });
-        queryClient.setQueryData(['products', 'all'], (prev: any[] | undefined) => {
+        };
+        ProductService.patchProductCaches(String(id), { ...(patch as Partial<ProductAggregated>), categoryName: catName || undefined });
+        queryClient.setQueryData(['products', 'all'], (prev: ProductAggregated[] | undefined) => {
           const arr = prev || [];
-          return arr.map((p) => String((p as any)?.id) === String(id)
-            ? { ...p, ...(patch as any), categoryName: (catName || (p as any).categoryName) }
+          return arr.map((p) => String(p.id) === String(id)
+            ? { ...p, ...(patch as Partial<ProductAggregated>), categoryName: catName || p.categoryName }
             : p);
         });
-      } catch {}
+      } catch { void 0; }
       toast.success(t('product_updated'));
       navigate('/user/products');
-    } catch (error: any) {
-      console.error('Error updating product:', error);
-      const key = (error?.message as string) || 'failed_save_product';
-      toast.error(t(key as any));
+    } catch {
+      toast.error(t('failed_save_product'));
     }
   };
 
@@ -187,12 +206,12 @@ export const ProductEdit = () => {
             onSubmit={handleFormSubmit}
             onCancel={handleCancel}
             onImagesLoadingChange={setImagesLoading}
-            preloadedImages={preloadedImagesRef.current as any}
-            preloadedParams={preloadedParamsRef.current as any}
+            preloadedImages={preloadedImagesRef.current}
+            preloadedParams={preloadedParamsRef.current}
             preloadedSuppliers={aggSuppliersRef.current}
             preloadedCurrencies={aggCurrenciesRef.current}
             preloadedCategories={aggCategoriesRef.current}
-            preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current as any}
+            preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current}
           />
         </div>
       </ProgressiveLoader>

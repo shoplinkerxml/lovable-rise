@@ -3,6 +3,7 @@ export const CACHE_TTL = {
   shopsList: 900_000,
   categoryFilters: 300_000,
   productLinks: 120_000,
+  uiPrefs: 2_592_000_000,
 } as const;
 
 export type CacheEnvelope<T> = { data: T; expiresAt: number };
@@ -41,4 +42,3 @@ export function removeCache(key: string): void {
     /* ignore */
   }
 }
-
