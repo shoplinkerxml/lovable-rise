@@ -5,7 +5,6 @@
  * for profile-related operations across the application.
  */
 
-import { toast } from "sonner";
 
 /**
  * Profile operation error types
@@ -26,17 +25,17 @@ export enum ProfileErrorCode {
 /**
  * User-friendly error messages
  */
-export const ERROR_MESSAGES = {
-  PROFILE_NOT_FOUND: 'User profile not found. Please refresh and try again.',
-  PROFILE_CREATION_FAILED: 'Failed to create user profile. Please try again.',
-  PROFILE_UPDATE_FAILED: 'Failed to update profile. Please try again.',
-  AVATAR_UPLOAD_FAILED: 'Failed to upload avatar. Please try again.',
-  VALIDATION_ERROR: 'Invalid data provided. Please check your input.',
-  PERMISSION_DENIED: 'You do not have permission to perform this action.',
-  NETWORK_ERROR: 'Network error. Please check your connection and try again.',
-  USER_EXISTS: 'An account with this email already exists. Please sign in instead.',
-  RATE_LIMIT_EXCEEDED: 'Too many attempts. Please try again in a few minutes.',
-  UNKNOWN_ERROR: 'An unexpected error occurred. Please try again.'
+export const errorMessages: Record<ProfileErrorCode, string> = {
+  [ProfileErrorCode.PROFILE_NOT_FOUND]: 'User profile not found. Please refresh and try again.',
+  [ProfileErrorCode.PROFILE_CREATION_FAILED]: 'Failed to create user profile. Please try again.',
+  [ProfileErrorCode.PROFILE_UPDATE_FAILED]: 'Failed to update profile. Please try again.',
+  [ProfileErrorCode.AVATAR_UPLOAD_FAILED]: 'Failed to upload avatar. Please try again.',
+  [ProfileErrorCode.VALIDATION_ERROR]: 'Invalid data provided. Please check your input.',
+  [ProfileErrorCode.PERMISSION_DENIED]: 'You do not have permission to perform this action.',
+  [ProfileErrorCode.NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
+  [ProfileErrorCode.USER_EXISTS]: 'An account with this email already exists. Please sign in instead.',
+  [ProfileErrorCode.RATE_LIMIT_EXCEEDED]: 'Too many attempts. Please try again in a few minutes.',
+  [ProfileErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred. Please try again.'
 };
 
 /**
@@ -61,7 +60,7 @@ export class ProfileOperationError extends Error {
     public originalError?: Error | unknown,
     message?: string
   ) {
-    super(message || ERROR_MESSAGES[code]);
+    super(message || errorMessages[code]);
     this.name = 'ProfileOperationError';
   }
 }
@@ -79,10 +78,11 @@ export class AuthorizationErrorHandler {
   /**
    * Analyze and categorize authorization errors
    */
-  static analyzeAuthorizationError(error: any): AuthorizationError {
-    const status = error.status || error.statusCode || 0;
-    const message = (error.message || '').toLowerCase();
-    const code = error.code || status;
+  static analyzeAuthorizationError(error: unknown): AuthorizationError {
+    const e = (error as { status?: number; statusCode?: number; message?: string; code?: number | string }) || {};
+    const status = e.status ?? e.statusCode ?? 0;
+    const message = (e.message || '').toLowerCase();
+    const code = e.code ?? status;
     
     // 401 Unauthorized errors
     if (status === 401 || message.includes('unauthorized')) {
@@ -204,84 +204,83 @@ export function handleAuthError(error: unknown, operation: string = 'operation')
   console.error(`Auth ${operation} error:`, error);
   
   if (error && typeof error === 'object' && 'message' in error) {
-    const errorMessage = (error as any).message?.toLowerCase() || '';
+    const errorObj = error as { message?: string };
+    const errorMessage = (errorObj.message || '').toLowerCase();
     
     // Enhanced error detection patterns
     if (errorMessage.includes('user already registered') || 
         errorMessage.includes('email already registered') ||
         errorMessage.includes('email already exists')) {
-      return ERROR_MESSAGES[ProfileErrorCode.USER_EXISTS];
+      return errorMessages[ProfileErrorCode.USER_EXISTS];
     }
     
     if (errorMessage.includes('too many') || 
         errorMessage.includes('rate limit') ||
         errorMessage.includes('429')) {
-      return ERROR_MESSAGES[ProfileErrorCode.RATE_LIMIT_EXCEEDED];
+      return errorMessages[ProfileErrorCode.RATE_LIMIT_EXCEEDED];
     }
     
     if (errorMessage.includes('network') || 
         errorMessage.includes('connection') ||
         errorMessage.includes('timeout')) {
-      return ERROR_MESSAGES[ProfileErrorCode.NETWORK_ERROR];
+      return errorMessages[ProfileErrorCode.NETWORK_ERROR];
     }
     
     if (errorMessage.includes('validation') || 
         errorMessage.includes('invalid') ||
         errorMessage.includes('format')) {
-      return ERROR_MESSAGES[ProfileErrorCode.VALIDATION_ERROR];
+      return errorMessages[ProfileErrorCode.VALIDATION_ERROR];
     }
     
     if (errorMessage.includes('permission') || 
         errorMessage.includes('access') ||
         errorMessage.includes('unauthorized')) {
-      return ERROR_MESSAGES[ProfileErrorCode.PERMISSION_DENIED];
+      return errorMessages[ProfileErrorCode.PERMISSION_DENIED];
     }
   }
   
   // Fallback to generic error
-  return ERROR_MESSAGES[ProfileErrorCode.UNKNOWN_ERROR];
+  return errorMessages[ProfileErrorCode.UNKNOWN_ERROR];
 }
 
-/**
- * Handle profile operation errors with user feedback
- */
-export function handleProfileError(error: unknown, operation: string = 'operation'): void {
-  console.error(`Profile ${operation} error:`, error);
-  
-  if (error instanceof ProfileOperationError) {
-    toast.error(error.message);
-    return;
-  }
+export type ProfileErrorResponse = {
+  code: ProfileErrorCode;
+  message: string;
+  operation: string;
+  original?: unknown;
+};
 
-  // Handle common Supabase errors
-  if (error && typeof error === 'object' && 'message' in error) {
-    const errorMessage = (error as any).message;
-    
-    if (errorMessage.includes('permission') || errorMessage.includes('access')) {
-      toast.error(ERROR_MESSAGES.PERMISSION_DENIED);
-      return;
-    }
-    
-    if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-      toast.error(ERROR_MESSAGES.NETWORK_ERROR);
-      return;
-    }
-    
-    if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
-      toast.error(ERROR_MESSAGES.VALIDATION_ERROR);
-      return;
-    }
+export function createProfileError(error: unknown, operation: string = 'operation'): ProfileErrorResponse {
+  if (error instanceof ProfileOperationError) {
+    return {
+      code: error.code,
+      message: error.message,
+      operation,
+      original: error.originalError
+    };
   }
   
-  // Fallback to generic error
-  toast.error(ERROR_MESSAGES.UNKNOWN_ERROR);
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg: string = String((error as { message?: string }).message || '');
+    const lower = msg.toLowerCase();
+    if (lower.includes('permission') || lower.includes('access')) {
+      return { code: ProfileErrorCode.PERMISSION_DENIED, message: errorMessages[ProfileErrorCode.PERMISSION_DENIED], operation, original: error };
+    }
+    if (lower.includes('network') || lower.includes('connection')) {
+      return { code: ProfileErrorCode.NETWORK_ERROR, message: errorMessages[ProfileErrorCode.NETWORK_ERROR], operation, original: error };
+    }
+    if (lower.includes('validation') || lower.includes('invalid')) {
+      return { code: ProfileErrorCode.VALIDATION_ERROR, message: errorMessages[ProfileErrorCode.VALIDATION_ERROR], operation, original: error };
+    }
+  }
+  return { code: ProfileErrorCode.UNKNOWN_ERROR, message: errorMessages[ProfileErrorCode.UNKNOWN_ERROR], operation, original: error };
 }
 
 /**
  * Show success message for profile operations
  */
-export function showProfileSuccess(message: string): void {
-  toast.success(message);
+export function formatSuccess(message: string): { message: string } {
+  return { message };
 }
 
 /**
@@ -291,18 +290,14 @@ export async function withProfileErrorHandling<T>(
   operation: () => Promise<T>,
   operationName: string,
   successMessage?: string
-): Promise<T | null> {
+): Promise<{ data: T | null; error?: ProfileErrorResponse; success?: { message: string } }> {
   try {
     const result = await operation();
-    
-    if (successMessage) {
-      showProfileSuccess(successMessage);
-    }
-    
-    return result;
+    const success = successMessage ? formatSuccess(successMessage) : undefined;
+    return { data: result, success };
   } catch (error) {
-    handleProfileError(error, operationName);
-    return null;
+    const err = createProfileError(error, operationName);
+    return { data: null, error: err };
   }
 }
 
@@ -340,11 +335,11 @@ export function validateProfileData(data: { email?: string; name?: string; id?: 
  * Provides better cache management with different TTL settings
  */
 class ProfileCache {
-  private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private static cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
   private static DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
   private static EXISTENCE_TTL = 2 * 60 * 1000; // 2 minutes for existence checks
   
-  static get(key: string): any | null {
+  static get(key: string): unknown | null {
     const cached = this.cache.get(key);
     if (cached && Date.now() - cached.timestamp < cached.ttl) {
       return cached.data;
@@ -353,7 +348,7 @@ class ProfileCache {
     return null;
   }
   
-  static set(key: string, data: any, customTtl?: number): void {
+  static set(key: string, data: unknown, customTtl?: number): void {
     const ttl = customTtl || (key.startsWith('user_existence_') || key.startsWith('exists_') 
       ? this.EXISTENCE_TTL 
       : this.DEFAULT_TTL);

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { getTariffsListCached, invalidateTariffsCache } from './tariff-cache';
 
 export type Tariff = Database['public']['Tables']['tariffs']['Row'];
 export type TariffInsert = Database['public']['Tables']['tariffs']['Insert'];
@@ -40,66 +41,30 @@ export interface TariffWithDetails {
 export class TariffService {
   private static tariffsRefreshInFlight = false;
   private static tariffsLastRefreshAt = 0;
+  private static async getAccessToken(): Promise<string | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  }
+  private static async invokeEdge<T>(name: string, body: unknown): Promise<T> {
+    const token = await TariffService.getAccessToken();
+    const { data, error } = await supabase.functions.invoke(name, { body, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+    if (error) throw error;
+    return (typeof data === 'string' ? JSON.parse(data) : data) as T;
+  }
   static async getTariffsAggregated(includeInactive = false, includeDemo = false): Promise<TariffWithDetails[]> {
-    try {
+    const rows = await getTariffsListCached<TariffWithDetails>(async () => {
       try {
-        const ck = 'rq:tariffs:list';
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(ck) : null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { items: TariffWithDetails[]; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            const timeLeft = parsed.expiresAt - Date.now();
-            const threshold = 2 * 60 * 1000;
-            if (timeLeft < threshold && !TariffService.tariffsRefreshInFlight && Date.now() - TariffService.tariffsLastRefreshAt > 60 * 1000) {
-              TariffService.tariffsRefreshInFlight = true;
-              TariffService.tariffsLastRefreshAt = Date.now();
-              (async () => {
-                try {
-                  const { data: auth } = await (supabase as any).auth.getSession();
-                  const accessToken: string | null = auth?.session?.access_token || null;
-                  const timeoutMs = 4000;
-                  const invokePromise = (supabase as any).functions.invoke('tariffs-list', {
-                    body: { includeInactive, includeDemo },
-                    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-                  });
-                  const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
-                  const respAny = await Promise.race([invokePromise, timeoutPromise]);
-                  let rows: TariffWithDetails[] | null = null;
-                  if (respAny && typeof respAny === 'object' && respAny !== null && !(respAny as any).error) {
-                    const payload = typeof (respAny as any).data === 'string' ? JSON.parse((respAny as any).data) : ((respAny as any).data as any);
-                    rows = Array.isArray(payload?.tariffs) ? (payload.tariffs as TariffWithDetails[]) : null;
-                  }
-                  if (!rows) {
-                    const fb = await TariffService.getAllTariffs(includeInactive, includeDemo);
-                    rows = Array.isArray(fb) ? (fb as unknown as TariffWithDetails[]) : null;
-                  }
-                  if (rows) {
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem(ck, JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 })); } catch { void 0; }
-                  }
-                } catch { void 0; }
-                finally { TariffService.tariffsRefreshInFlight = false; }
-              })();
-            }
-            return parsed.items;
-          }
-        }
-      } catch { void 0; }
-      const { data: auth } = await (supabase as any).auth.getSession();
-      const accessToken: string | null = auth?.session?.access_token || null;
-      const { data, error } = await (supabase as any).functions.invoke('tariffs-list', {
-        body: { includeInactive, includeDemo },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      if (error) throw error;
-      const payload = typeof data === 'string' ? JSON.parse(data) : (data as any);
-      const rows = payload?.tariffs;
-      try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: rows || [], expiresAt: Date.now() + 900_000 })); } catch { void 0; }
-      return Array.isArray(rows) ? (rows as TariffWithDetails[]) : [];
-    } catch (_e) {
-      const rows = await this.getAllTariffs(includeInactive, includeDemo);
-      try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: rows || [], expiresAt: Date.now() + 900_000 })); } catch { void 0; }
-      return Array.isArray(rows) ? (rows as any) : [];
-    }
+        const payload = await TariffService.invokeEdge<{ tariffs: TariffWithDetails[] }>('tariffs-list', { includeInactive, includeDemo });
+        const edgeRows = Array.isArray(payload.tariffs) ? payload.tariffs : [];
+        if (edgeRows.length) return edgeRows;
+        const fb = await TariffService.getAllTariffs(includeInactive, includeDemo);
+        return Array.isArray(fb) ? (fb as unknown as TariffWithDetails[]) : [];
+      } catch {
+        const fb = await TariffService.getAllTariffs(includeInactive, includeDemo);
+        return Array.isArray(fb) ? (fb as unknown as TariffWithDetails[]) : [];
+      }
+    });
+    return rows;
   }
   // Get all tariffs with currency data, features, and limits
   static async getAllTariffs(includeInactive = false, includeDemo = false) {
@@ -331,7 +296,7 @@ export class TariffService {
       }
 
       // Return tariff without currency data if no valid currency field
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
       return createdTariff as Tariff;
     } catch (error) {
       console.error('Error creating tariff:', error);
@@ -382,7 +347,7 @@ export class TariffService {
         } as (Tariff & { currency_data: Currency });
       }
 
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
       return updatedTariff as Tariff;
     } catch (error) {
       console.error('Error updating tariff:', error);
@@ -399,7 +364,7 @@ export class TariffService {
         .eq('id', id);
 
       if (error) throw error;
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
       return true;
     } catch (error) {
       console.error('Error deleting tariff:', error);
@@ -435,7 +400,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
       return data as TariffFeature;
     } catch (error) {
       console.error('Error adding tariff feature:', error);
@@ -454,7 +419,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
       return data as TariffFeature;
     } catch (error) {
       console.error('Error updating tariff feature:', error);
@@ -469,7 +434,7 @@ export class TariffService {
         .from('tariff_features')
         .delete()
         .eq('id', id);
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
 
       if (error) throw error;
       return true;
@@ -507,7 +472,7 @@ export class TariffService {
         .single();
 
       if (error) throw error;
-      try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list'); } catch {}
+      invalidateTariffsCache();
       return data as TariffLimit;
     } catch (error) {
       console.error('Error adding tariff limit:', error);

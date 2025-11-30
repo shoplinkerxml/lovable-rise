@@ -61,22 +61,44 @@ export interface RLSMonitoringReport {
  */
 export class RLSMonitor {
   private static performanceMetrics = {
-    queryTimes: [] as number[],
+    count: 0,
+    totalMs: 0,
+    maxMs: 0,
+    minMs: 0,
+    slowCount: 0,
     failedQueries: 0,
+    ewmaMs: 0,
     lastResetTime: Date.now()
   };
   
   private static consecutiveFailures = 0;
   private static lastHealthCheck: RLSMonitoringReport | null = null;
   private static monitoringInterval: NodeJS.Timeout | null = null;
+  private static lastRunAt: number | null = null;
+  private static inFlight: Promise<RLSMonitoringReport> | null = null;
+  private static cacheTtlMs = 60000;
+  private static minCheckIntervalMs = 30000;
   
   /**
    * Perform comprehensive RLS health check
    */
   static async performHealthCheck(): Promise<RLSMonitoringReport> {
-    const startTime = Date.now();
-    console.log('[RLSMonitor] Starting comprehensive health check...');
-    
+    const now = Date.now();
+    if (this.lastHealthCheck && this.lastRunAt && (now - this.lastRunAt) < this.cacheTtlMs) {
+      return this.lastHealthCheck;
+    }
+    if (this.inFlight) {
+      return await this.inFlight;
+    }
+    if (this.lastRunAt && (now - this.lastRunAt) < this.minCheckIntervalMs && this.lastHealthCheck) {
+      return this.lastHealthCheck;
+    }
+    const startTime = now;
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[RLSMonitor] Starting comprehensive health check...');
+    }
+    this.inFlight = (async () => {
+
     try {
       // 1. Session validation
       const sessionValidation = await SessionValidator.ensureValidSession();
@@ -103,20 +125,25 @@ export class RLSMonitor {
       };
       
       this.lastHealthCheck = report;
+      this.lastRunAt = Date.now();
       
       const executionTime = Date.now() - startTime;
-      console.log(`[RLSMonitor] Health check completed in ${executionTime}ms`, {
-        healthy: overall.healthy,
-        score: overall.score,
-        issues: overall.issues.length
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug(`[RLSMonitor] Health check completed in ${executionTime}ms`, {
+          healthy: overall.healthy,
+          score: overall.score,
+          issues: overall.issues.length
+        });
+      }
       
       return report;
     } catch (error) {
-      console.error('[RLSMonitor] Health check failed:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[RLSMonitor] Health check failed:', error);
+      }
       
       // Return minimal error report
-      return {
+      const failed = {
         timestamp: new Date().toISOString(),
         overall: {
           healthy: false,
@@ -147,6 +174,16 @@ export class RLSMonitor {
         rlsTests: [],
         performance: this.getPerformanceMetrics()
       };
+      this.lastHealthCheck = failed;
+      this.lastRunAt = Date.now();
+      return failed;
+    }
+    })();
+    try {
+      const res = await this.inFlight;
+      return res;
+    } finally {
+      this.inFlight = null;
     }
   }
   
@@ -235,21 +272,18 @@ export class RLSMonitor {
       }
     ));
     
-    // Test 3: User permissions access
     tests.push(await this.testRLSOperation(
-      'user-permissions-access',
+      'user-subscriptions-access',
       async () => {
         const validation = await SessionValidator.validateSession();
         if (!validation.isValid || !validation.user) {
           throw new Error('No valid session for test');
         }
-        
         const { data, error } = await supabase
-          .from('user_permissions')
-          .select('id, can_view, can_edit')
+          .from('user_subscriptions')
+          .select('id,is_active')
           .eq('user_id', validation.user.id)
           .limit(5);
-          
         if (error) throw error;
         return data;
       }
@@ -263,7 +297,7 @@ export class RLSMonitor {
    */
   private static async testRLSOperation(
     testName: string,
-    operation: () => Promise<any>
+    operation: () => Promise<unknown>
   ): Promise<RLSTestResult> {
     const startTime = Date.now();
     
@@ -292,7 +326,9 @@ export class RLSMonitor {
       const executionTime = Date.now() - startTime;
       this.performanceMetrics.failedQueries++;
       
-      console.error(`[RLSMonitor] RLS test '${testName}' failed:`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`[RLSMonitor] RLS test '${testName}' failed:`, error);
+      }
       
       const validation = await SessionValidator.validateSession().catch(() => null);
       
@@ -370,25 +406,23 @@ export class RLSMonitor {
    * Record query execution time for performance metrics
    */
   private static recordQueryTime(time: number): void {
-    this.performanceMetrics.queryTimes.push(time);
-    
-    // Keep only last 100 measurements
-    if (this.performanceMetrics.queryTimes.length > 100) {
-      this.performanceMetrics.queryTimes = this.performanceMetrics.queryTimes.slice(-100);
-    }
+    const alpha = 0.2;
+    this.performanceMetrics.count += 1;
+    this.performanceMetrics.totalMs += time;
+    this.performanceMetrics.maxMs = Math.max(this.performanceMetrics.maxMs, time);
+    this.performanceMetrics.minMs = this.performanceMetrics.minMs === 0 ? time : Math.min(this.performanceMetrics.minMs, time);
+    this.performanceMetrics.ewmaMs = this.performanceMetrics.ewmaMs === 0 ? time : (alpha * time + (1 - alpha) * this.performanceMetrics.ewmaMs);
+    if (time > 1000) this.performanceMetrics.slowCount += 1;
   }
   
   /**
    * Get current performance metrics
    */
   private static getPerformanceMetrics() {
-    const times = this.performanceMetrics.queryTimes;
-    const average = times.length > 0 ? 
-      times.reduce((sum, time) => sum + time, 0) / times.length : 0;
-    
+    const average = this.performanceMetrics.count > 0 ? (this.performanceMetrics.totalMs / this.performanceMetrics.count) : 0;
     return {
-      averageQueryTime: Math.round(average),
-      slowQueries: times.filter(time => time > 1000).length,
+      averageQueryTime: Math.round(this.performanceMetrics.ewmaMs || average),
+      slowQueries: this.performanceMetrics.slowCount,
       failedQueries: this.performanceMetrics.failedQueries
     };
   }
@@ -396,29 +430,37 @@ export class RLSMonitor {
   /**
    * Start continuous monitoring
    */
-  static startMonitoring(intervalMs: number = 30000): () => void {
+  static startMonitoring(intervalMs: number = 60000): () => void {
     if (this.monitoringInterval) {
-      console.warn('[RLSMonitor] Monitoring already started');
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[RLSMonitor] Monitoring already started');
+      }
       return () => this.stopMonitoring();
     }
     
-    console.log(`[RLSMonitor] Starting continuous monitoring (interval: ${intervalMs}ms)`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug(`[RLSMonitor] Starting continuous monitoring (interval: ${intervalMs}ms)`);
+    }
     
     this.monitoringInterval = setInterval(async () => {
       try {
         const report = await this.performHealthCheck();
         
         if (!report.overall.healthy) {
-          console.warn('[RLSMonitor] Health check detected issues:', {
-            score: report.overall.score,
-            issues: report.overall.issues
-          });
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[RLSMonitor] Health check detected issues:', {
+              score: report.overall.score,
+              issues: report.overall.issues
+            });
+          }
           
           // Could trigger alerts, automatic recovery, etc.
           this.handleHealthIssues(report);
         }
       } catch (error) {
-        console.error('[RLSMonitor] Monitoring error:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[RLSMonitor] Monitoring error:', error);
+        }
       }
     }, intervalMs);
     
@@ -433,7 +475,9 @@ export class RLSMonitor {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
-      console.log('[RLSMonitor] Monitoring stopped');
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[RLSMonitor] Monitoring stopped');
+      }
     }
   }
   
@@ -443,23 +487,31 @@ export class RLSMonitor {
   private static async handleHealthIssues(report: RLSMonitoringReport): Promise<void> {
     // Auto-recovery attempts
     if (!report.session.isValid && report.session.session?.refresh_token) {
-      console.log('[RLSMonitor] Attempting automatic session refresh...');
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[RLSMonitor] Attempting automatic session refresh...');
+      }
       try {
         await supabase.auth.refreshSession({
           refresh_token: report.session.session.refresh_token
         });
-        console.log('[RLSMonitor] Session refresh successful');
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[RLSMonitor] Session refresh successful');
+        }
       } catch (error) {
-        console.error('[RLSMonitor] Session refresh failed:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[RLSMonitor] Session refresh failed:', error);
+        }
       }
     }
     
     // Log detailed diagnostics for severe issues
     if (report.overall.score < 50) {
-      console.error('[RLSMonitor] Severe health issues detected:', {
-        report,
-        timestamp: new Date().toISOString()
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[RLSMonitor] Severe health issues detected:', {
+          report,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
   }
   
@@ -475,12 +527,19 @@ export class RLSMonitor {
    */
   static resetMetrics(): void {
     this.performanceMetrics = {
-      queryTimes: [],
+      count: 0,
+      totalMs: 0,
+      maxMs: 0,
+      minMs: 0,
+      slowCount: 0,
       failedQueries: 0,
+      ewmaMs: 0,
       lastResetTime: Date.now()
     };
     this.consecutiveFailures = 0;
-    console.log('[RLSMonitor] Performance metrics reset');
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[RLSMonitor] Performance metrics reset');
+    }
   }
   
   /**
@@ -540,14 +599,20 @@ ${report.rlsTests.map(test =>
  * Quick utility function to run a health check and log results
  */
 export async function quickHealthCheck(): Promise<void> {
-  console.log('[RLSMonitor] Running quick health check...');
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[RLSMonitor] Running quick health check...');
+  }
   const report = await RLSMonitor.performHealthCheck();
   
   if (report.overall.healthy) {
-    console.log('✅ System healthy - Score:', report.overall.score);
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('✅ System healthy - Score:', report.overall.score);
+    }
   } else {
-    console.warn('❌ System issues detected - Score:', report.overall.score);
-    console.warn('Issues:', report.overall.issues);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('❌ System issues detected - Score:', report.overall.score);
+      console.warn('Issues:', report.overall.issues);
+    }
   }
   
   return;
@@ -558,19 +623,20 @@ export async function quickHealthCheck(): Promise<void> {
  */
 export async function logErrorWithRLSContext(
   operation: string, 
-  error: any, 
-  additionalContext?: any
+  error: unknown, 
+  additionalContext?: unknown
 ): Promise<void> {
   try {
     const sessionValidation = await SessionValidator.validateSession();
     const tokenDebug = await SessionValidator.getTokenDebugInfo();
     const rlsContext = await SessionValidator.validateRLSContext();
     
+    const err = error as { message?: string; code?: string | number; status?: number; statusCode?: number } | undefined;
     console.error(`[RLS Error] ${operation}:`, {
       error: {
-        message: error.message,
-        code: error.code,
-        status: error.status || error.statusCode
+        message: err?.message,
+        code: err?.code,
+        status: (err?.status ?? err?.statusCode)
       },
       session: {
         valid: sessionValidation.isValid,

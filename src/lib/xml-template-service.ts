@@ -60,49 +60,52 @@ export type XMLParseResult = {
 };
 
 export class XMLTemplateService {
+  private static parser: XMLParser | null = null;
+  private static builder: XMLBuilder | null = null;
+  private static readonly MAX_DEPTH = 8;
   private parser: XMLParser;
   private detectedFormat?: XMLFormat;
 
   constructor() {
-    // Парсер с универсальной конфигурацией
-    this.parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@',
-      textNodeName: '_text',
-      parseAttributeValue: true,
-      parseTagValue: true,
-      trimValues: true,
-      processEntities: true,
-      allowBooleanAttributes: true,
-      removeNSPrefix: true, // Убираем namespace префиксы (g: для Google Shopping)
-      isArray: (name, jpath) => {
-        // Универсальное определение массивов (учёт полного пути от корня)
-        const p = String(jpath || '');
-        // YML: массивы на концах путей
-        if (
-          p.endsWith('currencies.currency') ||
-          p.endsWith('categories.category') ||
-          p.endsWith('offers.offer') ||
-          p.endsWith('offer.picture') ||
-          p.endsWith('offer.param')
-        ) {
-          return true;
+    if (!XMLTemplateService.parser) {
+      XMLTemplateService.parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@',
+        textNodeName: '_text',
+        parseAttributeValue: true,
+        parseTagValue: true,
+        trimValues: true,
+        processEntities: true,
+        allowBooleanAttributes: true,
+        removeNSPrefix: true,
+        isArray: (name, jpath) => {
+          const p = String(jpath || '');
+          if (
+            p.endsWith('currencies.currency') ||
+            p.endsWith('categories.category') ||
+            p.endsWith('offers.offer') ||
+            p.endsWith('offer.picture') ||
+            p.endsWith('offer.param')
+          ) {
+            return true;
+          }
+          if (p.endsWith('rss.channel.item') || p.endsWith('channel.item')) {
+            return true;
+          }
+          if (p.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
+            return true;
+          }
+          if (p.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
+            return true;
+          }
+          return false;
         }
-        // Google Shopping RSS
-        if (p.endsWith('rss.channel.item') || p.endsWith('channel.item')) {
-          return true;
-        }
-        // Shop-items формат
-        if (p.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
-          return true;
-        }
-        // Общие паттерны: массивы типовых повторяющихся тегов в самом конце пути
-        if (p.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
-          return true;
-        }
-        return false;
-      }
-    });
+      });
+    }
+    if (!XMLTemplateService.builder) {
+      XMLTemplateService.builder = new XMLBuilder({ ignoreAttributes: false });
+    }
+    this.parser = XMLTemplateService.parser as XMLParser;
   }
 
   // Определение типа XML формата
@@ -251,9 +254,15 @@ export class XMLTemplateService {
   }
 
   // Извлечение структуры XML с сохранением иерархии и порядка
-  private extractStructure(data: Record<string, unknown>, path = ''): XMLStructure {
+  private extractStructure(data: Record<string, unknown>, path = '', depth = 0): XMLStructure {
     const fields: XMLField[] = [];
     let orderCounter = 0;
+    if (depth > XMLTemplateService.MAX_DEPTH) {
+      return {
+        root: Object.keys(data)[0] || 'root',
+        fields: [],
+      };
+    }
     
     const getCategory = (fieldPath: string): string => {
       // Убираем индексы массивов для правильного определения категории
@@ -359,7 +368,7 @@ export class XMLTemplateService {
     };
     
     const traverse = (obj: Record<string, unknown>, currentPath: string, depth = 0) => {
-      if (depth > 10) return;
+      if (depth > XMLTemplateService.MAX_DEPTH) return;
       
       for (const [key, value] of Object.entries(obj)) {
         // Пропускаем XML declaration атрибуты на корневом уровне
@@ -591,7 +600,7 @@ export class XMLTemplateService {
       }
     };
 
-    traverse(data, path, 0);
+    traverse(data, path, depth);
 
     return {
       root: Object.keys(data)[0] || 'root',

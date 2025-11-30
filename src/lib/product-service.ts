@@ -3,6 +3,7 @@ import { ApiError } from "./user-service";
 import { SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
 import { CACHE_TTL, readCache, writeCache, removeCache } from "./cache-utils";
+import type { TablesInsert } from "@/integrations/supabase/types";
 
 export interface Product {
   id: string;
@@ -1070,10 +1071,7 @@ export class ProductService {
 
   /** Создание нового продукта (через функцию create-product) */
   static async createProduct(productData: CreateProductData): Promise<Product> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await this.ensureCanMutateProducts();
 
     let effectiveStoreId = productData.store_id;
     if (!effectiveStoreId || effectiveStoreId.trim() === "") {
@@ -1159,10 +1157,7 @@ export class ProductService {
 
   /** Обновление товара через функцию update-product */
   static async updateProduct(id: string, productData: UpdateProductData): Promise<void> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await this.ensureCanMutateProducts();
 
     const payload: Record<string, unknown> = {
       product_id: id,
@@ -1249,6 +1244,7 @@ export class ProductService {
 
   /** Удаление товара */
   static async deleteProduct(id: string): Promise<void> {
+    await this.ensureCanMutateProducts();
     const respDel = await ProductService.invokeEdge<{ success?: boolean }>(
       "delete-product",
       { product_ids: [String(id)] },
@@ -1261,6 +1257,7 @@ export class ProductService {
   }
 
   static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
+    await this.ensureCanMutateProducts();
     const validIds = Array.from(new Set(ids.map(String).filter(Boolean)));
     if (validIds.length === 0) return { deleted: 0 };
     const respDel2 = await ProductService.invokeEdge<{ success?: boolean }>(
@@ -1290,5 +1287,54 @@ export class ProductService {
         removeCache(key);
       }
     } catch { void 0; }
+  }
+
+  /** Централизованная проверка сессии и подписки перед изменениями */
+  private static async ensureCanMutateProducts(): Promise<void> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const subscription = await SubscriptionValidationService.getValidSubscription(user.id);
+    if (!subscription) throw new Error("No valid subscription");
+  }
+
+  /** Батчевое обновление/вставка товаров напрямую через upsert */
+  static async bulkUpsertProducts(rows: Array<UpdateProductData & { id: string; store_id?: string }>): Promise<{ upserted: number }>{
+    await this.ensureCanMutateProducts();
+    if (!Array.isArray(rows) || rows.length === 0) return { upserted: 0 };
+    const payload = rows.map((r) => ({
+      id: String(r.id),
+      store_id: r.store_id ?? null,
+      external_id: r.external_id ?? undefined,
+      name: r.name ?? undefined,
+      name_ua: r.name_ua ?? undefined,
+      vendor: r.vendor ?? undefined,
+      article: r.article ?? undefined,
+      available: r.available ?? undefined,
+      stock_quantity: r.stock_quantity ?? undefined,
+      price: r.price ?? undefined,
+      price_old: r.price_old ?? undefined,
+      price_promo: r.price_promo ?? undefined,
+      description: r.description ?? undefined,
+      description_ua: r.description_ua ?? undefined,
+      docket: r.docket ?? undefined,
+      docket_ua: r.docket_ua ?? undefined,
+      state: r.state ?? undefined,
+      category_id: ProductService.castNullableNumber(r.category_id) ?? undefined,
+      category_external_id: r.category_external_id ?? undefined,
+      currency_code: r.currency_code ?? undefined,
+      supplier_id: ProductService.castNullableNumber(r.supplier_id) ?? undefined,
+    })) as unknown as TablesInsert<'store_products'>[];
+    const { error } = await supabase
+      .from('store_products')
+      .upsert(payload)
+      .select('id');
+    if (error) throw new Error((error as { message?: string } | null)?.message || 'bulk_upsert_failed');
+    try { ProductService.clearAllFirstPageCaches(); } catch { void 0; }
+    removeCache('rq:products:all');
+    return { upserted: payload.length };
   }
 }

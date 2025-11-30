@@ -7,6 +7,81 @@ export type UploadResponse = {
   viewUrl?: string;
 };
 
+type EdgeErrorContext = { status?: number; body?: unknown };
+type EdgeErrorLike = { message?: string; context?: EdgeErrorContext };
+
+function parseEdgeError(err: unknown, fallbackMessage: string): Error {
+  const anyErr = err as EdgeErrorLike | undefined;
+  const status = anyErr?.context?.status;
+  let code: string | undefined;
+  let serverMessage: string | undefined;
+  try {
+    const rawBody = anyErr?.context?.body as unknown;
+    const body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
+    const obj = body as Record<string, unknown> | undefined;
+    code = typeof obj?.error === "string" ? (obj?.error as string) : undefined;
+    serverMessage = typeof obj?.message === "string" ? (obj?.message as string) : undefined;
+  } catch { void 0 }
+  const e = new Error(code || serverMessage || anyErr?.message || fallbackMessage);
+  (e as unknown as { status?: number }).status = typeof status === "number" ? status : undefined;
+  (e as unknown as { code?: string }).code = code;
+  return e;
+}
+
+function getAccessTokenSync(): string | null {
+  try {
+    const rawV1 = localStorage.getItem("supabase.auth.token");
+    if (rawV1) {
+      const parsed = JSON.parse(rawV1);
+      const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+      if (token) return token;
+    }
+    const urlObj = new URL(SUPABASE_URL);
+    const projectRef = urlObj.host.split(".")[0];
+    const v2Key = `sb-${projectRef}-auth-token`;
+    const rawV2 = localStorage.getItem(v2Key);
+    if (rawV2) {
+      const parsed = JSON.parse(rawV2);
+      const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+      if (token) return token;
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i) || "";
+      if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
+          if (token) return token;
+        } catch { void 0 }
+      }
+    }
+    return null;
+  } catch { return null }
+}
+
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  } catch {
+    return getAccessTokenSync();
+  }
+}
+
+function buildAuthHeaders(token: string | null): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
+function getPendingKey(userId: string): string { return `pending_uploads:${userId}`; }
+function readPendingUploads(userId: string): string[] { try { return JSON.parse(localStorage.getItem(getPendingKey(userId)) || "[]"); } catch { return []; } }
+function writePendingUploads(userId: string, list: string[]): void { try { if (list.length) localStorage.setItem(getPendingKey(userId), JSON.stringify(list)); else localStorage.removeItem(getPendingKey(userId)); } catch { void 0 } }
+function addPendingUpload(userId: string, objectKey: string): void { const list = readPendingUploads(userId); list.push(objectKey); writePendingUploads(userId, list); }
+function removePendingUploadKey(userId: string, objectKey: string): void { const list = readPendingUploads(userId); writePendingUploads(userId, list.filter((k) => k !== objectKey)); }
+
 export const R2Storage = {
   getWorkerUrl(): string {
     try {
@@ -31,75 +106,49 @@ export const R2Storage = {
    * Загружает файл через Supabase proxy, избегая CORS проблем
    */
   async uploadFile(file: File, productId?: string): Promise<UploadResponse> {
-    // Готовим заголовки с авторизацией, чтобы Edge Function получила токен пользователя
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const headers: Record<string, string> = {};
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    const token = await getAccessToken();
+    const headers = buildAuthHeaders(token);
+    const url = `${SUPABASE_URL}/functions/v1/r2-upload`;
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (productId) fd.append("productId", productId);
+      const res = await fetch(url, { method: "POST", body: fd, headers });
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        throw parseEdgeError({ message: errBody || "upload_failed", context: { status: res.status, body: errBody } }, "Failed to upload file to R2");
+      }
+      const data = (await res.json()) as UploadResponse;
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      if (!productId && userId && data?.objectKey && (data.objectKey.includes(`uploads/tmp/${userId}/`) || data.objectKey.includes(`/uploads/tmp/${userId}/`))) {
+        addPendingUpload(userId, data.objectKey);
+      }
+      return data;
+    } catch {
+      const base64File: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const commaIndex = result.indexOf(",");
+          resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("r2-upload", {
+        body: { fileName: file.name, fileType: file.type, fileSize: file.size, fileData: base64File, productId },
+        headers,
+      });
+      if (error) throw parseEdgeError(error, "Failed to upload file to R2");
+      const resp = data as UploadResponse;
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      if (!productId && userId && resp?.objectKey && (resp.objectKey.includes(`uploads/tmp/${userId}/`) || resp.objectKey.includes(`/uploads/tmp/${userId}/`))) {
+        addPendingUpload(userId, resp.objectKey);
+      }
+      return resp;
     }
-    // Конвертируем файл в base64 безопасно через FileReader (без переполнения стека)
-    const base64File: string = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // reader.readAsDataURL возвращает строку вида "data:<mime>;base64,<данные>"
-        const commaIndex = result.indexOf(",");
-        resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-
-    const { data, error } = await supabase.functions.invoke("r2-upload", {
-      body: {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        fileData: base64File,
-        productId: productId,
-      },
-      headers,
-    });
-
-    if (error) {
-      // Попробуем извлечь статус и код ошибки из ответа функции
-      const httpErr: any = error;
-      const status: number | undefined = httpErr?.context?.status;
-      let code: string | undefined;
-      let serverMessage: string | undefined;
-      try {
-        const rawBody = httpErr?.context?.body;
-        const body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-        code = body?.error;
-        serverMessage = body?.message;
-      } catch {}
-
-      const e = new Error(
-        code || serverMessage || error.message || 'Failed to upload file to R2'
-      );
-      (e as any).code = code;
-      (e as any).status = status;
-      throw e;
-    }
-
-    const resp = data as UploadResponse;
-    // Если productId нет — это временная загрузка, фиксируем ключ
-    const userId = session?.user?.id;
-    // Accept both with and without leading slash to be robust
-    if (
-      !productId &&
-      userId &&
-      resp?.objectKey &&
-      (resp.objectKey.includes(`uploads/tmp/${userId}/`) || resp.objectKey.includes(`/uploads/tmp/${userId}/`))
-    ) {
-      const storageKey = `pending_uploads:${userId}`;
-      const list = JSON.parse(localStorage.getItem(storageKey) || "[]");
-      list.push(resp.objectKey);
-      localStorage.setItem(storageKey, JSON.stringify(list));
-    }
-    return resp;
   },
 
   async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
@@ -135,61 +184,33 @@ export const R2Storage = {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     if (!userId) return;
-    const storageKey = `pending_uploads:${userId}`;
-    const list: string[] = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    const list = readPendingUploads(userId);
     if (!list.length) return;
-
     const toDelete = [...list];
     const remaining: string[] = [];
     for (const key of toDelete) {
       try {
         const res = await R2Storage.deleteFile(key);
-        if (!res?.success) {
-          remaining.push(key);
-        }
-      } catch (e: any) {
+        if (!res?.success) remaining.push(key);
+      } catch {
         remaining.push(key);
       }
     }
-    if (remaining.length) {
-      localStorage.setItem(storageKey, JSON.stringify(remaining));
-    } else {
-      localStorage.removeItem(storageKey);
-    }
+    writePendingUploads(userId, remaining);
   },
   /**
    * Возвращает подписанный view URL для предпросмотра по objectKey (GET)
    */
   async getViewUrl(objectKey: string, expiresInSeconds: number = 3600): Promise<string> {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const headers: Record<string, string> = {};
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
+    const token = await getAccessToken();
+    const headers = buildAuthHeaders(token);
 
     const { data, error } = await supabase.functions.invoke("r2-view", {
       body: { objectKey, expiresIn: expiresInSeconds },
       headers,
     });
 
-    if (error) {
-      const httpErr: any = error;
-      const status: number | undefined = httpErr?.context?.status;
-      let code: string | undefined;
-      let serverMessage: string | undefined;
-      try {
-        const rawBody = httpErr?.context?.body;
-        const body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-        code = body?.error;
-        serverMessage = body?.message;
-      } catch {}
-      const e = new Error(code || serverMessage || error.message || 'Failed to get view URL from R2');
-      (e as any).code = code;
-      (e as any).status = status;
-      throw e;
-    }
+    if (error) throw parseEdgeError(error, 'Failed to get view URL from R2');
 
     return (data?.viewUrl as string) || '';
   },
@@ -251,54 +272,10 @@ export const R2Storage = {
    * Удаляет файл из R2 по objectKey через Edge Function
    */
   async deleteFile(objectKey: string): Promise<{ success: boolean }> {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const headers: Record<string, string> = {};
-    let authorizationInBody: string | undefined;
-    const sessionToken = session?.access_token || null;
-    if (sessionToken) {
-      headers['Authorization'] = `Bearer ${sessionToken}`;
-      authorizationInBody = `Bearer ${sessionToken}`;
-    } else {
-      // Фолбэк: попробуем быстро извлечь токен из localStorage (как в keepalive)
-      try {
-        const urlObj = new URL(SUPABASE_URL);
-        const projectRef = urlObj.host.split('.')[0];
-        const v2Key = `sb-${projectRef}-auth-token`;
-        const rawV2 = localStorage.getItem(v2Key);
-        if (rawV2) {
-          const parsed = JSON.parse(rawV2);
-          const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
-          if (token) authorizationInBody = `Bearer ${token}`;
-        }
-        if (!authorizationInBody) {
-          const rawV1 = localStorage.getItem('supabase.auth.token');
-          if (rawV1) {
-            const parsed = JSON.parse(rawV1);
-            const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
-            if (token) authorizationInBody = `Bearer ${token}`;
-          }
-        }
-        if (!authorizationInBody) {
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i) || '';
-            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-              try {
-                const raw = localStorage.getItem(key);
-                if (!raw) continue;
-                const parsed = JSON.parse(raw);
-                const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
-                if (token) {
-                  authorizationInBody = `Bearer ${token}`;
-                  break;
-                }
-              } catch {}
-            }
-          }
-        }
-      } catch {}
-    }
+    const token = await getAccessToken();
+    const headers = buildAuthHeaders(token);
+    const syncToken = getAccessTokenSync();
+    const authorizationInBody = token ? `Bearer ${token}` : (syncToken ? `Bearer ${syncToken}` : undefined);
 
     // Dev-диагностика: выводим удаляемый ключ
     if (process.env.NODE_ENV !== 'production') {
@@ -310,25 +287,7 @@ export const R2Storage = {
       headers,
     });
 
-    if (error) {
-      const httpErr: any = error;
-      const status: number | undefined = httpErr?.context?.status;
-      let code: string | undefined;
-      let serverMessage: string | undefined;
-      try {
-        const rawBody = httpErr?.context?.body;
-        const body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-        code = body?.error;
-        serverMessage = body?.message;
-      } catch {}
-
-      const e = new Error(
-        code || serverMessage || error.message || 'Failed to delete file from R2'
-      );
-      (e as any).code = code;
-      (e as any).status = status;
-      throw e;
-    }
+    if (error) throw parseEdgeError(error, 'Failed to delete file from R2');
 
     return data as { success: boolean };
   },
@@ -339,54 +298,13 @@ export const R2Storage = {
    */
   async deleteFileKeepalive(objectKey: string): Promise<boolean> {
     try {
-      // Быстрое получение токена синхронно из localStorage, чтобы успеть до ухода со страницы
-      const getAccessTokenSync = (): string | null => {
-        try {
-          // 1) Пробуем старый ключ (v1)
-          const rawV1 = localStorage.getItem('supabase.auth.token');
-          if (rawV1) {
-            const parsed = JSON.parse(rawV1);
-            const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
-            if (token) return token;
-          }
-
-          // 2) Пробуем v2 ключ формата sb-<projectRef>-auth-token
-          const urlObj = new URL(SUPABASE_URL);
-          const projectRef = urlObj.host.split('.')[0];
-          const v2Key = `sb-${projectRef}-auth-token`;
-          const rawV2 = localStorage.getItem(v2Key);
-          if (rawV2) {
-            const parsed = JSON.parse(rawV2);
-            const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
-            if (token) return token;
-          }
-
-          // 3) Fallback: поиск любого ключа вида sb-*-auth-token (на случай нестандартного projectRef)
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i) || '';
-            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-              try {
-                const raw = localStorage.getItem(key);
-                if (!raw) continue;
-                const parsed = JSON.parse(raw);
-                const token = parsed?.currentSession?.access_token || parsed?.access_token || parsed?.accessToken || null;
-                if (token) return token;
-              } catch {}
-            }
-          }
-          return null;
-        } catch {
-          return null;
-        }
-      };
-
       let token = getAccessTokenSync();
       // Фолбэк: если синхронно не нашли токен, попробуем получить его из supabase (может не успеть при уходе)
       if (!token) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           token = session?.access_token || null;
-        } catch {}
+        } catch { void 0 }
       }
 
       // Для unload используем простое тело без нестандартных заголовков, чтобы не было preflight:
@@ -432,20 +350,13 @@ export const R2Storage = {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     if (!userId) return;
-    const storageKey = `pending_uploads:${userId}`;
-    const list: string[] = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const next = list.filter((k) => k !== objectKey);
-    if (next.length) {
-      localStorage.setItem(storageKey, JSON.stringify(next));
-    } else {
-      localStorage.removeItem(storageKey);
-    }
+    removePendingUploadKey(userId, objectKey);
   },
 
   /**
    * @deprecated Используйте uploadFile вместо этого метода
    */
-  async getUploadUrl(fileName: string, contentType: string, productId?: string): Promise<any> {
+  async getUploadUrl(fileName: string, contentType: string, productId?: string): Promise<unknown> {
     console.warn("getUploadUrl is deprecated, use uploadFile instead");
     const { data, error } = await supabase.functions.invoke("r2-presign", {
       body: { fileName, contentType, productId },

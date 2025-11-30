@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 // Minimal DTO shape aligned with UI needs
 export type StoreCategory = {
@@ -21,217 +22,204 @@ export interface CreateCategoryInput {
   parent_external_id?: string | null;
 }
 
-function normalizeSupplierId(supplierId?: string | number): number | undefined {
-  if (supplierId === undefined || supplierId === null) return undefined;
-  if (typeof supplierId === 'number') return supplierId;
-  const parsed = Number(supplierId);
-  return Number.isFinite(parsed) ? parsed : undefined;
+type StoreCategoryRow = Database["public"]["Tables"]["store_categories"]["Row"];
+type StoreCategoryBase = Pick<StoreCategoryRow, "external_id" | "name" | "parent_external_id">;
+type StoreCategoryFullRow = Pick<StoreCategoryRow, "id" | "external_id" | "name" | "parent_external_id" | "supplier_id">;
+
+function castNullableNumber(v: unknown): number | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 }
 
-function handleError(error: any): never {
-  // Preserve Supabase error object to retain code/details for UI handling
-  throw error;
+function categoriesSelect(columns: string, supplierId?: string | number) {
+  const normalized = castNullableNumber(supplierId);
+  let q = supabase.from("store_categories").select(columns);
+  if (normalized !== undefined) q = q.eq("supplier_id", normalized);
+  return q;
+}
+
+function toFull(row: StoreCategoryFullRow): StoreCategoryFull {
+  return {
+    id: String(row.id),
+    external_id: row.external_id,
+    name: row.name,
+    parent_external_id: row.parent_external_id,
+    supplier_id: String(row.supplier_id),
+  };
+}
+
+function toBase(row: StoreCategoryBase): StoreCategory {
+  return {
+    external_id: row.external_id,
+    name: row.name,
+    parent_external_id: row.parent_external_id,
+  };
 }
 
 export const CategoryService = {
   // 0. Read specific category by internal id
   async getById(id: string | number): Promise<StoreCategoryFull | null> {
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
-      .select('id,external_id,name,parent_external_id,supplier_id')
-      .eq('id', id)
+    const idNum = castNullableNumber(id);
+    if (idNum === undefined) return null;
+    const { data, error } = await supabase
+      .from("store_categories")
+      .select("id,external_id,name,parent_external_id,supplier_id")
+      .eq("id", idNum)
+      .returns<StoreCategoryFullRow>()
       .maybeSingle();
-    if (error) handleError(error);
+    if (error) throw error;
     if (!data) return null;
-    const r: any = data;
-    return {
-      id: String(r.id),
-      external_id: r.external_id,
-      name: r.name,
-      parent_external_id: r.parent_external_id,
-      supplier_id: String(r.supplier_id),
-    };
+    return toFull(data as StoreCategoryFullRow);
   },
 
   // 0a. Read category name by internal id (safe)
   async getNameByIdSafe(id: number | string): Promise<string | null> {
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
-      .select('name')
-      .eq('id', id)
+    const idNum = castNullableNumber(id);
+    if (idNum === undefined) return null;
+    const { data, error } = await supabase
+      .from("store_categories")
+      .select("name")
+      .eq("id", idNum)
+      .returns<Pick<StoreCategoryRow, "name">>()
       .maybeSingle();
     if (error) return null;
-    const r: any = data;
-    return r?.name ?? null;
+    return (data as Pick<StoreCategoryRow, "name"> | null)?.name ?? null;
   },
   // 4. Get all categories of supplier
   async listCategories(supplierId?: string | number): Promise<StoreCategory[]> {
-    const client = supabase as any;
-    const normalized = normalizeSupplierId(supplierId);
-    let query = client
-      .from('store_categories')
-      .select('external_id,name,parent_external_id')
-      .order('name');
-
-    if (normalized !== undefined) {
-      query = query.eq('supplier_id', normalized);
-    }
-
-    const { data, error } = await query;
-    if (error) handleError(error);
-    return (data as unknown as StoreCategory[]) || [];
+    const { data, error } = await categoriesSelect("external_id,name,parent_external_id", supplierId)
+      .order("name")
+      .returns<StoreCategoryBase[]>();
+    if (error) throw error;
+    const rows = data ?? [];
+    return rows.map(toBase);
   },
 
   // 1–2. Create category or subcategory
   async createCategory(input: CreateCategoryInput): Promise<StoreCategory> {
-    const payload: any = {
-      supplier_id: normalizeSupplierId(input.supplier_id),
+    const payload = {
+      supplier_id: castNullableNumber(input.supplier_id),
       external_id: input.external_id,
       name: input.name,
       parent_external_id: input.parent_external_id ?? null,
     };
-
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
+    const { data, error } = await supabase
+      .from("store_categories")
       .insert([payload])
-      .select('external_id,name,parent_external_id')
+      .select("external_id,name,parent_external_id")
+      .returns<StoreCategoryBase>()
       .single();
-    if (error) handleError(error);
-    return data as unknown as StoreCategory;
+    if (error) throw error;
+    return toBase(data as StoreCategoryBase);
   },
 
   // 3. Bulk create
   async bulkCreate(items: CreateCategoryInput[]): Promise<StoreCategory[]> {
     if (!items || items.length === 0) return [];
     const payload = items.map((it) => ({
-      supplier_id: normalizeSupplierId(it.supplier_id),
+      supplier_id: castNullableNumber(it.supplier_id),
       external_id: it.external_id,
       name: it.name,
       parent_external_id: it.parent_external_id ?? null,
     }));
-
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
+    const { data, error } = await supabase
+      .from("store_categories")
       .insert(payload)
-      .select('external_id,name,parent_external_id');
-    if (error) handleError(error);
-    return (data as unknown as StoreCategory[]) || [];
+      .select("external_id,name,parent_external_id")
+      .returns<StoreCategoryBase[]>();
+    if (error) throw error;
+    const rows = data ?? [];
+    return rows.map(toBase);
   },
 
   // 4. Read all categories for supplier (full shape including id)
   async getSupplierCategories(supplierId: string | number): Promise<StoreCategoryFull[]> {
-    const normalized = normalizeSupplierId(supplierId);
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
-      .select('id,external_id,name,parent_external_id,supplier_id')
-      .eq('supplier_id', normalized)
-      .order('name');
-    if (error) handleError(error);
-    // Normalize id/supplier_id to string for UI
-    const rows = (data ?? []) as any[];
-    return rows.map((r) => ({
-      id: String(r.id),
-      external_id: r.external_id,
-      name: r.name,
-      parent_external_id: r.parent_external_id,
-      supplier_id: String(r.supplier_id),
-    }));
+    const { data, error } = await categoriesSelect("id,external_id,name,parent_external_id,supplier_id", supplierId)
+      .order("name")
+      .returns<StoreCategoryFullRow[]>();
+    if (error) throw error;
+    const rows = data ?? [];
+    return rows.map(toFull);
   },
 
   // 5. Read subcategories of a specific category
   async getSubcategories(supplierId: string | number, parentExternalId: string): Promise<StoreCategoryFull[]> {
-    const normalized = normalizeSupplierId(supplierId);
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
-      .select('id,external_id,name,parent_external_id,supplier_id')
-      .eq('supplier_id', normalized)
-      .eq('parent_external_id', parentExternalId)
-      .order('name');
-    if (error) handleError(error);
-    const rows = (data ?? []) as any[];
-    return rows.map((r) => ({
-      id: String(r.id),
-      external_id: r.external_id,
-      name: r.name,
-      parent_external_id: r.parent_external_id,
-      supplier_id: String(r.supplier_id),
-    }));
+    const normalized = castNullableNumber(supplierId);
+    let q = supabase
+      .from("store_categories")
+      .select("id,external_id,name,parent_external_id,supplier_id")
+      .eq("parent_external_id", parentExternalId)
+      .order("name");
+    if (normalized !== undefined) q = q.eq("supplier_id", normalized);
+    const { data, error } = await q.returns<StoreCategoryFullRow[]>();
+    if (error) throw error;
+    const rows = data ?? [];
+    return rows.map(toFull);
   },
 
   // 6. Read specific category by external_id
   async getByExternalId(supplierId: string | number, externalId: string): Promise<StoreCategoryFull | null> {
-    const normalized = normalizeSupplierId(supplierId);
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
-      .select('id,external_id,name,parent_external_id,supplier_id')
-      .eq('supplier_id', normalized)
-      .in('external_id', [externalId, Number(externalId)])
-      .maybeSingle();
-    if (error) handleError(error);
+    const normalized = castNullableNumber(supplierId);
+    let builder = supabase
+      .from("store_categories")
+      .select("id,external_id,name,parent_external_id,supplier_id")
+      .eq("external_id", externalId);
+    if (normalized !== undefined) builder = builder.eq("supplier_id", normalized);
+    const { data, error } = await builder.returns<StoreCategoryFullRow>().maybeSingle();
+    if (error) throw error;
     if (!data) return null;
-    const r: any = data;
-    return {
-      id: String(r.id),
-      external_id: r.external_id,
-      name: r.name,
-      parent_external_id: r.parent_external_id,
-      supplier_id: String(r.supplier_id),
-    };
+    return toFull(data as StoreCategoryFullRow);
   },
 
   // 7. Update category name by external_id and supplier_id
   async updateName(supplierId: string | number, externalId: string, name: string): Promise<StoreCategory> {
-    const normalized = normalizeSupplierId(supplierId);
-    const client = supabase as any;
-    const { data, error } = await client
-      .from('store_categories')
+    const normalized = castNullableNumber(supplierId);
+    if (normalized === undefined) {
+      throw new Error("Invalid supplierId");
+    }
+    const { data, error } = await supabase
+      .from("store_categories")
       .update({ name })
-      .eq('external_id', externalId)
-      .eq('supplier_id', normalized)
-      .select('external_id,name,parent_external_id')
+      .eq("external_id", externalId)
+      .eq("supplier_id", normalized)
+      .select("external_id,name,parent_external_id")
+      .returns<StoreCategoryBase>()
       .single();
-    if (error) handleError(error);
-    return data as unknown as StoreCategory;
+    if (error) throw error;
+    return toBase(data as StoreCategoryBase);
   },
 
   // 8. Delete category by external_id and supplier_id
   async deleteCategory(supplierId: string | number, externalId: string): Promise<boolean> {
-    const normalized = normalizeSupplierId(supplierId);
-    const client = supabase as any;
-    const { error } = await client
-      .from('store_categories')
+    const normalized = castNullableNumber(supplierId);
+    if (normalized === undefined) {
+      throw new Error("Invalid supplierId");
+    }
+    const { error } = await supabase
+      .from("store_categories")
       .delete()
-      .eq('external_id', externalId)
-      .eq('supplier_id', normalized);
-    if (error) handleError(error);
+      .eq("external_id", externalId)
+      .eq("supplier_id", normalized);
+    if (error) throw error;
     return true;
   },
 
   // 9. Cascade delete: delete a category and all its descendants for a supplier
   async deleteCategoryCascade(supplierId: string | number, externalId: string): Promise<boolean> {
-    const normalized = normalizeSupplierId(supplierId);
-    const client = supabase as any;
-
-    // Fetch all categories for supplier (only fields needed for tree traversal)
-    const { data, error } = await client
-      .from('store_categories')
-      .select('external_id,parent_external_id')
-      .eq('supplier_id', normalized);
-    if (error) handleError(error);
-
-    const rows: { external_id: string; parent_external_id: string | null }[] = (data ?? []) as any[];
-
-    // Build set of external_ids to delete (start with selected node)
+    const normalized = castNullableNumber(supplierId);
+    if (normalized === undefined) {
+      throw new Error("Invalid supplierId");
+    }
+    const { data, error } = await supabase
+      .from("store_categories")
+      .select("external_id,parent_external_id")
+      .eq("supplier_id", normalized)
+      .returns<Array<{ external_id: string; parent_external_id: string | null }>>();
+    if (error) throw error;
+    const rows = data ?? [];
     const toDelete = new Set<string>([externalId]);
-
-    // Traverse descendants iteratively to avoid deep recursion
     let changed = true;
     while (changed) {
       changed = false;
@@ -243,16 +231,14 @@ export const CategoryService = {
         }
       }
     }
-
     const ids = Array.from(toDelete);
     if (ids.length === 0) return true;
-
-    const { error: delError } = await client
-      .from('store_categories')
+    const { error: delError } = await supabase
+      .from("store_categories")
       .delete()
-      .eq('supplier_id', normalized)
-      .in('external_id', ids);
-    if (delError) handleError(delError);
+      .eq("supplier_id", normalized)
+      .in("external_id", ids);
+    if (delError) throw delError;
     return true;
   },
 };

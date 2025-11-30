@@ -1,38 +1,29 @@
 import { z } from "zod";
 
-// Registration form validation schema
+const emailSchema = z.string().email("email_invalid");
+const passwordSchema = z.string().min(8, "password_min");
+
 export const registrationSchema = z.object({
   name: z.string().min(2, "name_min_length").max(50, "Name must be at most 50 characters"),
-  email: z.string().email("email_invalid"),
-  password: z.string().min(8, "password_min"),
+  email: emailSchema,
+  password: passwordSchema,
   confirmPassword: z.string().min(1, "confirm_password_required"),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "terms_required"
-  })
-}).refine(data => data.password === data.confirmPassword, {
-  message: "passwords_match",
-  path: ["confirmPassword"]
-});
+  acceptTerms: z.boolean().refine(val => val === true, { message: "terms_required" })
+}).refine(data => data.password === data.confirmPassword, { message: "passwords_match", path: ["confirmPassword"] });
 
-// Login form validation schema
 export const loginSchema = z.object({
-  email: z.string().email("email_invalid"),
+  email: emailSchema,
   password: z.string().min(1, "password_required")
 });
 
-// Password reset form validation schema
 export const resetPasswordSchema = z.object({
-  email: z.string().email("email_invalid")
+  email: emailSchema
 });
 
-// Password update form validation schema (for reset completion)
 export const updatePasswordSchema = z.object({
-  password: z.string().min(8, "password_min"),
+  password: passwordSchema,
   confirmPassword: z.string().min(1, "confirm_password_required")
-}).refine(data => data.password === data.confirmPassword, {
-  message: "passwords_match",
-  path: ["confirmPassword"]
-});
+}).refine(data => data.password === data.confirmPassword, { message: "passwords_match", path: ["confirmPassword"] });
 
 // Type exports for form data
 export type RegistrationData = z.infer<typeof registrationSchema>;
@@ -56,7 +47,7 @@ export interface UserProfile {
 // Authentication response interface
 export interface AuthResponse {
   user: UserProfile | null;
-  session: any | null;
+  session: { access_token?: string | null; refresh_token?: string | null } | null;
   error: string | null;
 }
 

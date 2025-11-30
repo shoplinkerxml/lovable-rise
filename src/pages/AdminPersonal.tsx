@@ -29,7 +29,7 @@ const AdminPersonal = () => {
 
   useEffect(() => {
     const load = async () => {
-      await withProfileErrorHandling(async () => {
+      const { error, success } = await withProfileErrorHandling(async () => {
         const { data: userData } = await supabase.auth.getUser();
         const user = userData.user;
         setEmail(user?.email ?? "");
@@ -50,6 +50,8 @@ const AdminPersonal = () => {
         }
         return null;
       }, 'profile loading', SUCCESS_MESSAGES.PROFILE_LOADED);
+      if (error) toast.error(error.message);
+      else if (success) toast.success(success.message);
     };
     load();
   }, []);
@@ -58,7 +60,7 @@ const AdminPersonal = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    await withProfileErrorHandling(async () => {
+    const { error, success } = await withProfileErrorHandling(async () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
       if (!user) throw new ProfileOperationError(ProfileErrorCode.PERMISSION_DENIED);
@@ -86,6 +88,8 @@ const AdminPersonal = () => {
         throw new ProfileOperationError(ProfileErrorCode.PROFILE_UPDATE_FAILED);
       }
     }, 'avatar upload', SUCCESS_MESSAGES.AVATAR_UPDATED);
+    if (error) toast.error(error.message);
+    else if (success) toast.success(success.message);
     
     e.target.value = '';
   };
@@ -97,7 +101,7 @@ const AdminPersonal = () => {
   const save = async () => {
     setSaving(true);
     try {
-      await withProfileErrorHandling(async () => {
+      const { error, success } = await withProfileErrorHandling(async () => {
         const { data: userData } = await supabase.auth.getUser();
         const user = userData.user;
         
@@ -113,6 +117,8 @@ const AdminPersonal = () => {
           throw new ProfileOperationError(ProfileErrorCode.PERMISSION_DENIED);
         }
       }, 'profile save', SUCCESS_MESSAGES.PROFILE_UPDATED);
+      if (error) toast.error(error.message);
+      else if (success) toast.success(success.message);
     } finally {
       setSaving(false);
     }
@@ -173,5 +179,4 @@ const AdminPersonal = () => {
 };
 
 export default AdminPersonal;
-
 

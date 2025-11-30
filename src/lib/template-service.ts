@@ -1,38 +1,65 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import { SessionValidator } from './session-validation';
 
-/** Get auth headers for API requests */
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session?.access_token) {
-    throw new Error('No authentication token available');
+export type TemplateServiceErrorCode = 'unauthorized' | 'validation_failed' | 'delete_failed';
+
+export class TemplateServiceError extends Error {
+  code: TemplateServiceErrorCode;
+  details?: unknown;
+  constructor(code: TemplateServiceErrorCode, message: string, details?: unknown) {
+    super(message);
+    this.code = code;
+    this.details = details;
   }
+}
 
+export async function getAuthHeaders(): Promise<HeadersInit> {
+  const validation = await SessionValidator.ensureValidSession();
+  if (!validation.isValid) {
+    throw new TemplateServiceError('unauthorized', 'Invalid session', validation.error);
+  }
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    throw new TemplateServiceError('unauthorized', 'No authentication token available');
+  }
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session.access_token}`
+    'Authorization': `Bearer ${token}`,
   };
 }
 
 export class TemplateService {
-  /** Удаление шаблона напрямую через Supabase */
+  private static async getAccessToken(): Promise<string> {
+    const validation = await SessionValidator.ensureValidSession();
+    if (!validation.isValid) {
+      throw new TemplateServiceError('unauthorized', 'Invalid session', validation.error);
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      throw new TemplateServiceError('unauthorized', 'No authentication token available');
+    }
+    return token;
+  }
+
   static async deleteTemplate(id: string): Promise<{ success: boolean }> {
-    if (!id) throw new Error("Template ID is required");
+    if (!id) {
+      throw new TemplateServiceError('validation_failed', 'Template ID is required');
+    }
 
-    console.log("TemplateService.deleteTemplate called with:", { id });
+    await this.getAccessToken();
 
-    // Hard delete - full removal from database
-    // @ts-ignore - table not in generated types yet
-    const { error: deleteError } = await (supabase as any)
+    const { error } = await supabase
       .from('store_templates')
       .delete()
       .eq('id', id);
-    
-    if (deleteError) {
-      console.error('Delete error:', deleteError);
-      throw new Error(deleteError.message || 'Failed to delete template');
+
+    if (error) {
+      throw new TemplateServiceError('delete_failed', error.message || 'Failed to delete template', { code: (error as unknown as { code?: string }).code });
     }
-    
+
     return { success: true };
   }
 }

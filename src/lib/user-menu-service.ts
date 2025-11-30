@@ -431,18 +431,12 @@ export class UserMenuService {
    */
   static async reorderMenuItems(userId: string, reorderedItems: MenuReorderItem[]): Promise<void> {
     try {
-      // Perform updates in a transaction-like manner
-      const updates = reorderedItems.map(item => 
-        (supabase as any)
-          .from('user_menu_items')
-          .update({ 
-            order_index: item.order_index,
-            parent_id: item.parent_id || null
-          })
-          .eq('id', item.id)
-      );
-
-      await Promise.all(updates);
+      const payload = reorderedItems.map((i) => ({ id: i.id, order_index: i.order_index, parent_id: i.parent_id ?? null }));
+      const { error } = await supabase
+        .from('user_menu_items')
+        .upsert(payload)
+        .select('id');
+      if (error) throw error;
     } catch (error) {
       console.error('Error in reorderMenuItems:', error);
       throw error;

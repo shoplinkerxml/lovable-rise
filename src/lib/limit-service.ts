@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 export interface LimitTemplate {
   id: number;
@@ -24,36 +25,47 @@ export interface UpdateLimitData {
 }
 
 export class LimitService {
+  private static codeRegex = /^[a-z][a-z0-9_]*$/;
+  private static ensureName(name?: string): string {
+    const v = (name ?? '').trim();
+    if (!v) throw new Error("Назва обмеження обов'язкова");
+    return v;
+  }
+  private static ensureCode(code?: string): string {
+    const v = (code ?? '').trim();
+    if (!v) throw new Error("Системне ім'я обмеження обов'язкове");
+    if (!LimitService.codeRegex.test(v)) {
+      throw new Error("Системне ім'я має бути в форматі snake_case (тільки малі літери, цифри та _)");
+    }
+    return v;
+  }
+  private static trimOrNull(v?: string): string | null { return (v?.trim() || '') || null; }
   /** Отримання списку всіх лімітів */
   static async getLimits(): Promise<LimitTemplate[]> {
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('limit_templates')
-      .select('*')
+      .select('id,code,name,path,description,order_index')
       .order('order_index', { ascending: true })
       .order('id', { ascending: true });
 
     if (error) {
-      console.error('Get limits error:', error);
       throw new Error(error.message);
     }
 
-    return data || [];
+    return (data || []) as LimitTemplate[];
   }
 
   /** Отримання одного ліміту за ID */
   static async getLimit(id: number): Promise<LimitTemplate> {
     if (!id) throw new Error("Limit ID is required");
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('limit_templates')
-      .select('*')
+      .select('id,code,name,path,description,order_index')
       .eq('id', id)
       .single();
 
     if (error) {
-      console.error('Get limit error:', error);
       throw new Error(error.message);
     }
 
@@ -61,39 +73,26 @@ export class LimitService {
       throw new Error("Limit not found");
     }
 
-    return data;
+    return data as LimitTemplate;
   }
 
   /** Створення нового ліміту */
   static async createLimit(limitData: CreateLimitData): Promise<LimitTemplate> {
-    if (!limitData.name?.trim()) {
-      throw new Error("Назва обмеження обов'язкова");
-    }
+    const name = LimitService.ensureName(limitData.name);
+    const code = LimitService.ensureCode(limitData.code);
 
-    if (!limitData.code?.trim()) {
-      throw new Error("Системне ім'я обмеження обов'язкове");
-    }
-
-    // Validate code format (snake_case)
-    const codeRegex = /^[a-z][a-z0-9_]*$/;
-    if (!codeRegex.test(limitData.code.trim())) {
-      throw new Error("Системне ім'я має бути в форматі snake_case (тільки малі літери, цифри та _)");
-    }
-
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('limit_templates')
       .insert({
-        name: limitData.name.trim(),
-        code: limitData.code.trim(),
-        path: limitData.path?.trim() || null,
-        description: limitData.description?.trim() || null,
+        name,
+        code,
+        path: LimitService.trimOrNull(limitData.path),
+        description: LimitService.trimOrNull(limitData.description),
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Create limit error:', error);
       // Check for unique constraint violation
       if (error.code === '23505') {
         throw new Error("Ліміт з таким системним ім'ям вже існує");
@@ -101,48 +100,36 @@ export class LimitService {
       throw new Error(error.message);
     }
 
-    return data;
+    return data as LimitTemplate;
   }
 
   /** Оновлення ліміту */
   static async updateLimit(id: number, limitData: UpdateLimitData): Promise<LimitTemplate> {
     if (!id) throw new Error("Limit ID is required");
 
-    const cleanData: any = {};
+    const cleanData: Partial<Database['public']['Tables']['limit_templates']['Update']> = {};
     
     if (limitData.name !== undefined) {
-      if (!limitData.name.trim()) {
-        throw new Error("Назва обмеження обов'язкова");
-      }
-      cleanData.name = limitData.name.trim();
+      cleanData.name = LimitService.ensureName(limitData.name);
     }
     
     if (limitData.code !== undefined) {
-      if (!limitData.code.trim()) {
-        throw new Error("Системне ім'я обмеження обов'язкове");
-      }
-      // Validate code format (snake_case)
-      const codeRegex = /^[a-z][a-z0-9_]*$/;
-      if (!codeRegex.test(limitData.code.trim())) {
-        throw new Error("Системне ім'я має бути в форматі snake_case (тільки малі літери, цифри та _)");
-      }
-      cleanData.code = limitData.code.trim();
+      cleanData.code = LimitService.ensureCode(limitData.code);
     }
     
     if (limitData.path !== undefined) {
-      cleanData.path = limitData.path?.trim() || null;
+      cleanData.path = LimitService.trimOrNull(limitData.path);
     }
     
     if (limitData.description !== undefined) {
-      cleanData.description = limitData.description?.trim() || null;
+      cleanData.description = LimitService.trimOrNull(limitData.description);
     }
 
     if (Object.keys(cleanData).length === 0) {
       throw new Error("No fields to update");
     }
 
-    // @ts-ignore - table not in generated types yet
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('limit_templates')
       .update(cleanData)
       .eq('id', id)
@@ -150,7 +137,6 @@ export class LimitService {
       .single();
 
     if (error) {
-      console.error('Update limit error:', error);
       // Check for unique constraint violation
       if (error.code === '23505') {
         throw new Error("Ліміт з таким системним ім'ям вже існує");
@@ -158,42 +144,31 @@ export class LimitService {
       throw new Error(error.message);
     }
 
-    return data;
+    return data as LimitTemplate;
   }
 
   /** Видалення ліміту */
   static async deleteLimit(id: number): Promise<void> {
     if (!id) throw new Error("Limit ID is required");
 
-    // @ts-ignore - table not in generated types yet
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('limit_templates')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.error('Delete limit error:', error);
       throw new Error(error.message);
     }
   }
 
   /** Оновлення порядку лімітів */
   static async updateLimitsOrder(limits: { id: number; order_index: number }[]): Promise<void> {
-    try {
-      // Оновлюємо кожен ліміт окремо
-      const updates = limits.map(async (limit) => {
-        // @ts-ignore - table not in generated types yet
-        const { error } = await (supabase as any)
-          .from('limit_templates')
-          .update({ order_index: limit.order_index })
-          .eq('id', limit.id);
-
-        if (error) throw error;
-      });
-
-      await Promise.all(updates);
-    } catch (error) {
-      console.error('Update limits order error:', error);
+    if (!Array.isArray(limits) || limits.length === 0) return;
+    const payload: Array<Pick<Database['public']['Tables']['limit_templates']['Insert'], 'id' | 'order_index'>> = limits.map((l) => ({ id: l.id, order_index: l.order_index }));
+    const { error } = await supabase
+      .from('limit_templates')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
       throw new Error('Failed to update limits order');
     }
   }

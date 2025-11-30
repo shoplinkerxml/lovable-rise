@@ -43,6 +43,9 @@ export interface TokenDebugInfo {
 export class SessionValidator {
   private static readonly REFRESH_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly SESSION_CHECK_INTERVAL = 30 * 1000; // 30 seconds
+  private static readonly CACHE_TTL_MS = 20 * 1000; // 20 seconds
+  private static cache: { result: SessionValidationResult; timestamp: number } | null = null;
+  private static inFlight: Promise<SessionValidationResult> | null = null;
   
   /**
    * Validate current session and access token
@@ -50,54 +53,69 @@ export class SessionValidator {
    */
   static async validateSession(): Promise<SessionValidationResult> {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('[SessionValidator] Session fetch error:', error);
-        return {
-          isValid: false,
-          session: null,
-          user: null,
-          accessToken: null,
-          refreshToken: null,
-          expiresAt: null,
-          timeUntilExpiry: null,
-          needsRefresh: false,
-          error: error.message
-        };
-      }
-      
-      if (!session) {
-        return {
-          isValid: false,
-          session: null,
-          user: null,
-          accessToken: null,
-          refreshToken: null,
-          expiresAt: null,
-          timeUntilExpiry: null,
-          needsRefresh: false,
-          error: 'No active session'
-        };
-      }
-      
       const now = Date.now();
-      const expiresAt = session.expires_at ? session.expires_at * 1000 : null;
-      const timeUntilExpiry = expiresAt ? expiresAt - now : null;
-      const needsRefresh = timeUntilExpiry ? timeUntilExpiry < this.REFRESH_THRESHOLD_MS : false;
-      const isExpired = timeUntilExpiry ? timeUntilExpiry <= 0 : false;
-      
-      return {
-        isValid: !isExpired && !!session.access_token && !!session.user,
-        session,
-        user: session.user,
-        accessToken: session.access_token,
-        refreshToken: session.refresh_token,
-        expiresAt,
-        timeUntilExpiry,
-        needsRefresh,
-        error: isExpired ? 'Session expired' : undefined
-      };
+      if (this.cache && now - this.cache.timestamp < this.CACHE_TTL_MS) {
+        return this.cache.result;
+      }
+      if (this.inFlight) {
+        return await this.inFlight;
+      }
+      const flight = (async () => {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[SessionValidator] Session fetch error:', error);
+          return {
+            isValid: false,
+            session: null,
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            expiresAt: null,
+            timeUntilExpiry: null,
+            needsRefresh: false,
+            error: error.message
+          };
+        }
+        
+        if (!session) {
+          return {
+            isValid: false,
+            session: null,
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            expiresAt: null,
+            timeUntilExpiry: null,
+            needsRefresh: false,
+            error: 'No active session'
+          };
+        }
+        
+        const now = Date.now();
+        const expiresAt = session.expires_at ? session.expires_at * 1000 : null;
+        const timeUntilExpiry = expiresAt ? expiresAt - now : null;
+        const needsRefresh = timeUntilExpiry ? timeUntilExpiry < this.REFRESH_THRESHOLD_MS : false;
+        const isExpired = timeUntilExpiry ? timeUntilExpiry <= 0 : false;
+        
+        const result: SessionValidationResult = {
+          isValid: !isExpired && !!session.access_token && !!session.user,
+          session,
+          user: session.user,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt,
+          timeUntilExpiry,
+          needsRefresh,
+          error: isExpired ? 'Session expired' : undefined
+        };
+        this.cache = { result, timestamp: Date.now() };
+        return result;
+      })();
+      this.inFlight = flight;
+      const res = await flight;
+      this.inFlight = null;
+      return res;
     } catch (error) {
       console.error('[SessionValidator] Validation error:', error);
       return {
@@ -139,7 +157,9 @@ export class SessionValidator {
         
         if (session) {
           console.log('[SessionValidator] Session refreshed successfully');
-          return this.validateSession(); // Re-validate after refresh
+          // bust cache and re-validate
+          this.cache = null;
+          return this.validateSession();
         }
       } catch (error) {
         console.error('[SessionValidator] Refresh error:', error);
@@ -241,7 +261,7 @@ export class SessionValidator {
    */
   static async logSessionDebugInfo(context: string = 'general'): Promise<void> {
     // Only log in development to avoid extra network calls in production
-    const isDev = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.DEV === true;
+    const isDev = typeof import.meta !== 'undefined' && !!((import.meta as unknown as { env?: Record<string, unknown> })?.env?.DEV);
     if (!isDev) return;
     try {
       const validation = await this.validateSession();
@@ -320,13 +340,12 @@ export class SessionValidator {
  * Utility function to check if error is related to authentication/authorization
  * Helps identify RLS-related issues
  */
-export function isAuthenticationError(error: any): boolean {
+export function isAuthenticationError(error: unknown): boolean {
   if (!error) return false;
-  
-  const status = error.status || error.statusCode;
+  const e = error as { status?: number; statusCode?: number; message?: string; code?: string };
+  const status = e.status ?? e.statusCode;
   if (status === 401 || status === 403) return true;
-  
-  const message = (error.message || '').toLowerCase();
+  const message = (e.message || '').toLowerCase();
   if (message.includes('unauthorized') || 
       message.includes('violates row-level security') ||
       message.includes('jwt') ||
@@ -337,7 +356,7 @@ export function isAuthenticationError(error: any): boolean {
       message.includes('auth.uid()')) return true;
       
   // Check PostgREST error codes
-  if (error.code === 'PGRST301' || error.code === 'PGRST116') return true;
+  if (e.code === 'PGRST301' || e.code === 'PGRST116') return true;
   
   return false;
 }

@@ -8,21 +8,11 @@ import { SessionValidator } from "./session-validation";
  * - Для операций администратора, используем только Bearer token
  */
 async function getAuthHeaders() {
-  const session = await supabase.auth.getSession();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json"
-  };
-
-  if (session.data.session?.access_token) {
-    // For authenticated operations, use only Bearer token
-    headers["Authorization"] = `Bearer ${session.data.session.access_token}`;
-  } else {
-    // For unauthenticated requests to Edge Functions, don't send apikey
-    // Edge Functions expect only Bearer tokens for authenticated operations
-    console.warn("No valid session found for Edge Function request");
+  const validation = await SessionValidator.ensureValidSession();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (validation.isValid && validation.accessToken) {
+    headers["Authorization"] = `Bearer ${validation.accessToken}`;
   }
-
-  console.log("getAuthHeaders called, returning headers:", headers);
   return headers;
 }
 
@@ -91,7 +81,7 @@ export class UserService {
       throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
-    console.log("UserService.getUsers called with:", { filters, pagination });
+    void filters; void pagination;
 
     // Get auth headers
     const headers = await getAuthHeaders();
@@ -116,7 +106,7 @@ export class UserService {
     });
 
     const responseData = await response.json();
-    console.log("UserService.getUsers response:", { status: response.status, responseData });
+    void response;
 
     if (!response.ok) {
       throw new ApiError(responseData.error || "Failed to fetch users", response.status);
@@ -195,7 +185,7 @@ export class UserService {
       throw new ApiError("No fields provided for update", 400);
     }
 
-    console.log("UserService.updateUser called with:", { id, cleanData });
+    void id; void cleanData;
 
     // Get auth headers
     const headers = await getAuthHeaders();
@@ -209,7 +199,7 @@ export class UserService {
     });
 
     const responseData = await response.json();
-    console.log("UserService.updateUser response:", { status: response.status, responseData });
+    void response;
 
     if (!response.ok) {
       throw new ApiError(responseData.error || "Failed to update user", response.status);
@@ -232,7 +222,7 @@ export class UserService {
       throw new ApiError("Invalid session: " + (sessionValidation.error || "Session expired"), 401);
     }
 
-    console.log("UserService.getUser called with:", { id });
+    void id;
 
     // Get auth headers
     const headers = await getAuthHeaders();
@@ -245,7 +235,7 @@ export class UserService {
     });
 
     const responseData = await response.json();
-    console.log("UserService.getUser response:", { status: response.status, responseData });
+    void response;
 
     if (!response.ok) {
       throw new ApiError(responseData.error || "Failed to get user", response.status);
