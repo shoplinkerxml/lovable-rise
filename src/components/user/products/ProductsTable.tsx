@@ -679,17 +679,20 @@ export const ProductsTable = ({
               if (storeId) {
                 didBatch = true;
                 try {
-                  await Promise.all(
-                    selected
-                      .map((p) => p.id)
-                      .filter((id) => !!id)
-                      .map((id: string) => ProductService.removeStoreProductLink(String(id), storeId))
-                  );
+                  const ids = selected.map((p) => String(p.id)).filter(Boolean);
+                  setDeleteProgress({ open: true });
+                  const { deleted, deletedByStore } = await ProductService.bulkRemoveStoreProductLinks(ids, [String(storeId)]);
+                  setProductsCached((prev) => prev.filter((p) => !ids.includes(String(p.id))));
+                  setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - (deleted ?? ids.length)) } : prev);
+                  try { ShopService.bumpProductsCountInCache(String(storeId), -((deletedByStore?.[String(storeId)] ?? ids.length))); } catch { void 0; }
+                  try { await ProductService.recomputeStoreCategoryFilterCache(String(storeId)); } catch { void 0; }
                   toast.success(t('product_removed_from_store'));
+                  try { await loadFirstPage(); } catch { void 0; }
                 } catch (_) {
                   toast.error(t('failed_remove_from_store'));
-                }
+                } finally { setDeleteProgress({ open: false }); }
                 table.resetRowSelection();
+                try { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); } catch { void 0; }
               } else {
                 const ids = selected.map((p) => String(p.id));
                 if (onDelete && selected.length === 1) {
@@ -702,6 +705,7 @@ export const ProductsTable = ({
                     setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - ids.length) } : prev);
                     didBatch = true;
                     toast.success(t('products_deleted_successfully'));
+                    try { await loadFirstPage(); } catch { void 0; }
                   } catch (_) {
                     toast.error(t('failed_delete_product'));
                   } finally { setDeleteProgress({ open: false }); }

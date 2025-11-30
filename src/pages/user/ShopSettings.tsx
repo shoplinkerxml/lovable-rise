@@ -172,61 +172,35 @@ export default function ShopSettings() {
   const [addCurrencyCode, setAddCurrencyCode] = useState<string>('');
   useEffect(() => {
     const loadCurrencyData = async () => {
-      const { data: sysCurrencies } = await supabase.from('currencies').select('code,rate');
-      const sys = (sysCurrencies || []) as Array<{ code: unknown; rate?: unknown }>;
-      setAvailableCurrencies(sys.map((c) => ({
-        code: String(c.code as string),
-        rate: typeof c.rate === 'number' ? (c.rate as number) : undefined
-      })));
-      const { data: sc } = await supabase.from('store_currencies').select('code,rate,is_base').eq('store_id', id!);
-      const rows = (sc || []) as Array<{ code: unknown; rate?: unknown; is_base?: unknown }>;
-      setStoreCurrencies(rows.map((c) => ({
-        code: String(c.code as string),
-        rate: Number((c.rate as number | undefined) ?? 1),
-        is_base: !!(c.is_base as boolean | undefined)
-      })));
+      const sys = await ShopService.getAvailableCurrencies();
+      setAvailableCurrencies(sys);
+      const rows = await ShopService.getStoreCurrencies(id!);
+      setStoreCurrencies(rows);
     };
     if (id) loadCurrencyData();
   }, [id]);
   const refreshStoreCurrencies = async () => {
-    const { data: sc } = await supabase.from('store_currencies').select('code,rate,is_base').eq('store_id', id!);
-    const rows = (sc || []) as Array<{ code: unknown; rate?: unknown; is_base?: unknown }>;
-    setStoreCurrencies(rows.map((c) => ({
-      code: String(c.code as string),
-      rate: Number((c.rate as number | undefined) ?? 1),
-      is_base: !!(c.is_base as boolean | undefined)
-    })));
+    const rows = await ShopService.getStoreCurrencies(id!);
+    setStoreCurrencies(rows);
   };
   const handleAddCurrency = async () => {
     if (!addCurrencyCode) return;
     const sys = availableCurrencies.find(c => c.code === addCurrencyCode);
     const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
-    await supabase.from('store_currencies').insert({
-      store_id: id!,
-      code: addCurrencyCode,
-      rate: defaultRate,
-      is_base: false
-    });
+    await ShopService.addStoreCurrency(id!, addCurrencyCode, defaultRate);
     setAddCurrencyCode('');
     await refreshStoreCurrencies();
   };
   const handleUpdateRate = async (code: string, rate: number) => {
-    await supabase.from('store_currencies').update({
-      rate
-    }).eq('store_id', id!).eq('code', code);
+    await ShopService.updateStoreCurrencyRate(id!, code, rate);
     await refreshStoreCurrencies();
   };
   const handleSetBase = async (code: string) => {
-    await supabase.from('store_currencies').update({
-      is_base: false
-    }).eq('store_id', id!);
-    await supabase.from('store_currencies').update({
-      is_base: true
-    }).eq('store_id', id!).eq('code', code);
+    await ShopService.setBaseStoreCurrency(id!, code);
     await refreshStoreCurrencies();
   };
   const handleDeleteCurrency = async (code: string) => {
-    await supabase.from('store_currencies').delete().eq('store_id', id!).eq('code', code);
+    await ShopService.deleteStoreCurrency(id!, code);
     await refreshStoreCurrencies();
   };
   return <div className="p-6 space-y-6" data-testid="shop_settings_page">
