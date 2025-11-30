@@ -125,7 +125,7 @@ export const ProductsTable = ({
           return { pageIndex: pi, pageSize: ps };
         }
       }
-    } catch {}
+    } catch { void 0; }
     return { pageIndex: 0, pageSize: 10 };
   });
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
@@ -208,7 +208,7 @@ export const ProductsTable = ({
   useEffect(() => {
     try {
       writeCache('user_products_pagination', { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }, CACHE_TTL.uiPrefs);
-    } catch {}
+    } catch { void 0; }
   }, [pagination.pageIndex, pagination.pageSize]);
   useEffect(() => {
     const requiredForCurrent = (pagination.pageIndex + 1) * pagination.pageSize;
@@ -286,7 +286,7 @@ export const ProductsTable = ({
       }
     } catch { void 0; }
     setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
-    try { setSelectedStoreIds(ids.map(String)); } catch { /* ignore */ }
+    try { setSelectedStoreIds(ids.map(String)); } catch { void 0; }
   }, [setProductsCached]);
 
   const handleToggleAvailable = useCallback(async (productId: string, checked: boolean) => {
@@ -359,7 +359,7 @@ export const ProductsTable = ({
   useEffect(() => {
     try {
       writeCache(COLUMN_VIS_KEY, columnVisibility, CACHE_TTL.uiPrefs);
-    } catch {}
+    } catch { void 0; }
   }, [columnVisibility]);
   // Default column order: photo → article → category → name → price → quantity → status → actions
   const [columnOrder, setColumnOrder] = useState<string[]>([
