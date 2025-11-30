@@ -384,24 +384,24 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
                 </Tooltip>
               </TooltipProvider>
 
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+              <DropdownMenu>
+                <TooltipProvider>
+                  <Tooltip>
+                    <DropdownMenuTrigger asChild>
+                      <TooltipTrigger asChild>
                         <Button type="button" variant="ghost" size="icon" className="h-8 w-8" data-testid="parametersDataTable_export" aria-label={t('export_section')}>
                           <Upload className="h-4 w-4 text-foreground" />
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={handleExportCsv} data-testid="parametersDataTable_export_csv">CSV</DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleExportJson} data-testid="parametersDataTable_export_json">JSON</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('export_section')}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                      </TooltipTrigger>
+                    </DropdownMenuTrigger>
+                    <TooltipContent>{t('export_section')}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExportCsv} data-testid="parametersDataTable_export_csv">CSV</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportJson} data-testid="parametersDataTable_export_json">JSON</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <input ref={fileInputRef} className="hidden" type="file" accept=".csv,.json" onChange={handleFileChange} />
             </>
           )}

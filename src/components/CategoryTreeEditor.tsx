@@ -329,8 +329,15 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         if (!open) resetCreateState();
       }}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm" onClick={() => setIsCreateOpen(true)} data-testid="categoryTree_newButton">
-              <Plus className="mr-[0.25rem] h-[1rem] w-[1rem]" /> {t("new_category")}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsCreateOpen(true)}
+              data-testid="categoryTree_newButton"
+              aria-label={t("new_category")}
+              className="border border-transparent hover:border-success hover:text-success hover:bg-transparent"
+            >
+              <Plus className="h-[1rem] w-[1rem]" />
             </Button>
           </DialogTrigger>
           <DialogContent>

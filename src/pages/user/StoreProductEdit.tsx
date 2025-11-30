@@ -144,7 +144,19 @@ export const StoreProductEdit = () => {
     try {
       const productPayload: { params?: ProductParam[]; category_id?: number } = {};
       if (params && params.length >= 0) {
-        productPayload.params = params;
+        const sanitized: Array<
+          Omit<ProductParam, "paramid" | "valueid"> & {
+            paramid?: string | null;
+            valueid?: string | null;
+          }
+        > = (params || []).map((p, idx) => ({
+          name: p.name,
+          value: p.value,
+          order_index: typeof p.order_index === "number" ? p.order_index : idx,
+          paramid: p.paramid && p.paramid.trim() ? p.paramid.trim() : null,
+          valueid: p.valueid && p.valueid.trim() ? p.valueid.trim() : null,
+        }))
+        productPayload.params = sanitized as unknown as ProductParam[];
       }
       const patch: StoreProductLinkPatch = {
         is_active: !!form.is_active,

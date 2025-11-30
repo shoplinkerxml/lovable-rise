@@ -34,6 +34,7 @@ function extractObjectKeyFromUrl(url: string): string | null {
     const host = u.host || ""
     const pathname = (u.pathname || "/").replace(/^\/+/, "")
     const parts = pathname.split("/").filter(Boolean)
+
     if (host.includes("cloudflarestorage.com")) {
       const hostParts = host.split(".")
       const isPathStyle = hostParts.length === 4
@@ -43,18 +44,33 @@ function extractObjectKeyFromUrl(url: string): string | null {
       }
       return pathname || null
     }
+
     if (host.includes("r2.dev")) {
       if (parts.length >= 2) return parts.slice(1).join("/")
       return parts[0] || null
     }
+
     return null
   } catch {
     return null
   }
 }
 
-type ImageInput = { key?: string; url?: string; order_index?: number; is_main?: boolean }
-type ParamInput = { name: string; value: string; order_index?: number; paramid?: string | null; valueid?: string | null }
+type ImageInput = {
+  key?: string
+  url?: string
+  order_index?: number
+  is_main?: boolean
+}
+
+type ParamInput = {
+  name: string
+  value: string
+  order_index?: number
+  paramid?: string | null
+  valueid?: string | null
+}
+
 type LinkPatch = {
   is_active?: boolean
   custom_price?: number | null
@@ -123,30 +139,56 @@ function buildDatePath() {
   return `${yyyy}/${mm}/${dd}`
 }
 
-async function buildFinalImageUrl(img: ImageInput, productId: string, datePath: string): Promise<string> {
+async function buildFinalImageUrl(
+  img: ImageInput,
+  productId: string,
+  datePath: string,
+): Promise<string> {
   const srcRaw = img.url ?? ""
   let finalUrl = String(srcRaw || "").trim()
   if (!s3 || !bucket || !accountId) return finalUrl
-  const srcKey = (img.key && String(img.key)) || (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url) : null)
+
+  const srcKey =
+    (img.key && String(img.key)) ||
+    (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url) : null)
+
   if (!srcKey) return finalUrl
+
   const parts = srcKey.split("/").filter(Boolean)
   const baseName = parts[parts.length - 1] || "file"
   const cleanName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_")
-  const suffix = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  const suffix =
+    crypto.randomUUID?.() ??
+    `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
   const destKey = `uploads/products/${productId}/${datePath}/${suffix}-${cleanName}`
+
   try {
-    await s3.send(new CopyObjectCommand({ Bucket: bucket, Key: destKey, CopySource: `${bucket}/${srcKey}` }))
+    await s3.send(
+      new CopyObjectCommand({
+        Bucket: bucket,
+        Key: destKey,
+        CopySource: `${bucket}/${srcKey}`,
+      }),
+    )
     finalUrl = `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${destKey}`
-  } catch {}
+  } catch {
+    // оставляем исходный finalUrl
+  }
+
   return finalUrl
 }
 
-async function handleImages(productId: string, images: ImageInput[] | undefined): Promise<void> {
+async function handleImages(
+  productId: string,
+  images: ImageInput[] | undefined,
+): Promise<void> {
   if (!Array.isArray(images) || images.length === 0) {
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }
+
   const datePath = buildDatePath()
+
   const processed = await Promise.all(
     images.map(async (img, index) => {
       const url = await buildFinalImageUrl(img, productId, datePath)
@@ -155,13 +197,18 @@ async function handleImages(productId: string, images: ImageInput[] | undefined)
       return { raw: img, url: trimmed, index }
     }),
   )
-  const valid = processed.filter((x): x is { raw: ImageInput; url: string; index: number } => x !== null)
+
+  const valid = processed.filter(
+    (x): x is { raw: ImageInput; url: string; index: number } => x !== null,
+  )
   if (!valid.length) {
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }
+
   const hasMain = valid.some((i) => i.raw.is_main === true)
   let assigned = false
+
   const normalized = valid.map(({ raw, url, index }) => {
     let isMain = raw.is_main === true && !assigned
     if (hasMain) {
@@ -173,8 +220,15 @@ async function handleImages(productId: string, images: ImageInput[] | undefined)
     } else {
       isMain = index === 0
     }
-    return { product_id: productId, url, is_main: isMain, order_index: typeof raw.order_index === "number" ? raw.order_index : index }
+    return {
+      product_id: productId,
+      url,
+      is_main: isMain,
+      order_index:
+        typeof raw.order_index === "number" ? raw.order_index : index,
+    }
   })
+
   const mainIdx = normalized.findIndex((i) => i.is_main === true)
   const ordered = (() => {
     const arr = normalized.slice()
@@ -184,43 +238,74 @@ async function handleImages(productId: string, images: ImageInput[] | undefined)
     }
     return arr.map((i, idx) => ({ ...i, order_index: idx }))
   })()
+
   await supabase.from("store_product_images").delete().eq("product_id", productId)
   if (ordered.length) {
     await supabase.from("store_product_images").insert(ordered)
   }
 }
 
-async function handleParams(productId: string, params: ParamInput[] | undefined): Promise<void> {
+async function handleParams(
+  productId: string,
+  params: ParamInput[] | undefined,
+): Promise<void> {
   await supabase.from("store_product_params").delete().eq("product_id", productId)
   if (!Array.isArray(params) || params.length === 0) return
+
   const mapped = params.map((p, index) => ({
     product_id: productId,
     name: p.name,
     value: p.value,
     order_index: typeof p.order_index === "number" ? p.order_index : index,
-    paramid: p.paramid ?? null,
-    valueid: p.valueid ?? null,
+    paramid: (() => {
+      const v = p.paramid == null ? null : String(p.paramid).trim()
+      return v === "" ? null : v
+    })(),
+    valueid: (() => {
+      const v = p.valueid == null ? null : String(p.valueid).trim()
+      return v === "" ? null : v
+    })(),
   }))
+
   if (mapped.length) {
     await supabase.from("store_product_params").insert(mapped)
   }
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: jsonHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
   }
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "method_not_allowed" }),
+      { status: 405, headers: jsonHeaders },
+    )
+  }
+
   try {
     const auth = req.headers.get("authorization")
-    if (!auth) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: jsonHeaders })
+    if (!auth) {
+      return new Response(
+        JSON.stringify({ error: "unauthorized" }),
+        { status: 401, headers: jsonHeaders },
+      )
+    }
     const userId = decodeJwtSub(auth)
-    if (!userId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: jsonHeaders })
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "unauthorized" }),
+        { status: 401, headers: jsonHeaders },
+      )
+    }
 
     const body = (await req.json().catch(() => ({}))) as Body
     const productId = String(body?.product_id || "").trim()
     if (!productId) {
-      return new Response(JSON.stringify({ error: "invalid_body", message: "product_id required" }), { status: 400, headers: jsonHeaders })
+      return new Response(
+        JSON.stringify({ error: "invalid_body", message: "product_id required" }),
+        { status: 400, headers: jsonHeaders },
+      )
     }
 
     const { data: productRow } = await supabase
@@ -228,76 +313,132 @@ serve(async (req) => {
       .select("id,store_id,category_id,category_external_id")
       .eq("id", productId)
       .maybeSingle()
-    if (!productRow) return new Response(JSON.stringify({ error: "not_found" }), { status: 404, headers: jsonHeaders })
-    const storeId = String(body.store_id || (productRow as { store_id: string }).store_id || "")
+
+    if (!productRow) {
+      return new Response(
+        JSON.stringify({ error: "not_found" }),
+        { status: 404, headers: jsonHeaders },
+      )
+    }
+
+    const storeId = String(
+      body.store_id || (productRow as { store_id: string }).store_id || "",
+    )
 
     const { data: storeRow } = await supabase
       .from("user_stores")
       .select("id,user_id,is_active")
       .eq("id", storeId)
       .maybeSingle()
+
     if (!storeRow || String(storeRow.user_id) !== String(userId)) {
-      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: jsonHeaders })
+      return new Response(
+        JSON.stringify({ error: "forbidden" }),
+        { status: 403, headers: jsonHeaders },
+      )
     }
+
     const isActive = (storeRow as { is_active?: boolean }).is_active
     if (isActive === false) {
-      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: jsonHeaders })
+      return new Response(
+        JSON.stringify({ error: "forbidden" }),
+        { status: 403, headers: jsonHeaders },
+      )
     }
 
-    const updateBase: Record<string, unknown> = {}
-    if (body.supplier_id !== undefined) updateBase.supplier_id = body.supplier_id != null ? Number(body.supplier_id) : null
-    if (body.external_id !== undefined) updateBase.external_id = body.external_id
-    if (body.name !== undefined) updateBase.name = body.name
-    if (body.name_ua !== undefined) updateBase.name_ua = body.name_ua
-    if (body.docket !== undefined) updateBase.docket = body.docket
-    if (body.docket_ua !== undefined) updateBase.docket_ua = body.docket_ua
-    if (body.description !== undefined) updateBase.description = body.description
-    if (body.description_ua !== undefined) updateBase.description_ua = body.description_ua
-    if (body.vendor !== undefined) updateBase.vendor = body.vendor
-    if (body.article !== undefined) updateBase.article = body.article
-    if (body.category_id !== undefined) updateBase.category_id = body.category_id != null ? Number(body.category_id) : null
+    // Полное обновление всех полей товара по переданному body
+    const updateBase: Record<string, unknown> = {
+      supplier_id:
+        body.supplier_id != null ? Number(body.supplier_id) : null,
+      external_id: body.external_id ?? null,
+      name: body.name ?? null,
+      name_ua: body.name_ua ?? null,
+      docket: body.docket ?? null,
+      docket_ua: body.docket_ua ?? null,
+      description: body.description ?? null,
+      description_ua: body.description_ua ?? null,
+      vendor: body.vendor ?? null,
+      article: body.article ?? null,
+      currency_code: body.currency_code ?? null,
+      price: body.price ?? null,
+      price_old: body.price_old ?? null,
+      price_promo: body.price_promo ?? null,
+      stock_quantity: body.stock_quantity ?? 0,
+      available: body.available ?? true,
+      state: body.state ?? "new",
+      category_id:
+        body.category_id != null ? Number(body.category_id) : null,
+    }
 
-    if (body.category_external_id !== undefined) {
-      const raw = body.category_external_id
+    // category_external_id: вычисление / очистка
+    {
       let nextExt: string | null = null
-      if (raw != null && String(raw).trim() !== "") {
-        nextExt = String(raw)
-      } else if (body.category_id != null) {
-        const { data: catRow } = await supabase
-          .from("store_categories")
-          .select("external_id")
-          .eq("id", Number(body.category_id))
-          .maybeSingle()
-        nextExt = (catRow as { external_id?: string } | null)?.external_id ?? null
+
+      const hasExtInBody = body.category_external_id !== undefined
+      const hasCatInBody = body.category_id !== undefined
+
+      if (hasExtInBody) {
+        if (body.category_external_id != null &&
+            String(body.category_external_id).trim() !== "") {
+          nextExt = String(body.category_external_id)
+        } else {
+          nextExt = null
+        }
+      } else if (hasCatInBody) {
+        if (body.category_id != null) {
+          const { data: catRow } = await supabase
+            .from("store_categories")
+            .select("external_id")
+            .eq("id", Number(body.category_id))
+            .maybeSingle()
+          nextExt =
+            (catRow as { external_id?: string } | null)?.external_id ?? null
+        } else {
+          nextExt = null
+        }
       } else {
-        nextExt = (productRow as { category_external_id?: string } | null)?.category_external_id ?? null
+        // ни category_id, ни category_external_id не пришли — оставляем как в БД
+        nextExt =
+          (productRow as { category_external_id?: string } | null)
+            ?.category_external_id ?? null
       }
-      if (nextExt != null && String(nextExt).trim() !== "") {
-        updateBase.category_external_id = String(nextExt)
-      } else {
-        updateBase.category_external_id = null
-      }
+
+      updateBase.category_external_id =
+        nextExt != null && String(nextExt).trim() !== ""
+          ? String(nextExt)
+          : null
     }
 
-    if (body.currency_code !== undefined) updateBase.currency_code = body.currency_code
-    if (body.price !== undefined) updateBase.price = body.price
-    if (body.price_old !== undefined) updateBase.price_old = body.price_old
-    if (body.price_promo !== undefined) updateBase.price_promo = body.price_promo
-    if (body.stock_quantity !== undefined) updateBase.stock_quantity = body.stock_quantity
-    if (body.available !== undefined) updateBase.available = body.available
-    if (body.state !== undefined) updateBase.state = body.state
+    const { error: updErr } = await supabase
+      .from("store_products")
+      .update(updateBase)
+      .eq("id", productId)
 
-    if (Object.keys(updateBase).length > 0) {
-      const { error: updErr } = await supabase.from("store_products").update(updateBase).eq("id", productId)
-      if (updErr) {
-        return new Response(JSON.stringify({ error: "update_failed", message: updErr.message || "Update failed" }), { status: 500, headers: jsonHeaders })
-      }
+    if (updErr) {
+      return new Response(
+        JSON.stringify({
+          error: "update_failed",
+          message: updErr.message || "Update failed",
+        }),
+        { status: 500, headers: jsonHeaders },
+      )
     }
 
     try {
-      await Promise.all([handleImages(productId, body.images), handleParams(productId, body.params)])
+      await Promise.all([
+        handleImages(productId, body.images),
+        handleParams(productId, body.params),
+      ])
     } catch (subErr) {
-      return new Response(JSON.stringify({ error: "update_failed", message: (subErr as { message?: string })?.message || "Update sub-ops failed" }), { status: 500, headers: jsonHeaders })
+      return new Response(
+        JSON.stringify({
+          error: "update_failed",
+          message:
+            (subErr as { message?: string })?.message ||
+            "Update sub-ops failed",
+        }),
+        { status: 500, headers: jsonHeaders },
+      )
     }
 
     const patch = body.linkPatch || {}
@@ -321,6 +462,7 @@ serve(async (req) => {
       .maybeSingle()
 
     let link: any = null
+
     if (!existing) {
       const { data: inserted, error: insErr } = await supabase
         .from("store_product_links")
@@ -341,28 +483,47 @@ serve(async (req) => {
         ])
         .select("*")
         .maybeSingle()
+
       if (insErr) {
-        return new Response(JSON.stringify({ error: "update_failed", message: insErr.message || "Insert link failed" }), { status: 500, headers: jsonHeaders })
+        return new Response(
+          JSON.stringify({
+            error: "update_failed",
+            message: insErr.message || "Insert link failed",
+          }),
+          { status: 500, headers: jsonHeaders },
+        )
       }
       link = inserted
     } else {
-      const { data: updated, error: updErr } = await supabase
+      const { data: updated, error: updErr2 } = await supabase
         .from("store_product_links")
         .update(allowed)
         .eq("product_id", productId)
         .eq("store_id", storeId)
         .select("*")
         .maybeSingle()
-      if (updErr) {
-        return new Response(JSON.stringify({ error: "update_failed", message: updErr.message || "Update link failed" }), { status: 500, headers: jsonHeaders })
+
+      if (updErr2) {
+        return new Response(
+          JSON.stringify({
+            error: "update_failed",
+            message: updErr2.message || "Update link failed",
+          }),
+          { status: 500, headers: jsonHeaders },
+        )
       }
       link = updated
     }
 
-    return new Response(JSON.stringify({ product_id: String(productId), link }), { status: 200, headers: jsonHeaders })
+    return new Response(
+      JSON.stringify({ product_id: String(productId), link }),
+      { status: 200, headers: jsonHeaders },
+    )
   } catch (e) {
     const msg = (e as { message?: string })?.message ?? "Update failed"
-    return new Response(JSON.stringify({ error: "update_failed", message: msg }), { status: 500, headers: jsonHeaders })
+    return new Response(
+      JSON.stringify({ error: "update_failed", message: msg }),
+      { status: 500, headers: jsonHeaders },
+    )
   }
 })
-

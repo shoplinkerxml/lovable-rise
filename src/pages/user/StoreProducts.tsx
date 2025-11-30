@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ProductsTable } from "@/components/user/products/ProductsTable";
-import { ProductService, type Product, type ProductLimitInfo } from "@/lib/product-service";
+import { ProductService, type Product } from "@/lib/product-service";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
@@ -20,7 +20,7 @@ export const StoreProducts = () => {
   const [shopName, setShopName] = useState("");
   const [tableLoading, setTableLoading] = useState<boolean>(true);
   const [totalCount, setTotalCount] = useState<number>(0);
-  const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
+  const [limitInfo] = useState<{ current: number; max: number; canCreate: boolean }>({ current: 0, max: 0, canCreate: true });
   const queryClient = useQueryClient();
   const { data: shopsAgg } = useQuery({ queryKey: ['shopsList'], queryFn: ShopService.getShopsAggregated });
   const aggProducts = (() => {
@@ -43,10 +43,7 @@ export const StoreProducts = () => {
       } catch (_) {
         setShopName("");
       }
-      try {
-        const info = await ProductService.getProductLimit();
-        setLimitInfo(info);
-      } catch (_) { void 0; }
+      
     })();
   }, [storeId, t]);
 
