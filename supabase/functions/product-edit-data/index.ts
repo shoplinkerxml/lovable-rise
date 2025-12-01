@@ -57,6 +57,9 @@ type ProductImage = {
   order_index: number
   is_main: boolean
   alt_text?: string | null
+  r2_key_card?: string | null
+  r2_key_thumb?: string | null
+  r2_key_original?: string | null
 }
 
 type SupplierRow = { id: string; supplier_name: string }
@@ -259,7 +262,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const imagesPromise = supabase
       .from('store_product_images')
-      .select('id,product_id,url,order_index,is_main,alt_text')
+      .select('id,product_id,url,order_index,is_main,alt_text,r2_key_card,r2_key_thumb,r2_key_original')
       .eq('product_id', productId)
       .order('order_index')
 
@@ -346,19 +349,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    const images: ProductImage[] = ((imageRows || []) as any[]).map(
-      (img, index) => ({
-        id: img.id != null ? String(img.id) : undefined,
-        product_id:
-          img.product_id != null ? String(img.product_id) : productId,
-        url: String(img.url || ''),
-        order_index:
-          typeof img.order_index === 'number'
-            ? img.order_index
-            : index,
-        is_main: img.is_main === true,
-        alt_text: img.alt_text ?? null,
-      }),
+    const imageBase = Deno.env.get('IMAGE_BASE_URL') || ''
+
+    const images: (ProductImage & { images?: { original: string | null; card: string | null; thumb: string | null } })[] = ((imageRows || []) as any[]).map(
+      (img, index) => {
+        const r2o = img.r2_key_original ? String(img.r2_key_original) : ''
+        const r2c = img.r2_key_card ? String(img.r2_key_card) : ''
+        const r2t = img.r2_key_thumb ? String(img.r2_key_thumb) : ''
+        const originalUrl = r2o && imageBase ? `${imageBase}/${r2o}` : null
+        const cardUrl = r2c && imageBase ? `${imageBase}/${r2c}` : null
+        const thumbUrl = r2t && imageBase ? `${imageBase}/${r2t}` : null
+        const fallbackUrl = String(img.url || '')
+        const finalCard = cardUrl || (thumbUrl ? thumbUrl : (fallbackUrl || null))
+        const finalThumb = thumbUrl || (cardUrl ? cardUrl : (fallbackUrl || null))
+        return {
+          id: img.id != null ? String(img.id) : undefined,
+          product_id: img.product_id != null ? String(img.product_id) : productId,
+          url: fallbackUrl,
+          order_index: typeof img.order_index === 'number' ? img.order_index : index,
+          is_main: img.is_main === true,
+          alt_text: img.alt_text ?? null,
+          r2_key_card: r2c || null,
+          r2_key_thumb: r2t || null,
+          r2_key_original: r2o || null,
+          images: { original: originalUrl, card: finalCard, thumb: finalThumb },
+        }
+      },
     )
 
     const params: ProductParam[] = ((paramRows || []) as any[]).map(

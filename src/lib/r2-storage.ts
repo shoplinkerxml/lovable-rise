@@ -91,16 +91,17 @@ export const R2Storage = {
       return v || 'https://images-service.xmlreactor.shop';
     } catch (e) { void e; return 'https://images-service.xmlreactor.shop'; }
   },
-  getPublicHost(): string {
+  getImageBaseUrl(): string {
     try {
       const env = import.meta as unknown as { env?: Record<string, string> };
-      const v = env?.env?.VITE_R2_PUBLIC_HOST || '';
-      return v || 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com';
-    } catch (e) { void e; return 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com'; }
+      const w = window as unknown as { __IMAGE_BASE_URL__?: string };
+      const v = env?.env?.VITE_IMAGE_BASE_URL || w.__IMAGE_BASE_URL__ || '';
+      return v || R2Storage.getWorkerUrl();
+    } catch (e) { void e; return R2Storage.getWorkerUrl(); }
   },
-  makePublicUrl(objectKey: string, bucket = 'shop-linker'): string {
-    const host = R2Storage.getPublicHost();
-    return `https://${host}/${bucket}/${objectKey}`;
+  makePublicUrl(objectKey: string): string {
+    const base = R2Storage.getImageBaseUrl();
+    return `${base}/${objectKey}`;
   },
   /**
    * Загружает файл через Supabase proxy, избегая CORS проблем
@@ -156,14 +157,13 @@ export const R2Storage = {
     const res = await fetch(`${base}/upload`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId, url }) });
     if (!res.ok) throw new Error('upload_failed');
     const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
-    const bucket = 'shop-linker';
+    const imageBase = R2Storage.getImageBaseUrl();
     const imageId = String(json.imageId || '');
     const originalKey = String(json.originalKey || '');
     const cardKey = String(json.cardKey || '');
     const thumbKey = String(json.thumbKey || '');
-    const isDevWorker = (() => { try { const u = new URL(base); return u.hostname === 'localhost'; } catch { return false; } })();
-    const publicCardUrl = isDevWorker ? `${base}/image?key=${cardKey}` : R2Storage.makePublicUrl(cardKey, bucket);
-    const publicThumbUrl = isDevWorker ? `${base}/image?key=${thumbKey}` : R2Storage.makePublicUrl(thumbKey, bucket);
+    const publicCardUrl = `${imageBase}/${cardKey}`;
+    const publicThumbUrl = `${imageBase}/${thumbKey}`;
     return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
   },
 
@@ -175,14 +175,13 @@ export const R2Storage = {
     const res = await fetch(`${base}/upload`, { method: 'POST', body: fd });
     if (!res.ok) throw new Error('upload_failed');
     const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
-    const bucket = 'shop-linker';
+    const imageBase = R2Storage.getImageBaseUrl();
     const imageId = String(json.imageId || '');
     const originalKey = String(json.originalKey || '');
     const cardKey = String(json.cardKey || '');
     const thumbKey = String(json.thumbKey || '');
-    const isDevWorker = (() => { try { const u = new URL(base); return u.hostname === 'localhost'; } catch { return false; } })();
-    const publicCardUrl = isDevWorker ? `${base}/image?key=${cardKey}` : R2Storage.makePublicUrl(cardKey, bucket);
-    const publicThumbUrl = isDevWorker ? `${base}/image?key=${thumbKey}` : R2Storage.makePublicUrl(thumbKey, bucket);
+    const publicCardUrl = `${imageBase}/${cardKey}`;
+    const publicThumbUrl = `${imageBase}/${thumbKey}`;
     return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
   },
 
@@ -231,47 +230,16 @@ export const R2Storage = {
   extractObjectKeyFromUrl(url: string): string | null {
     try {
       const u = new URL(url);
-      const host = u.host || '';
       const pathname = (u.pathname || '/').replace(/^\/+/, '');
+      if (!pathname) return null;
+      const idxProducts = pathname.indexOf('products/');
+      const idxUploads = pathname.indexOf('uploads/');
+      if (idxProducts >= 0) return pathname.slice(idxProducts);
+      if (idxUploads >= 0) return pathname.slice(idxUploads);
       const parts = pathname.split('/').filter(Boolean);
-      // ВАЖНО: сначала корректно обрабатываем известные форматы хостов,
-      // чтобы не перепутать bucket с частью objectKey
-
-      // cloudflarestorage.com поддерживает два формата:
-      // 1) Виртуальный хост: https://<bucket>.<account>.r2.cloudflarestorage.com/<objectKey>
-      //    В этом случае bucket в поддомене, а путь — это objectKey целиком.
-      // 2) Path-style (подписанные URL): https://<account>.r2.cloudflarestorage.com/<bucket>/<objectKey>
-      //    В этом случае первая часть path — bucket, её нужно отбросить.
-      if (host.includes('cloudflarestorage.com')) {
-        const hostParts = host.split('.');
-        // Формат без bucket в поддомене: <account>.r2.cloudflarestorage.com
-        const isPathStyle = hostParts.length === 4; // [account, r2, cloudflarestorage, com]
-        if (isPathStyle) {
-          if (parts.length >= 2) return parts.slice(1).join('/');
-          return parts[0] || null;
-        }
-        // Виртуальный хост — путь уже равен objectKey
-        return pathname || null;
-      }
-
-      // r2.dev: первая часть пути — bucket, дальше objectKey
-      if (host.includes('r2.dev')) {
-        if (parts.length >= 2) return parts.slice(1).join('/');
-        return parts[0] || null;
-      }
-
-      // Фолбэк: если неизвестный хост и внутри пути есть uploads/, вернём путь от uploads/
-      // (Не применяем для известных хостов выше, чтобы не возвращать bucket как часть objectKey)
-      const uploadsIdx = pathname.indexOf('uploads/');
-      if (uploadsIdx > 0) {
-        return pathname.slice(uploadsIdx);
-      }
-
-      // Общий фолбэк: вернуть путь без ведущего слэша
-      return parts.join('/') || null;
-    } catch {
-      return null;
-    }
+      if (parts.length <= 1) return parts[0] || null;
+      return parts.slice(1).join('/');
+    } catch { return null }
   },
 
   /**

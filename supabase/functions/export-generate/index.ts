@@ -233,6 +233,17 @@ Deno.serve(async (req) => {
       .in('product_id', productIds)
       .order('order_index');
 
+    const r2PublicHost = Deno.env.get('R2_PUBLIC_HOST') ?? '';
+    const accountIdEnv = Deno.env.get('CLOUDFLARE_ACCOUNT_ID') ?? '';
+    const bucketEnv = Deno.env.get('R2_BUCKET_NAME') ?? '';
+    const makePublicUrlFromKey = (key: string): string => {
+      const k = String(key || '');
+      if (!k) return '';
+      if (r2PublicHost && bucketEnv) return `https://${r2PublicHost}/${bucketEnv}/${k}`;
+      if (accountIdEnv && bucketEnv) return `https://${bucketEnv}.${accountIdEnv}.r2.cloudflarestorage.com/${k}`;
+      return k;
+    };
+
     const offersXml = (linksData || [])
       .filter((row: LinkRow) => {
         const base: Product = row.store_products || ({} as Product);
@@ -303,7 +314,11 @@ Deno.serve(async (req) => {
         const picPaths = fieldPaths.filter((p) => p.match(/offers\.offer\.picture\[\d+\]$/));
         const includePics = (imgs.length > 0) || (picPaths.length > 0);
         if (!includePics) return '';
-        return imgs.map((img) => `<picture>${xmlEscape(cleanText(String(img.url || '')))}</picture>`).join('');
+        return imgs.map((img: any) => {
+          const key = img?.r2_key_original as string | undefined;
+          const u = key ? makePublicUrlFromKey(key) : String(img?.url || '');
+          return `<picture>${xmlEscape(cleanText(u))}</picture>`;
+        }).join('');
       })();
 
       const paramsXml = (() => {

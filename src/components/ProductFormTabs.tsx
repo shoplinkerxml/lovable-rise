@@ -55,6 +55,7 @@ interface ProductImage {
   order_index: number;
   is_main: boolean;
   object_key?: string;
+  thumb_url?: string;
 }
 // Shallow lookup types to avoid deep Supabase generics
 type SupplierOption = {
@@ -742,9 +743,23 @@ export function ProductFormTabs({
       const imagesData: ProductImage[] | null = preloadedImages ?? null;
       if (imagesData) {
         const resolved = await Promise.all(imagesData.map(async (img) => {
+          const row = img as unknown as {
+            r2_key_card?: string | null;
+            r2_key_thumb?: string | null;
+            r2_key_original?: string | null;
+          };
           let previewUrl: string = img.url;
-          const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          if (typeof previewUrl === 'string') {
+          let thumbUrl: string | undefined;
+          const cardKey = row.r2_key_card || undefined;
+          const thumbKey = row.r2_key_thumb || undefined;
+          let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          if (cardKey) {
+            try {
+              const signed = await R2Storage.getViewUrl(cardKey);
+              previewUrl = signed || R2Storage.makePublicUrl(cardKey);
+              objectKeyRaw = cardKey;
+            } catch { previewUrl = R2Storage.makePublicUrl(cardKey); objectKeyRaw = cardKey; }
+          } else if (typeof previewUrl === 'string') {
             let host = '';
             try { host = new URL(previewUrl).host; } catch {}
             const isR2Dev = previewUrl.includes('r2.dev');
@@ -755,9 +770,15 @@ export function ProductFormTabs({
                 try {
                   const signed = await R2Storage.getViewUrl(objectKey);
                   if (signed) previewUrl = signed;
-                } catch (e) {}
+                } catch {}
               }
             }
+          }
+          if (thumbKey) {
+            try {
+              const signedThumb = await R2Storage.getViewUrl(thumbKey);
+              thumbUrl = signedThumb || R2Storage.makePublicUrl(thumbKey);
+            } catch { thumbUrl = R2Storage.makePublicUrl(thumbKey); }
           }
           return {
             id: img.id,
@@ -765,7 +786,8 @@ export function ProductFormTabs({
             alt_text: img.alt_text || '',
             order_index: img.order_index,
             is_main: img.is_main,
-            object_key: objectKeyRaw || undefined
+            object_key: objectKeyRaw || undefined,
+            thumb_url: thumbUrl || undefined,
           } as ProductImage;
         }));
         setImages(resolved);
@@ -888,7 +910,7 @@ export function ProductFormTabs({
     (async () => {
       try {
         const res = await R2Storage.uploadViaWorkerFromUrl(String((product as unknown as { id?: string }).id || ''), imageUrl.trim());
-        const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey };
+        const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey, thumb_url: res.publicThumbUrl };
         const nextImages = [...images, newImage];
         setImages(nextImages);
         imagesRef.current = nextImages;
@@ -978,7 +1000,7 @@ export function ProductFormTabs({
     try {
       if (!product) { toast.error(t('failed_load_product_data')); return; }
       const res = await R2Storage.uploadViaWorkerFromFile(String((product as unknown as { id?: string }).id || ''), file);
-      const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey };
+      const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey, thumb_url: res.publicThumbUrl };
       const nextImages = [...images, newImage];
       setImages(nextImages);
       imagesRef.current = nextImages;
@@ -1198,8 +1220,8 @@ export function ProductFormTabs({
                                     <Card className={`relative group cursor-pointer transition-all ${activeImageIndex === index ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-gray-300'}`} onClick={() => setActiveImageIndex(index)}>
                                       <CardContent className="p-1">
                                         <div className="aspect-square relative overflow-hidden rounded-md">
-                                          <img src={image.url} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} />
-                                        </div>
+                                          <img src={image.thumb_url || image.url} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} />
+                                          </div>
                                         {image.is_main && <Badge className="absolute -top-1 -left-1 text-xs px-1 py-0" variant="default">
                                             Г
                                           </Badge>}

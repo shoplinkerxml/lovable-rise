@@ -3,7 +3,7 @@
 // Импорты вида "https://deno.land/..." и "npm:..." валидны в Deno,
 // но редактор Node/TypeScript может ругаться на их типы.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { S3Client, DeleteObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from "npm:@aws-sdk/client-s3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,9 +79,26 @@ serve(async (req) => {
       credentials: { accessKeyId, secretAccessKey },
     });
 
+    const m = objectKey.match(/^products\/([^\/]+)\/([^\/]+)\/(.+)$/);
+    if (m) {
+      const prefix = `products/${m[1]}/${m[2]}/`;
+      try {
+        const listed = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }));
+        const keys = (listed.Contents || []).map((o) => o.Key).filter((k): k is string => !!k);
+        if (keys.length > 0) {
+          await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys.map((k) => ({ Key: k })) } }));
+          return new Response(JSON.stringify({ success: true, deleted: keys.length, prefix }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (_) {
+        // fall through to single object delete
+      }
+    }
     await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }));
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, deleted: 1 }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
