@@ -27,11 +27,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'invalid_payload' }), { status: 400, headers: corsHeaders })
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
-      { global: { headers: {} } }
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: supabaseKey ? { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } : {} } })
 
     const patch: Record<string, string> = {}
     if (r2Card) patch['r2_key_card'] = r2Card
@@ -47,7 +45,8 @@ Deno.serve(async (req) => {
       .update(patch)
       .eq('id', imageId)
     if (error) {
-      return new Response(JSON.stringify({ error: 'update_failed' }), { status: 500, headers: corsHeaders })
+      const msg = (error as any)?.message || ''
+      return new Response(JSON.stringify({ error: 'update_failed', message: msg }), { status: 500, headers: corsHeaders })
     }
 
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders })

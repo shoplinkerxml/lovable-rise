@@ -88,8 +88,8 @@ export const R2Storage = {
       const env = import.meta as unknown as { env?: Record<string, string> };
       const w = window as unknown as { __IMAGE_WORKER_URL__?: string };
       const v = env?.env?.VITE_IMAGE_WORKER_URL || w.__IMAGE_WORKER_URL__ || '';
-      return v || 'http://localhost:8787';
-    } catch (e) { void e; return 'http://localhost:8787'; }
+      return v || 'https://images-service.xmlreactor.shop';
+    } catch (e) { void e; return 'https://images-service.xmlreactor.shop'; }
   },
   getPublicHost(): string {
     try {

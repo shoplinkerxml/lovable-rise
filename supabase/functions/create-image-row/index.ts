@@ -26,11 +26,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'invalid_payload' }), { status: 400, headers: corsHeaders })
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
-      { global: { headers: {} } }
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: supabaseKey ? { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } : {} } })
 
     // Determine next order_index
     let nextOrder = 0
