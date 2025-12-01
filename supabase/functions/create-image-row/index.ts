@@ -7,7 +7,7 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 }
 
-type Body = { product_id?: string | number; url?: string }
+type Body = { product_id?: string; url?: string }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -20,10 +20,9 @@ Deno.serve(async (req) => {
     }
 
     const body: Body = await req.json().catch(() => ({}) as Body)
-    const productIdRaw = body?.product_id
-    const productId = typeof productIdRaw === 'number' ? productIdRaw : Number(String(productIdRaw || ''))
+    const productId = (body?.product_id ? String(body.product_id) : '').trim()
     const url = (body?.url ? String(body.url) : '').trim()
-    if (!Number.isFinite(productId) || !productId || !url) {
+    if (!productId || !url) {
       return new Response(JSON.stringify({ error: 'invalid_payload' }), { status: 400, headers: corsHeaders })
     }
 
@@ -71,4 +70,3 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders })
   }
 })
-
