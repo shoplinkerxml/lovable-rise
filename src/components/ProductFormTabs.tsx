@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import ImageSection from './ProductFormTabs/ImageSection';
 import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, ChevronDown, Check, MoreHorizontal, Pencil, Trash, Trash2, Globe, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -1606,75 +1607,26 @@ export function ProductFormTabs({
 
             {/* Tab 2: Images */}
             <TabsContent value="images" className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
-              <div className="relative space-y-3 md:space-y-4">
-
-                {/* Existing images */}
-                <div className="flex flex-wrap gap-3 md:gap-4">
-                  {images.map((image, index) => <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
-                      <CardContent className="p-2">
-                        <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={getGalleryAdaptiveImageStyle(index)}>
-                          <img ref={el => galleryImgRefs.current[index] = el} src={image.url} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={e => handleGalleryImageLoad(e, index)} onError={e => handleGalleryImageError(e, index)} />
-                          {readOnly ? null : <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                              <Button size="icon" variant="ghost" onClick={() => setMainImage(index)} aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')} data-testid={`productFormTabs_setMainButton_${index}`} className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}>
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="destructive" onClick={() => removeImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>}
-                        </div>
-                        {image.is_main && <Badge className="absolute top-2 left-2" variant="default">
-                            {t('main_photo')}
-                          </Badge>}
-                      </CardContent>
-                    </Card>)}
-                </div>
-
-                <Separator />
-
-                {/* Drop zone under photos */}
-                {readOnly ? null : <Card className="relative group w-full" data-testid="productFormTabs_dropZone">
-                    <CardContent className="p-1 md:p-2">
-                      <div className={`relative overflow-hidden rounded-md flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${isDragOver ? 'bg-emerald-100 border-2 border-dashed border-emerald-300 shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-200 hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100'} hover:scale-[1.01]`} style={{
-                    width: '100%',
-                    maxWidth: '100%',
-                    height: 'auto',
-                    minHeight: 'clamp(12rem, 30vh, 24rem)'
-                  }} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => document.getElementById('fileUpload')?.click()} role="button" tabIndex={0} onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      document.getElementById('fileUpload')?.click();
-                    }
-                  }}>
-                        <ImageIcon className={`h-12 w-12 mb-2 md:mb-3 transition-colors ${isDragOver ? 'text-emerald-600' : 'text-emerald-500'}`} />
-                        <p className={`text-sm text-center px-2 transition-colors ${isDragOver ? 'text-emerald-700 font-medium' : 'text-emerald-700'}`}>
-                          {isDragOver ? t('drop_image_here') : t('click_to_upload') || t('add_images_instruction')}
-                        </p>
-                        <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
-                          {t('image_types_and_limit')}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>}
-
-                {/* Hidden file input retained for drop zone click */}
-                {readOnly ? null : <input type="file" accept="image/*,.avif,image/avif" onChange={handleFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />}
-
-                {/* Add by URL under photos */}
-                <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
-                  <div className="flex-1">
-                    {readOnly ? null : <>
-                        <Label htmlFor="imageUrl">{t('add_image_by_url')}</Label>
-                        <div className="flex gap-2 mt-2">
-                          <Input id="imageUrl" name="imageUrl" autoComplete="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder={t('image_url_placeholder')} data-testid="productFormTabs_imageUrlInput" />
-                          <Button onClick={addImageFromUrl} variant="outline" size="icon" data-testid="productFormTabs_addImageUrlButton">
-                            <Link className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </>}
-                  </div>
-                </div>
-              </div>
+              <ImageSection
+                images={images}
+                readOnly={readOnly}
+                isDragOver={isDragOver}
+                imageUrl={imageUrl}
+                onSetImageUrl={(v) => setImageUrl(v)}
+                onAddImageFromUrl={addImageFromUrl}
+                onRemoveImage={(index) => removeImage(index)}
+                onSetMainImage={(index) => setMainImage(index)}
+                onFileUpload={handleFileUpload}
+                onDropZoneClick={() => document.getElementById('fileUpload')?.click()}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                getGalleryAdaptiveImageStyle={getGalleryAdaptiveImageStyle}
+                galleryImgRefs={galleryImgRefs}
+                onGalleryImageLoad={handleGalleryImageLoad}
+                onGalleryImageError={handleGalleryImageError}
+              />
             </TabsContent>
 
             {/* Tab 3: Parameters */}

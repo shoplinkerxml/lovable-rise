@@ -419,15 +419,15 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     try {
       setLoading(true);
       
-      // Используем новый API для загрузки через proxy
-      const result = await R2Storage.uploadFile(file, product ? String(product.id) : undefined);
-
+      const pid = product ? String(product.id) : ''
+      const result = await R2Storage.uploadViaWorkerFromFile(pid, file)
       const newImage = {
-        url: result.viewUrl || result.publicUrl,
+        url: result.publicCardUrl,
         order_index: images.length,
         is_main: images.length === 0,
-        object_key: result.objectKey,
-      };
+        object_key: result.cardKey,
+        thumb_url: result.publicThumbUrl,
+      } as ProductImage
       setImages([...images, newImage]);
       toast.success(t('image_uploaded_successfully'));
     } catch (error) {

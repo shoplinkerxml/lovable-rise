@@ -109,47 +109,28 @@ export const R2Storage = {
   async uploadFile(file: File, productId?: string): Promise<UploadResponse> {
     const token = await getAccessToken();
     const headers = buildAuthHeaders(token);
-    const url = `${SUPABASE_URL}/functions/v1/r2-upload`;
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      if (productId) fd.append("productId", productId);
-      const res = await fetch(url, { method: "POST", body: fd, headers });
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => "");
-        throw parseEdgeError({ message: errBody || "upload_failed", context: { status: res.status, body: errBody } }, "Failed to upload file to R2");
-      }
-      const data = (await res.json()) as UploadResponse;
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (!productId && userId && data?.objectKey && (data.objectKey.includes(`uploads/tmp/${userId}/`) || data.objectKey.includes(`/uploads/tmp/${userId}/`))) {
-        addPendingUpload(userId, data.objectKey);
-      }
-      return data;
-    } catch {
-      const base64File: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const commaIndex = result.indexOf(",");
-          resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-      const { data, error } = await supabase.functions.invoke("r2-upload", {
-        body: { fileName: file.name, fileType: file.type, fileSize: file.size, fileData: base64File, productId },
-        headers,
-      });
-      if (error) throw parseEdgeError(error, "Failed to upload file to R2");
-      const resp = data as UploadResponse;
-      const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id;
-      if (!productId && userId && resp?.objectKey && (resp.objectKey.includes(`uploads/tmp/${userId}/`) || resp.objectKey.includes(`/uploads/tmp/${userId}/`))) {
-        addPendingUpload(userId, resp.objectKey);
-      }
-      return resp;
+    const base64File: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const commaIndex = result.indexOf(",");
+        resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    const { data, error } = await supabase.functions.invoke("r2-upload", {
+      body: { fileName: file.name, fileType: file.type, fileSize: file.size, fileData: base64File, productId },
+      headers,
+    });
+    if (error) throw parseEdgeError(error, "Failed to upload file to R2");
+    const resp = data as UploadResponse;
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!productId && userId && resp?.objectKey && (resp.objectKey.includes(`uploads/tmp/${userId}/`) || resp.objectKey.includes(`/uploads/tmp/${userId}/`))) {
+      addPendingUpload(userId, resp.objectKey);
     }
+    return resp;
   },
 
   async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
