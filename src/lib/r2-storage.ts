@@ -154,7 +154,9 @@ export const R2Storage = {
 
   async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
     const base = R2Storage.getWorkerUrl();
-    const res = await fetch(`${base}/upload`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId, url }) });
+    const token = await getAccessToken();
+    const authHeaders = buildAuthHeaders(token);
+    const res = await fetch(`${base}/upload`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders }, body: JSON.stringify({ productId, url }) });
     if (!res.ok) throw new Error('upload_failed');
     const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
     const imageBase = R2Storage.getImageBaseUrl();
@@ -169,10 +171,12 @@ export const R2Storage = {
 
   async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
     const base = R2Storage.getWorkerUrl();
+    const token = await getAccessToken();
+    const authHeaders = buildAuthHeaders(token);
     const fd = new FormData();
     fd.append('productId', productId);
     fd.append('file', file);
-    const res = await fetch(`${base}/upload`, { method: 'POST', body: fd });
+    const res = await fetch(`${base}/upload`, { method: 'POST', headers: authHeaders, body: fd });
     if (!res.ok) throw new Error('upload_failed');
     const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
     const imageBase = R2Storage.getImageBaseUrl();
