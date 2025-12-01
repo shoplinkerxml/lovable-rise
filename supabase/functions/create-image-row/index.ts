@@ -48,7 +48,6 @@ Deno.serve(async (req) => {
       url,
       order_index: nextOrder,
       is_main: false,
-      alt_text: null,
     }
 
     const { data: inserted, error } = await supabase
