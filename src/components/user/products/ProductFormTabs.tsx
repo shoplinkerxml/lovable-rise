@@ -39,6 +39,19 @@ interface ProductImage {
   object_key?: string;
 }
 
+// Тип строки из store_product_images с R2-ключами
+type StoreProductImageRow = {
+  id: number;
+  product_id: string;
+  url: string;
+  order_index: number;
+  is_main?: boolean;
+  alt_text?: string | null;
+  r2_key_card?: string | null;
+  r2_key_thumb?: string | null;
+  r2_key_original?: string | null;
+}
+
 export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTabsProps) => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
@@ -198,14 +211,15 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         }
 
         // Загружаем изображения товара
-        const { data: productImages } = await supabase
+        const { data: productImagesRaw } = await supabase
           .from('store_product_images')
           .select('*')
           .eq('product_id', product.id)
           .order('order_index');
 
-        if (productImages) {
-          const resolved = await Promise.all(productImages.map(async (img) => {
+        if (productImagesRaw) {
+          const rows = (productImagesRaw || []) as StoreProductImageRow[];
+          const resolved = await Promise.all(rows.map(async (img) => {
             let previewUrl = img.r2_key_card ? R2Storage.makePublicUrl(String(img.r2_key_card)) : (img.url as string);
             const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
             if (typeof previewUrl === 'string') {
@@ -327,21 +341,35 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     setParams(updated);
   };
 
-  const addImageByUrl = () => {
+  const addImageByUrl = async () => {
     if (!newImageUrl.trim()) {
       toast.error('Введіть URL зображення');
       return;
     }
 
-    const newImage: ProductImage = {
-      url: newImageUrl.trim(),
-      order_index: images.length,
-      is_main: images.length === 0
-    };
-
-    setImages([...images, newImage]);
-    setNewImageUrl('');
-    toast.success('Зображення додано');
+    const pid = product?.id ? String(product.id) : '';
+    if (!pid) {
+      toast.error('Спочатку збережіть товар, щоб додати фото за URL');
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await R2Storage.uploadViaWorkerFromUrl(pid, newImageUrl.trim());
+      const newImage: ProductImage = {
+        url: res.publicCardUrl,
+        order_index: images.length,
+        is_main: images.length === 0,
+        object_key: res.cardKey,
+      };
+      setImages([...images, newImage]);
+      setNewImageUrl('');
+      toast.success('Зображення додано');
+    } catch (e) {
+      console.error(e);
+      toast.error('Не вдалося завантажити зображення через воркер');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const removeImage = async (index: number) => {

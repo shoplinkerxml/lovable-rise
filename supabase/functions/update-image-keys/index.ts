@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
 
   try {
     const tokenHdr = req.headers.get('X-Worker-Token') || ''
-    const expected = Deno.env.get('WORKER_SHARED_SECRET') || ''
+    const expected = Deno.env.get('WORKER_SHARED_SECRET') || Deno.env.get('WORKER_TOKEN') || ''
     if (!expected || tokenHdr !== expected) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders })
     }

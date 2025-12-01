@@ -88,8 +88,8 @@ export const R2Storage = {
       const env = import.meta as unknown as { env?: Record<string, string> };
       const w = window as unknown as { __IMAGE_WORKER_URL__?: string };
       const v = env?.env?.VITE_IMAGE_WORKER_URL || w.__IMAGE_WORKER_URL__ || '';
-      return v || 'http://localhost:8788';
-    } catch (e) { void e; return 'http://localhost:8788'; }
+      return v || 'http://localhost:8787';
+    } catch (e) { void e; return 'http://localhost:8787'; }
   },
   getPublicHost(): string {
     try {
@@ -161,7 +161,10 @@ export const R2Storage = {
     const originalKey = String(json.originalKey || '');
     const cardKey = String(json.cardKey || '');
     const thumbKey = String(json.thumbKey || '');
-    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl: R2Storage.makePublicUrl(cardKey, bucket), publicThumbUrl: R2Storage.makePublicUrl(thumbKey, bucket) };
+    const isDevWorker = (() => { try { const u = new URL(base); return u.hostname === 'localhost'; } catch { return false; } })();
+    const publicCardUrl = isDevWorker ? `${base}/image?key=${cardKey}` : R2Storage.makePublicUrl(cardKey, bucket);
+    const publicThumbUrl = isDevWorker ? `${base}/image?key=${thumbKey}` : R2Storage.makePublicUrl(thumbKey, bucket);
+    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
   },
 
   async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
@@ -177,7 +180,10 @@ export const R2Storage = {
     const originalKey = String(json.originalKey || '');
     const cardKey = String(json.cardKey || '');
     const thumbKey = String(json.thumbKey || '');
-    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl: R2Storage.makePublicUrl(cardKey, bucket), publicThumbUrl: R2Storage.makePublicUrl(thumbKey, bucket) };
+    const isDevWorker = (() => { try { const u = new URL(base); return u.hostname === 'localhost'; } catch { return false; } })();
+    const publicCardUrl = isDevWorker ? `${base}/image?key=${cardKey}` : R2Storage.makePublicUrl(cardKey, bucket);
+    const publicThumbUrl = isDevWorker ? `${base}/image?key=${thumbKey}` : R2Storage.makePublicUrl(thumbKey, bucket);
+    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
   },
 
   async cleanupPendingUploads(): Promise<void> {
