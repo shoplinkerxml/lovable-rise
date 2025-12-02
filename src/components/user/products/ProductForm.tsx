@@ -30,6 +30,7 @@ interface ProductImage {
   order_index: number;
   alt_text?: string;
   is_main?: boolean;
+  thumb_url?: string;
 }
 
 export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) => {
@@ -217,18 +218,41 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
     setParams(newParams);
   };
 
-  const addImageByUrl = () => {
+  const addImageByUrl = async () => {
     if (!newImageUrl.trim()) {
       toast.error('Введіть URL зображення');
       return;
     }
     
-    setImages([...images, { 
-      url: newImageUrl.trim(), 
-      order_index: images.length,
-      is_main: images.length === 0
-    }]);
-    setNewImageUrl('');
+    // Если редактируем существующий товар - загружаем через бэкенд с ресайзом
+    if (product?.id) {
+      try {
+        setLoading(true);
+        const result = await R2Storage.uploadProductImageFromUrl(product.id, newImageUrl.trim());
+        
+        setImages([...images, { 
+          url: result.cardUrl,
+          order_index: result.orderIndex,
+          is_main: result.isMain,
+          thumb_url: result.thumbUrl,
+        }]);
+        setNewImageUrl('');
+        toast.success('Зображення завантажено');
+      } catch (error) {
+        console.error('Upload from URL error:', error);
+        toast.error('Помилка завантаження зображення за URL');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Для нового товара - просто добавляем URL (будет обработан при сохранении)
+      setImages([...images, { 
+        url: newImageUrl.trim(), 
+        order_index: images.length,
+        is_main: images.length === 0
+      }]);
+      setNewImageUrl('');
+    }
   };
 
   const removeImage = (index: number) => {
@@ -252,24 +276,38 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       toast.error('Оберіть файл зображення');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Розмір файлу не повинен перевищувати 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Розмір файлу не повинен перевищувати 10MB');
       return;
     }
 
     try {
       setLoading(true);
       
-      // Используем новый API для загрузки через proxy
-      const result = await R2Storage.uploadFile(file, formData.external_id);
+      // Если редактируем существующий товар - загружаем напрямую в R2 с ресайзом
+      if (product?.id) {
+        const result = await R2Storage.uploadProductImage(product.id, file);
+        
+        setImages([...images, {
+          url: result.cardUrl,
+          order_index: result.orderIndex,
+          is_main: result.isMain,
+          thumb_url: result.thumbUrl,
+        }]);
+        
+        toast.success('Зображення завантажено');
+      } else {
+        // Для нового товара - используем временную загрузку
+        const result = await R2Storage.uploadFile(file, formData.external_id);
 
-      setImages([...images, {
-        url: result.publicUrl,
-        order_index: images.length,
-        is_main: images.length === 0
-      }]);
+        setImages([...images, {
+          url: result.publicUrl,
+          order_index: images.length,
+          is_main: images.length === 0
+        }]);
 
-      toast.success('Зображення завантажено');
+        toast.success('Зображення завантажено');
+      }
     } catch (error) {
       console.error('Upload error:', error);
       
@@ -279,10 +317,10 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         if (error.message.includes('unauthorized')) {
           errorMessage = 'Немає доступу для завантаження';
         } else if (error.message.includes('file_too_large')) {
-          errorMessage = 'Розмір файлу не повинен перевищувати 5MB';
+          errorMessage = 'Розмір файлу не повинен перевищувати 10MB';
         } else if (error.message.includes('invalid_file_type')) {
           errorMessage = 'Оберіть файл зображення';
-        } else if (error.message.includes('upload_failed')) {
+        } else if (error.message.includes('upload_failed') || error.message.includes('processing_failed')) {
           errorMessage = 'Помилка сервера при завантаженні';
         }
       }

@@ -7,6 +7,31 @@ export type UploadResponse = {
   viewUrl?: string;
 };
 
+export type UploadProductImageResult = {
+  imageId: string;
+  originalUrl: string;
+  cardUrl: string;
+  thumbUrl: string;
+  r2KeyOriginal: string;
+  r2KeyCard: string;
+  r2KeyThumb: string;
+  isMain: boolean;
+  orderIndex: number;
+};
+
+type UploadProductImageResponse = {
+  success?: boolean;
+  image_id?: number;
+  original_url?: string;
+  card_url?: string;
+  thumb_url?: string;
+  r2_key_original?: string;
+  r2_key_card?: string;
+  r2_key_thumb?: string;
+  is_main?: boolean;
+  order_index?: number;
+};
+
 type EdgeErrorContext = { status?: number; body?: unknown };
 type EdgeErrorLike = { message?: string; context?: EdgeErrorContext };
 
@@ -133,41 +158,97 @@ export const R2Storage = {
     return resp;
   },
 
-  async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }> {
+  /**
+   * Загружает изображение товара с ресайзом в три размера (original, card, thumb).
+   * Использует edge function upload-product-image для обработки на бэкенде.
+   */
+  async uploadProductImage(productId: string, file: File): Promise<UploadProductImageResult> {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
-    const { data, error } = await supabase.functions.invoke('r2-upload-url', { body: { productId, url }, headers });
+    
+    // Convert file to base64
+    const base64File: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result); // Include full data URL
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    const { data, error } = await supabase.functions.invoke('upload-product-image', {
+      body: { productId, fileData: base64File, fileName: file.name, fileType: file.type },
+      headers,
+    });
+
     if (error) throw parseEdgeError(error, 'upload_failed');
-    const json = data as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
-    const imageBase = R2Storage.getImageBaseUrl();
-    const imageId = String(json.imageId || '');
-    const originalKey = String(json.originalKey || '');
-    const cardKey = String(json.cardKey || '');
-    const thumbKey = String(json.thumbKey || '');
-    const publicCardUrl = `${imageBase}/${cardKey}`;
-    const publicThumbUrl = `${imageBase}/${thumbKey}`;
-    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
+    
+    const json = data as UploadProductImageResponse;
+    return {
+      imageId: String(json.image_id || ''),
+      originalUrl: json.original_url || '',
+      cardUrl: json.card_url || '',
+      thumbUrl: json.thumb_url || '',
+      r2KeyOriginal: json.r2_key_original || '',
+      r2KeyCard: json.r2_key_card || '',
+      r2KeyThumb: json.r2_key_thumb || '',
+      isMain: json.is_main || false,
+      orderIndex: json.order_index || 0,
+    };
   },
 
-  async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
+  /**
+   * Загружает изображение товара по URL с ресайзом в три размера.
+   */
+  async uploadProductImageFromUrl(productId: string, url: string): Promise<UploadProductImageResult> {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
-    const { data, error } = await supabase.functions.invoke('r2-upload-url', { body: { productId }, headers });
+
+    const { data, error } = await supabase.functions.invoke('upload-product-image', {
+      body: { productId, url },
+      headers,
+    });
+
     if (error) throw parseEdgeError(error, 'upload_failed');
-    const json = data as { upload_url?: string; imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
-    const uploadUrl = String(json.upload_url || '');
-    if (!uploadUrl) throw new Error('missing_upload_url');
-    const putRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } });
-    if (!putRes.ok) throw new Error('worker_put_failed');
-    const putJson = await putRes.json().catch(() => ({})) as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
-    const imageBase = R2Storage.getImageBaseUrl();
-    const imageId = String(putJson.imageId || json.imageId || '');
-    const originalKey = String(putJson.originalKey || json.originalKey || '');
-    const cardKey = String(putJson.cardKey || json.cardKey || '');
-    const thumbKey = String(putJson.thumbKey || json.thumbKey || '');
-    const publicCardUrl = `${imageBase}/${cardKey}`;
-    const publicThumbUrl = `${imageBase}/${thumbKey}`;
-    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
+    
+    const json = data as UploadProductImageResponse;
+    return {
+      imageId: String(json.image_id || ''),
+      originalUrl: json.original_url || '',
+      cardUrl: json.card_url || '',
+      thumbUrl: json.thumb_url || '',
+      r2KeyOriginal: json.r2_key_original || '',
+      r2KeyCard: json.r2_key_card || '',
+      r2KeyThumb: json.r2_key_thumb || '',
+      isMain: json.is_main || false,
+      orderIndex: json.order_index || 0,
+    };
+  },
+
+  // Legacy methods for backwards compatibility
+  async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }> {
+    const result = await R2Storage.uploadProductImageFromUrl(productId, url);
+    return {
+      imageId: result.imageId,
+      originalKey: result.r2KeyOriginal,
+      cardKey: result.r2KeyCard,
+      thumbKey: result.r2KeyThumb,
+      publicCardUrl: result.cardUrl,
+      publicThumbUrl: result.thumbUrl,
+    };
+  },
+
+  async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }> {
+    const result = await R2Storage.uploadProductImage(productId, file);
+    return {
+      imageId: result.imageId,
+      originalKey: result.r2KeyOriginal,
+      cardKey: result.r2KeyCard,
+      thumbKey: result.r2KeyThumb,
+      publicCardUrl: result.cardUrl,
+      publicThumbUrl: result.thumbUrl,
+    };
   },
 
   async cleanupPendingUploads(): Promise<void> {

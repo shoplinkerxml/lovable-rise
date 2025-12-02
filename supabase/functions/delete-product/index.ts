@@ -190,31 +190,37 @@ serve(async (req) => {
     if (s3 && accountId && bucket && accessKeyId && secretAccessKey) {
       const { data: imageRows, error: imgErr } = await supabase
         .from("store_product_images")
-        .select("url")
+        .select("url, r2_key_original, r2_key_card, r2_key_thumb")
         .in("product_id", productIds)
 
       if (!imgErr && imageRows && imageRows.length > 0) {
         const keys: string[] = []
 
-        for (const r of imageRows as { url?: string }[]) {
+        for (const r of imageRows as { url?: string; r2_key_original?: string; r2_key_card?: string; r2_key_thumb?: string }[]) {
+          // Собираем все r2 ключи
+          if (r.r2_key_original) keys.push(r.r2_key_original)
+          if (r.r2_key_card) keys.push(r.r2_key_card)
+          if (r.r2_key_thumb) keys.push(r.r2_key_thumb)
+          
+          // Фолбэк: извлекаем ключ из URL если r2_key_* не заполнены
           const u = String(r.url || "")
-          if (!u) continue
+          if (u && !r.r2_key_original && !r.r2_key_card && !r.r2_key_thumb) {
+            let host = ""
+            try {
+              host = new URL(u).host
+            } catch {
+              host = ""
+            }
 
-          let host = ""
-          try {
-            host = new URL(u).host
-          } catch {
-            host = ""
-          }
+            const isOurBucket =
+              host === `${bucket}.${accountId}.r2.cloudflarestorage.com` ||
+              host === "shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com" ||
+              host === "images-service.xmlreactor.shop"
 
-          const isOurBucket =
-            host === `${bucket}.${accountId}.r2.cloudflarestorage.com` ||
-            host ===
-              "shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com"
-
-          if (isOurBucket) {
-            const key = extractObjectKeyFromUrl(u)
-            if (key) keys.push(key)
+            if (isOurBucket) {
+              const key = extractObjectKeyFromUrl(u)
+              if (key) keys.push(key)
+            }
           }
         }
 
