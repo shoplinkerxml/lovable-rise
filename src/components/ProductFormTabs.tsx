@@ -750,7 +750,7 @@ export function ProductFormTabs({
             r2_key_original?: string | null;
           };
           let previewUrl: string = img.url;
-          let thumbUrl: string | undefined;
+          let thumbUrl: string | undefined = (img as unknown as { thumb_url?: string }).thumb_url;
           const cardKey = row.r2_key_card || undefined;
           const thumbKey = row.r2_key_thumb || undefined;
           let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
@@ -775,7 +775,7 @@ export function ProductFormTabs({
               }
             }
           }
-          if (thumbKey) {
+          if (!thumbUrl && thumbKey) {
             try {
               const signedThumb = await R2Storage.getViewUrl(thumbKey);
               thumbUrl = signedThumb || R2Storage.makePublicUrl(thumbKey);
@@ -909,6 +909,7 @@ export function ProductFormTabs({
     if (!imageUrl.trim()) return;
     if (!product) return;
     (async () => {
+      setUploadingImage(true);
       try {
         const res = await R2Storage.uploadViaWorkerFromUrl(String((product as unknown as { id?: string }).id || ''), imageUrl.trim());
         const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey, thumb_url: res.publicThumbUrl };
@@ -918,6 +919,7 @@ export function ProductFormTabs({
         setImageUrl('');
         toast.success(t('image_uploaded_successfully'));
       } catch (e) { console.error(e); toast.error(t('operation_failed')); }
+      finally { setUploadingImage(false); }
     })();
   };
 
@@ -1611,6 +1613,7 @@ export function ProductFormTabs({
                 images={images}
                 readOnly={readOnly}
                 isDragOver={isDragOver}
+                uploading={uploadingImage}
                 imageUrl={imageUrl}
                 onSetImageUrl={(v) => setImageUrl(v)}
                 onAddImageFromUrl={addImageFromUrl}

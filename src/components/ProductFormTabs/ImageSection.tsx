@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Image as ImageIcon, Check, X, Link as LinkIcon } from 'lucide-react'
+import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { useI18n } from '@/providers/i18n-provider'
 
 export type ProductImage = {
@@ -22,6 +22,7 @@ type Props = {
   images: ProductImage[]
   readOnly?: boolean
   isDragOver: boolean
+  uploading?: boolean
   imageUrl: string
   onSetImageUrl: (v: string) => void
   onAddImageFromUrl: () => void
@@ -111,6 +112,14 @@ export function ImageSection(props: Props) {
               <p className="text-xs text-center text-muted-foreground mt-1 md:mt-2 px-3" data-testid="productFormTabs_fileInfo">
                 {t('image_types_and_limit')}
               </p>
+              {props.uploading ? (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-10">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+                    <span className="text-sm text-emerald-700">{t('uploading_image')}</span>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>

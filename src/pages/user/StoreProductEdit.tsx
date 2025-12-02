@@ -60,7 +60,7 @@ export const StoreProductEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [baseProduct, setBaseProduct] = useState<Product | null>(null);
-  type FormImage = { id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string };
+  type FormImage = { id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string; thumb_url?: string };
   const [images, setImages] = useState<FormImage[]>([]);
   const [params, setParams] = useState<ProductParam[]>([]);
   const [imagesLoading, setImagesLoading] = useState<boolean>(false);
@@ -100,13 +100,14 @@ export const StoreProductEdit = () => {
             custom_available: link.custom_available == null ? (agg.product ? !!agg.product.available : true) : !!link.custom_available,
           });
         }
-        const srcImages = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main?: boolean; alt_text?: string | null }>;
+        const srcImages = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main?: boolean; alt_text?: string | null; images?: { original: string | null; card: string | null; thumb: string | null } }>;
         setImages(srcImages.map((img, index) => ({
           id: img.id ? String(img.id) : undefined,
           url: String(img.url || ''),
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: !!img.is_main,
           alt_text: img.alt_text ?? undefined,
+          thumb_url: img.images?.thumb || undefined,
         })));
         setParams(agg.params || []);
         setShopName(agg.shop?.store_name || "");

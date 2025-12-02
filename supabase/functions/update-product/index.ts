@@ -107,6 +107,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? ""
 const bucket = Deno.env.get("R2_BUCKET_NAME") ?? ""
+const IMAGE_BASE_URL = Deno.env.get("IMAGE_BASE_URL") ?? ""
 const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") ?? ""
 const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? ""
 
@@ -133,44 +134,30 @@ function buildDatePath() {
   return `${yyyy}/${mm}/${dd}`
 }
 
-async function buildFinalImageUrl(
-  img: ImageInput,
-  productId: string,
-  datePath: string,
-): Promise<string> {
-  const srcRaw = img.url ?? ""
-  let finalUrl = String(srcRaw || "").trim()
-  if (!s3 || !bucket || !accountId) return finalUrl
-
-  const srcKey =
-    (img.key && String(img.key)) ||
-    (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url) : null)
-
-  if (!srcKey) return finalUrl
-
-  const parts = srcKey.split("/").filter(Boolean)
-  const baseName = parts[parts.length - 1] || "file"
-  const cleanName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_")
-  const suffix =
-    crypto.randomUUID?.() ??
-    `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-  const destKey = `uploads/products/${productId}/${datePath}/${suffix}-${cleanName}`
-
-  try {
-    await s3.send(
-      new CopyObjectCommand({
-        Bucket: bucket,
-        Key: destKey,
-        CopySource: `${bucket}/${srcKey}`,
-      }),
-    )
-    // постоянный публичный URL R2
-    finalUrl = `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${destKey}`
-  } catch {
-    // оставляем исходный URL, если копирование не удалось
+async function toPreferredUrl(img: ImageInput): Promise<{ url: string; r2_card?: string; r2_thumb?: string; r2_original?: string }> {
+  const srcKey = (img.key && String(img.key)) || (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url!) : null)
+  const k = srcKey ? String(srcKey) : ""
+  let cardKey = ""
+  let thumbKey = ""
+  let originalKey = ""
+  if (k) {
+    if (k.endsWith("/card.webp")) {
+      cardKey = k
+      thumbKey = k.replace("/card.webp", "/thumb.webp")
+      originalKey = k.replace("/card.webp", "/original.webp")
+    } else if (k.endsWith("/thumb.webp")) {
+      thumbKey = k
+      cardKey = k.replace("/thumb.webp", "/card.webp")
+      originalKey = k.replace("/thumb.webp", "/original.webp")
+    } else if (k.endsWith("/original.webp")) {
+      originalKey = k
+      cardKey = k.replace("/original.webp", "/card.webp")
+      thumbKey = k.replace("/original.webp", "/thumb.webp")
+    }
   }
-
-  return finalUrl
+  const base = IMAGE_BASE_URL || ""
+  const preferred = base && cardKey ? `${base}/${cardKey}` : String(img.url || "").trim()
+  return { url: preferred, r2_card: cardKey || undefined, r2_thumb: thumbKey || undefined, r2_original: originalKey || undefined }
 }
 
 async function handleImages(
@@ -178,77 +165,69 @@ async function handleImages(
   images: ImageInput[] | undefined,
 ): Promise<void> {
   if (!Array.isArray(images) || images.length === 0) {
-    // если нет картинок – просто очищаем
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }
+  const { data: existingRows } = await supabase
+    .from("store_product_images")
+    .select("id,product_id,url,order_index,is_main,alt_text,r2_key_card,r2_key_thumb,r2_key_original")
+    .eq("product_id", productId)
+    .order("order_index")
 
-  const datePath = buildDatePath()
-
-  // Копирование всех файлов в R2 параллельно
-  const processed = await Promise.all(
-    images.map(async (img, index) => {
-      const url = await buildFinalImageUrl(img, productId, datePath)
-      const trimmed = url.trim()
-      if (!trimmed) return null
-
-      return {
-        raw: img,
-        url: trimmed,
-        index,
-      }
-    }),
-  )
-
-  const valid = processed.filter(
-    (x): x is { raw: ImageInput; url: string; index: number } => x !== null,
-  )
-
-  if (!valid.length) {
-    await supabase.from("store_product_images").delete().eq("product_id", productId)
-    return
+  const existing = (existingRows || []) as any[]
+  const mapByKey = new Map<string, any>()
+  for (const r of existing) {
+    const kc = r?.r2_key_card ? String(r.r2_key_card) : ""
+    const kt = r?.r2_key_thumb ? String(r.r2_key_thumb) : ""
+    if (kc) mapByKey.set(kc, r)
+    if (kt) mapByKey.set(kt, r)
   }
 
-  const hasMain = valid.some((i) => i.raw.is_main === true)
+  const updates: any[] = []
+  const inserts: any[] = []
+
+  let hasMain = images.some((i) => i.is_main === true)
   let assigned = false
 
-  const normalized = valid.map((item) => {
-    const { raw, url, index } = item
+  for (let index = 0; index < images.length; index++) {
+    const raw = images[index]
+    const preferred = await toPreferredUrl(raw)
+    const keyCandidate = (raw.key && String(raw.key)) || (typeof raw.url === "string" ? extractObjectKeyFromUrl(raw.url!) : null) || ""
+    const match = keyCandidate ? mapByKey.get(String(keyCandidate)) : null
     let isMain = raw.is_main === true && !assigned
-
     if (hasMain) {
-      if (raw.is_main === true && !assigned) {
-        assigned = true
-      } else {
-        isMain = false
-      }
+      if (raw.is_main === true && !assigned) assigned = true
+      else isMain = false
     } else {
       isMain = index === 0
     }
-
-    return {
-      product_id: productId,
-      url,
-      is_main: isMain,
-      order_index:
-        typeof raw.order_index === "number" ? raw.order_index : index,
+    const oi = typeof raw.order_index === "number" ? raw.order_index : index
+    if (match && match.id != null) {
+      updates.push({ id: match.id, url: preferred.url, is_main: isMain, order_index: oi })
+    } else {
+      inserts.push({ product_id: productId, url: preferred.url, is_main: isMain, order_index: oi, r2_key_card: preferred.r2_card ?? null, r2_key_thumb: preferred.r2_thumb ?? null, r2_key_original: preferred.r2_original ?? null })
     }
-  })
+  }
 
-  const mainIdx = normalized.findIndex((i) => i.is_main === true)
+  const mainIdx = updates.findIndex((i) => i.is_main === true)
+  if (mainIdx > 0) {
+    const [main] = updates.splice(mainIdx, 1)
+    updates.unshift(main)
+  }
+  for (let i = 0; i < updates.length; i++) updates[i].order_index = i
+  const start = updates.length
+  for (let i = 0; i < inserts.length; i++) inserts[i].order_index = start + i
 
-  const ordered = (() => {
-    const arr = normalized.slice()
-    if (mainIdx > 0) {
-      const [main] = arr.splice(mainIdx, 1)
-      arr.unshift(main)
-    }
-    return arr.map((i, idx) => ({ ...i, order_index: idx }))
-  })()
-
-  await supabase.from("store_product_images").delete().eq("product_id", productId)
-  if (ordered.length) {
-    await supabase.from("store_product_images").insert(ordered)
+  if (updates.length) {
+    await supabase.from("store_product_images").upsert(updates, { onConflict: "id" })
+  }
+  if (inserts.length) {
+    await supabase.from("store_product_images").insert(inserts)
+  }
+  const keptIds = new Set<string>(updates.map((u) => String(u.id)))
+  const toDelete = existing.filter((r) => !keptIds.has(String(r.id)))
+  if (toDelete.length) {
+    await supabase.from("store_product_images").delete().in("id", toDelete.map((r) => r.id))
   }
 }
 

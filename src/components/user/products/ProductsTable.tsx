@@ -40,7 +40,7 @@ import { LoadingSkeleton } from "./ProductsTable/LoadingSkeleton";
 import { PaginationFooter } from "./ProductsTable/PaginationFooter";
 import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { useVirtualRows } from "@/hooks/useVirtualRows";
 import { CopyProgressDialog, DeleteDialog, DeleteProgressDialog } from "./ProductsTable/Dialogs";
@@ -390,15 +390,7 @@ export const ProductsTable = ({
     for (const s of stores || []) m[String(s.id)] = String(s.store_name || "");
     return m;
   }, [stores]);
-  const { data: shopsAgg } = useQuery({
-    queryKey: ['shopsList'],
-    queryFn: ShopService.getShopsAggregated,
-    staleTime: 900_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-  useEffect(() => { if (Array.isArray(shopsAgg)) setStores(shopsAgg as ShopAggregated[]); }, [shopsAgg]);
+  
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const loadStoresForMenu = useCallback(async () => {
     const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);

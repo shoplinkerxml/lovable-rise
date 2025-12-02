@@ -108,7 +108,7 @@ export const R2Storage = {
    */
   async uploadFile(file: File, productId?: string): Promise<UploadResponse> {
     const token = await getAccessToken();
-    const headers = buildAuthHeaders(token);
+    const headers = token ? buildAuthHeaders(token) : undefined;
     const base64File: string = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -133,9 +133,9 @@ export const R2Storage = {
     return resp;
   },
 
-  async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
+  async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }> {
     const token = await getAccessToken();
-    const headers = buildAuthHeaders(token);
+    const headers = token ? buildAuthHeaders(token) : undefined;
     const { data, error } = await supabase.functions.invoke('r2-upload-url', { body: { productId, url }, headers });
     if (error) throw parseEdgeError(error, 'upload_failed');
     const json = data as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
@@ -177,7 +177,7 @@ export const R2Storage = {
    */
   async getViewUrl(objectKey: string, expiresInSeconds: number = 3600): Promise<string> {
     const token = await getAccessToken();
-    const headers = buildAuthHeaders(token);
+    const headers = token ? buildAuthHeaders(token) : undefined;
 
     const { data, error } = await supabase.functions.invoke("r2-view", {
       body: { objectKey, expiresIn: expiresInSeconds },
@@ -216,7 +216,7 @@ export const R2Storage = {
    */
   async deleteFile(objectKey: string): Promise<{ success: boolean }> {
     const token = await getAccessToken();
-    const headers = buildAuthHeaders(token);
+    const headers = token ? buildAuthHeaders(token) : undefined;
     const syncToken = getAccessTokenSync();
     const authorizationInBody = token ? `Bearer ${token}` : (syncToken ? `Bearer ${syncToken}` : undefined);
 
