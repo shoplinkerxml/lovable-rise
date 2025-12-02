@@ -134,12 +134,11 @@ export const R2Storage = {
   },
 
   async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
-    const base = R2Storage.getWorkerUrl();
     const token = await getAccessToken();
-    const authHeaders = buildAuthHeaders(token);
-    const res = await fetch(`${base}/upload`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders }, body: JSON.stringify({ productId, url }), credentials: 'include' });
-    if (!res.ok) throw new Error('upload_failed');
-    const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
+    const headers = buildAuthHeaders(token);
+    const { data, error } = await supabase.functions.invoke('r2-upload-url', { body: { productId, url }, headers });
+    if (error) throw parseEdgeError(error, 'upload_failed');
+    const json = data as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
     const imageBase = R2Storage.getImageBaseUrl();
     const imageId = String(json.imageId || '');
     const originalKey = String(json.originalKey || '');
@@ -151,23 +150,8 @@ export const R2Storage = {
   },
 
   async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
-    const base = R2Storage.getWorkerUrl();
-    const token = await getAccessToken();
-    const authHeaders = buildAuthHeaders(token);
-    const fd = new FormData();
-    fd.append('productId', productId);
-    fd.append('file', file);
-    const res = await fetch(`${base}/upload`, { method: 'POST', headers: authHeaders, body: fd, credentials: 'include' });
-    if (!res.ok) throw new Error('upload_failed');
-    const json = await res.json() as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
-    const imageBase = R2Storage.getImageBaseUrl();
-    const imageId = String(json.imageId || '');
-    const originalKey = String(json.originalKey || '');
-    const cardKey = String(json.cardKey || '');
-    const thumbKey = String(json.thumbKey || '');
-    const publicCardUrl = `${imageBase}/${cardKey}`;
-    const publicThumbUrl = `${imageBase}/${thumbKey}`;
-    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
+    const uploaded = await R2Storage.uploadFile(file, productId);
+    return await R2Storage.uploadViaWorkerFromUrl(productId, uploaded.publicUrl);
   },
 
   async cleanupPendingUploads(): Promise<void> {
