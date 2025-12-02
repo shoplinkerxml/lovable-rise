@@ -13,9 +13,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const tokenHdr = req.headers.get('X-Worker-Token') || ''
+    const tokenHdr = req.headers.get('X-Worker-Token') || req.headers.get('x-worker-token') || ''
     const expected = Deno.env.get('WORKER_SHARED_SECRET') || Deno.env.get('WORKER_TOKEN') || ''
+    console.log('create-image-row: tokenHdr length:', tokenHdr.length, 'expected length:', expected.length, 'match:', tokenHdr === expected)
     if (!expected || tokenHdr !== expected) {
+      console.log('create-image-row: unauthorized - token mismatch')
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders })
     }
 
