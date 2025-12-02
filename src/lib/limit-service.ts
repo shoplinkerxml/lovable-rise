@@ -164,12 +164,15 @@ export class LimitService {
   /** Оновлення порядку лімітів */
   static async updateLimitsOrder(limits: { id: number; order_index: number }[]): Promise<void> {
     if (!Array.isArray(limits) || limits.length === 0) return;
-    const payload: Array<Pick<Database['public']['Tables']['limit_templates']['Insert'], 'id' | 'order_index'>> = limits.map((l) => ({ id: l.id, order_index: l.order_index }));
-    const { error } = await supabase
-      .from('limit_templates')
-      .upsert(payload, { onConflict: 'id' });
-    if (error) {
-      throw new Error('Failed to update limits order');
+    // Update each limit individually to avoid type issues
+    for (const l of limits) {
+      const { error } = await supabase
+        .from('limit_templates')
+        .update({ order_index: l.order_index })
+        .eq('id', l.id);
+      if (error) {
+        throw new Error('Failed to update limits order');
+      }
     }
   }
 }

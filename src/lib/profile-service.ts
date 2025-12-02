@@ -68,7 +68,7 @@ export class ProfileService {
       const cached = ProfileCache.get(`profile_email_${email.toLowerCase()}`);
       if (cached) {
         this.logProfileOperation('getProfileByEmail (cached)', email, cached);
-        return cached;
+        return cached as UserProfile;
       }
 
       const { data, error } = await supabase
@@ -113,7 +113,7 @@ export class ProfileService {
       const cached = ProfileCache.get(`profile_${userId}`);
       if (cached) {
         this.logProfileOperation('getProfile (cached)', userId, cached);
-        return cached;
+        return cached as UserProfile;
       }
 
       const { data, error } = await supabase
@@ -632,7 +632,7 @@ export class ProfileService {
     try {
       // Check cache first
       const cached = ProfileCache.get(`exists_${email.toLowerCase()}`);
-      if (cached !== null) {
+      if (cached !== null && typeof cached === 'boolean') {
         return cached;
       }
 

@@ -13,6 +13,7 @@ import { ShopService, type Shop } from '@/lib/shop-service';
 import { toast } from 'sonner';
 import { InteractiveXmlTree } from '@/components/store-templates/InteractiveXmlTree';
 import type { XMLStructure } from '@/lib/xml-template-service';
+import type { Json } from '@/integrations/supabase/types';
 
 interface ShopStructureEditorProps {
   shop: Shop;
@@ -24,7 +25,9 @@ interface ShopStructureEditorProps {
 export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: ShopStructureEditorProps) => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
-  const [xmlStructure, setXmlStructure] = useState<XMLStructure | undefined>(shop.xml_config);
+  const [xmlStructure, setXmlStructure] = useState<XMLStructure | undefined>(
+    shop.xml_config ? (shop.xml_config as unknown as XMLStructure) : undefined
+  );
 
   // Update local state when structure changes in tree
   const handleStructureChange = (newStructure: XMLStructure) => {
@@ -41,7 +44,7 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
       setLoading(true);
       
       await ShopService.updateShop(shop.id, {
-        xml_config: xmlStructure
+        xml_config: xmlStructure as unknown as Json
       });
       
       toast.success('Структуру XML збережено');

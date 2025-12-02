@@ -1,4 +1,4 @@
-import { readCache, writeCache, removeCache, CACHE_TTL } from './cache-utils';
+import { readCache, writeCache, removeCache, CACHE_TTL, type CacheEnvelope } from './cache-utils';
 
 const KEY = 'rq:tariffs:list';
 const SOFT_REFRESH_THRESHOLD_MS = 120000;
@@ -22,3 +22,20 @@ export async function getTariffsListCached<T>(fetch: () => Promise<T[]>): Promis
 export function invalidateTariffsCache(): void {
   removeCache(KEY);
 }
+
+const TariffCache = {
+  getTariffsListCached,
+  invalidateTariffsCache,
+  get<T>(): T | null {
+    const cached = readCache<T>(KEY);
+    return cached ? cached.data : null;
+  },
+  set<T>(data: T): void {
+    writeCache(KEY, data, CACHE_TTL.tariffsList);
+  },
+  clear(): void {
+    removeCache(KEY);
+  }
+};
+
+export default TariffCache;

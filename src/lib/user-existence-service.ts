@@ -51,8 +51,8 @@ export class UserExistenceService {
 
       // Check cache first
       const cacheKey = `${this.CACHE_PREFIX}${email.toLowerCase()}`;
-      const cached = ProfileCache.get(cacheKey);
-      if (cached) {
+      const cached = ProfileCache.get(cacheKey) as UserExistenceCheck | null;
+      if (cached && typeof cached === 'object' && 'exists' in cached) {
         this.logCheck(email, cached.exists, 'cached');
         return cached;
       }

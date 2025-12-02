@@ -81,7 +81,7 @@ const AdminTariffManagement = () => {
     try {
       // Check if we have valid cached data
       if (useCache) {
-        const cachedTariffs = TariffCache.get();
+        const cachedTariffs = TariffCache.get<Tariff[]>();
         if (cachedTariffs) {
           setTariffs(cachedTariffs);
           setLoading(false);
