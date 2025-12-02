@@ -42,9 +42,10 @@ serve(async (req) => {
     if (!token) return new Response(JSON.stringify({ error: "server_misconfig" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } })
 
     // Create image row first to obtain image_id
-    const fnUrl = Deno.env.get("SUPABASE_FUNCTIONS_URL") || ""
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://ehznqzaumsnjkrntaiox.supabase.co"
     const bearer = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-    const insRes = await fetch(`${fnUrl}/create-image-row`, { method: "POST", headers: { "content-type": "application/json", "X-Worker-Token": token, ...(bearer ? { Authorization: `Bearer ${bearer}`, apikey: bearer } : {}) }, body: JSON.stringify({ product_id: body.productId, url: "#pending" }) })
+    console.log("Calling create-image-row for productId:", body.productId)
+    const insRes = await fetch(`${supabaseUrl}/functions/v1/create-image-row`, { method: "POST", headers: { "content-type": "application/json", "X-Worker-Token": token, ...(bearer ? { Authorization: `Bearer ${bearer}`, apikey: bearer } : {}) }, body: JSON.stringify({ product_id: body.productId, url: "#pending" }) })
     if (!insRes.ok) {
       const txt = await insRes.text().catch(() => "")
       return new Response(JSON.stringify({ error: "insert_failed", message: txt }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } })
