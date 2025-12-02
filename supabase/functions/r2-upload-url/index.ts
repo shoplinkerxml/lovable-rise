@@ -11,8 +11,20 @@ serve(async (req) => {
   try {
     const auth = req.headers.get("authorization")
     if (!auth) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } })
-    const body = await req.json().catch(() => null) as { productId?: string; url?: string }
-    if (!body || !body.productId) return new Response(JSON.stringify({ error: "invalid_body" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } })
+    
+    let body: { productId?: string; url?: string } | null = null
+    try {
+      body = await req.json()
+      console.log("Parsed body:", JSON.stringify(body))
+    } catch (parseErr) {
+      console.error("JSON parse error:", parseErr)
+      return new Response(JSON.stringify({ error: "json_parse_error", message: String(parseErr) }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } })
+    }
+    
+    if (!body || !body.productId) {
+      console.error("Missing productId in body:", body)
+      return new Response(JSON.stringify({ error: "invalid_body", received: body }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } })
+    }
 
     const workerBase = Deno.env.get("IMAGE_WORKER_URL") || "https://img-api.xmlreactor.shop"
 
