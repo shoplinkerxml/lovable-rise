@@ -58,7 +58,7 @@ serve(async (req) => {
     const cardKey = `products/${body.productId}/${imageId}/card.webp`
     const thumbKey = `products/${body.productId}/${imageId}/thumb.webp`
 
-    const upRes = await fetch(`${workerBase}/r2/upload-url`, { method: "POST", headers: { "content-type": "application/json", "X-Worker-Secret": token }, body: JSON.stringify({ key: originalKey, expiresIn: 900 }) })
+    const upRes = await fetch(`${workerBase}/r2/upload-url`, { method: "POST", headers: { "content-type": "application/json", "X-Worker-Token": token }, body: JSON.stringify({ key: originalKey, expiresIn: 900 }) })
     const upTxt = await upRes.text()
     const headers = { ...cors, "Content-Type": "application/json" }
     if (!upRes.ok) return new Response(JSON.stringify({ error: "worker_failed", message: upTxt }), { status: upRes.status || 500, headers })
