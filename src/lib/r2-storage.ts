@@ -88,16 +88,16 @@ export const R2Storage = {
       const env = import.meta as unknown as { env?: Record<string, string> };
       const w = window as unknown as { __IMAGE_WORKER_URL__?: string };
       const v = env?.env?.VITE_IMAGE_WORKER_URL || w.__IMAGE_WORKER_URL__ || '';
-      return v || 'https://images-service.xmlreactor.shop';
-    } catch (e) { void e; return 'https://images-service.xmlreactor.shop'; }
+      return v || 'https://img-api.xmlreactor.shop';
+    } catch (e) { void e; return 'https://img-api.xmlreactor.shop'; }
   },
   getImageBaseUrl(): string {
     try {
       const env = import.meta as unknown as { env?: Record<string, string> };
       const w = window as unknown as { __IMAGE_BASE_URL__?: string };
       const v = env?.env?.VITE_IMAGE_BASE_URL || w.__IMAGE_BASE_URL__ || '';
-      return v || R2Storage.getWorkerUrl();
-    } catch (e) { void e; return R2Storage.getWorkerUrl(); }
+      return v || 'https://images-service.xmlreactor.shop';
+    } catch (e) { void e; return 'https://images-service.xmlreactor.shop'; }
   },
   makePublicUrl(objectKey: string): string {
     const base = R2Storage.getImageBaseUrl();
@@ -150,8 +150,24 @@ export const R2Storage = {
   },
 
   async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }>{
-    const uploaded = await R2Storage.uploadFile(file, productId);
-    return await R2Storage.uploadViaWorkerFromUrl(productId, uploaded.publicUrl);
+    const token = await getAccessToken();
+    const headers = token ? buildAuthHeaders(token) : undefined;
+    const { data, error } = await supabase.functions.invoke('r2-upload-url', { body: { productId }, headers });
+    if (error) throw parseEdgeError(error, 'upload_failed');
+    const json = data as { upload_url?: string; imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
+    const uploadUrl = String(json.upload_url || '');
+    if (!uploadUrl) throw new Error('missing_upload_url');
+    const putRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } });
+    if (!putRes.ok) throw new Error('worker_put_failed');
+    const putJson = await putRes.json().catch(() => ({})) as { imageId?: string; originalKey?: string; cardKey?: string; thumbKey?: string };
+    const imageBase = R2Storage.getImageBaseUrl();
+    const imageId = String(putJson.imageId || json.imageId || '');
+    const originalKey = String(putJson.originalKey || json.originalKey || '');
+    const cardKey = String(putJson.cardKey || json.cardKey || '');
+    const thumbKey = String(putJson.thumbKey || json.thumbKey || '');
+    const publicCardUrl = `${imageBase}/${cardKey}`;
+    const publicThumbUrl = `${imageBase}/${thumbKey}`;
+    return { imageId, originalKey, cardKey, thumbKey, publicCardUrl, publicThumbUrl };
   },
 
   async cleanupPendingUploads(): Promise<void> {

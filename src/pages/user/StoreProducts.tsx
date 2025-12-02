@@ -9,7 +9,7 @@ import { ShopService } from "@/lib/shop-service";
 import { Loader2, Package, List } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+ 
 
 export const StoreProducts = () => {
   const { id } = useParams();
@@ -22,22 +22,7 @@ export const StoreProducts = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [limitInfo] = useState<{ current: number; max: number; canCreate: boolean }>({ current: 0, max: 0, canCreate: true });
   const queryClient = useQueryClient();
-  const { data: shopsAgg } = useQuery({
-    queryKey: ['shopsList'],
-    queryFn: ShopService.getShopsAggregated,
-    staleTime: 900_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-  const aggProducts = (() => {
-    const s = (shopsAgg || []).find((row) => String((row as { id: string }).id) === storeId);
-    return Number((s as { productsCount?: number } | undefined)?.productsCount ?? 0);
-  })();
-  const aggCategories = (() => {
-    const s = (shopsAgg || []).find((row) => String((row as { id: string }).id) === storeId);
-    return Number((s as { categoriesCount?: number } | undefined)?.categoriesCount ?? 0);
-  })();
+  const [categoriesCount, setCategoriesCount] = useState<number>(0);
 
   useEffect(() => {
     if (!storeId) {
@@ -53,6 +38,27 @@ export const StoreProducts = () => {
       
     })();
   }, [storeId, t]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const names = await ProductService.getStoreCategoryFilterOptions(storeId);
+        setCategoriesCount(Array.isArray(names) ? names.length : 0);
+      } catch {
+        try {
+          const key = `rq:filters:categories:${storeId}`;
+          const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+          if (raw) {
+            const parsed = JSON.parse(raw) as { items?: string[] } | string[];
+            const cnt = Array.isArray((parsed as { items?: string[] }).items)
+              ? ((parsed as { items?: string[] }).items as string[]).length
+              : (Array.isArray(parsed) ? (parsed as string[]).length : 0);
+            setCategoriesCount(cnt);
+          }
+        } catch { void 0; }
+      }
+    })();
+  }, [storeId]);
 
   const handleEdit = (product: Product) => {
     navigate(`/user/shops/${storeId}/products/edit/${product.id}`);
@@ -85,11 +91,11 @@ export const StoreProducts = () => {
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
               <Package className="h-3 w-3" />
-              <span>{aggProducts}</span>
+              <span>{totalCount}</span>
             </Badge>
             <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
               <List className="h-3 w-3" />
-              <span>{aggCategories}</span>
+              <span>{categoriesCount}</span>
             </Badge>
           </div>
         }

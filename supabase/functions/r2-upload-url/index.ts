@@ -12,17 +12,47 @@ serve(async (req) => {
     const auth = req.headers.get("authorization")
     if (!auth) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } })
     const body = await req.json().catch(() => null) as { productId?: string; url?: string }
-    if (!body || !body.productId || !body.url) return new Response(JSON.stringify({ error: "invalid_body" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } })
-    const workerBase = Deno.env.get("IMAGE_WORKER_URL") || "https://images-service.xmlreactor.shop"
-    const token = Deno.env.get("WORKER_SHARED_SECRET") || Deno.env.get("WORKER_TOKEN") || ""
-    const res = await fetch(`${workerBase}/upload`, { method: "POST", headers: { "content-type": "application/json", ...(token ? { "X-Worker-Token": token } : {}) }, body: JSON.stringify({ productId: body.productId, url: body.url }) })
-    const txt = await res.text()
+    if (!body || !body.productId) return new Response(JSON.stringify({ error: "invalid_body" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } })
+
+    const workerBase = Deno.env.get("IMAGE_WORKER_URL") || "https://img-api.xmlreactor.shop"
+
+    // If a source URL is provided, delegate to existing upload-from-URL flow
+    if (body.url && body.url.length > 0) {
+      const token = Deno.env.get("WORKER_SHARED_SECRET") || Deno.env.get("WORKER_TOKEN") || ""
+      const res = await fetch(`${workerBase}/upload`, { method: "POST", headers: { "content-type": "application/json", ...(token ? { "X-Worker-Token": token } : {}) }, body: JSON.stringify({ productId: body.productId, url: body.url }) })
+      const txt = await res.text()
+      const headers = { ...cors, "Content-Type": "application/json" }
+      if (!res.ok) return new Response(JSON.stringify({ error: "worker_failed", message: txt }), { status: res.status || 500, headers })
+      return new Response(txt, { status: 200, headers })
+    }
+
+    const token = Deno.env.get("WORKER_SHARED_SECRET") || ""
+    if (!token) return new Response(JSON.stringify({ error: "server_misconfig" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } })
+
+    // Create image row first to obtain image_id
+    const fnUrl = Deno.env.get("SUPABASE_FUNCTIONS_URL") || ""
+    const bearer = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+    const insRes = await fetch(`${fnUrl}/create-image-row`, { method: "POST", headers: { "content-type": "application/json", "X-Worker-Token": token, ...(bearer ? { Authorization: `Bearer ${bearer}`, apikey: bearer } : {}) }, body: JSON.stringify({ product_id: body.productId, url: "#pending" }) })
+    if (!insRes.ok) {
+      const txt = await insRes.text().catch(() => "")
+      return new Response(JSON.stringify({ error: "insert_failed", message: txt }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } })
+    }
+    const insJson = await insRes.json() as { image_id?: number }
+    const imageId = String(insJson?.image_id ?? "")
+    if (!imageId) return new Response(JSON.stringify({ error: "image_id_missing" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } })
+
+    const originalKey = `products/${body.productId}/${imageId}/original.webp`
+    const cardKey = `products/${body.productId}/${imageId}/card.webp`
+    const thumbKey = `products/${body.productId}/${imageId}/thumb.webp`
+
+    const upRes = await fetch(`${workerBase}/r2/upload-url`, { method: "POST", headers: { "content-type": "application/json", "X-Worker-Secret": token }, body: JSON.stringify({ key: originalKey, expiresIn: 900 }) })
+    const upTxt = await upRes.text()
     const headers = { ...cors, "Content-Type": "application/json" }
-    if (!res.ok) return new Response(JSON.stringify({ error: "worker_failed", message: txt }), { status: res.status || 500, headers })
-    return new Response(txt, { status: 200, headers })
+    if (!upRes.ok) return new Response(JSON.stringify({ error: "worker_failed", message: upTxt }), { status: upRes.status || 500, headers })
+    const payload = JSON.parse(upTxt)
+    return new Response(JSON.stringify({ imageId, originalKey, cardKey, thumbKey, ...payload }), { status: 200, headers })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown_error"
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } })
   }
 })
-
