@@ -297,7 +297,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
                     </h4>
                     <div className="text-sm">
                       {Array.isArray(getFieldValue('images')) 
-                        ? `${getFieldValue('images').length} зображень`
+                        ? `${(getFieldValue('images') as unknown[]).length} зображень`
                         : 'URL: ' + String(getFieldValue('images')).substring(0, 50) + '...'}
                     </div>
                   </div>

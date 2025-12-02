@@ -18,6 +18,7 @@ import { ShopService, type Shop, type UpdateShopData } from '@/lib/shop-service'
 import { useMarketplaces } from '@/hooks/useMarketplaces';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -182,8 +183,8 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
       if (template) {
         await ShopService.updateShop(shop.id, {
           template_id: template.id,
-          xml_config: template.xml_structure,
-          custom_mapping: template.mapping_rules,
+          xml_config: template.xml_structure as Json,
+          custom_mapping: template.mapping_rules as Json,
         });
       }
     } catch (err) {
