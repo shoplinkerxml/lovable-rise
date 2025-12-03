@@ -71,10 +71,29 @@ const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? ""
 const bucket = Deno.env.get("R2_BUCKET_NAME") ?? ""
 const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") ?? ""
 const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? ""
-// Use images-service domain as default - it should be properly configured to serve from R2
-const IMAGE_BASE_URL = Deno.env.get("R2_PUBLIC_BASE_URL") || "https://images-service.xmlreactor.shop"
-
-// Log the base URL for debugging
+// Resolve base URL for public image links
+function resolvePublicBase(): string {
+  const host = Deno.env.get("R2_PUBLIC_HOST") || ""
+  if (host) {
+    const h = host.startsWith("http") ? host : `https://${host}`
+    try {
+      const u = new URL(h)
+      return `${u.protocol}//${u.host}`
+    } catch {
+      return h
+    }
+  }
+  const raw = Deno.env.get("R2_PUBLIC_BASE_URL") || Deno.env.get("IMAGE_BASE_URL") || "https://images-service.xmlreactor.shop"
+  try {
+    const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`)
+    const origin = `${u.protocol}//${u.host}`
+    const path = (u.pathname || "/").replace(/^\/+/, "").replace(/\/+$/, "")
+    return path ? `${origin}/${path}` : origin
+  } catch {
+    return raw
+  }
+}
+const IMAGE_BASE_URL = resolvePublicBase()
 console.log(`[upload-product-image] Using IMAGE_BASE_URL: ${IMAGE_BASE_URL}`)
 
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/

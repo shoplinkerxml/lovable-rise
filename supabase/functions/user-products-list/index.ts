@@ -335,7 +335,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    const imageBase = Deno.env.get('IMAGE_BASE_URL') ?? ''
+    function resolvePublicBase(): string {
+      const host = Deno.env.get('R2_PUBLIC_HOST') || ''
+      if (host) {
+        const h = host.startsWith('http') ? host : `https://${host}`
+        try { const u = new URL(h); return `${u.protocol}//${u.host}` } catch { return h }
+      }
+      const raw = Deno.env.get('R2_PUBLIC_BASE_URL') || Deno.env.get('IMAGE_BASE_URL') || ''
+      if (!raw) return ''
+      try {
+        const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+        const origin = `${u.protocol}//${u.host}`
+        const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/+$/, '')
+        return path ? `${origin}/${path}` : origin
+      } catch { return raw }
+    }
+    const imageBase = resolvePublicBase()
     const makePublicUrlFromKey = (key: string): string => {
       const k = String(key || '')
       if (!k) return ''
