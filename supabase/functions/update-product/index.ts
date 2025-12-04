@@ -37,26 +37,15 @@ const decodeJwtSub = (authHeader: string | null) => {
 function extractObjectKeyFromUrl(url: string): string | null {
   try {
     const u = new URL(url)
-    const host = u.host || ""
     const pathname = (u.pathname || "/").replace(/^\/+/, "")
+    if (!pathname) return null
+    const idxProducts = pathname.indexOf("products/")
+    const idxUploads = pathname.indexOf("uploads/")
+    if (idxProducts >= 0) return pathname.slice(idxProducts)
+    if (idxUploads >= 0) return pathname.slice(idxUploads)
     const parts = pathname.split("/").filter(Boolean)
-
-    if (host.includes("cloudflarestorage.com")) {
-      const hostParts = host.split(".")
-      const isPathStyle = hostParts.length === 4
-      if (isPathStyle) {
-        if (parts.length >= 2) return parts.slice(1).join("/")
-        return parts[0] || null
-      }
-      return pathname || null
-    }
-
-    if (host.includes("r2.dev")) {
-      if (parts.length >= 2) return parts.slice(1).join("/")
-      return parts[0] || null
-    }
-
-    return null
+    if (parts.length <= 1) return parts[0] || null
+    return parts.slice(1).join("/")
   } catch {
     return null
   }

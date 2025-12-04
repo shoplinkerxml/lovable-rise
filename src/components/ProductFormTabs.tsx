@@ -744,42 +744,18 @@ export function ProductFormTabs({
       const imagesData: ProductImage[] | null = preloadedImages ?? null;
       if (imagesData) {
         const resolved = await Promise.all(imagesData.map(async (img) => {
-          const row = img as unknown as {
-            r2_key_card?: string | null;
-            r2_key_thumb?: string | null;
-            r2_key_original?: string | null;
-          };
-          let previewUrl: string = img.url;
-          let thumbUrl: string | undefined = (img as unknown as { thumb_url?: string }).thumb_url;
+          const row = img as unknown as { r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null };
           const cardKey = row.r2_key_card || undefined;
           const thumbKey = row.r2_key_thumb || undefined;
+          let previewUrl: string = img.url;
+          let thumbUrl: string | undefined = (img as unknown as { thumb_url?: string }).thumb_url;
           let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          if (cardKey) {
-            try {
-              const signed = await R2Storage.getViewUrl(cardKey);
-              previewUrl = signed || R2Storage.makePublicUrl(cardKey);
-              objectKeyRaw = cardKey;
-            } catch { previewUrl = R2Storage.makePublicUrl(cardKey); objectKeyRaw = cardKey; }
-          } else if (typeof previewUrl === 'string') {
-            let host = '';
-            try { host = new URL(previewUrl).host; } catch {}
-            const isR2Dev = previewUrl.includes('r2.dev');
-            const isOurBucket = host === 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com';
-            if (isR2Dev || isOurBucket) {
-              const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
-              if (objectKey) {
-                try {
-                  const signed = await R2Storage.getViewUrl(objectKey);
-                  if (signed) previewUrl = signed;
-                } catch {}
-              }
-            }
+          if (!previewUrl && cardKey) {
+            previewUrl = R2Storage.makePublicUrl(cardKey);
+            objectKeyRaw = cardKey;
           }
           if (!thumbUrl && thumbKey) {
-            try {
-              const signedThumb = await R2Storage.getViewUrl(thumbKey);
-              thumbUrl = signedThumb || R2Storage.makePublicUrl(thumbKey);
-            } catch { thumbUrl = R2Storage.makePublicUrl(thumbKey); }
+            thumbUrl = R2Storage.makePublicUrl(thumbKey);
           }
           return {
             id: img.id,

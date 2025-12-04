@@ -220,23 +220,9 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         if (productImagesRaw) {
           const rows = (productImagesRaw || []) as StoreProductImageRow[];
           const resolved = await Promise.all(rows.map(async (img) => {
-            let previewUrl = img.r2_key_card ? R2Storage.makePublicUrl(String(img.r2_key_card)) : (img.url as string);
-            const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-            if (typeof previewUrl === 'string') {
-              let host = '';
-              try { host = new URL(previewUrl).host; } catch {}
-              const isR2Dev = previewUrl.includes('r2.dev');
-              const isOurBucket = host === 'shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com';
-              if (isR2Dev || isOurBucket) {
-                const objectKey = R2Storage.extractObjectKeyFromUrl(previewUrl);
-                if (objectKey) {
-                  try {
-                    const signed = await R2Storage.getViewUrl(objectKey);
-                    if (signed) previewUrl = signed;
-                  } catch (e) {}
-                }
-              }
-            }
+            const cardKey = img.r2_key_card ? String(img.r2_key_card) : undefined;
+            let previewUrl = (img.url as string) || (cardKey ? R2Storage.makePublicUrl(cardKey) : "");
+            const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : (cardKey || null);
             return {
               url: previewUrl,
               order_index: img.order_index,

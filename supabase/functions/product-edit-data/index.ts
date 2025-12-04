@@ -387,13 +387,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         return {
           id: img.id != null ? String(img.id) : undefined,
           product_id: img.product_id != null ? String(img.product_id) : productId,
-          url: fallbackUrl,
+          url: finalCard || fallbackUrl,
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: img.is_main === true,
           alt_text: img.alt_text ?? null,
           r2_key_card: r2c || null,
           r2_key_thumb: r2t || null,
           r2_key_original: r2o || null,
+          thumb_url: finalThumb || null,
           images: { original: originalUrl, card: finalCard, thumb: finalThumb },
         }
       },
