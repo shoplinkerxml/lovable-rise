@@ -39,3 +39,8 @@ md/
 *report*.txt
 *.sql
 *.temp
+
+.env
+.env.local
+.env.development
+.env.production
