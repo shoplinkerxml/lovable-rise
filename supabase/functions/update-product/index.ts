@@ -179,32 +179,14 @@ async function handleImages(
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }
-  const { data: existingRows } = await supabase
-    .from("store_product_images")
-    .select("id,product_id,url,order_index,is_main,alt_text,r2_key_card,r2_key_thumb,r2_key_original")
-    .eq("product_id", productId)
-    .order("order_index")
-
-  const existing = (existingRows || []) as any[]
-  const mapByKey = new Map<string, any>()
-  for (const r of existing) {
-    const kc = r?.r2_key_card ? String(r.r2_key_card) : ""
-    const kt = r?.r2_key_thumb ? String(r.r2_key_thumb) : ""
-    if (kc) mapByKey.set(kc, r)
-    if (kt) mapByKey.set(kt, r)
-  }
-
-  const updates: any[] = []
-  const inserts: any[] = []
 
   let hasMain = images.some((i) => i.is_main === true)
   let assigned = false
+  const normalized: Array<{ product_id: string; url: string; is_main: boolean; order_index: number; r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null }> = []
 
   for (let index = 0; index < images.length; index++) {
     const raw = images[index]
     const preferred = await toPreferredUrl(raw)
-    const keyCandidate = (raw.key && String(raw.key)) || (typeof raw.url === "string" ? extractObjectKeyFromUrl(raw.url!) : null) || ""
-    const match = keyCandidate ? mapByKey.get(String(keyCandidate)) : null
     let isMain = raw.is_main === true && !assigned
     if (hasMain) {
       if (raw.is_main === true && !assigned) assigned = true
@@ -213,32 +195,24 @@ async function handleImages(
       isMain = index === 0
     }
     const oi = typeof raw.order_index === "number" ? raw.order_index : index
-    if (match && match.id != null) {
-      updates.push({ id: match.id, url: preferred.url, is_main: isMain, order_index: oi })
-    } else {
-      inserts.push({ product_id: productId, url: preferred.url, is_main: isMain, order_index: oi, r2_key_card: preferred.r2_card ?? null, r2_key_thumb: preferred.r2_thumb ?? null, r2_key_original: preferred.r2_original ?? null })
+    if (preferred.url && preferred.url.trim() !== "") {
+      normalized.push({ product_id: productId, url: preferred.url, is_main: isMain, order_index: oi, r2_key_card: preferred.r2_card ?? null, r2_key_thumb: preferred.r2_thumb ?? null, r2_key_original: preferred.r2_original ?? null })
     }
   }
 
-  const mainIdx = updates.findIndex((i) => i.is_main === true)
-  if (mainIdx > 0) {
-    const [main] = updates.splice(mainIdx, 1)
-    updates.unshift(main)
-  }
-  for (let i = 0; i < updates.length; i++) updates[i].order_index = i
-  const start = updates.length
-  for (let i = 0; i < inserts.length; i++) inserts[i].order_index = start + i
+  const mainIdx = normalized.findIndex((i) => i.is_main === true)
+  const ordered = (() => {
+    const arr = normalized.slice()
+    if (mainIdx > 0) {
+      const [main] = arr.splice(mainIdx, 1)
+      arr.unshift(main)
+    }
+    return arr.map((i, idx) => ({ ...i, order_index: idx }))
+  })()
 
-  if (updates.length) {
-    await supabase.from("store_product_images").upsert(updates, { onConflict: "id" })
-  }
-  if (inserts.length) {
-    await supabase.from("store_product_images").insert(inserts)
-  }
-  const keptIds = new Set<string>(updates.map((u) => String(u.id)))
-  const toDelete = existing.filter((r) => !keptIds.has(String(r.id)))
-  if (toDelete.length) {
-    await supabase.from("store_product_images").delete().in("id", toDelete.map((r) => r.id))
+  await supabase.from("store_product_images").delete().eq("product_id", productId)
+  if (ordered.length) {
+    await supabase.from("store_product_images").insert(ordered)
   }
 }
 

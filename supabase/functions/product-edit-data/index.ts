@@ -308,6 +308,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       sscPromise,
     ])
 
+    let imageRowsResolved: any[] = Array.isArray(imageRows) ? imageRows : []
+    if (imageRowsResolved.length === 0 && storeId) {
+      const alt = await supabase
+        .from('store_product_links')
+        .select('images:store_product_images(id,product_id,url,order_index,is_main,alt_text,r2_key_card,r2_key_thumb,r2_key_original)')
+        .eq('product_id', productId)
+        .eq('store_id', storeId)
+        .maybeSingle()
+      const nested = (alt as any)?.data?.images || []
+      if (Array.isArray(nested) && nested.length > 0) imageRowsResolved = nested
+    }
+
     const catsAllRows = (catsAll || []) as any[]
     if (catsAllRows.length > 0) {
       for (const c of catsAllRows) {
@@ -373,7 +385,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
     const imageBase = resolvePublicBase()
 
-    const images: (ProductImage & { images?: { original: string | null; card: string | null; thumb: string | null } })[] = ((imageRows || []) as any[]).map(
+    const images: (ProductImage & { images?: { original: string | null; card: string | null; thumb: string | null } })[] = (imageRowsResolved as any[]).map(
       (img, index) => {
         const r2o = img.r2_key_original ? String(img.r2_key_original) : ''
         const r2c = img.r2_key_card ? String(img.r2_key_card) : ''

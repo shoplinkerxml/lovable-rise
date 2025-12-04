@@ -1074,7 +1074,7 @@ export class ProductService {
 
   /** Создание нового продукта (через функцию create-product) */
   static async createProduct(productData: CreateProductData): Promise<Product> {
-    await this.ensureCanMutateProducts();
+    await this.ensureCanCreateProduct();
 
     let effectiveStoreId = productData.store_id;
     if (!effectiveStoreId || effectiveStoreId.trim() === "") {
@@ -1292,15 +1292,21 @@ export class ProductService {
     } catch { void 0; }
   }
 
-  /** Централизованная проверка сессии и подписки перед изменениями */
+  /** Проверка только валидности сессии (без дополнительных запросов) */
   private static async ensureCanMutateProducts(): Promise<void> {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    const subscription = await SubscriptionValidationService.getValidSubscription(user.id);
+  }
+
+  /** Проверка права на создание (сессия + актуальная подписка) */
+  private static async ensureCanCreateProduct(): Promise<void> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid || !sessionValidation.user?.id) {
+      throw new Error("Invalid session");
+    }
+    const subscription = await SubscriptionValidationService.getValidSubscription(sessionValidation.user.id);
     if (!subscription) throw new Error("No valid subscription");
   }
 

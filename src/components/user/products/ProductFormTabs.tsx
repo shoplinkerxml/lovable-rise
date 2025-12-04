@@ -14,6 +14,7 @@ import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
 import { ShopService } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
+import { SessionValidator } from "@/lib/session-validation";
 import { R2Storage } from "@/lib/r2-storage";
 import { useI18n } from "@/providers/i18n-provider";
 
@@ -475,10 +476,12 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       
       // Создаем или обновляем запись в store_currencies
       if (selectedCurrency) {
+        const session = await SessionValidator.ensureValidSession();
+        const userId = session.user?.id || null;
         const { error: storeCurrencyError } = await supabase
           .from('store_currencies')
           .upsert({
-            user_id: (await supabase.auth.getUser()).data.user?.id,
+            user_id: userId,
             store_id: formData.store_id,
             currency_id: selectedCurrency.id,
             name: selectedCurrency.name,
