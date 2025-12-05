@@ -56,7 +56,6 @@ type ProductImage = {
   url: string
   order_index: number
   is_main: boolean
-  alt_text?: string | null
   r2_key_card?: string | null
   r2_key_thumb?: string | null
   r2_key_original?: string | null
@@ -262,7 +261,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const imagesPromise = supabase
       .from('store_product_images')
-      .select('id,product_id,url,order_index,is_main,alt_text,r2_key_card,r2_key_thumb,r2_key_original')
+      .select('id,product_id,url,order_index,is_main,r2_key_card,r2_key_thumb,r2_key_original')
       .eq('product_id', productId)
       .order('order_index')
 
@@ -295,7 +294,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const [
       { data: catsAll },
       { data: linkRow },
-      { data: imageRows },
+      imagesResult,
       { data: paramRows },
       { data: shopRow },
       { data: sscRows },
@@ -308,11 +307,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       sscPromise,
     ])
 
+    const imageRows = imagesResult?.data
+    const imageError = imagesResult?.error
+    console.log(`[product-edit-data] Images query for product ${productId}:`, { count: imageRows?.length ?? 0, error: imageError?.message ?? null })
+
     let imageRowsResolved: any[] = Array.isArray(imageRows) ? imageRows : []
     if (imageRowsResolved.length === 0 && storeId) {
       const alt = await supabase
         .from('store_product_links')
-        .select('images:store_product_images(id,product_id,url,order_index,is_main,alt_text,r2_key_card,r2_key_thumb,r2_key_original)')
+        .select('images:store_product_images(id,product_id,url,order_index,is_main,r2_key_card,r2_key_thumb,r2_key_original)')
         .eq('product_id', productId)
         .eq('store_id', storeId)
         .maybeSingle()
@@ -402,7 +405,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
           url: finalCard || fallbackUrl,
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: img.is_main === true,
-          alt_text: img.alt_text ?? null,
           r2_key_card: r2c || null,
           r2_key_thumb: r2t || null,
           r2_key_original: r2o || null,
