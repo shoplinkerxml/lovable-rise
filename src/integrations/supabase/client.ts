@@ -1,14 +1,9 @@
-// This file configures Supabase client using environment variables.
+// This file configures Supabase client.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Read from Vite env (define in .env: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing Supabase env vars: VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY');
-}
+export const SUPABASE_URL = 'https://ehznqzaumsnjkrntaiox.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
