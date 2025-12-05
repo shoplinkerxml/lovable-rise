@@ -664,6 +664,9 @@ export const ProductsTable = ({
             let didBatch = false;
             if (productToDelete) {
               await onDelete?.(productToDelete);
+              setProductsCached((prev) => prev.filter((p) => String(p.id) !== String(productToDelete.id)));
+              setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - 1) } : prev);
+              try { await loadFirstPage(); } catch { void 0; }
             } else {
               const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
               if (storeId) {

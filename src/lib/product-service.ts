@@ -1257,6 +1257,9 @@ export class ProductService {
       throw new Error("delete_failed");
     }
     removeCache("rq:products:all");
+    try {
+      ProductService.clearAllFirstPageCaches();
+    } catch { void 0; }
   }
 
   static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
