@@ -372,8 +372,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
           return h
         }
       }
-      const raw = Deno.env.get('R2_PUBLIC_BASE_URL') || Deno.env.get('IMAGE_BASE_URL') || ''
-      if (!raw) return ''
+      const raw = Deno.env.get('R2_PUBLIC_BASE_URL') || Deno.env.get('IMAGE_BASE_URL') || 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev'
+      if (!raw) return 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev'
       try {
         const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
         const origin = `${u.protocol}//${u.host}`
