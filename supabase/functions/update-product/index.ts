@@ -175,7 +175,10 @@ async function handleImages(
   productId: string,
   images: ImageInput[] | undefined,
 ): Promise<void> {
+  console.log(`[handleImages] productId=${productId}, images count=${images?.length ?? 0}`)
+  
   if (!Array.isArray(images) || images.length === 0) {
+    console.log(`[handleImages] No images provided, deleting all for product`)
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }
@@ -186,7 +189,9 @@ async function handleImages(
 
   for (let index = 0; index < images.length; index++) {
     const raw = images[index]
+    console.log(`[handleImages] Processing image ${index}:`, JSON.stringify(raw))
     const preferred = await toPreferredUrl(raw)
+    console.log(`[handleImages] Preferred result:`, JSON.stringify(preferred))
     let isMain = raw.is_main === true && !assigned
     if (hasMain) {
       if (raw.is_main === true && !assigned) assigned = true
@@ -200,6 +205,8 @@ async function handleImages(
     }
   }
 
+  console.log(`[handleImages] Normalized count: ${normalized.length}`)
+
   const mainIdx = normalized.findIndex((i) => i.is_main === true)
   const ordered = (() => {
     const arr = normalized.slice()
@@ -210,9 +217,21 @@ async function handleImages(
     return arr.map((i, idx) => ({ ...i, order_index: idx }))
   })()
 
-  await supabase.from("store_product_images").delete().eq("product_id", productId)
+  console.log(`[handleImages] Ordered images to insert:`, JSON.stringify(ordered))
+
+  // Delete existing images first
+  const { error: deleteErr } = await supabase.from("store_product_images").delete().eq("product_id", productId)
+  if (deleteErr) {
+    console.error(`[handleImages] Delete error:`, deleteErr)
+  }
+  
   if (ordered.length) {
-    await supabase.from("store_product_images").insert(ordered)
+    const { data: insertData, error: insertErr } = await supabase.from("store_product_images").insert(ordered).select()
+    if (insertErr) {
+      console.error(`[handleImages] Insert error:`, insertErr)
+      throw new Error(`Failed to insert images: ${insertErr.message}`)
+    }
+    console.log(`[handleImages] Inserted images:`, JSON.stringify(insertData))
   }
 }
 
