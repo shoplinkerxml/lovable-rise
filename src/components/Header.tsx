@@ -69,15 +69,9 @@ export function Header() {
       {/* Mobile Navigation */}
       {isMenuOpen && <div className="md:hidden border-t bg-background/95 backdrop-blur-lg p-4">
           <nav className="flex flex-col space-y-3">
-            <a href="#features" className="text-foreground font-medium py-2">
-              {t('nav_features')}
-            </a>
-            <a href="#how-it-works" className="text-muted-foreground py-2">
-              {t('nav_how_it_works')}
-            </a>
-            <a href="#pricing" className="text-muted-foreground py-2">
-              {t('nav_pricing')}
-            </a>
+            
+            
+            
             <a href="/docs" className="text-muted-foreground py-2">
               API Docs
             </a>
