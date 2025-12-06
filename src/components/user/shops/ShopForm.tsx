@@ -33,7 +33,7 @@ export const ShopForm = ({ shop, onSuccess, onCancel }: ShopFormProps) => {
     if (shop?.template_id) {
       const loadTemplateMarketplace = async () => {
         try {
-          // @ts-ignore - table not in generated types yet
+         
           const { data, error } = await (supabase as any)
             .from('store_templates')
             .select('marketplace')
@@ -56,7 +56,7 @@ export const ShopForm = ({ shop, onSuccess, onCancel }: ShopFormProps) => {
     
     try {
       // Get template by marketplace
-      // @ts-ignore - table not in generated types yet
+    
       const { data: template, error } = await (supabase as any)
         .from('store_templates')
         .select('id, xml_structure, mapping_rules')

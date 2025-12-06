@@ -9,9 +9,9 @@ export interface UserMenuItem {
   order_index: number;
   is_active: boolean;
   page_type: 'content' | 'form' | 'dashboard' | 'list' | 'custom';
-  content_data?: Record<string, any>;
+  content_data?: Record<string, unknown>;
   template_name?: string;
-  meta_data?: Record<string, any>;
+  meta_data?: Record<string, unknown>;
   icon_name?: string;
   description?: string;
   created_at: string;
@@ -24,9 +24,9 @@ export interface CreateUserMenuItem {
   parent_id?: number;
   order_index?: number;
   page_type?: 'content' | 'form' | 'dashboard' | 'list' | 'custom';
-  content_data?: Record<string, any>;
+  content_data?: Record<string, unknown>;
   template_name?: string;
-  meta_data?: Record<string, any>;
+  meta_data?: Record<string, unknown>;
   icon_name?: string;
   description?: string;
 }
@@ -38,9 +38,9 @@ export interface UpdateUserMenuItem {
   order_index?: number;
   is_active?: boolean;
   page_type?: 'content' | 'form' | 'dashboard' | 'list' | 'custom';
-  content_data?: Record<string, any>;
+  content_data?: Record<string, unknown>;
   template_name?: string;
-  meta_data?: Record<string, any>;
+  meta_data?: Record<string, unknown>;
   icon_name?: string;
   description?: string;
 }
@@ -110,56 +110,52 @@ export class UserMenuService {
    * Get all menu items for a user
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
-    try {
-      const authMe = await UserAuthService.fetchAuthMe();
-      let items = Array.isArray(authMe.menuItems) ? authMe.menuItems : [];
-      if (activeOnly) items = items.filter(i => i.is_active === true);
-      if (items.length > 0) {
-        return items.map((item: UserMenuItem) => {
-          if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
-              (item.title.toLowerCase().includes('supplier') || 
-               item.title.toLowerCase().includes('постачальник') ||
-               item.title.toLowerCase().includes('shop') || 
-               item.title.toLowerCase().includes('магазин') ||
-               item.title.toLowerCase().includes('payment') || 
-               item.title.toLowerCase().includes('платеж') ||
-               item.path.toLowerCase().includes('supplier') || 
-               item.path.toLowerCase().includes('постачальник') ||
-               item.path.toLowerCase().includes('shop') || 
-               item.path.toLowerCase().includes('магазин') ||
-               item.path.toLowerCase().includes('payment') || 
-               item.path.toLowerCase().includes('платеж'))) {
-            return { ...item, icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
-          }
-          return item;
-        });
-      }
-      const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
-        action: "list",
-        active_only: !!activeOnly,
-      });
-      const rows: UserMenuItem[] = Array.isArray(resp.items) ? (resp.items as UserMenuItem[]) : [];
-      return rows.map((item: UserMenuItem) => {
+    const authMe = await UserAuthService.fetchAuthMe();
+    let items = Array.isArray(authMe.menuItems) ? authMe.menuItems : [];
+    if (activeOnly) items = items.filter(i => i.is_active === true);
+    if (items.length > 0) {
+      return items.map((item: UserMenuItem) => {
         if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
-            (item.title.toLowerCase().includes('supplier') || 
+            (item.title.toLowerCase().includes('supplier') ||
              item.title.toLowerCase().includes('постачальник') ||
-             item.title.toLowerCase().includes('shop') || 
+             item.title.toLowerCase().includes('shop') ||
              item.title.toLowerCase().includes('магазин') ||
-             item.title.toLowerCase().includes('payment') || 
+             item.title.toLowerCase().includes('payment') ||
              item.title.toLowerCase().includes('платеж') ||
-             item.path.toLowerCase().includes('supplier') || 
+             item.path.toLowerCase().includes('supplier') ||
              item.path.toLowerCase().includes('постачальник') ||
-             item.path.toLowerCase().includes('shop') || 
+             item.path.toLowerCase().includes('shop') ||
              item.path.toLowerCase().includes('магазин') ||
-             item.path.toLowerCase().includes('payment') || 
+             item.path.toLowerCase().includes('payment') ||
              item.path.toLowerCase().includes('платеж'))) {
           return { ...item, icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
         }
         return item;
       });
-    } catch (error) {
-      throw error;
     }
+    const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
+      action: "list",
+      active_only: !!activeOnly,
+    });
+    const rows: UserMenuItem[] = Array.isArray(resp.items) ? (resp.items as UserMenuItem[]) : [];
+    return rows.map((item: UserMenuItem) => {
+      if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
+          (item.title.toLowerCase().includes('supplier') ||
+           item.title.toLowerCase().includes('постачальник') ||
+           item.title.toLowerCase().includes('shop') ||
+           item.title.toLowerCase().includes('магазин') ||
+           item.title.toLowerCase().includes('payment') ||
+           item.title.toLowerCase().includes('платеж') ||
+           item.path.toLowerCase().includes('supplier') ||
+           item.path.toLowerCase().includes('постачальник') ||
+           item.path.toLowerCase().includes('shop') ||
+           item.path.toLowerCase().includes('магазин') ||
+           item.path.toLowerCase().includes('payment') ||
+           item.path.toLowerCase().includes('платеж'))) {
+        return { ...item, icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
+      }
+      return item;
+    });
   }
 
   /**
@@ -221,26 +217,27 @@ export class UserMenuService {
    */
   static async createMenuItem(userId: string, menuData: CreateUserMenuItem): Promise<UserMenuItem> {
     try {
-      const respUnique = await UserMenuService.invokeEdge<{ error?: string }>("user-menu-items", {
+      const respUnique = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
         action: "get_by_path",
         path: menuData.path,
       });
-      if ((respUnique as any)?.item) {
+      if (respUnique.item) {
         throw new Error('Path already exists for this user');
       }
 
       // Get the next order index if not provided
       let orderIndex = menuData.order_index;
       if (orderIndex === undefined) {
-        const { data: maxOrderItem } = await (supabase as any)
+        const respMax = await supabase
           .from('user_menu_items')
           .select('order_index')
           .eq('parent_id', menuData.parent_id || null)
           .order('order_index', { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        orderIndex = (maxOrderItem?.order_index || 0) + 1;
+        const maxOrderItem = (respMax.data ?? null) as { order_index: number | null } | null;
+        const maxIdx = maxOrderItem?.order_index ?? 0;
+        orderIndex = maxIdx + 1;
       }
 
       // Auto-assign icon only for supplier/shop/payment-related items
@@ -337,7 +334,7 @@ export class UserMenuService {
           action: "get_by_path",
           path: menuData.path,
         });
-        const existingItem = (check.item && (check.item as any).id !== undefined && (check.item as any).id !== itemId) ? check.item : null;
+        const existingItem = check.item && typeof check.item.id === 'number' && check.item.id !== itemId ? check.item : null;
         if (existingItem) {
           throw new Error('Path already exists');
         }
@@ -353,17 +350,15 @@ export class UserMenuService {
            menuData.title.toLowerCase().includes('payment') || 
            menuData.title.toLowerCase().includes('платеж'))) {
         // We need to get the path to determine the icon
-        const { data: existingItem } = await (supabase as any)
+        const respPath = await supabase
           .from('user_menu_items')
           .select('path')
           .eq('id', itemId)
           .maybeSingle();
-        
-        if (existingItem) {
-          icon_name = this.getAutoIconForMenuItem({ 
-            title: menuData.title, 
-            path: menuData.path || existingItem.path 
-          });
+        const existingPathRow = (respPath.data ?? null) as { path: string | null } | null;
+        const pathForIcon = menuData.path || (existingPathRow?.path ?? '');
+        if (pathForIcon) {
+          icon_name = this.getAutoIconForMenuItem({ title: menuData.title, path: pathForIcon });
         }
       }
 

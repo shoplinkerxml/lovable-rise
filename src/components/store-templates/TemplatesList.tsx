@@ -50,7 +50,7 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
 
   const loadTemplates = async () => {
     try {
-      // @ts-ignore - table not in generated types yet
+     
       const { data, error } = await (supabase as any)
         .from('store_templates')
         .select('*')

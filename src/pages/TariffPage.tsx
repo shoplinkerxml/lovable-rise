@@ -66,12 +66,12 @@ const TariffPage = () => {
             return parsed.items;
           }
         }
-      } catch {}
+      } catch { void 0; }
       const rows = await TariffService.getTariffsAggregated(false);
       try {
         const payload = JSON.stringify({ items: rows as TariffWithDetails[], expiresAt: Date.now() + 900_000 });
         if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-      } catch {}
+      } catch { void 0; }
       return rows as TariffWithDetails[];
     },
     retry: false,

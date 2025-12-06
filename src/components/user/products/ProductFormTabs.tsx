@@ -222,7 +222,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           const rows = (productImagesRaw || []) as StoreProductImageRow[];
           const resolved = await Promise.all(rows.map(async (img) => {
             const cardKey = img.r2_key_card ? String(img.r2_key_card) : undefined;
-            let previewUrl = (img.url as string) || (cardKey ? R2Storage.makePublicUrl(cardKey) : "");
+            const previewUrl = (img.url as string) || (cardKey ? R2Storage.makePublicUrl(cardKey) : "");
             const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : (cardKey || null);
             return {
               url: previewUrl,
