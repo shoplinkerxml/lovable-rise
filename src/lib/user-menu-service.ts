@@ -52,6 +52,20 @@ export interface MenuReorderItem {
 }
 
 export class UserMenuService {
+  private static async getAccessToken(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || null;
+  }
+
+  private static async invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
+    const token = await UserMenuService.getAccessToken();
+    const { data, error } = await supabase.functions.invoke<T | string>(name, {
+      body,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (error) throw error;
+    return (typeof data === "string" ? (JSON.parse(data as string) as T) : (data as T));
+  }
   
   /**
    * Auto-assign icon based on menu item properties
@@ -120,14 +134,11 @@ export class UserMenuService {
           return item;
         });
       }
-
-      let query = (supabase as any)
-        .from('user_menu_items')
-        .select('*');
-      if (activeOnly) query = query.eq('is_active', true);
-      const { data, error } = await query.order('order_index', { ascending: true });
-      if (error) throw error;
-      const rows: UserMenuItem[] = (data || []) as UserMenuItem[];
+      const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
+        action: "list",
+        active_only: !!activeOnly,
+      });
+      const rows: UserMenuItem[] = Array.isArray(resp.items) ? (resp.items as UserMenuItem[]) : [];
       return rows.map((item: UserMenuItem) => {
         if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
             (item.title.toLowerCase().includes('supplier') || 
@@ -210,14 +221,11 @@ export class UserMenuService {
    */
   static async createMenuItem(userId: string, menuData: CreateUserMenuItem): Promise<UserMenuItem> {
     try {
-      // Validate path uniqueness for the user
-      const { data: existingItem } = await (supabase as any)
-        .from('user_menu_items')
-        .select('id')
-        .eq('path', menuData.path)
-        .maybeSingle();
-
-      if (existingItem) {
+      const respUnique = await UserMenuService.invokeEdge<{ error?: string }>("user-menu-items", {
+        action: "get_by_path",
+        path: menuData.path,
+      });
+      if ((respUnique as any)?.item) {
         throw new Error('Path already exists for this user');
       }
 
@@ -302,25 +310,17 @@ export class UserMenuService {
         }
       }
 
-      const { data, error } = await (supabase as any)
-        .from('user_menu_items')
-        .insert({
-          user_id: userId, // Still store user_id for RLS policy compatibility
+      const resp = await UserMenuService.invokeEdge<{ item: UserMenuItem }>("user-menu-items", {
+        action: "create",
+        data: {
           ...menuData,
-          icon_name: icon_name || 'FileText', // Default to FileText instead of circle
+          icon_name: icon_name || 'FileText',
           order_index: orderIndex,
           page_type: menuData.page_type || 'content',
-          content_data: defaultContent
-        })
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error creating menu item:', error);
-        throw error;
-      }
-
-      return data as UserMenuItem;
+          content_data: defaultContent,
+        },
+      });
+      return resp.item as UserMenuItem;
     } catch (error) {
       console.error('Error in createMenuItem:', error);
       throw error;
@@ -332,15 +332,12 @@ export class UserMenuService {
    */
   static async updateMenuItem(itemId: number, userId: string, menuData: UpdateUserMenuItem): Promise<UserMenuItem> {
     try {
-      // If path is being updated, validate uniqueness
       if (menuData.path) {
-        const { data: existingItem } = await (supabase as any)
-          .from('user_menu_items')
-          .select('id')
-          .eq('path', menuData.path)
-          .neq('id', itemId)
-          .maybeSingle();
-
+        const check = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+          action: "get_by_path",
+          path: menuData.path,
+        });
+        const existingItem = (check.item && (check.item as any).id !== undefined && (check.item as any).id !== itemId) ? check.item : null;
         if (existingItem) {
           throw new Error('Path already exists');
         }
@@ -375,19 +372,12 @@ export class UserMenuService {
         ...(icon_name !== undefined && { icon_name }) // Only include icon_name if it's defined
       };
 
-      const { data, error } = await (supabase as any)
-        .from('user_menu_items')
-        .update(updateData)
-        .eq('id', itemId)
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error updating menu item:', error);
-        throw error;
-      }
-
-      return data as UserMenuItem;
+      const resp = await UserMenuService.invokeEdge<{ item: UserMenuItem }>("user-menu-items", {
+        action: "update",
+        id: itemId,
+        data: updateData,
+      });
+      return resp.item as UserMenuItem;
     } catch (error) {
       console.error('Error in updateMenuItem:', error);
       throw error;
@@ -399,15 +389,7 @@ export class UserMenuService {
    */
   static async deleteMenuItem(itemId: number, userId: string): Promise<void> {
     try {
-      const { error } = await (supabase as any)
-        .from('user_menu_items')
-        .delete()
-        .eq('id', itemId);
-
-      if (error) {
-        console.error('Error deleting menu item:', error);
-        throw error;
-      }
+      await UserMenuService.invokeEdge<{ ok: boolean }>("user-menu-items", { action: "delete", id: itemId });
     } catch (error) {
       console.error('Error in deleteMenuItem:', error);
       throw error;
@@ -431,14 +413,10 @@ export class UserMenuService {
    */
   static async reorderMenuItems(userId: string, reorderedItems: MenuReorderItem[]): Promise<void> {
     try {
-      // Update each item individually to avoid type issues with partial upsert
-      for (const item of reorderedItems) {
-        const { error } = await supabase
-          .from('user_menu_items')
-          .update({ order_index: item.order_index, parent_id: item.parent_id ?? null })
-          .eq('id', item.id);
-        if (error) throw error;
-      }
+      await UserMenuService.invokeEdge<{ ok: boolean }>("user-menu-items", {
+        action: "reorder",
+        items: reorderedItems,
+      });
     } catch (error) {
       console.error('Error in reorderMenuItems:', error);
       throw error;
@@ -451,19 +429,11 @@ export class UserMenuService {
    */
   static async getMenuItem(itemId: number, userId: string): Promise<UserMenuItem | null> {
     try {
-      const { data, error } = await (supabase as any)
-        .from('user_menu_items')
-        .select('*')
-        .eq('id', itemId)
-        .maybeSingle();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return null; // Not found
-        }
-        console.error('Error fetching menu item:', error);
-        throw error;
-      }
+      const resp = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+        action: "get",
+        id: itemId,
+      });
+      const data = resp.item ?? null;
 
       // Only apply auto-icon assignment for supplier/shop/payment-related items
       if (data && (!data.icon_name || data.icon_name === 'circle' || data.icon_name === 'Circle') &&
@@ -497,68 +467,11 @@ export class UserMenuService {
    */
   static async getMenuItemByPath(path: string, userId: string): Promise<UserMenuItem | null> {
     try {
-      // Remove leading slash if present to match database format
-      const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
-      
-      // First try exact match
-      const { data, error } = await (supabase as any)
-        .from('user_menu_items')
-        .select('*')
-        .eq('path', normalizedPath)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      // If not found, try to find a parent menu item for hierarchical paths
-      if (error || !data) {
-        const pathParts = normalizedPath.split('/').filter(part => part.length > 0);
-        if (pathParts.length > 1) {
-          // Try parent paths
-          for (let i = pathParts.length - 1; i > 0; i--) {
-            const parentPath = pathParts.slice(0, i).join('/');
-            const { data: parentData, error: parentError } = await (supabase as any)
-              .from('user_menu_items')
-              .select('*')
-              .eq('path', parentPath)
-              .eq('is_active', true)
-              .maybeSingle();
-            
-            if (!parentError && parentData) {
-              // Found a parent, return it with modified path
-              const result = {
-                ...parentData,
-                path: normalizedPath
-              } as UserMenuItem;
-              
-              // Only apply auto-icon assignment for supplier/shop/payment-related items
-              if ((!result.icon_name || result.icon_name === 'circle' || result.icon_name === 'Circle') &&
-                  (result.title.toLowerCase().includes('supplier') || 
-                   result.title.toLowerCase().includes('постачальник') ||
-                   result.title.toLowerCase().includes('shop') || 
-                   result.title.toLowerCase().includes('магазин') ||
-                   result.title.toLowerCase().includes('payment') || 
-                   result.title.toLowerCase().includes('платеж') ||
-                   result.path.toLowerCase().includes('supplier') || 
-                   result.path.toLowerCase().includes('постачальник') ||
-                   result.path.toLowerCase().includes('shop') || 
-                   result.path.toLowerCase().includes('магазин') ||
-                   result.path.toLowerCase().includes('payment') || 
-                   result.path.toLowerCase().includes('платеж'))) {
-                result.icon_name = this.getAutoIconForMenuItem({ title: result.title, path: result.path });
-              }
-              
-              return result;
-            }
-          }
-        }
-        
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching menu item by path:', error);
-          throw error;
-        }
-        return null; // Not found
-      }
-
-      // Only apply auto-icon assignment for supplier/shop/payment-related items
+      const resp = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+        action: "get_by_path",
+        path,
+      });
+      const data = resp.item ?? null;
       if (data && (!data.icon_name || data.icon_name === 'circle' || data.icon_name === 'Circle') &&
           (data.title.toLowerCase().includes('supplier') || 
            data.title.toLowerCase().includes('постачальник') ||
@@ -575,9 +488,8 @@ export class UserMenuService {
         return {
           ...data,
           icon_name: this.getAutoIconForMenuItem({ title: data.title, path: data.path })
-        };
+        } as UserMenuItem;
       }
-
       return data;
     } catch (error) {
       console.error('Error in getMenuItemByPath:', error);
@@ -590,21 +502,11 @@ export class UserMenuService {
    */
   static async getChildMenuItems(userId: string, parentId?: number): Promise<UserMenuItem[]> {
     try {
-      const { data, error } = await (supabase as any)
-        .from('user_menu_items')
-        .select('*')
-        .eq('parent_id', parentId || null)
-        .eq('is_active', true)
-        .order('order_index');
-
-      if (error) {
-        console.error('Error fetching child menu items:', error);
-        throw error;
-      }
-
-      // Only apply auto-icon assignment for items that don't have an icon or have the default circle icon
-      // AND are supplier/shop/payment-related
-      const itemsWithIcons = (data || []).map((item: UserMenuItem) => {
+      const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
+        action: "get_children",
+        parent_id: parentId ?? null,
+      });
+      const itemsWithIcons = (resp.items || []).map((item: UserMenuItem) => {
         if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
             (item.title.toLowerCase().includes('supplier') || 
              item.title.toLowerCase().includes('постачальник') ||

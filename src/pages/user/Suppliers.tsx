@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, Truck, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -32,14 +32,14 @@ export const Suppliers = () => {
     setLimitInfo(prev => ({ ...prev, max: supplierLimit, canCreate: prev.current < supplierLimit }));
   }, [tariffLimits]);
 
-  const handleSuppliersLoaded = (count: number) => {
+  const handleSuppliersLoaded = useCallback((count: number) => {
     setSuppliersCount(count);
     setLimitInfo(prev => ({
       ...prev,
       current: count,
-      canCreate: count < prev.max
+      canCreate: count < prev.max,
     }));
-  };
+  }, []);
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);

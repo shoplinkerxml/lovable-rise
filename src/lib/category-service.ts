@@ -35,9 +35,7 @@ function castNullableNumber(v: unknown): number | undefined {
 
 function categoriesSelect(columns: string, supplierId?: string | number) {
   const normalized = castNullableNumber(supplierId);
-  let q = supabase.from("store_categories").select(columns);
-  if (normalized !== undefined) q = q.eq("supplier_id", normalized);
-  return q;
+  return { columns, supplierId: normalized } as { columns: string; supplierId?: number };
 }
 
 function toFull(row: StoreCategoryFullRow): StoreCategoryFull {
@@ -59,41 +57,34 @@ function toBase(row: StoreCategoryBase): StoreCategory {
 }
 
 export const CategoryService = {
+  
   // 0. Read specific category by internal id
   async getById(id: string | number): Promise<StoreCategoryFull | null> {
     const idNum = castNullableNumber(id);
     if (idNum === undefined) return null;
-    const { data, error } = await supabase
-      .from("store_categories")
-      .select("id,external_id,name,parent_external_id,supplier_id")
-      .eq("id", idNum)
-      .returns<StoreCategoryFullRow>()
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return null;
-    return toFull(data as StoreCategoryFullRow);
+    const resp = await invokeEdge<{ item?: StoreCategoryFullRow | null }>("categories", {
+      action: "get_by_id",
+      id: idNum,
+    });
+    if (!resp.item) return null;
+    return toFull(resp.item as StoreCategoryFullRow);
   },
 
   // 0a. Read category name by internal id (safe)
   async getNameByIdSafe(id: number | string): Promise<string | null> {
     const idNum = castNullableNumber(id);
     if (idNum === undefined) return null;
-    const { data, error } = await supabase
-      .from("store_categories")
-      .select("name")
-      .eq("id", idNum)
-      .returns<Pick<StoreCategoryRow, "name">>()
-      .maybeSingle();
-    if (error) return null;
-    return (data as Pick<StoreCategoryRow, "name"> | null)?.name ?? null;
+    const resp = await invokeEdge<{ name?: string | null }>("categories", { action: "get_name_by_id", id: idNum });
+    return (resp.name ?? null) as string | null;
   },
   // 4. Get all categories of supplier
   async listCategories(supplierId?: string | number): Promise<StoreCategory[]> {
-    const { data, error } = await categoriesSelect("external_id,name,parent_external_id", supplierId)
-      .order("name")
-      .returns<StoreCategoryBase[]>();
-    if (error) throw error;
-    const rows = data ?? [];
+    const sel = categoriesSelect("external_id,name,parent_external_id", supplierId);
+    const resp = await invokeEdge<{ rows?: StoreCategoryBase[] }>("categories", {
+      action: "list",
+      supplier_id: sel.supplierId,
+    });
+    const rows = resp.rows ?? [];
     return rows.map(toBase);
   },
 
@@ -105,14 +96,8 @@ export const CategoryService = {
       name: input.name,
       parent_external_id: input.parent_external_id ?? null,
     };
-    const { data, error } = await supabase
-      .from("store_categories")
-      .insert([payload])
-      .select("external_id,name,parent_external_id")
-      .returns<StoreCategoryBase>()
-      .single();
-    if (error) throw error;
-    return toBase(data as StoreCategoryBase);
+    const resp = await invokeEdge<{ item: StoreCategoryBase }>("categories", { action: "create", data: payload });
+    return toBase(resp.item as StoreCategoryBase);
   },
 
   // 3. Bulk create
@@ -124,53 +109,44 @@ export const CategoryService = {
       name: it.name,
       parent_external_id: it.parent_external_id ?? null,
     }));
-    const { data, error } = await supabase
-      .from("store_categories")
-      .insert(payload)
-      .select("external_id,name,parent_external_id")
-      .returns<StoreCategoryBase[]>();
-    if (error) throw error;
-    const rows = data ?? [];
+    const resp = await invokeEdge<{ rows?: StoreCategoryBase[] }>("categories", { action: "bulk_create", items: payload });
+    const rows = resp.rows ?? [];
     return rows.map(toBase);
   },
 
   // 4. Read all categories for supplier (full shape including id)
   async getSupplierCategories(supplierId: string | number): Promise<StoreCategoryFull[]> {
-    const { data, error } = await categoriesSelect("id,external_id,name,parent_external_id,supplier_id", supplierId)
-      .order("name")
-      .returns<StoreCategoryFullRow[]>();
-    if (error) throw error;
-    const rows = data ?? [];
+    const sel = categoriesSelect("id,external_id,name,parent_external_id,supplier_id", supplierId);
+    const resp = await invokeEdge<{ rows?: StoreCategoryFullRow[] }>("categories", {
+      action: "get_supplier_categories",
+      supplier_id: sel.supplierId,
+    });
+    const rows = resp.rows ?? [];
     return rows.map(toFull);
   },
 
   // 5. Read subcategories of a specific category
   async getSubcategories(supplierId: string | number, parentExternalId: string): Promise<StoreCategoryFull[]> {
     const normalized = castNullableNumber(supplierId);
-    let q = supabase
-      .from("store_categories")
-      .select("id,external_id,name,parent_external_id,supplier_id")
-      .eq("parent_external_id", parentExternalId)
-      .order("name");
-    if (normalized !== undefined) q = q.eq("supplier_id", normalized);
-    const { data, error } = await q.returns<StoreCategoryFullRow[]>();
-    if (error) throw error;
-    const rows = data ?? [];
+    const resp = await invokeEdge<{ rows?: StoreCategoryFullRow[] }>("categories", {
+      action: "get_subcategories",
+      supplier_id: normalized,
+      parent_external_id: parentExternalId,
+    });
+    const rows = resp.rows ?? [];
     return rows.map(toFull);
   },
 
   // 6. Read specific category by external_id
   async getByExternalId(supplierId: string | number, externalId: string): Promise<StoreCategoryFull | null> {
     const normalized = castNullableNumber(supplierId);
-    let builder = supabase
-      .from("store_categories")
-      .select("id,external_id,name,parent_external_id,supplier_id")
-      .eq("external_id", externalId);
-    if (normalized !== undefined) builder = builder.eq("supplier_id", normalized);
-    const { data, error } = await builder.returns<StoreCategoryFullRow>().maybeSingle();
-    if (error) throw error;
-    if (!data) return null;
-    return toFull(data as StoreCategoryFullRow);
+    const resp = await invokeEdge<{ item?: StoreCategoryFullRow | null }>("categories", {
+      action: "get_by_external_id",
+      supplier_id: normalized,
+      external_id: externalId,
+    });
+    if (!resp.item) return null;
+    return toFull(resp.item as StoreCategoryFullRow);
   },
 
   // 7. Update category name by external_id and supplier_id
@@ -179,16 +155,13 @@ export const CategoryService = {
     if (normalized === undefined) {
       throw new Error("Invalid supplierId");
     }
-    const { data, error } = await supabase
-      .from("store_categories")
-      .update({ name })
-      .eq("external_id", externalId)
-      .eq("supplier_id", normalized)
-      .select("external_id,name,parent_external_id")
-      .returns<StoreCategoryBase>()
-      .single();
-    if (error) throw error;
-    return toBase(data as StoreCategoryBase);
+    const resp = await invokeEdge<{ item: StoreCategoryBase }>("categories", {
+      action: "update_name",
+      supplier_id: normalized,
+      external_id: externalId,
+      name,
+    });
+    return toBase(resp.item as StoreCategoryBase);
   },
 
   // 8. Delete category by external_id and supplier_id
@@ -197,12 +170,11 @@ export const CategoryService = {
     if (normalized === undefined) {
       throw new Error("Invalid supplierId");
     }
-    const { error } = await supabase
-      .from("store_categories")
-      .delete()
-      .eq("external_id", externalId)
-      .eq("supplier_id", normalized);
-    if (error) throw error;
+    await invokeEdge<{ ok: boolean }>("categories", {
+      action: "delete",
+      supplier_id: normalized,
+      external_id: externalId,
+    });
     return true;
   },
 
@@ -212,33 +184,26 @@ export const CategoryService = {
     if (normalized === undefined) {
       throw new Error("Invalid supplierId");
     }
-    const { data, error } = await supabase
-      .from("store_categories")
-      .select("external_id,parent_external_id")
-      .eq("supplier_id", normalized)
-      .returns<Array<{ external_id: string; parent_external_id: string | null }>>();
-    if (error) throw error;
-    const rows = data ?? [];
-    const toDelete = new Set<string>([externalId]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const r of rows) {
-        const parent = r.parent_external_id ?? undefined;
-        if (parent && toDelete.has(String(parent)) && !toDelete.has(r.external_id)) {
-          toDelete.add(r.external_id);
-          changed = true;
-        }
-      }
-    }
-    const ids = Array.from(toDelete);
-    if (ids.length === 0) return true;
-    const { error: delError } = await supabase
-      .from("store_categories")
-      .delete()
-      .eq("supplier_id", normalized)
-      .in("external_id", ids);
-    if (delError) throw delError;
+    await invokeEdge<{ ok: boolean }>("categories", {
+      action: "delete_cascade",
+      supplier_id: normalized,
+      external_id: externalId,
+    });
     return true;
   },
 };
+
+async function getAccessToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token || null;
+}
+
+async function invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const token = await getAccessToken();
+  const { data, error } = await supabase.functions.invoke<T | string>(name, {
+    body,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (error) throw error;
+  return (typeof data === "string" ? (JSON.parse(data as string) as T) : (data as T));
+}

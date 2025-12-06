@@ -67,7 +67,7 @@ export const SuppliersList = ({
     supplier: null
   });
 
-  useEffect(() => { onSuppliersLoaded?.(suppliers.length); }, [suppliers.length, onSuppliersLoaded]);
+  useEffect(() => { onSuppliersLoaded?.(suppliers.length); }, [suppliers.length]);
   useEffect(() => { queryClient.invalidateQueries({ queryKey: ['suppliersList'] }); }, [refreshTrigger, queryClient]);
 
   useEffect(() => {

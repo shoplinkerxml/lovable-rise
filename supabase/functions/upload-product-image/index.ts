@@ -1,18 +1,48 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// Use native Deno.serve for Supabase Edge Functions
 import { createClient } from "npm:@supabase/supabase-js"
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3"
+import { ImageMagick, initializeImageMagick, MagickFormat } from "npm:@imagemagick/magick-wasm@0.0.30"
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+function buildCorsHeadersFromRequest(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin")
+  const allowOrigin = origin && origin !== "null" ? origin : "*"
+  const requested = req.headers.get("access-control-request-headers") || "authorization, x-client-info, apikey, content-type, accept"
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": requested,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    "Access-Control-Expose-Headers": "Content-Type, Content-Length, ETag",
+    "Vary": "Origin, Access-Control-Request-Headers, Access-Control-Request-Method",
+  }
+  if (allowOrigin !== "*") {
+    headers["Access-Control-Allow-Credentials"] = "true"
+  }
+  return headers
 }
 
-const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" }
+let magickInitialized = false
+let magickInitPromise: Promise<void> | null = null
+async function initMagickWasm(): Promise<void> {
+  if (magickInitialized) return
+  if (!magickInitPromise) {
+    const magickWasmBytes = await Deno.readFile(
+      new URL(
+        "magick.wasm",
+        import.meta.resolve("npm:@imagemagick/magick-wasm@0.0.30"),
+      ),
+    )
+    magickInitPromise = initializeImageMagick(magickWasmBytes).then(() => {
+      magickInitialized = true
+    })
+  }
+  return magickInitPromise
+}
 
 // Image size configs
-const CARD_WIDTH = 900
-const THUMB_WIDTH = 300
+const CARD_WIDTH = 600
+const THUMB_WIDTH = 200
+const WEBP_QUALITY = 80
 
 type Body = {
   productId?: string
@@ -53,15 +83,29 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-// Simple image resize using canvas-like approach for Deno
-// Since imagescript has issues, we'll use a simpler approach - just convert to webp without resize for now
-// and rely on the browser/CDN for resizing, or use a different library
+const WEBP_QUALITY_ORIGINAL = 80
+const WEBP_QUALITY_CARD = 80
+const WEBP_QUALITY_THUMB = 70
 
-async function processImage(imageBytes: Uint8Array, _targetWidth?: number): Promise<Uint8Array> {
-  // For now, just return the original bytes
-  // TODO: Add proper image processing with a working library
-  // The images will be stored as-is and can be resized on-demand via CDN or frontend
-  return imageBytes
+function makeWebpVariant(bytes: Uint8Array, targetWidth: number | null, quality: number): Uint8Array {
+  const result = ImageMagick.read(bytes, (img): Uint8Array => {
+    if (targetWidth && targetWidth > 0) {
+      const ratio = targetWidth / img.width
+      const targetHeight = Math.max(1, Math.round(img.height * ratio))
+      img.resize(targetWidth, targetHeight)
+    }
+    img.quality = quality
+    img.format = MagickFormat.WebP
+    return img.write((data) => data)
+  })
+  return result
+}
+
+async function toWebpVariants(bytes: Uint8Array, _mimeHint?: string): Promise<{ original: Uint8Array; card: Uint8Array; thumb: Uint8Array }> {
+  const original = makeWebpVariant(bytes, null, WEBP_QUALITY_ORIGINAL)
+  const card = makeWebpVariant(bytes, CARD_WIDTH, WEBP_QUALITY_CARD)
+  const thumb = makeWebpVariant(bytes, THUMB_WIDTH, WEBP_QUALITY_THUMB)
+  return { original, card, thumb }
 }
 
 function sniffMime(bytes: Uint8Array, hinted?: string): { mime: string; ext: string } {
@@ -134,12 +178,15 @@ console.log(`[upload-product-image] Using IMAGE_BASE_URL: ${IMAGE_BASE_URL}`)
 
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeadersFromRequest(req)
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" }
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
 
   try {
+    await initMagickWasm()
     // Auth check
     const auth = req.headers.get("authorization")
     if (!auth) {
@@ -269,47 +316,21 @@ serve(async (req) => {
     const imageId = (inserted as any).id
     console.log(`[upload-product-image] Created image row with id: ${imageId}`)
 
-    // Detect mime/extension
-    const { mime, ext } = sniffMime(imageBytes, inputMime)
-    // Generate R2 keys (use real extension for original; card/thumb keep same ext)
+    // Detect mime
+    const { mime } = sniffMime(imageBytes, inputMime)
+    // Keys are always webp to keep consistent public URLs
     const baseKey = `products/${productId}/${imageId}`
-    const originalKey = `${baseKey}/original.${ext}`
-    const cardKey = `${baseKey}/card.${ext}`
-    const thumbKey = `${baseKey}/thumb.${ext}`
+    const originalKey = `${baseKey}/original.webp`
+    const cardKey = `${baseKey}/card.webp`
+    const thumbKey = `${baseKey}/thumb.webp`
 
     try {
-      // Process images - for now storing same size, resize can be done via CDN
-      console.log(`[upload-product-image] Processing image...`)
-      const processedBuffer = await processImage(imageBytes)
-      
-      // Use same buffer for all sizes for now (CDN can resize on-demand)
-      const originalBuffer = processedBuffer
-      const cardBuffer = processedBuffer
-      const thumbBuffer = processedBuffer
-
-      // Upload to R2
-      console.log(`[upload-product-image] Uploading original (${originalBuffer.length} bytes)...`)
-      try {
-        await s3.send(new PutObjectCommand({ Bucket: bucket, Key: originalKey, Body: originalBuffer, ContentType: mime }))
-      } catch (e) {
-        console.error('[upload-product-image] Put original failed', e)
-        // If original fails, abort entire operation
-        throw e
-      }
-
-      console.log(`[upload-product-image] Uploading card (${cardBuffer.length} bytes)...`)
-      try {
-        await s3.send(new PutObjectCommand({ Bucket: bucket, Key: cardKey, Body: cardBuffer, ContentType: mime }))
-      } catch (e) {
-        console.warn('[upload-product-image] Put card failed, will continue with original only')
-      }
-
-      console.log(`[upload-product-image] Uploading thumb (${thumbBuffer.length} bytes)...`)
-      try {
-        await s3.send(new PutObjectCommand({ Bucket: bucket, Key: thumbKey, Body: thumbBuffer, ContentType: mime }))
-      } catch (e) {
-        console.warn('[upload-product-image] Put thumb failed, will continue with original only')
-      }
+      console.log(`[upload-product-image] Processing image with imagescript...`)
+      const { original: originalBuffer, card: cardBuffer, thumb: thumbBuffer } = await toWebpVariants(imageBytes, inputMime)
+      console.log(`[upload-product-image] Uploading original (${originalBuffer.length}), card (${cardBuffer.length}), thumb (${thumbBuffer.length})`)
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: originalKey, Body: originalBuffer, ContentType: 'image/webp' }))
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: cardKey, Body: cardBuffer, ContentType: 'image/webp' }))
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: thumbKey, Body: thumbBuffer, ContentType: 'image/webp' }))
 
       console.log(`[upload-product-image] All uploads complete`)
 

@@ -709,42 +709,13 @@ export class ProductService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    // Получаем активную подписку пользователя (как в Shop/Supplier сервисах)
-    const { data: subscriptions, error: subscriptionError } = await supabase
-      .from('user_subscriptions')
-      .select('tariff_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('start_date', { ascending: false })
-      .limit(1);
-
-    if (subscriptionError || !subscriptions?.[0]) {
+    try {
+      const resp = await ProductService.invokeEdge<{ value?: number }>("get-product-limit-only", {});
+      const v = Number(resp?.value ?? 0) || 0;
+      return v;
+    } catch (e) {
       return 0;
     }
-
-    const subscription = subscriptions[0];
-
-    // Берём лимит по товарам из tariff_limits (активное ограничение по имени)
-    const { data: limitData, error: limitError } = await supabase
-      .from('tariff_limits')
-      .select('value')
-      .eq('tariff_id', subscription.tariff_id)
-      .ilike('limit_name', '%товар%')
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (limitError) {
-      console.error('Error fetching product tariff limit:', limitError);
-      return 0;
-    }
-
-    return Number(limitData?.value ?? 0) || 0;
   }
 
   /** Лимит продуктов для текущего пользователя */

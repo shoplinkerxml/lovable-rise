@@ -50,36 +50,15 @@ export class SupplierService {
       throw new Error("User not authenticated");
     }
 
-    // Get user's current active subscription
-    const { data: subscriptions, error: subscriptionError } = await supabase
-      .from('user_subscriptions')
-      .select('tariff_id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('start_date', { ascending: false })
-      .limit(1);
-
-    if (subscriptionError || !subscriptions?.[0]) {
-      return 0;
-    }
-
-    const subscription = subscriptions[0];
-
-    // Get the supplier limit directly from tariff_limits by limit_name
-    const { data: limitData, error: limitError } = await supabase
-      .from('tariff_limits')
-      .select('value')
-      .eq('tariff_id', subscription.tariff_id)
-      .ilike('limit_name', '%постачальник%')
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (limitError) {
-      console.error('Error fetching tariff limit:', limitError);
-      return 0;
-    }
-
-    return limitData?.value || 0;
+    const { data: auth } = await supabase.auth.getSession();
+    const accessToken: string | null = auth?.session?.access_token || null;
+    const { data, error } = await supabase.functions.invoke<{ value?: number }>("suppliers-limit", {
+      body: {},
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) return 0;
+    const payload = typeof data === "string" ? (JSON.parse(data) as { value?: number }) : (data as { value?: number });
+    return Number(payload?.value || 0);
   }
 
   /** Получение лимита поставщиков для текущего пользователя */
@@ -111,22 +90,8 @@ export class SupplierService {
       }
     } catch { /* ignore */ }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const { count, error } = await supabase
-      .from('user_suppliers')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Get suppliers count error:', error);
-      return 0;
-    }
-
-    return count || 0;
+    const list = await SupplierService.getSuppliers();
+    return Array.isArray(list) ? list.length : 0;
   }
 
   /** Отримання списку постачальників поточного користувача */
@@ -193,39 +158,15 @@ export class SupplierService {
       }
     } catch (_e) { void 0; }
 
-    try {
-      const { data: auth } = await supabase.auth.getSession();
-      const accessToken: string | null = auth?.session?.access_token || null;
-      const timeoutMs = 4000;
-      const invokePromise = supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
-        body: {},
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
-      const resp = await Promise.race([invokePromise, timeoutPromise]);
-      if (resp && typeof resp === 'object' && resp !== null) {
-        const r = resp as { data: unknown; error: unknown };
-        if (r.error == null) {
-          const payload: { suppliers?: Supplier[] } = typeof r.data === 'string'
-            ? (JSON.parse(r.data as string) as { suppliers?: Supplier[] })
-            : (r.data as { suppliers?: Supplier[] });
-          const rows = payload?.suppliers;
-          if (Array.isArray(rows)) return rows;
-        }
-      }
-    } catch (_e) { void 0; }
-
-    try {
-      const { data, error } = await supabase
-        .from('user_suppliers')
-        .select('id,user_id,supplier_name,website_url,xml_feed_url,phone,created_at,updated_at,is_active')
-        .eq('user_id', sessionValidation.user.id)
-        .order('created_at', { ascending: false });
-      if (error) return [];
-      return data || [];
-    } catch (_e) {
-      return [];
-    }
+    const { data: auth } = await supabase.auth.getSession();
+    const accessToken: string | null = auth?.session?.access_token || null;
+    const { data, error } = await supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
+      body: {},
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) return [];
+    const payload: { suppliers?: Supplier[] } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
+    return Array.isArray(payload?.suppliers) ? payload!.suppliers! : [];
   }
 
   /** Отримання одного постачальника за ID */
@@ -237,22 +178,10 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const { data, error } = await supabase
-      .from('user_suppliers')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      console.error('Get supplier error:', error);
-      throw new Error(error.message);
-    }
-
-    if (!data) {
-      throw new Error("Supplier not found");
-    }
-
-    return data;
+    const list = await SupplierService.getSuppliers();
+    const found = list.find((s) => Number(s.id) === Number(id));
+    if (!found) throw new Error("Supplier not found");
+    return found;
   }
 
   /** Створення нового постачальника */
@@ -281,25 +210,23 @@ export class SupplierService {
 
     const xmlUrl = supplierData.xml_feed_url ? supplierData.xml_feed_url.trim() : '';
 
-    const { data, error } = await supabase
-      .from('user_suppliers')
-      .insert({
-        user_id: user.id,
+    const { data: auth } = await supabase.auth.getSession();
+    const accessToken: string | null = auth?.session?.access_token || null;
+    const { data, error } = await supabase.functions.invoke<{ supplier?: Supplier }>('suppliers-create', {
+      body: {
         supplier_name: supplierData.supplier_name.trim(),
         website_url: supplierData.website_url?.trim() || null,
         xml_feed_url: xmlUrl ? xmlUrl : null,
         phone: supplierData.phone?.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Create supplier error:', error);
-      throw new Error(error.message);
-    }
-
+      },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) throw new Error(error.message ?? 'Create failed');
+    const payload: { supplier?: Supplier } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
+    const row = payload?.supplier as Supplier | undefined;
+    if (!row) throw new Error('Create failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
-    return data;
+    return row;
   }
 
   /** Оновлення постачальника */
@@ -336,20 +263,18 @@ export class SupplierService {
 
     cleanData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
-      .from('user_suppliers')
-      .update(cleanData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Update supplier error:', error);
-      throw new Error(error.message);
-    }
-
+    const { data: auth } = await supabase.auth.getSession();
+    const accessToken: string | null = auth?.session?.access_token || null;
+    const { data, error } = await supabase.functions.invoke<{ supplier?: Supplier }>('suppliers-update', {
+      body: { id, ...cleanData },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) throw new Error(error.message ?? 'Update failed');
+    const payload: { supplier?: Supplier } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
+    const row = payload?.supplier as Supplier | undefined;
+    if (!row) throw new Error('Update failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
-    return data;
+    return row;
   }
 
   /** Видалення постачальника */
@@ -361,15 +286,13 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const { error } = await supabase
-      .from('user_suppliers')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Delete supplier error:', error);
-      throw new Error(error.message);
-    }
+    const { data: auth } = await supabase.auth.getSession();
+    const accessToken: string | null = auth?.session?.access_token || null;
+    const { error } = await supabase.functions.invoke<{ ok?: boolean }>('suppliers-delete', {
+      body: { id },
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) throw new Error(error.message ?? 'Delete failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
   }
 }

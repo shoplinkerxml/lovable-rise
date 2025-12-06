@@ -151,42 +151,8 @@ export class ShopService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const { data: subscriptions, error: subscriptionError } = await supabase
-      .from("user_subscriptions")
-      .select("tariff_id")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("start_date", { ascending: false })
-      .limit(1);
-
-    if (subscriptionError || !subscriptions?.[0]) {
-      return 0;
-    }
-
-    const subscription = subscriptions[0];
-
-    const { data: limitData, error: limitError } = await supabase
-      .from("tariff_limits")
-      .select("value")
-      .eq("tariff_id", subscription.tariff_id)
-      .ilike("limit_name", "%магазин%")
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (limitError) {
-      console.error("Error fetching tariff limit:", limitError);
-      return 0;
-    }
-
-    return limitData?.value || 0;
+    const resp = await ShopService.invokeEdge<{ value?: number }>("get-shop-limit-only", {});
+    return Number(resp.value ?? 0) || 0;
   }
 
   /** Получение лимита магазинов для текущего пользователя */
@@ -210,24 +176,9 @@ export class ShopService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const { count, error } = await supabase
-      .from("user_stores")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id);
-
-    if (error) {
-      return 0;
-    }
-
-    return count || 0;
+    const resp = await ShopService.invokeEdge<{ shops?: unknown[] }>("user-shops-list", {});
+    const arr = Array.isArray(resp.shops) ? (resp.shops as unknown[]) : [];
+    return arr.length;
   }
 
   /** Получение списка магазинов текущего пользователя */
@@ -239,30 +190,11 @@ export class ShopService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
-      const { data, error } = await supabase
-        .from("user_stores")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .order("store_name", { ascending: true });
-
-      if (error) {
-        return [];
-      }
-
-      return (data || []) as Shop[];
-    } catch {
-      return [];
-    }
+    const payload = await ShopService.invokeEdge<Record<string, unknown>>("user-shops-list", {});
+    const rows = Array.isArray((payload as { shops?: Shop[] }).shops)
+      ? ((payload as { shops?: Shop[] }).shops as Shop[])
+      : [];
+    return rows as Shop[];
   }
 
   static async getShopsAggregated(): Promise<ShopAggregated[]> {
@@ -330,30 +262,9 @@ export class ShopService {
 
   private static async getShopsAggregatedFallback(): Promise<ShopAggregated[]> {
     const baseShops: Shop[] = await this.getShops();
-    const templateIds = Array.from(
-      new Set(baseShops.map((s) => s.template_id).filter((v) => !!v)),
-    ) as string[];
-
-    const [templates] = await Promise.all([
-      templateIds.length
-        ? supabase
-            .from("store_templates")
-            .select("id,marketplace")
-            .in("id", templateIds)
-            .then((r) => r.data || [])
-        : Promise.resolve([]),
-    ]);
-
-    const templatesMap: Record<string, string> = {};
-    for (const r of templates as Array<{ id: string; marketplace?: string }>) {
-      if (r?.id) templatesMap[String(r.id)] = r?.marketplace || "Не вказано";
-    }
-
     return baseShops.map((s) => ({
       ...s,
-      marketplace: s.template_id
-        ? templatesMap[String(s.template_id)] || "Не вказано"
-        : "Не вказано",
+      marketplace: "Не вказано",
       productsCount: 0,
       categoriesCount: 0,
     }));
@@ -405,27 +316,16 @@ export class ShopService {
       throw new Error(`Досягнуто ліміту магазинів (${limitInfo.max}). Оновіть тарифний план.`);
     }
 
-    const { data, error } = await supabase
-      .from("user_stores")
-      .insert({
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        store_name: shopData.store_name.trim(),
-        template_id: shopData.template_id || null,
-        xml_config: shopData.xml_config || null,
-        custom_mapping: shopData.custom_mapping || null,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Create shop error:", error);
-      throw new Error(error.message);
-    }
-
+    const resp = await ShopService.invokeEdge<{ shop?: Shop }>("create-shop", {
+      store_name: shopData.store_name.trim(),
+      template_id: shopData.template_id ?? null,
+      xml_config: shopData.xml_config ?? null,
+      custom_mapping: shopData.custom_mapping ?? null,
+      store_company: shopData.store_company ?? null,
+      store_url: shopData.store_url ?? null,
+    });
     removeCache(ShopService.SHOPS_CACHE_KEY);
-    return data as Shop;
+    return (resp.shop as Shop);
   }
 
   /** Обновление магазина */
@@ -469,20 +369,9 @@ export class ShopService {
 
     cleanData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
-      .from("user_stores")
-      .update(cleanData)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Update shop error:", error);
-      throw new Error(error.message);
-    }
-
+    const resp = await ShopService.invokeEdge<{ shop?: Shop }>("update-shop", { id, patch: cleanData });
     removeCache(ShopService.SHOPS_CACHE_KEY);
-    return data as Shop;
+    return (resp.shop as Shop);
   }
 
   /** Удаление магазина */
@@ -494,12 +383,7 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const { error } = await supabase.from("user_stores").delete().eq("id", id);
-
-    if (error) {
-      console.error("Delete shop error:", error);
-      throw new Error(error.message);
-    }
+    await ShopService.invokeEdge<{ ok: boolean }>("delete-shop", { id });
     removeCache(ShopService.SHOPS_CACHE_KEY);
   }
 
@@ -522,53 +406,26 @@ export class ShopService {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) throw new Error("Invalid session");
 
-    try {
-      const resp = await ShopService.invokeEdge<{ rows?: Array<Record<string, unknown>> }>(
-        "store-categories-list",
-        { store_id: storeId },
-      );
-      const rows = (resp?.rows || []) as Array<Record<string, unknown>>;
-      return rows.map((r) => {
-        const sc = ((r as Record<string, unknown>).store_categories as Record<string, unknown> | undefined) || {};
-        return {
-          store_category_id: Number((r as Record<string, unknown>).id),
-          store_id: String((r as Record<string, unknown>).store_id),
-          category_id: Number((r as Record<string, unknown>).category_id),
-          name: String(((r as Record<string, unknown>).custom_name ?? sc["name"] ?? "")),
-          base_external_id: (sc["external_id"] as string | null) ?? null,
-          parent_external_id: (sc["parent_external_id"] as string | null) ?? null,
-          base_rz_id: (sc["rz_id"] as string | null) ?? null,
-          store_external_id: ((r as Record<string, unknown>).external_id as string | null) ?? null,
-          store_rz_id_value: ((r as Record<string, unknown>).rz_id_value as string | null) ?? null,
-          is_active: !!(r as Record<string, unknown>).is_active,
-        };
-      });
-    } catch {
-      const { data, error } = await supabase
-        .from("store_store_categories")
-        .select(
-          "id,store_id,category_id,custom_name,is_active,external_id,rz_id_value, store_categories:category_id(id,external_id,name,parent_external_id,rz_id)",
-        )
-        .eq("store_id", storeId)
-        .order("id", { ascending: true });
-      if (error) throw new Error(error.message);
-      const rows = (data || []) as Array<Record<string, unknown>>;
-      return rows.map((r) => {
-        const sc = ((r as Record<string, unknown>).store_categories as Record<string, unknown> | undefined) || {};
-        return {
-          store_category_id: Number((r as Record<string, unknown>).id),
-          store_id: String((r as Record<string, unknown>).store_id),
-          category_id: Number((r as Record<string, unknown>).category_id),
-          name: String(((r as Record<string, unknown>).custom_name ?? sc["name"] ?? "")),
-          base_external_id: (sc["external_id"] as string | null) ?? null,
-          parent_external_id: (sc["parent_external_id"] as string | null) ?? null,
-          base_rz_id: (sc["rz_id"] as string | null) ?? null,
-          store_external_id: ((r as Record<string, unknown>).external_id as string | null) ?? null,
-          store_rz_id_value: ((r as Record<string, unknown>).rz_id_value as string | null) ?? null,
-          is_active: !!(r as Record<string, unknown>).is_active,
-        };
-      });
-    }
+    const resp = await ShopService.invokeEdge<{ rows?: Array<Record<string, unknown>> }>(
+      "store-categories-list",
+      { store_id: storeId },
+    );
+    const rows = (resp?.rows || []) as Array<Record<string, unknown>>;
+    return rows.map((r) => {
+      const sc = ((r as Record<string, unknown>).store_categories as Record<string, unknown> | undefined) || {};
+      return {
+        store_category_id: Number((r as Record<string, unknown>).id),
+        store_id: String((r as Record<string, unknown>).store_id),
+        category_id: Number((r as Record<string, unknown>).category_id),
+        name: String(((r as Record<string, unknown>).custom_name ?? sc["name"] ?? "")),
+        base_external_id: (sc["external_id"] as string | null) ?? null,
+        parent_external_id: (sc["parent_external_id"] as string | null) ?? null,
+        base_rz_id: (sc["rz_id"] as string | null) ?? null,
+        store_external_id: ((r as Record<string, unknown>).external_id as string | null) ?? null,
+        store_rz_id_value: ((r as Record<string, unknown>).rz_id_value as string | null) ?? null,
+        is_active: !!(r as Record<string, unknown>).is_active,
+      };
+    });
   }
 
   /** Обновление полей категории магазина */
@@ -586,15 +443,7 @@ export class ShopService {
     if (payload.custom_name !== undefined) clean.custom_name = payload.custom_name ?? null;
     if (payload.external_id !== undefined) clean.external_id = payload.external_id ?? null;
 
-    try {
-      await ShopService.invokeEdge<unknown>("update-store-category", { id: payload.id, patch: clean });
-    } catch {
-      const { error } = await supabase
-        .from("store_store_categories")
-        .update(clean)
-        .eq("id", payload.id);
-      if (error) throw new Error(error.message);
-    }
+    await ShopService.invokeEdge<unknown>("update-store-category", { id: payload.id, patch: clean });
   }
 
   /** Удаление категории магазина и всех её товаров в магазине */
@@ -603,22 +452,7 @@ export class ShopService {
     categoryId: number,
   ): Promise<void> {
     if (!storeId || !categoryId) throw new Error("storeId and categoryId required");
-    try {
-      await ShopService.invokeEdge<unknown>("delete-store-category-with-products", { store_id: storeId, category_id: categoryId });
-    } catch {
-      const { error: prodErr } = await supabase
-        .from("store_products")
-        .delete()
-        .eq("store_id", storeId)
-        .eq("category_id", categoryId);
-      if (prodErr) throw new Error(prodErr.message);
-      const { error: catErr } = await supabase
-        .from("store_store_categories")
-        .delete()
-        .eq("store_id", storeId)
-        .eq("category_id", categoryId);
-      if (catErr) throw new Error(catErr.message);
-    }
+    await ShopService.invokeEdge<unknown>("delete-store-category-with-products", { store_id: storeId, category_id: categoryId });
   }
 
   /** Массовое удаление категорий магазина и их товаров */
@@ -628,22 +462,7 @@ export class ShopService {
   ): Promise<void> {
     if (!storeId || !Array.isArray(categoryIds) || categoryIds.length === 0) return;
     const ids = categoryIds;
-    try {
-      await ShopService.invokeEdge<unknown>("delete-store-categories-with-products", { store_id: storeId, category_ids: ids });
-    } catch {
-      const { error: prodErr } = await supabase
-        .from("store_products")
-        .delete()
-        .eq("store_id", storeId)
-        .in("category_id", ids);
-      if (prodErr) throw new Error(prodErr.message);
-      const { error: catErr } = await supabase
-        .from("store_store_categories")
-        .delete()
-        .eq("store_id", storeId)
-        .in("category_id", ids);
-      if (catErr) throw new Error(catErr.message);
-    }
+    await ShopService.invokeEdge<unknown>("delete-store-categories-with-products", { store_id: storeId, category_ids: ids });
   }
 
   /** Убедиться, что категория привязана к магазину (апсерт) */
@@ -656,62 +475,13 @@ export class ShopService {
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) throw new Error("Invalid session");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data: storeOwner, error: storeOwnerErr } = await supabase
-      .from("user_stores")
-      .select("id,user_id")
-      .eq("id", storeId)
-      .maybeSingle();
-    if (storeOwnerErr) throw new Error(storeOwnerErr.message);
-    if (!storeOwner) throw new Error("Store not found");
-    if (String(storeOwner.user_id) !== String(user.id)) throw new Error("store_not_owned_by_user");
-
-    try {
-      const resp = await ShopService.invokeEdge<{ id?: number | string }>("ensure-store-category", {
-        store_id: storeId,
-        category_id: Number(categoryId),
-        external_id: options?.external_id ?? null,
-        custom_name: options?.custom_name ?? null,
-      });
-      return resp?.id != null ? Number(resp.id) : null;
-    } catch {
-      const { data: existing, error: selErr } = await supabase
-        .from("store_store_categories")
-        .select("id,is_active,external_id")
-        .eq("store_id", storeId)
-        .eq("category_id", categoryId)
-        .maybeSingle();
-      if (selErr) throw new Error(selErr.message);
-      if (existing?.id) {
-        const patch: Record<string, unknown> = { is_active: true };
-        if (options?.external_id !== undefined) patch.external_id = options.external_id;
-        if (options?.custom_name !== undefined) patch.custom_name = options.custom_name;
-        const { error: updErr } = await supabase
-          .from("store_store_categories")
-          .update(patch)
-          .eq("id", existing.id);
-        if (updErr) throw new Error(updErr.message);
-        return Number(existing.id);
-      }
-      const payload = {
-        store_id: storeId,
-        category_id: Number(categoryId),
-        is_active: true,
-        external_id: options?.external_id ?? null,
-        custom_name: options?.custom_name ?? null,
-      };
-      const { data: inserted, error: insErr } = await supabase
-        .from("store_store_categories")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (insErr) throw new Error(insErr.message);
-      return inserted?.id ? Number(inserted.id) : null;
-    }
+    const resp = await ShopService.invokeEdge<{ id?: number | string }>("ensure-store-category", {
+      store_id: storeId,
+      category_id: Number(categoryId),
+      external_id: options?.external_id ?? null,
+      custom_name: options?.custom_name ?? null,
+    });
+    return resp?.id != null ? Number(resp.id) : null;
   }
 
   /** Получить внешний ID категории магазина для пары (store_id, category_id) */
@@ -720,133 +490,52 @@ export class ShopService {
     categoryId: number,
   ): Promise<string | null> {
     if (!storeId || !Number.isFinite(categoryId)) throw new Error("storeId and categoryId required");
-    try {
-      const resp = await ShopService.invokeEdge<{ external_id?: string | null }>("get-store-category-external-id", {
-        store_id: storeId,
-        category_id: categoryId,
-      });
-      return resp?.external_id ?? null;
-    } catch {
-      const { data, error } = await supabase
-        .from("store_store_categories")
-        .select("external_id")
-        .eq("store_id", storeId)
-        .eq("category_id", categoryId)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      return data ? ((data as { external_id?: string | null }).external_id ?? null) : null;
-    }
+    const resp = await ShopService.invokeEdge<{ external_id?: string | null }>("get-store-category-external-id", {
+      store_id: storeId,
+      category_id: categoryId,
+    });
+    return resp?.external_id ?? null;
   }
 
   static async cleanupUnusedStoreCategory(storeId: string, categoryId: number): Promise<void> {
     if (!storeId || !Number.isFinite(categoryId)) return;
-    const { data: prod, error: prodErr } = await supabase
-      .from("store_products")
-      .select("id")
-      .eq("store_id", storeId)
-      .eq("category_id", categoryId)
-      .limit(1);
-    if (prodErr) return;
-    const used = Array.isArray(prod) && prod.length > 0;
-    if (used) return;
-    try {
-      await ShopService.invokeEdge<unknown>("cleanup-unused-store-category", { store_id: storeId, category_id: categoryId });
-    } catch {
-      await supabase
-        .from("store_store_categories")
-        .delete()
-        .eq("store_id", storeId)
-        .eq("category_id", categoryId);
-    }
+    await ShopService.invokeEdge<unknown>("cleanup-unused-store-category", { store_id: storeId, category_id: categoryId });
   }
 
   /** Валюты магазина */
   static async getStoreCurrencies(storeId: string): Promise<Array<{ code: string; rate: number; is_base: boolean }>> {
-    try {
-      const resp = await ShopService.invokeEdge<{ rows?: Array<{ code: string; rate?: number; is_base?: boolean }> }>(
-        "store-currencies-list",
-        { store_id: storeId },
-      );
-      const rows = (resp?.rows || []) as Array<{ code: string; rate?: number; is_base?: boolean }>;
-      return rows.map((r) => ({ code: String(r.code), rate: Number(r.rate ?? 1), is_base: !!r.is_base }));
-    } catch {
-      const { data, error } = await supabase
-        .from("store_currencies")
-        .select("code,rate,is_base")
-        .eq("store_id", storeId);
-      if (error) throw new Error(error.message);
-      const rows = (data || []) as Array<{ code: string; rate?: number; is_base?: boolean }>;
-      return rows.map((r) => ({ code: String(r.code), rate: Number(r.rate ?? 1), is_base: !!r.is_base }));
-    }
+    const resp = await ShopService.invokeEdge<{ rows?: Array<{ code: string; rate?: number; is_base?: boolean }> }>(
+      "store-currencies-list",
+      { store_id: storeId },
+    );
+    const rows = (resp?.rows || []) as Array<{ code: string; rate?: number; is_base?: boolean }>;
+    return rows.map((r) => ({ code: String(r.code), rate: Number(r.rate ?? 1), is_base: !!r.is_base }));
   }
 
   static async addStoreCurrency(storeId: string, code: string, rate: number): Promise<void> {
-    try {
-      await ShopService.invokeEdge<unknown>("add-store-currency", { store_id: storeId, code, rate });
-    } catch {
-      const { error } = await supabase
-        .from("store_currencies")
-        .insert({ store_id: storeId, code, rate, is_base: false });
-      if (error) throw new Error(error.message);
-    }
+    await ShopService.invokeEdge<unknown>("add-store-currency", { store_id: storeId, code, rate });
   }
 
   static async updateStoreCurrencyRate(storeId: string, code: string, rate: number): Promise<void> {
-    try {
-      await ShopService.invokeEdge<unknown>("update-store-currency-rate", { store_id: storeId, code, rate });
-    } catch {
-      const { error } = await supabase
-        .from("store_currencies")
-        .update({ rate })
-        .eq("store_id", storeId)
-        .eq("code", code);
-      if (error) throw new Error(error.message);
-    }
+    await ShopService.invokeEdge<unknown>("update-store-currency-rate", { store_id: storeId, code, rate });
   }
 
   static async setBaseStoreCurrency(storeId: string, code: string): Promise<void> {
-    try {
-      await ShopService.invokeEdge<unknown>("set-base-store-currency", { store_id: storeId, code });
-    } catch {
-      const { error: e1 } = await supabase
-        .from("store_currencies")
-        .update({ is_base: false })
-        .eq("store_id", storeId);
-      if (e1) throw new Error(e1.message);
-      const { error: e2 } = await supabase
-        .from("store_currencies")
-        .update({ is_base: true })
-        .eq("store_id", storeId)
-        .eq("code", code);
-      if (e2) throw new Error(e2.message);
-    }
+    await ShopService.invokeEdge<unknown>("set-base-store-currency", { store_id: storeId, code });
   }
 
   static async deleteStoreCurrency(storeId: string, code: string): Promise<void> {
-    try {
-      await ShopService.invokeEdge<unknown>("delete-store-currency", { store_id: storeId, code });
-    } catch {
-      const { error } = await supabase
-        .from("store_currencies")
-        .delete()
-        .eq("store_id", storeId)
-        .eq("code", code);
-      if (error) throw new Error(error.message);
-    }
+    await ShopService.invokeEdge<unknown>("delete-store-currency", { store_id: storeId, code });
   }
 
   static async getAvailableCurrencies(): Promise<Array<{ code: string; rate?: number }>> {
-    const { data, error } = await supabase.from("currencies").select("code,rate");
-    if (error) throw new Error(error.message);
-    const rows = (data || []) as Array<{ code: unknown; rate?: unknown }>;
-    return rows.map((c) => ({ code: String(c.code as string), rate: typeof c.rate === "number" ? (c.rate as number) : undefined }));
+    const resp = await ShopService.invokeEdge<{ rows?: Array<{ code: string; rate?: number }> }>("get-available-currencies", {});
+    const rows = (resp.rows || []) as Array<{ code: string; rate?: number }>;
+    return rows.map((c) => ({ code: String(c.code), rate: typeof c.rate === "number" ? c.rate : undefined }));
   }
 
   static async getStoreProductsCount(storeId: string): Promise<number> {
-    const { count } = await supabase
-      .from("store_products")
-      .select("*", { count: "exact", head: true })
-      .eq("store_id", storeId);
-    return count || 0;
+    const resp = await ShopService.invokeEdge<{ count?: number }>("get-store-products-count", { store_id: storeId });
+    return Number(resp.count ?? 0) || 0;
   }
 }
