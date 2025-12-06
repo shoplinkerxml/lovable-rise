@@ -1,7 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js"
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3"
-import Jimp from "npm:jimp@0.22.12"
+import { 
+  ImageMagick, 
+  initializeImageMagick, 
+  MagickFormat 
+} from "npm:@imagemagick/magick-wasm@0.0.30"
+
+// Initialize ImageMagick
+let magickInitialized = false
+async function ensureMagickInit() {
+  if (!magickInitialized) {
+    await initializeImageMagick()
+    magickInitialized = true
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,7 +27,7 @@ const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" }
 // Image size configs
 const CARD_WIDTH = 600
 const THUMB_WIDTH = 200
-const WEBP_QUALITY = 80
+const JPEG_QUALITY = 80
 
 type Body = {
   productId?: string
@@ -55,35 +68,40 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-// Resize and convert image using Jimp (pure JS, works in Deno)
+// Resize and convert image using ImageMagick WASM
 async function resizeImage(
   imageBytes: Uint8Array,
   targetWidth: number | null,
   quality: number
 ): Promise<Uint8Array> {
-  try {
-    // Load image from buffer
-    const image = await Jimp.read(Buffer.from(imageBytes))
-    
-    console.log(`[resizeImage] Input: ${image.getWidth()}x${image.getHeight()}`)
-    
-    // Only resize if targetWidth is specified and image is wider
-    if (targetWidth && image.getWidth() > targetWidth) {
-      image.resize(targetWidth, Jimp.AUTO)
+  await ensureMagickInit()
+  
+  return new Promise((resolve, reject) => {
+    try {
+      ImageMagick.read(imageBytes, (image) => {
+        console.log(`[resizeImage] Input: ${image.width}x${image.height}`)
+        
+        // Resize if targetWidth specified and image is wider
+        if (targetWidth && image.width > targetWidth) {
+          const ratio = targetWidth / image.width
+          const newHeight = Math.round(image.height * ratio)
+          image.resize(targetWidth, newHeight)
+        }
+        
+        // Set quality
+        image.quality = quality
+        
+        // Write to JPEG
+        image.write(MagickFormat.Jpeg, (data) => {
+          console.log(`[resizeImage] Output: ${data.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
+          resolve(new Uint8Array(data))
+        })
+      })
+    } catch (err) {
+      console.error("[resizeImage] Error:", err)
+      reject(err)
     }
-    
-    // Set quality and get buffer
-    image.quality(quality)
-    
-    // Get as JPEG buffer (Jimp doesn't support webp natively, use JPEG with good compression)
-    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG)
-    
-    console.log(`[resizeImage] Output: ${buffer.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
-    return new Uint8Array(buffer)
-  } catch (err) {
-    console.error("[resizeImage] Error:", err)
-    throw err
-  }
+  })
 }
 
 // ENV
