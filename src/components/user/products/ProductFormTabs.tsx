@@ -220,15 +220,22 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
 
         if (productImagesRaw) {
           const rows = (productImagesRaw || []) as StoreProductImageRow[];
+          const normalizeImageUrl = (u: string): string => {
+            const s = String(u || "");
+            if (!s) return s;
+            return s.replace(/\.web(\?|#|$)/, '.webp$1');
+          };
           const resolved = await Promise.all(rows.map(async (img) => {
             const cardKey = img.r2_key_card ? String(img.r2_key_card) : undefined;
-            const previewUrl = (img.url as string) || (cardKey ? R2Storage.makePublicUrl(cardKey) : "");
+            const rawUrl = (img.url as string) || (cardKey ? R2Storage.makePublicUrl(cardKey) : "");
+            const previewUrl = normalizeImageUrl(rawUrl);
             const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : (cardKey || null);
+            const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
             return {
               url: previewUrl,
               order_index: img.order_index,
               is_main: img.order_index === 0,
-              object_key: objectKeyRaw || undefined,
+              object_key: objectKeyFixed || undefined,
             } as ProductImage;
           }));
           setImages(resolved);

@@ -743,6 +743,11 @@ export function ProductFormTabs({
 
       const imagesData: ProductImage[] | null = preloadedImages ?? null;
       if (imagesData) {
+        const normalizeImageUrl = (u: string): string => {
+          const s = String(u || '');
+          if (!s) return s;
+          return s.replace(/\.web(\?|#|$)/, '.webp$1');
+        };
         const resolved = await Promise.all(imagesData.map(async (img) => {
           const row = img as unknown as { r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null };
           const cardKey = row.r2_key_card || undefined;
@@ -757,13 +762,16 @@ export function ProductFormTabs({
           if (!thumbUrl && thumbKey) {
             thumbUrl = R2Storage.makePublicUrl(thumbKey);
           }
+          previewUrl = normalizeImageUrl(previewUrl);
+          if (thumbUrl) thumbUrl = normalizeImageUrl(thumbUrl);
+          const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
           return {
             id: img.id,
             url: previewUrl,
             alt_text: img.alt_text || '',
             order_index: img.order_index,
             is_main: img.is_main,
-            object_key: objectKeyRaw || undefined,
+            object_key: objectKeyFixed || undefined,
             thumb_url: thumbUrl || undefined,
           } as ProductImage;
         }));
