@@ -20,7 +20,7 @@ export function Header() {
   return <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center space-x-2">
+        <div className="space-x-2 flex items-center justify-center">
           <div className="bg-gradient-success p-2 rounded-lg shadow-glow">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
