@@ -24,7 +24,7 @@ export function Header() {
           <div className="bg-gradient-success p-2 rounded-lg shadow-glow">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
-          <span data-testid="header_brand" className="inline-flex items-center px-3 py-1 rounded-md bg-success-light border border-success/20 text-success text-base font-semibold">
+          <span data-testid="header_brand" className="inline-flex items-center px-3 py-1 rounded-md border border-success/20 text-base font-semibold text-secondary-foreground bg-primary-foreground font-sans">
             {t('brand_name')}
           </span>
         </div>
