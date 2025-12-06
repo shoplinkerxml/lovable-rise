@@ -1186,6 +1186,7 @@ const toastDictionary = {
   added_images: { uk: "Додані зображення", en: "Added Images" },
   main_photo: { uk: "Головне", en: "Main" },
   set_as_main_photo: { uk: "Зробити головним", en: "Set as main" },
+  uploading_image: { uk: "Завантаження зображення...", en: "Uploading image..." },
   product_characteristics: { uk: "Характеристики товару", en: "Product Characteristics" },
   add_characteristic: { uk: "Додати характеристику", en: "Add Characteristic" },
   no_characteristics_added: { uk: "Характеристики не додані", en: "No Characteristics Added" },

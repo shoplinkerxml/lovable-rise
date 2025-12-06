@@ -64,6 +64,42 @@ async function processImage(imageBytes: Uint8Array, _targetWidth?: number): Prom
   return imageBytes
 }
 
+function sniffMime(bytes: Uint8Array, hinted?: string): { mime: string; ext: string } {
+  const hint = (hinted || '').toLowerCase()
+  const map: Record<string, string> = {
+    'image/webp': 'webp',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/avif': 'avif',
+    'image/gif': 'gif',
+    'image/svg+xml': 'svg',
+  }
+  if (map[hint]) return { mime: hint, ext: map[hint] }
+  // Magic bytes detection
+  if (bytes.length > 12) {
+    const head = bytes.subarray(0, 12)
+    const str = new TextDecoder().decode(head)
+    // WEBP: RIFF....WEBP
+    if (str.startsWith('RIFF') && new TextDecoder().decode(bytes.subarray(8, 12)) === 'WEBP') {
+      return { mime: 'image/webp', ext: 'webp' }
+    }
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      return { mime: 'image/png', ext: 'png' }
+    }
+    // JPEG: FF D8 FF
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return { mime: 'image/jpeg', ext: 'jpg' }
+    }
+    // GIF: GIF87a/GIF89a
+    if (str.startsWith('GIF8')) {
+      return { mime: 'image/gif', ext: 'gif' }
+    }
+  }
+  return { mime: 'image/webp', ext: 'webp' }
+}
+
 // ENV
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -165,10 +201,12 @@ serve(async (req) => {
 
     // Get image data
     let imageBytes: Uint8Array
+    let inputMime: string | undefined
 
     if (body.fileData) {
       // Base64 upload
       imageBytes = decodeBase64ToBytes(body.fileData)
+      inputMime = body.fileType
     } else if (body.url) {
       // URL upload
       const imgRes = await fetch(body.url)
@@ -176,6 +214,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "fetch_url_failed" }), { status: 400, headers: jsonHeaders })
       }
       imageBytes = new Uint8Array(await imgRes.arrayBuffer())
+      inputMime = imgRes.headers.get('content-type') || undefined
     } else {
       return new Response(
         JSON.stringify({ error: "invalid_body", message: "fileData or url required" }),
@@ -230,11 +269,13 @@ serve(async (req) => {
     const imageId = (inserted as any).id
     console.log(`[upload-product-image] Created image row with id: ${imageId}`)
 
-    // Generate R2 keys
+    // Detect mime/extension
+    const { mime, ext } = sniffMime(imageBytes, inputMime)
+    // Generate R2 keys (use real extension for original; card/thumb keep same ext)
     const baseKey = `products/${productId}/${imageId}`
-    const originalKey = `${baseKey}/original.webp`
-    const cardKey = `${baseKey}/card.webp`
-    const thumbKey = `${baseKey}/thumb.webp`
+    const originalKey = `${baseKey}/original.${ext}`
+    const cardKey = `${baseKey}/card.${ext}`
+    const thumbKey = `${baseKey}/thumb.${ext}`
 
     try {
       // Process images - for now storing same size, resize can be done via CDN
@@ -248,28 +289,27 @@ serve(async (req) => {
 
       // Upload to R2
       console.log(`[upload-product-image] Uploading original (${originalBuffer.length} bytes)...`)
-      await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: originalKey,
-        Body: originalBuffer,
-        ContentType: "image/webp",
-      }))
+      try {
+        await s3.send(new PutObjectCommand({ Bucket: bucket, Key: originalKey, Body: originalBuffer, ContentType: mime }))
+      } catch (e) {
+        console.error('[upload-product-image] Put original failed', e)
+        // If original fails, abort entire operation
+        throw e
+      }
 
       console.log(`[upload-product-image] Uploading card (${cardBuffer.length} bytes)...`)
-      await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: cardKey,
-        Body: cardBuffer,
-        ContentType: "image/webp",
-      }))
+      try {
+        await s3.send(new PutObjectCommand({ Bucket: bucket, Key: cardKey, Body: cardBuffer, ContentType: mime }))
+      } catch (e) {
+        console.warn('[upload-product-image] Put card failed, will continue with original only')
+      }
 
       console.log(`[upload-product-image] Uploading thumb (${thumbBuffer.length} bytes)...`)
-      await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: thumbKey,
-        Body: thumbBuffer,
-        ContentType: "image/webp",
-      }))
+      try {
+        await s3.send(new PutObjectCommand({ Bucket: bucket, Key: thumbKey, Body: thumbBuffer, ContentType: mime }))
+      } catch (e) {
+        console.warn('[upload-product-image] Put thumb failed, will continue with original only')
+      }
 
       console.log(`[upload-product-image] All uploads complete`)
 
@@ -308,10 +348,11 @@ serve(async (req) => {
     } catch (processErr) {
       // Cleanup: delete the DB row if image processing failed
       console.error("[upload-product-image] Processing error:", processErr)
-      await supabase.from("store_product_images").delete().eq("id", imageId)
+      // Do not delete row; instead, mark as failed for visibility but keep consistency
+      await supabase.from("store_product_images").update({ url: "#failed" }).eq("id", imageId)
       
       return new Response(
-        JSON.stringify({ error: "processing_failed", message: (processErr as any)?.message }),
+        JSON.stringify({ error: "processing_failed", message: (processErr as any)?.message || 'Failed to upload image' }),
         { status: 500, headers: jsonHeaders }
       )
     }
