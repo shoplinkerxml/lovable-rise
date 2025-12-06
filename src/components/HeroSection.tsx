@@ -28,7 +28,7 @@ export function HeroSection() {
           <div className={`space-y-8 ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`}>
             {/* Badge */}
             <div className="inline-block">
-              <div className="px-4 py-2 rounded-md bg-primary/10 border border-primary/20">
+              <div className="px-4 py-2 rounded-md bg-primary/10 border border-primary/20 mt-[20px]">
                 <span className="text-sm font-medium text-primary uppercase tracking-wider">
                   {t('hero_badge')}
                 </span>
