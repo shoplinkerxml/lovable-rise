@@ -33,7 +33,7 @@ export function SolutionsSection() {
           </div>
           <h2 className="text-3xl lg:text-5xl font-bold mb-4">
             {t('solutions_title')}{" "}
-            <span className="bg-gradient-success bg-clip-text text-transparent">
+            <span className="bg-gradient-success bg-clip-text text-secondary-foreground">
               {t('solutions_accent')}
             </span>
           </h2>
