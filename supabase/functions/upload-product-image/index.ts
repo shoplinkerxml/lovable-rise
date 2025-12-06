@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js"
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3"
+import sharp from "npm:sharp@0.33.2"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,8 +12,9 @@ const corsHeaders = {
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" }
 
 // Image size configs
-const CARD_WIDTH = 900
-const THUMB_WIDTH = 300
+const CARD_WIDTH = 600
+const THUMB_WIDTH = 200
+const WEBP_QUALITY = 80
 
 type Body = {
   productId?: string
@@ -53,15 +55,38 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-// Simple image resize using canvas-like approach for Deno
-// Since imagescript has issues, we'll use a simpler approach - just convert to webp without resize for now
-// and rely on the browser/CDN for resizing, or use a different library
-
-async function processImage(imageBytes: Uint8Array, _targetWidth?: number): Promise<Uint8Array> {
-  // For now, just return the original bytes
-  // TODO: Add proper image processing with a working library
-  // The images will be stored as-is and can be resized on-demand via CDN or frontend
-  return imageBytes
+// Resize and convert image to webp
+async function resizeImage(
+  imageBytes: Uint8Array,
+  targetWidth: number | null,
+  quality: number
+): Promise<Uint8Array> {
+  try {
+    let pipeline = sharp(imageBytes)
+    
+    // Get metadata to check dimensions
+    const metadata = await pipeline.metadata()
+    console.log(`[resizeImage] Input: ${metadata.width}x${metadata.height}, format: ${metadata.format}`)
+    
+    // Only resize if targetWidth is specified and image is wider
+    if (targetWidth && metadata.width && metadata.width > targetWidth) {
+      pipeline = pipeline.resize(targetWidth, null, {
+        withoutEnlargement: true,
+        fit: 'inside'
+      })
+    }
+    
+    // Convert to webp with compression
+    const result = await pipeline
+      .webp({ quality })
+      .toBuffer()
+    
+    console.log(`[resizeImage] Output: ${result.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
+    return new Uint8Array(result)
+  } catch (err) {
+    console.error("[resizeImage] Error:", err)
+    throw err
+  }
 }
 
 // ENV
@@ -71,6 +96,7 @@ const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? ""
 const bucket = Deno.env.get("R2_BUCKET_NAME") ?? ""
 const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") ?? ""
 const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? ""
+
 // Resolve base URL for public image links
 function resolvePublicBase(): string {
   const host = Deno.env.get("R2_PUBLIC_HOST") || ""
@@ -237,14 +263,19 @@ serve(async (req) => {
     const thumbKey = `${baseKey}/thumb.webp`
 
     try {
-      // Process images - for now storing same size, resize can be done via CDN
-      console.log(`[upload-product-image] Processing image...`)
-      const processedBuffer = await processImage(imageBytes)
+      // Process images with different sizes
+      console.log(`[upload-product-image] Converting to webp and creating size variants...`)
       
-      // Use same buffer for all sizes for now (CDN can resize on-demand)
-      const originalBuffer = processedBuffer
-      const cardBuffer = processedBuffer
-      const thumbBuffer = processedBuffer
+      // Original - convert to webp without resize, high quality
+      const originalBuffer = await resizeImage(imageBytes, null, 90)
+      
+      // Card - resize to 600px width, good quality
+      const cardBuffer = await resizeImage(imageBytes, CARD_WIDTH, WEBP_QUALITY)
+      
+      // Thumb - resize to 200px width, good quality  
+      const thumbBuffer = await resizeImage(imageBytes, THUMB_WIDTH, WEBP_QUALITY)
+
+      console.log(`[upload-product-image] Sizes: original=${originalBuffer.length}, card=${cardBuffer.length}, thumb=${thumbBuffer.length}`)
 
       // Upload to R2
       console.log(`[upload-product-image] Uploading original (${originalBuffer.length} bytes)...`)
@@ -302,6 +333,11 @@ serve(async (req) => {
           r2_key_thumb: thumbKey,
           is_main: isFirstImage,
           order_index: nextOrder,
+          sizes: {
+            original: originalBuffer.length,
+            card: cardBuffer.length,
+            thumb: thumbBuffer.length,
+          }
         }),
         { status: 200, headers: jsonHeaders }
       )
