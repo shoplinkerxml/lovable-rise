@@ -1,20 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js"
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3"
-import { 
-  ImageMagick, 
-  initializeImageMagick, 
-  MagickFormat 
-} from "npm:@imagemagick/magick-wasm@0.0.30"
-
-// Initialize ImageMagick
-let magickInitialized = false
-async function ensureMagickInit() {
-  if (!magickInitialized) {
-    await initializeImageMagick()
-    magickInitialized = true
-  }
-}
+import { Image } from "https://deno.land/x/imagescript@1.3.0/mod.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,40 +55,34 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-// Resize and convert image using ImageMagick WASM
+// Resize and convert image using ImageScript (pure TS, works in Deno)
 async function resizeImage(
   imageBytes: Uint8Array,
   targetWidth: number | null,
   quality: number
 ): Promise<Uint8Array> {
-  await ensureMagickInit()
-  
-  return new Promise((resolve, reject) => {
-    try {
-      ImageMagick.read(imageBytes, (image) => {
-        console.log(`[resizeImage] Input: ${image.width}x${image.height}`)
-        
-        // Resize if targetWidth specified and image is wider
-        if (targetWidth && image.width > targetWidth) {
-          const ratio = targetWidth / image.width
-          const newHeight = Math.round(image.height * ratio)
-          image.resize(targetWidth, newHeight)
-        }
-        
-        // Set quality
-        image.quality = quality
-        
-        // Write to JPEG
-        image.write(MagickFormat.Jpeg, (data) => {
-          console.log(`[resizeImage] Output: ${data.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
-          resolve(new Uint8Array(data))
-        })
-      })
-    } catch (err) {
-      console.error("[resizeImage] Error:", err)
-      reject(err)
+  try {
+    // Decode image
+    const image = await Image.decode(imageBytes)
+    
+    console.log(`[resizeImage] Input: ${image.width}x${image.height}`)
+    
+    // Only resize if targetWidth is specified and image is wider
+    if (targetWidth && image.width > targetWidth) {
+      const ratio = targetWidth / image.width
+      const newHeight = Math.round(image.height * ratio)
+      image.resize(targetWidth, newHeight)
     }
-  })
+    
+    // Encode to JPEG with quality
+    const jpegBytes = await image.encodeJPEG(quality)
+    
+    console.log(`[resizeImage] Output: ${jpegBytes.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
+    return jpegBytes
+  } catch (err) {
+    console.error("[resizeImage] Error:", err)
+    throw err
+  }
 }
 
 // ENV
@@ -285,10 +266,10 @@ serve(async (req) => {
       const originalBuffer = await resizeImage(imageBytes, null, 90)
       
       // Card - resize to 600px width, good quality
-      const cardBuffer = await resizeImage(imageBytes, CARD_WIDTH, WEBP_QUALITY)
+      const cardBuffer = await resizeImage(imageBytes, CARD_WIDTH, JPEG_QUALITY)
       
       // Thumb - resize to 200px width, good quality  
-      const thumbBuffer = await resizeImage(imageBytes, THUMB_WIDTH, WEBP_QUALITY)
+      const thumbBuffer = await resizeImage(imageBytes, THUMB_WIDTH, JPEG_QUALITY)
 
       console.log(`[upload-product-image] Sizes: original=${originalBuffer.length}, card=${cardBuffer.length}, thumb=${thumbBuffer.length}`)
 
