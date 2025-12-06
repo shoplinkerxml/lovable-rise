@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js"
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3"
-import sharp from "npm:sharp@0.33.2"
+import Jimp from "npm:jimp@0.22.12"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,34 +55,31 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-// Resize and convert image to webp
+// Resize and convert image using Jimp (pure JS, works in Deno)
 async function resizeImage(
   imageBytes: Uint8Array,
   targetWidth: number | null,
   quality: number
 ): Promise<Uint8Array> {
   try {
-    let pipeline = sharp(imageBytes)
+    // Load image from buffer
+    const image = await Jimp.read(Buffer.from(imageBytes))
     
-    // Get metadata to check dimensions
-    const metadata = await pipeline.metadata()
-    console.log(`[resizeImage] Input: ${metadata.width}x${metadata.height}, format: ${metadata.format}`)
+    console.log(`[resizeImage] Input: ${image.getWidth()}x${image.getHeight()}`)
     
     // Only resize if targetWidth is specified and image is wider
-    if (targetWidth && metadata.width && metadata.width > targetWidth) {
-      pipeline = pipeline.resize(targetWidth, null, {
-        withoutEnlargement: true,
-        fit: 'inside'
-      })
+    if (targetWidth && image.getWidth() > targetWidth) {
+      image.resize(targetWidth, Jimp.AUTO)
     }
     
-    // Convert to webp with compression
-    const result = await pipeline
-      .webp({ quality })
-      .toBuffer()
+    // Set quality and get buffer
+    image.quality(quality)
     
-    console.log(`[resizeImage] Output: ${result.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
-    return new Uint8Array(result)
+    // Get as JPEG buffer (Jimp doesn't support webp natively, use JPEG with good compression)
+    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG)
+    
+    console.log(`[resizeImage] Output: ${buffer.length} bytes (target width: ${targetWidth || 'original'}, quality: ${quality})`)
+    return new Uint8Array(buffer)
   } catch (err) {
     console.error("[resizeImage] Error:", err)
     throw err
@@ -256,17 +253,17 @@ serve(async (req) => {
     const imageId = (inserted as any).id
     console.log(`[upload-product-image] Created image row with id: ${imageId}`)
 
-    // Generate R2 keys
+    // Generate R2 keys (use .jpg extension since we're using JPEG format)
     const baseKey = `products/${productId}/${imageId}`
-    const originalKey = `${baseKey}/original.webp`
-    const cardKey = `${baseKey}/card.webp`
-    const thumbKey = `${baseKey}/thumb.webp`
+    const originalKey = `${baseKey}/original.jpg`
+    const cardKey = `${baseKey}/card.jpg`
+    const thumbKey = `${baseKey}/thumb.jpg`
 
     try {
       // Process images with different sizes
-      console.log(`[upload-product-image] Converting to webp and creating size variants...`)
+      console.log(`[upload-product-image] Converting and creating size variants...`)
       
-      // Original - convert to webp without resize, high quality
+      // Original - high quality, no resize
       const originalBuffer = await resizeImage(imageBytes, null, 90)
       
       // Card - resize to 600px width, good quality
@@ -283,7 +280,7 @@ serve(async (req) => {
         Bucket: bucket,
         Key: originalKey,
         Body: originalBuffer,
-        ContentType: "image/webp",
+        ContentType: "image/jpeg",
       }))
 
       console.log(`[upload-product-image] Uploading card (${cardBuffer.length} bytes)...`)
@@ -291,7 +288,7 @@ serve(async (req) => {
         Bucket: bucket,
         Key: cardKey,
         Body: cardBuffer,
-        ContentType: "image/webp",
+        ContentType: "image/jpeg",
       }))
 
       console.log(`[upload-product-image] Uploading thumb (${thumbBuffer.length} bytes)...`)
@@ -299,7 +296,7 @@ serve(async (req) => {
         Bucket: bucket,
         Key: thumbKey,
         Body: thumbBuffer,
-        ContentType: "image/webp",
+        ContentType: "image/jpeg",
       }))
 
       console.log(`[upload-product-image] All uploads complete`)
