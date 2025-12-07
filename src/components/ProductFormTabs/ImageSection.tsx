@@ -50,14 +50,19 @@ export function ImageSection(props: Props) {
           <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
             <CardContent className="p-2">
               <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={props.getGalleryAdaptiveImageStyle(index)}>
-                <img
-                  ref={(el) => (props.galleryImgRefs.current[index] = el)}
-                  src={getImageUrl(image.url, IMAGE_SIZES.CARD)}
-                  alt={image.alt_text || `Изображение ${index + 1}`}
-                  className="w-full h-full object-contain"
-                  onLoad={(e) => props.onGalleryImageLoad(e, index)}
-                  onError={(e) => props.onGalleryImageError(e, index)}
-                />
+                {(() => {
+                  const src = getImageUrl(image.url, IMAGE_SIZES.THUMB)
+                  return src ? (
+                    <img
+                      ref={(el) => (props.galleryImgRefs.current[index] = el)}
+                      src={src}
+                      alt={image.alt_text || `Изображение ${index + 1}`}
+                      className="w-full h-full object-contain"
+                      onLoad={(e) => props.onGalleryImageLoad(e, index)}
+                      onError={(e) => props.onGalleryImageError(e, index)}
+                    />
+                  ) : null
+                })()}
                 {props.readOnly ? null : (
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
                     <Button

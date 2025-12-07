@@ -23,6 +23,7 @@ import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
 import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
 import ParametersDataTable from '@/components/products/ParametersDataTable';
+import { getImageUrl, IMAGE_SIZES } from '@/lib/imageUtils';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -418,7 +419,11 @@ export function ProductFormTabs({
       notifyImagesLoading(false);
       return;
     }
-    const done = galleryImgRefs.current.slice(0, total).reduce((acc, img) => acc + (img && img.complete ? 1 : 0), 0);
+    const done = images.map((it, i) => {
+      const el = galleryImgRefs.current[i];
+      const hasUrl = !!it?.url;
+      return hasUrl ? (el && el.complete ? 1 : 0) : 1;
+    }).reduce((a, b) => a + b, 0);
     if (done >= total) {
       setGalleryLoaded(true);
       notifyImagesLoading(false);
@@ -1178,7 +1183,25 @@ export function ProductFormTabs({
                           <Card className="relative group">
                             <CardContent className="p-2 sm:p-3 md:p-4">
                               <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
-                                <img ref={mainImgRef} src={images[activeImageIndex]?.url} alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`} className="w-full h-full object-contain select-none" data-testid={`productFormTabs_mainImage`} onLoad={handleImageLoad} onError={handleMainImageError} />
+                                {(() => {
+                                  const original = images[activeImageIndex]?.url || '';
+                                  const src = getImageUrl(original, IMAGE_SIZES.CARD);
+                                  return src ? (
+                                    <img
+                                      ref={mainImgRef}
+                                      src={src}
+                                      alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`}
+                                      className="w-full h-full object-contain select-none"
+                                      data-testid={`productFormTabs_mainImage`}
+                                      onLoad={handleImageLoad}
+                                      onError={(e) => {
+                                        const el = e.target as HTMLImageElement;
+                                        if (original) el.src = original;
+                                        handleMainImageError(e);
+                                      }}
+                                    />
+                                  ) : null;
+                                })()}
                               </div>
                               {images[activeImageIndex]?.is_main && <Badge className="absolute top-2 left-2" variant="default" data-testid="productFormTabs_mainBadge">
                                   {t('main_image')}
@@ -1207,7 +1230,22 @@ export function ProductFormTabs({
                                     <Card className={`relative group cursor-pointer transition-all ${activeImageIndex === index ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-gray-300'}`} onClick={() => setActiveImageIndex(index)}>
                                       <CardContent className="p-1">
                                         <div className="aspect-square relative overflow-hidden rounded-md">
-                                          <img src={image.thumb_url || image.url} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} />
+                                          {(() => {
+                                            const original = image.url || '';
+                                            const src = getImageUrl(original, IMAGE_SIZES.THUMB);
+                                            return src ? (
+                                              <img
+                                                src={src}
+                                                alt={image.alt_text || `Превью ${index + 1}`}
+                                                className="w-full h-full object-cover"
+                                                data-testid={`productFormTabs_thumbnail_${index}`}
+                                                onError={(e) => {
+                                                  const el = e.target as HTMLImageElement;
+                                                  if (original) el.src = original;
+                                                }}
+                                              />
+                                            ) : null;
+                                          })()}
                                           </div>
                                         {image.is_main && <Badge className="absolute -top-1 -left-1 text-xs px-1 py-0" variant="default">
                                             Г

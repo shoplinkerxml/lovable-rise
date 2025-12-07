@@ -153,7 +153,16 @@ export function createColumns({
           <div className="flex items-center justify-start" data-testid="user_products_photo">
             <button type="button" className="inline-flex" onClick={() => onEdit?.(product)} aria-label={t("edit")} title={t("edit")}>
               <Avatar className={`${sizeCls} rounded-md cursor-pointer`}>
-                <AvatarImage src={img ? getImageUrl(img, IMAGE_SIZES.THUMB) : ''} alt={product.name_ua || product.name || ''} />
+                <AvatarImage
+                  src={img ? getImageUrl(img, IMAGE_SIZES.THUMB) : ''}
+                  alt={product.name_ua || product.name || ''}
+                  onError={(e) => {
+                    const el = e.target as HTMLImageElement;
+                    if (img) {
+                      el.src = img;
+                    }
+                  }}
+                />
                 <AvatarFallback className="bg-primary/10 text-primary rounded-md">{initials}</AvatarFallback>
               </Avatar>
             </button>
