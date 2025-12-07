@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { useI18n } from '@/providers/i18n-provider'
+import { getImageUrl, IMAGE_SIZES } from '@/lib/imageUtils'
 
 export type ProductImage = {
   id?: string
@@ -51,7 +52,7 @@ export function ImageSection(props: Props) {
               <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={props.getGalleryAdaptiveImageStyle(index)}>
                 <img
                   ref={(el) => (props.galleryImgRefs.current[index] = el)}
-                  src={image.url}
+                  src={getImageUrl(image.url, IMAGE_SIZES.CARD)}
                   alt={image.alt_text || `Изображение ${index + 1}`}
                   className="w-full h-full object-contain"
                   onLoad={(e) => props.onGalleryImageLoad(e, index)}

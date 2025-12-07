@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "@/lib/session-validation";
 import { R2Storage } from "@/lib/r2-storage";
 import { useI18n } from "@/providers/i18n-provider";
+import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 
 interface ProductFormTabsProps {
   product?: any | null;
@@ -38,6 +39,7 @@ interface ProductImage {
   alt_text?: string;
   is_main?: boolean;
   object_key?: string;
+  thumb_url?: string;
 }
 
 // Тип строки из store_product_images с R2-ключами
@@ -220,19 +222,14 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
 
         if (productImagesRaw) {
           const rows = (productImagesRaw || []) as StoreProductImageRow[];
-          const normalizeImageUrl = (u: string): string => {
-            const s = String(u || "");
-            if (!s) return s;
-            return s.replace(/\.web(\?|#|$)/, '.webp$1');
-          };
           const resolved = await Promise.all(rows.map(async (img) => {
-            const cardKey = img.r2_key_card ? String(img.r2_key_card) : undefined;
-            const rawUrl = (img.url as string) || (cardKey ? R2Storage.makePublicUrl(cardKey) : "");
-            const previewUrl = normalizeImageUrl(rawUrl);
-            const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : (cardKey || null);
-            const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+            const originalFull = img.r2_key_original
+              ? R2Storage.makePublicUrl(String(img.r2_key_original))
+              : (typeof img.url === 'string' && /^https?:\/\//.test(img.url) ? String(img.url) : (img.url ? R2Storage.makePublicUrl(String(img.url)) : ''));
+            const objectKey = originalFull ? (R2Storage.extractObjectKeyFromUrl(originalFull) || undefined) : undefined;
+            const objectKeyFixed = objectKey ? String(objectKey).replace(/\.web$/, '.webp') : undefined;
             return {
-              url: previewUrl,
+              url: originalFull || '',
               order_index: img.order_index,
               is_main: img.order_index === 0,
               object_key: objectKeyFixed || undefined,
@@ -349,11 +346,15 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     try {
       setLoading(true);
       const res = await R2Storage.uploadViaWorkerFromUrl(pid, newImageUrl.trim());
+      const previewKey = res.originalKey || res.cardKey || res.thumbKey || '';
+      const previewUrlFull = res.publicCardUrl || res.publicThumbUrl || '';
+      const urlForRender = previewKey || previewUrlFull;
       const newImage: ProductImage = {
-        url: res.publicCardUrl,
+        url: urlForRender,
         order_index: images.length,
         is_main: images.length === 0,
-        object_key: res.cardKey,
+        object_key: previewKey || undefined,
+        thumb_url: res.publicThumbUrl || undefined,
       };
       setImages([...images, newImage]);
       setNewImageUrl('');
@@ -921,14 +922,16 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                     {images.map((image, index) => (
                       <div key={index} className="relative group">
                         <div className="aspect-square rounded-lg border overflow-hidden bg-muted">
-                          <img
-                            src={image.url}
-                            alt={`Product ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiAxNkM5Ljc5IDEzLjc5IDkuNzkgMTAuMjEgMTIgOEMxNC4yMSAxMC4yMSAxNC4yMSAxMy43OSAxMiAxNloiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
-                            }}
-                          />
+                          {(() => {
+                            const src = getImageUrl(image.url, IMAGE_SIZES.THUMB)
+                            return src ? (
+                              <img
+                                src={src}
+                                alt={`Product ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : null
+                          })()}
                         </div>
                         {image.is_main && (
                           <div className="absolute top-2 left-2">

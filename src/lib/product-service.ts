@@ -247,9 +247,79 @@ export class ProductService {
 
   /** Агрегированный список продуктов (только функция user-products-list) */
   static async getProductsAggregated(storeId?: string | null): Promise<ProductAggregated[]> {
-    const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", { store_id: storeId ?? null });
-    const rows = Array.isArray(resp?.products) ? resp!.products! : [];
-    return rows;
+    try {
+      const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", { store_id: storeId ?? null });
+      const rows = Array.isArray(resp?.products) ? resp!.products! : [];
+      return rows;
+    } catch (e) {
+      return await ProductService.getProductsAggregatedFallback(storeId ?? null);
+    }
+  }
+
+  private static async getProductsAggregatedFallback(storeId?: string | null): Promise<ProductAggregated[]> {
+    const storeIds = storeId ? [String(storeId)] : await ProductService.getUserStoreIds();
+    if (!storeIds.length) return [];
+    const { data: rows, error } = await supabase
+      .from('store_products')
+      .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at')
+      .in('store_id', storeIds)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw new Error((error as { message?: string } | null)?.message || 'fallback_failed');
+    const ids = (rows || []).map((r) => String((r as any).id));
+    let images: Array<{ product_id: string; url: string; is_main: boolean; order_index: number }> = [];
+    if (ids.length) {
+      const { data: imgData } = await supabase
+        .from('store_product_images')
+        .select('product_id,r2_key_original,url,is_main,order_index')
+        .in('product_id', ids);
+      images = ((imgData || []) as any[]).map((r) => ({
+        product_id: String((r as any).product_id),
+        url: String(((r as any).r2_key_original || (r as any).url || '')),
+        is_main: !!(r as any).is_main,
+        order_index: Number((r as any).order_index || 0),
+      }));
+    }
+    const imgByPid: Record<string, { url: string; is_main: boolean; order_index: number }> = {};
+    for (const im of images) {
+      const prev = imgByPid[im.product_id];
+      if (!prev || (im.is_main && !prev.is_main) || im.order_index === 0) {
+        imgByPid[im.product_id] = im;
+      }
+    }
+    const out = ((rows || []) as any[]).map((r) => {
+      const pid = String((r as any).id);
+      const mr = imgByPid[pid];
+      return {
+        id: pid,
+        store_id: String((r as any).store_id),
+        supplier_id: (r as any).supplier_id ?? null,
+        external_id: (r as any).external_id ?? null,
+        name: (r as any).name ?? null,
+        name_ua: (r as any).name_ua ?? null,
+        docket: (r as any).docket ?? null,
+        docket_ua: (r as any).docket_ua ?? null,
+        description: (r as any).description ?? null,
+        description_ua: (r as any).description_ua ?? null,
+        vendor: (r as any).vendor ?? null,
+        article: (r as any).article ?? null,
+        category_id: (r as any).category_id ?? null,
+        category_external_id: (r as any).category_external_id ?? null,
+        currency_id: null,
+        currency_code: (r as any).currency_code ?? null,
+        price: (r as any).price ?? null,
+        price_old: (r as any).price_old ?? null,
+        price_promo: (r as any).price_promo ?? null,
+        stock_quantity: Number((r as any).stock_quantity ?? 0),
+        available: (r as any).available ?? true,
+        state: (r as any).state ?? 'new',
+        created_at: (r as any).created_at ?? new Date().toISOString(),
+        updated_at: (r as any).updated_at ?? new Date().toISOString(),
+        is_active: true,
+        mainImageUrl: mr?.url || undefined,
+      } as ProductAggregated;
+    });
+    return out;
   }
 
   static async getProductsFirstPage(
@@ -286,27 +356,111 @@ export class ProductService {
               total: fresh?.page?.total ?? productsN.length,
             };
             writeCache(sizedKey, { items: productsN, page: pageN }, CACHE_TTL.productsPage);
-          } catch { /* ignore */ }
+          } catch {
+            try {
+              const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
+              writeCache(sizedKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
+            } catch { /* ignore */ }
+          }
         })();
         return { products: cached.data.items, page: cached.data.page };
       }
     }
+    try {
+      const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
+        store_id: storeId ?? null,
+        limit,
+        offset: 0,
+      });
+      const products = Array.isArray(fresh?.products) ? fresh.products! : [];
+      const page: ProductListPage = {
+        limit,
+        offset: 0,
+        hasMore: !!fresh?.page?.hasMore,
+        nextOffset: fresh?.page?.nextOffset ?? null,
+        total: fresh?.page?.total ?? products.length,
+      };
+      writeCache(sizedKey, { items: products, page }, CACHE_TTL.productsPage);
+      return { products, page };
+    } catch {
+      const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
+      writeCache(sizedKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
+      return fb;
+    }
+  }
 
-    const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-      store_id: storeId ?? null,
-      limit,
-      offset: 0,
+  private static async fetchProductsPageFallback(
+    storeId: string | null,
+    limit: number,
+    offset: number,
+  ): Promise<{ products: ProductAggregated[]; page: ProductListPage }> {
+    const storeIds = storeId ? [String(storeId)] : await ProductService.getUserStoreIds();
+    if (!storeIds.length) return { products: [], page: { limit, offset, hasMore: false, nextOffset: null, total: 0 } };
+    const { count } = await supabase
+      .from('store_products')
+      .select('id', { count: 'exact', head: true })
+      .in('store_id', storeIds);
+    const total = Number(count || 0);
+    const { data: rows } = await supabase
+      .from('store_products')
+      .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at')
+      .in('store_id', storeIds)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    const ids = ((rows || []) as any[]).map((r) => String((r as any).id));
+    let images: Array<{ product_id: string; url: string; is_main: boolean; order_index: number }> = [];
+    if (ids.length) {
+      const { data: imgData } = await supabase
+        .from('store_product_images')
+        .select('product_id,r2_key_original,url,is_main,order_index')
+        .in('product_id', ids);
+      images = ((imgData || []) as any[]).map((r) => ({
+        product_id: String((r as any).product_id),
+        url: String(((r as any).r2_key_original || (r as any).url || '')),
+        is_main: !!(r as any).is_main,
+        order_index: Number((r as any).order_index || 0),
+      }));
+    }
+    const imgByPid: Record<string, { url: string; is_main: boolean; order_index: number }> = {};
+    for (const im of images) {
+      const prev = imgByPid[im.product_id];
+      if (!prev || (im.is_main && !prev.is_main) || im.order_index === 0) imgByPid[im.product_id] = im;
+    }
+    const items: ProductAggregated[] = ((rows || []) as any[]).map((r) => {
+      const pid = String((r as any).id);
+      const mr = imgByPid[pid];
+      return {
+        id: pid,
+        store_id: String((r as any).store_id),
+        supplier_id: (r as any).supplier_id ?? null,
+        external_id: (r as any).external_id ?? null,
+        name: (r as any).name ?? null,
+        name_ua: (r as any).name_ua ?? null,
+        docket: (r as any).docket ?? null,
+        docket_ua: (r as any).docket_ua ?? null,
+        description: (r as any).description ?? null,
+        description_ua: (r as any).description_ua ?? null,
+        vendor: (r as any).vendor ?? null,
+        article: (r as any).article ?? null,
+        category_id: (r as any).category_id ?? null,
+        category_external_id: (r as any).category_external_id ?? null,
+        currency_id: null,
+        currency_code: (r as any).currency_code ?? null,
+        price: (r as any).price ?? null,
+        price_old: (r as any).price_old ?? null,
+        price_promo: (r as any).price_promo ?? null,
+        stock_quantity: Number((r as any).stock_quantity ?? 0),
+        available: (r as any).available ?? true,
+        state: (r as any).state ?? 'new',
+        created_at: (r as any).created_at ?? new Date().toISOString(),
+        updated_at: (r as any).updated_at ?? new Date().toISOString(),
+        is_active: true,
+        mainImageUrl: mr?.url || undefined,
+      } as ProductAggregated;
     });
-    const products = Array.isArray(fresh?.products) ? fresh.products! : [];
-    const page: ProductListPage = {
-      limit,
-      offset: 0,
-      hasMore: !!fresh?.page?.hasMore,
-      nextOffset: fresh?.page?.nextOffset ?? null,
-      total: fresh?.page?.total ?? products.length,
-    };
-    writeCache(sizedKey, { items: products, page }, CACHE_TTL.productsPage);
-    return { products, page };
+    const hasMore = offset + limit < total;
+    const nextOffset = hasMore ? offset + limit : null;
+    return { products: items, page: { limit, offset, hasMore, nextOffset, total } };
   }
 
   static async getProductsPage(
@@ -323,20 +477,24 @@ export class ProductService {
       total: number;
     };
   }> {
-    const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-      store_id: storeId ?? null,
-      limit,
-      offset,
-    });
-    const products = Array.isArray(resp?.products) ? resp!.products! : [];
-    const page: ProductListPage = {
-      limit,
-      offset,
-      hasMore: !!resp?.page?.hasMore,
-      nextOffset: resp?.page?.nextOffset ?? null,
-      total: resp?.page?.total ?? products.length,
-    };
-    return { products, page };
+    try {
+      const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
+        store_id: storeId ?? null,
+        limit,
+        offset,
+      });
+      const products = Array.isArray(resp?.products) ? resp!.products! : [];
+      const page: ProductListPage = {
+        limit,
+        offset,
+        hasMore: !!resp?.page?.hasMore,
+        nextOffset: resp?.page?.nextOffset ?? null,
+        total: resp?.page?.total ?? products.length,
+      };
+      return { products, page };
+    } catch {
+      return await ProductService.fetchProductsPageFallback(storeId ?? null, limit, offset);
+    }
   }
 
   static updateFirstPageCaches(
@@ -774,22 +932,30 @@ export class ProductService {
     let hasMore = true;
 
     while (hasMore) {
-      const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-        store_id: null,
-        limit,
-        offset,
-      });
-      const products = Array.isArray(resp?.products) ? resp!.products! : [];
-      const page: ProductListPage = {
-        limit,
-        offset,
-        hasMore: !!resp?.page?.hasMore,
-        nextOffset: resp?.page?.nextOffset ?? null,
-        total: resp?.page?.total ?? products.length,
-      };
+      let products: ProductAggregated[] = [];
+      let page: ProductListPage | null = null;
+      try {
+        const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
+          store_id: null,
+          limit,
+          offset,
+        });
+        products = Array.isArray(resp?.products) ? resp!.products! : [];
+        page = {
+          limit,
+          offset,
+          hasMore: !!resp?.page?.hasMore,
+          nextOffset: resp?.page?.nextOffset ?? null,
+          total: resp?.page?.total ?? products.length,
+        };
+      } catch {
+        const fb = await ProductService.fetchProductsPageFallback(null, limit, offset);
+        products = fb.products;
+        page = fb.page;
+      }
       all = [...all, ...products];
-      hasMore = !!page.hasMore;
-      const nextOffset = page.nextOffset;
+      hasMore = !!page?.hasMore;
+      const nextOffset = page?.nextOffset ?? null;
       if (nextOffset == null) break;
       offset = nextOffset;
       if (all.length >= 1000) break;

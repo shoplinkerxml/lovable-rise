@@ -12,6 +12,7 @@ import { SupplierService } from "@/lib/supplier-service";
 import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { useI18n } from "@/providers/i18n-provider";
+import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 
 interface ProductFormProps {
   product?: any | null;
@@ -126,7 +127,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         .eq('product_id', product.id)
         .order('order_index');
       setImages(imagesData?.map((img: any) => ({ 
-        url: img.url, 
+        url: img.r2_key_original || img.url, 
         order_index: img.order_index,
         alt_text: img.alt_text,
         is_main: img.is_main
@@ -549,7 +550,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
                   {images.map((image, index) => (
                     <div key={index} className="relative group">
                       <img
-                        src={image.url}
+                        src={getImageUrl(image.url, IMAGE_SIZES.THUMB)}
                         alt={`Product ${index + 1}`}
                         className="w-full h-32 object-cover rounded border"
                       />

@@ -1,13 +1,9 @@
 {
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
-    "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3@3",
-    "@jsquash/webp": "https://esm.sh/@jsquash/webp@1.2.0",
-    "@jsquash/jpeg": "https://esm.sh/@jsquash/jpeg@1.2.0",
-    "@jsquash/png": "https://esm.sh/@jsquash/png@1.2.0",
-    "@jsquash/resize": "https://esm.sh/@jsquash/resize@1.1.0"
+    "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3@3"
   },
   "compilerOptions": {
-    "lib": ["deno.ns", "esnext", "dom"]
+    "lib": ["deno.ns", "esnext"]
   }
 }

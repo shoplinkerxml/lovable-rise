@@ -103,11 +103,10 @@ export const StoreProductEdit = () => {
         const srcImages = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main?: boolean; alt_text?: string | null; images?: { original: string | null; card: string | null; thumb: string | null } }>;
         setImages(srcImages.map((img, index) => ({
           id: img.id ? String(img.id) : undefined,
-          url: String(img.url || ''),
+          url: String((img.images?.original || img.url || '')),
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: !!img.is_main,
           alt_text: img.alt_text ?? undefined,
-          thumb_url: img.images?.thumb || undefined,
         })));
         setParams(agg.params || []);
         setShopName(agg.shop?.store_name || "");

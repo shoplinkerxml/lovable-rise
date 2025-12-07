@@ -3,6 +3,7 @@ import type { ColumnDef, FilterFn, Column } from "@tanstack/react-table";
 import type { Table as TanTable } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { SortToggle } from "./SortToggle";
@@ -150,13 +151,12 @@ export function createColumns({
           : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
         return (
           <div className="flex items-center justify-start" data-testid="user_products_photo">
-            <Avatar className={`${sizeCls} rounded-md`}>
-              {img ? (
-                <AvatarImage src={img} alt={product.name_ua || product.name || ""} />
-              ) : (
+            <button type="button" className="inline-flex" onClick={() => onEdit?.(product)} aria-label={t("edit")} title={t("edit")}>
+              <Avatar className={`${sizeCls} rounded-md cursor-pointer`}>
+                <AvatarImage src={img ? getImageUrl(img, IMAGE_SIZES.THUMB) : ''} alt={product.name_ua || product.name || ''} />
                 <AvatarFallback className="bg-primary/10 text-primary rounded-md">{initials}</AvatarFallback>
-              )}
-            </Avatar>
+              </Avatar>
+            </button>
           </div>
         );
       },

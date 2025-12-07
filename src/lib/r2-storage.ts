@@ -113,28 +113,55 @@ export const R2Storage = {
       const env = import.meta as unknown as { env?: Record<string, string> };
       const w = window as unknown as { __IMAGE_WORKER_URL__?: string };
       const v = env?.env?.VITE_IMAGE_WORKER_URL || w.__IMAGE_WORKER_URL__ || '';
-      return v || 'https://img-api.xmlreactor.shop';
-    } catch (e) { void e; return 'https://img-api.xmlreactor.shop'; }
+      return v;
+    } catch (e) { void e; return ''; }
   },
   getImageBaseUrl(): string {
     try {
-      const env = import.meta as unknown as { env?: Record<string, string> };
-      const w = window as unknown as { __IMAGE_BASE_URL__?: string; __R2_PUBLIC_HOST__?: string };
-      const host = env?.env?.VITE_R2_PUBLIC_HOST || w.__R2_PUBLIC_HOST__ || '';
-      if (host) {
-        const h = host.startsWith('http') ? host : `https://${host}`;
-        try { const u = new URL(h); return `${u.protocol}//${u.host}`; } catch { return h; }
+      const base = (import.meta as any).env?.VITE_IMAGE_BASE_URL
+        || (import.meta as any).env?.IMAGE_BASE_URL
+        || (window as any).__IMAGE_BASE_URL__
+        || '';
+      if (!base) return '';
+      const b = String(base).startsWith('http') ? String(base) : `https://${String(base)}`;
+      try {
+        const u = new URL(b);
+        const origin = `${u.protocol}//${u.host}`;
+        const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        return path ? `${origin}/${path}` : origin;
+      } catch {
+        return b;
       }
-      const base = env?.env?.VITE_IMAGE_BASE_URL || w.__IMAGE_BASE_URL__ || '';
-      if (base) {
-        const b = base.startsWith('http') ? base : `https://${base}`;
-        try { const u = new URL(b); const origin = `${u.protocol}//${u.host}`; const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/+$/, ''); return path ? `${origin}/${path}` : origin; } catch { return b; }
+    } catch {
+      return '';
+    }
+  },
+  getR2PublicBaseUrl(): string {
+    try {
+      const base = (import.meta as any).env?.VITE_R2_PUBLIC_BASE_URL
+        || (import.meta as any).env?.VITE_R2_PUBLIC_HOST
+        || (import.meta as any).env?.R2_PUBLIC_BASE_URL
+        || (import.meta as any).env?.R2_PUBLIC_HOST
+        || (window as any).__R2_PUBLIC_BASE_URL__
+        || (window as any).__R2_PUBLIC_HOST__
+        || '';
+      if (!base) return '';
+      const b = String(base).startsWith('http') ? String(base) : `https://${String(base)}`;
+      try {
+        const u = new URL(b);
+        const origin = `${u.protocol}//${u.host}`;
+        const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        return path ? `${origin}/${path}` : origin;
+      } catch {
+        return b;
       }
-      return 'https://images-service.xmlreactor.shop';
-    } catch { return 'https://images-service.xmlreactor.shop'; }
+    } catch {
+      return '';
+    }
   },
   makePublicUrl(objectKey: string): string {
-    const base = R2Storage.getImageBaseUrl();
+    const base = R2Storage.getR2PublicBaseUrl();
+    if (!base) return objectKey;
     return `${base}/${objectKey}`;
   },
   /**

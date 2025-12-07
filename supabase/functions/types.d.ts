@@ -18,19 +18,8 @@ declare module "npm:@aws-sdk/client-s3" {
 
 declare type ImageData = { data: Uint8ClampedArray; width: number; height: number }
 
-declare module "@jsquash/webp" {
-  export function encode(data: ImageData, options?: any): Promise<ArrayBuffer>
-  export function decode(buf: ArrayBuffer): Promise<ImageData>
-}
-
-declare module "@jsquash/jpeg" {
-  export default function decode(buf: ArrayBuffer): Promise<ImageData>
-}
-
-declare module "@jsquash/png" {
-  export default function decode(buf: ArrayBuffer): Promise<ImageData>
-}
-
-declare module "@jsquash/resize" {
-  export default function resize(data: ImageData, options: { width: number; height: number; method?: string; fitMethod?: string }): Promise<ImageData>
+declare module "npm:@imagemagick/magick-wasm" {
+  export const ImageMagick: any
+  export function initializeImageMagick(wasm: Uint8Array | ArrayBuffer): Promise<void>
+  export enum MagickFormat { WebP }
 }

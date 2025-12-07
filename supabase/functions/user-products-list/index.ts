@@ -241,7 +241,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ids.length > 0
         ? supabase
             .from('store_product_images')
-            .select('product_id,url,is_main,order_index,r2_key_thumb,r2_key_card')
+            .select('product_id,url,is_main,order_index,r2_key_thumb,r2_key_card,r2_key_original')
             .in('product_id', ids)
         : Promise.resolve({ data: [], error: null } as any)
 
@@ -305,7 +305,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const imgRows = ((imgsRes as any)?.data || []) as any[]
     const chosenImageRowByPid: Record<
       string,
-      { url: string; is_main: boolean; order_index: number; r2_key_thumb?: string | null; r2_key_card?: string | null }
+      { url: string; is_main: boolean; order_index: number; r2_key_thumb?: string | null; r2_key_card?: string | null; r2_key_original?: string | null }
     > = {}
 
     for (const r of imgRows) {
@@ -318,20 +318,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
         (r as any).order_index != null ? Number((r as any).order_index) : 9999
       const keyThumb = (r as any).r2_key_thumb ? String((r as any).r2_key_thumb) : null
       const keyCard = (r as any).r2_key_card ? String((r as any).r2_key_card) : null
+      const keyOriginal = (r as any).r2_key_original ? String((r as any).r2_key_original) : null
 
       const current = chosenImageRowByPid[pid]
       if (!current) {
-        chosenImageRowByPid[pid] = { url, is_main: isMain, order_index: orderIndex, r2_key_thumb: keyThumb, r2_key_card: keyCard }
+        chosenImageRowByPid[pid] = { url, is_main: isMain, order_index: orderIndex, r2_key_thumb: keyThumb, r2_key_card: keyCard, r2_key_original: keyOriginal }
         continue
       }
 
       if (isMain && !current.is_main) {
-        chosenImageRowByPid[pid] = { url, is_main: isMain, order_index: orderIndex, r2_key_thumb: keyThumb, r2_key_card: keyCard }
+        chosenImageRowByPid[pid] = { url, is_main: isMain, order_index: orderIndex, r2_key_thumb: keyThumb, r2_key_card: keyCard, r2_key_original: keyOriginal }
         continue
       }
 
       if (isMain === current.is_main && orderIndex < current.order_index) {
-        chosenImageRowByPid[pid] = { url, is_main: isMain, order_index: orderIndex, r2_key_thumb: keyThumb, r2_key_card: keyCard }
+        chosenImageRowByPid[pid] = { url, is_main: isMain, order_index: orderIndex, r2_key_thumb: keyThumb, r2_key_card: keyCard, r2_key_original: keyOriginal }
       }
     }
 
@@ -361,7 +362,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     for (const [pid, row] of Object.entries(chosenImageRowByPid)) {
       const thumb = row.r2_key_thumb ? makePublicUrlFromKey(String(row.r2_key_thumb)) : ''
       const card = row.r2_key_card ? makePublicUrlFromKey(String(row.r2_key_card)) : ''
-      mainImageMap[pid] = thumb || card || row.url
+      const original = row.r2_key_original ? makePublicUrlFromKey(String(row.r2_key_original)) : ''
+      mainImageMap[pid] = thumb || card || original || row.url
     }
 
     const categoryNameMap: Record<string, string> = {}

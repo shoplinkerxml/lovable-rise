@@ -1,7 +1,6 @@
-// Use native Deno.serve for Supabase Edge Functions
+// supabase/functions/upload-product-image/index.ts
 import { createClient } from "npm:@supabase/supabase-js"
 import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3"
-import { ImageMagick, initializeImageMagick, MagickFormat } from "npm:@imagemagick/magick-wasm@0.0.30"
 
 function buildCorsHeadersFromRequest(req: Request): Record<string, string> {
   const origin = req.headers.get("origin")
@@ -21,36 +20,13 @@ function buildCorsHeadersFromRequest(req: Request): Record<string, string> {
   return headers
 }
 
-let magickInitialized = false
-let magickInitPromise: Promise<void> | null = null
-async function initMagickWasm(): Promise<void> {
-  if (magickInitialized) return
-  if (!magickInitPromise) {
-    const magickWasmBytes = await Deno.readFile(
-      new URL(
-        "magick.wasm",
-        import.meta.resolve("npm:@imagemagick/magick-wasm@0.0.30"),
-      ),
-    )
-    magickInitPromise = initializeImageMagick(magickWasmBytes).then(() => {
-      magickInitialized = true
-    })
-  }
-  return magickInitPromise
-}
-
-// Image size configs
-const CARD_WIDTH = 600
-const THUMB_WIDTH = 200
-const WEBP_QUALITY = 80
-
 type Body = {
   productId?: string
   product_id?: string
-  fileData?: string // base64
+  fileData?: string
   fileName?: string
   fileType?: string
-  url?: string // альтернатива - загрузка по URL
+  url?: string
 }
 
 const base64UrlToBase64 = (input: string) => input.replace(/-/g, "+").replace(/_/g, "/")
@@ -72,7 +48,6 @@ const decodeJwtSub = (authHeader: string | null) => {
 }
 
 function decodeBase64ToBytes(b64: string): Uint8Array {
-  // Handle data URL format
   const commaIdx = b64.indexOf(",")
   const pureBase64 = commaIdx >= 0 ? b64.slice(commaIdx + 1) : b64
   const binary = atob(pureBase64)
@@ -83,67 +58,6 @@ function decodeBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-const WEBP_QUALITY_ORIGINAL = 80
-const WEBP_QUALITY_CARD = 80
-const WEBP_QUALITY_THUMB = 70
-
-function makeWebpVariant(bytes: Uint8Array, targetWidth: number | null, quality: number): Uint8Array {
-  const result = ImageMagick.read(bytes, (img): Uint8Array => {
-    if (targetWidth && targetWidth > 0) {
-      const ratio = targetWidth / img.width
-      const targetHeight = Math.max(1, Math.round(img.height * ratio))
-      img.resize(targetWidth, targetHeight)
-    }
-    img.quality = quality
-    img.format = MagickFormat.WebP
-    return img.write((data) => data)
-  })
-  return result
-}
-
-async function toWebpVariants(bytes: Uint8Array, _mimeHint?: string): Promise<{ original: Uint8Array; card: Uint8Array; thumb: Uint8Array }> {
-  const original = makeWebpVariant(bytes, null, WEBP_QUALITY_ORIGINAL)
-  const card = makeWebpVariant(bytes, CARD_WIDTH, WEBP_QUALITY_CARD)
-  const thumb = makeWebpVariant(bytes, THUMB_WIDTH, WEBP_QUALITY_THUMB)
-  return { original, card, thumb }
-}
-
-function sniffMime(bytes: Uint8Array, hinted?: string): { mime: string; ext: string } {
-  const hint = (hinted || '').toLowerCase()
-  const map: Record<string, string> = {
-    'image/webp': 'webp',
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/avif': 'avif',
-    'image/gif': 'gif',
-    'image/svg+xml': 'svg',
-  }
-  if (map[hint]) return { mime: hint, ext: map[hint] }
-  // Magic bytes detection
-  if (bytes.length > 12) {
-    const head = bytes.subarray(0, 12)
-    const str = new TextDecoder().decode(head)
-    // WEBP: RIFF....WEBP
-    if (str.startsWith('RIFF') && new TextDecoder().decode(bytes.subarray(8, 12)) === 'WEBP') {
-      return { mime: 'image/webp', ext: 'webp' }
-    }
-    // PNG: 89 50 4E 47 0D 0A 1A 0A
-    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-      return { mime: 'image/png', ext: 'png' }
-    }
-    // JPEG: FF D8 FF
-    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-      return { mime: 'image/jpeg', ext: 'jpg' }
-    }
-    // GIF: GIF87a/GIF89a
-    if (str.startsWith('GIF8')) {
-      return { mime: 'image/gif', ext: 'gif' }
-    }
-  }
-  return { mime: 'image/webp', ext: 'webp' }
-}
-
 // ENV
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -151,7 +65,7 @@ const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? ""
 const bucket = Deno.env.get("R2_BUCKET_NAME") ?? ""
 const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") ?? ""
 const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? ""
-// Resolve base URL for public image links
+
 function resolvePublicBase(): string {
   const host = Deno.env.get("R2_PUBLIC_HOST") || ""
   if (host) {
@@ -163,7 +77,7 @@ function resolvePublicBase(): string {
       return h
     }
   }
-  const raw = Deno.env.get("R2_PUBLIC_BASE_URL") || Deno.env.get("IMAGE_BASE_URL") || "https://images-service.xmlreactor.shop"
+  const raw = Deno.env.get("R2_PUBLIC_BASE_URL") || Deno.env.get("IMAGE_BASE_URL") || "https://image-resize-worker.shoplinkerxml.workers.dev"
   try {
     const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`)
     const origin = `${u.protocol}//${u.host}`
@@ -173,36 +87,58 @@ function resolvePublicBase(): string {
     return raw
   }
 }
+
 const IMAGE_BASE_URL = resolvePublicBase()
+console.log("[upload-product-image] version v10-cloudflare-worker")
 console.log(`[upload-product-image] Using IMAGE_BASE_URL: ${IMAGE_BASE_URL}`)
 
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
 
 Deno.serve(async (req) => {
+  console.log("[upload-product-image] === NEW REQUEST ===")
+  console.log("[upload-product-image] Method:", req.method)
+  console.log("[upload-product-image] URL:", req.url)
+  
   const corsHeaders = buildCorsHeadersFromRequest(req)
   const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" }
+  
   if (req.method === "OPTIONS") {
+    console.log("[upload-product-image] OPTIONS request - returning CORS headers")
     return new Response("ok", { headers: corsHeaders })
   }
 
+  console.log("[upload-product-image] Request received")
+
   try {
-    await initMagickWasm()
+    console.log("[upload-product-image] Entering try block")
+    
     // Auth check
     const auth = req.headers.get("authorization")
+    console.log("[upload-product-image] Auth header exists:", !!auth)
+    
     if (!auth) {
+      console.log("[upload-product-image] No auth header")
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: jsonHeaders })
     }
 
     const userId = decodeJwtSub(auth)
     if (!userId) {
+      console.log("[upload-product-image] Invalid auth token")
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: jsonHeaders })
     }
 
+    console.log("[upload-product-image] User authenticated:", userId)
+
     // Parse body
-    const body = (await req.json().catch(() => ({}))) as Body
+    const body = (await req.json().catch((e) => {
+      console.error("[upload-product-image] JSON parse error:", e)
+      return {}
+    })) as Body
+    
     const productId = (body.productId || body.product_id || "").trim()
 
     if (!productId || !uuidRegex.test(productId)) {
+      console.log("[upload-product-image] Invalid product_id:", productId)
       return new Response(
         JSON.stringify({ error: "invalid_body", message: "product_id must be valid UUID" }),
         { status: 400, headers: jsonHeaders }
@@ -211,18 +147,35 @@ Deno.serve(async (req) => {
 
     // Check env config
     if (!SUPABASE_URL || !SERVICE_KEY) {
-      return new Response(JSON.stringify({ error: "server_misconfig", message: "Missing Supabase config" }), { status: 500, headers: jsonHeaders })
+      console.error("[upload-product-image] Missing Supabase config")
+      return new Response(
+        JSON.stringify({ error: "server_misconfig", message: "Missing Supabase config" }), 
+        { status: 500, headers: jsonHeaders }
+      )
     }
 
     if (!accountId || !bucket || !accessKeyId || !secretAccessKey) {
-      return new Response(JSON.stringify({ error: "server_misconfig", message: "Missing R2 config" }), { status: 500, headers: jsonHeaders })
+      console.error("[upload-product-image] Missing R2 config")
+      return new Response(
+        JSON.stringify({ error: "server_misconfig", message: "Missing R2 config" }), 
+        { status: 500, headers: jsonHeaders }
+      )
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
+    
+    // Проверяем R2 endpoint
+    const r2Endpoint = `https://${accountId}.r2.cloudflarestorage.com`
+    console.log(`[upload-product-image] R2 endpoint: ${r2Endpoint}`)
+    console.log(`[upload-product-image] R2 bucket: ${bucket}`)
+    
     const s3 = new S3Client({
       region: "auto",
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      endpoint: r2Endpoint,
       credentials: { accessKeyId, secretAccessKey },
+      requestHandler: {
+        requestTimeout: 25000, // 25 секунд максимум
+      }
     })
 
     // Verify user owns this product
@@ -233,7 +186,11 @@ Deno.serve(async (req) => {
       .single()
 
     if (prodErr || !product) {
-      return new Response(JSON.stringify({ error: "product_not_found" }), { status: 404, headers: jsonHeaders })
+      console.log("[upload-product-image] Product not found:", productId)
+      return new Response(
+        JSON.stringify({ error: "product_not_found" }), 
+        { status: 404, headers: jsonHeaders }
+      )
     }
 
     const { data: store } = await supabase
@@ -243,7 +200,11 @@ Deno.serve(async (req) => {
       .single()
 
     if (!store || (store as any).user_id !== userId) {
-      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: jsonHeaders })
+      console.log("[upload-product-image] User doesn't own product")
+      return new Response(
+        JSON.stringify({ error: "forbidden" }), 
+        { status: 403, headers: jsonHeaders }
+      )
     }
 
     // Get image data
@@ -251,25 +212,30 @@ Deno.serve(async (req) => {
     let inputMime: string | undefined
 
     if (body.fileData) {
-      // Base64 upload
+      console.log("[upload-product-image] Processing base64 upload")
       imageBytes = decodeBase64ToBytes(body.fileData)
       inputMime = body.fileType
     } else if (body.url) {
-      // URL upload
+      console.log("[upload-product-image] Fetching from URL:", body.url)
       const imgRes = await fetch(body.url)
       if (!imgRes.ok) {
-        return new Response(JSON.stringify({ error: "fetch_url_failed" }), { status: 400, headers: jsonHeaders })
+        console.error("[upload-product-image] URL fetch failed:", imgRes.status)
+        return new Response(
+          JSON.stringify({ error: "fetch_url_failed" }), 
+          { status: 400, headers: jsonHeaders }
+        )
       }
       imageBytes = new Uint8Array(await imgRes.arrayBuffer())
       inputMime = imgRes.headers.get('content-type') || undefined
     } else {
+      console.log("[upload-product-image] No fileData or url provided")
       return new Response(
         JSON.stringify({ error: "invalid_body", message: "fileData or url required" }),
         { status: 400, headers: jsonHeaders }
       )
     }
 
-    console.log(`[upload-product-image] Processing image for product ${productId}, size: ${imageBytes.length} bytes`)
+    console.log(`[upload-product-image] Image size: ${imageBytes.length} bytes`)
 
     // Determine next order_index
     let nextOrder = 0
@@ -285,7 +251,7 @@ Deno.serve(async (req) => {
       nextOrder = Number((lastRow as any).order_index) + 1
     }
 
-    // Check if first image (make it main)
+    // Check if first image
     const { count } = await supabase
       .from("store_product_images")
       .select("id", { count: "exact", head: true })
@@ -293,7 +259,7 @@ Deno.serve(async (req) => {
 
     const isFirstImage = (count || 0) === 0
 
-    // Create DB row first to get image_id
+    // Create DB row
     const { data: inserted, error: insertErr } = await supabase
       .from("store_product_images")
       .insert({
@@ -314,35 +280,46 @@ Deno.serve(async (req) => {
     }
 
     const imageId = (inserted as any).id
-    console.log(`[upload-product-image] Created image row with id: ${imageId}`)
+    console.log(`[upload-product-image] Created image row: ${imageId}`)
 
-    // Detect mime
-    const { mime } = sniffMime(imageBytes, inputMime)
-    // Keys are always webp to keep consistent public URLs
-    const baseKey = `products/${productId}/${imageId}`
-    const originalKey = `${baseKey}/original.webp`
-    const cardKey = `${baseKey}/card.webp`
-    const thumbKey = `${baseKey}/thumb.webp`
+    // Определяем расширение файла
+    const contentType = inputMime || 'image/jpeg'
+    const ext = contentType.includes('png') ? 'png' : 
+                contentType.includes('webp') ? 'webp' : 
+                contentType.includes('gif') ? 'gif' : 'jpg'
+
+    // Создаём ключ только для оригинала
+    const originalKey = `products/${productId}/${imageId}/original.${ext}`
 
     try {
-      console.log(`[upload-product-image] Processing image with imagescript...`)
-      const { original: originalBuffer, card: cardBuffer, thumb: thumbBuffer } = await toWebpVariants(imageBytes, inputMime)
-      console.log(`[upload-product-image] Uploading original (${originalBuffer.length}), card (${cardBuffer.length}), thumb (${thumbBuffer.length})`)
-      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: originalKey, Body: originalBuffer, ContentType: 'image/webp' }))
-      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: cardKey, Body: cardBuffer, ContentType: 'image/webp' }))
-      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: thumbKey, Body: thumbBuffer, ContentType: 'image/webp' }))
+      // Загружаем только оригинал
+      console.log(`[upload-product-image] Uploading to R2: ${originalKey}`)
+      
+      // Добавляем таймаут для загрузки в R2
+      const uploadPromise = s3.send(new PutObjectCommand({ 
+        Bucket: bucket, 
+        Key: originalKey, 
+        Body: imageBytes, 
+        ContentType: contentType 
+      }))
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('R2 upload timeout after 30s')), 30000)
+      )
+      
+      await Promise.race([uploadPromise, timeoutPromise])
 
-      console.log(`[upload-product-image] All uploads complete`)
+      console.log(`[upload-product-image] Upload complete`)
 
-      // Update DB with R2 keys
-      const publicUrl = `${IMAGE_BASE_URL}/${cardKey}`
+      // Формируем URL оригинала
+      const originalUrl = `${IMAGE_BASE_URL}/${originalKey}`
+
+      // Обновляем БД
       const { error: updateErr } = await supabase
         .from("store_product_images")
         .update({
-          url: publicUrl,
+          url: originalUrl,
           r2_key_original: originalKey,
-          r2_key_card: cardKey,
-          r2_key_thumb: thumbKey,
         })
         .eq("id", imageId)
 
@@ -350,30 +327,32 @@ Deno.serve(async (req) => {
         console.error("[upload-product-image] Update failed:", updateErr)
       }
 
-      // Return success response
+      console.log("[upload-product-image] Success!")
+
       return new Response(
         JSON.stringify({
           success: true,
           image_id: imageId,
-          original_url: `${IMAGE_BASE_URL}/${originalKey}`,
-          card_url: `${IMAGE_BASE_URL}/${cardKey}`,
-          thumb_url: `${IMAGE_BASE_URL}/${thumbKey}`,
-          r2_key_original: originalKey,
-          r2_key_card: cardKey,
-          r2_key_thumb: thumbKey,
+          url: originalUrl,
           is_main: isFirstImage,
           order_index: nextOrder,
         }),
         { status: 200, headers: jsonHeaders }
       )
     } catch (processErr) {
-      // Cleanup: delete the DB row if image processing failed
       console.error("[upload-product-image] Processing error:", processErr)
-      // Do not delete row; instead, mark as failed for visibility but keep consistency
-      await supabase.from("store_product_images").update({ url: "#failed" }).eq("id", imageId)
+      
+      // Mark as failed
+      await supabase
+        .from("store_product_images")
+        .update({ url: "#failed" })
+        .eq("id", imageId)
       
       return new Response(
-        JSON.stringify({ error: "processing_failed", message: (processErr as any)?.message || 'Failed to upload image' }),
+        JSON.stringify({ 
+          error: "processing_failed", 
+          message: (processErr as any)?.message || 'Failed to process image' 
+        }),
         { status: 500, headers: jsonHeaders }
       )
     }
