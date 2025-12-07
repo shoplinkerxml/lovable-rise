@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js";
-import { S3Client, CopyObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3";
-import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
+import { S3Client, CopyObjectCommand } from "npm:@aws-sdk/client-s3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
