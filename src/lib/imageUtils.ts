@@ -1,13 +1,15 @@
 // Worker URL for image resizing
-const WORKER_URL = 'https://image-resize-worker.shoplinkerxml.workers.dev'
+// ВАЖНО: Worker защищён Cloudflare Access - требует настройки публичного доступа
+// Пока worker закрыт, используем оригинальные URL напрямую
+const WORKER_URL = '' // 'https://image-resize-worker.shoplinkerxml.workers.dev'
 
 export function getImageUrl(originalUrl: string | null | undefined, width?: number): string {
   if (!originalUrl || originalUrl === '' || originalUrl === '#processing' || originalUrl === '#failed') {
     return ''
   }
   
-  // If no width specified, return original URL
-  if (!width) return originalUrl
+  // If no worker URL configured or no width specified, return original URL
+  if (!WORKER_URL || !width) return originalUrl
   
   // Use Cloudflare Worker for resizing
   const w = Math.max(1, Math.floor(Number(width)))
