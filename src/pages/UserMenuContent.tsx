@@ -168,95 +168,115 @@ const UserMenuContent = () => {
           ) : menuItem.page_type === 'form' ? (
             <div className="space-y-4">
               <p className="text-muted-foreground">{t("configure_form_fields_in_admin")}</p>
-              {menuItem.content_data?.form_config?.fields && menuItem.content_data.form_config.fields.length > 0 ? (
-                <div className="space-y-4">
-                  {menuItem.content_data.form_config.fields.map((field, index) => (
-                    <div key={index} className="border p-4 rounded-lg">
-                      <label className="block font-medium mb-2">{field.label}</label>
-                      {field.type === 'text' && <Input type="text" placeholder={field.placeholder} />}
-                      {field.type === 'email' && <Input type="email" placeholder={field.placeholder} />}
-                      {field.type === 'textarea' && <Textarea placeholder={field.placeholder} />}
-                      {field.type === 'select' && (
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder={field.placeholder} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {field.options?.map((option, optIndex) => (
-                              <SelectItem key={optIndex} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+              {(() => {
+                const formConfig = menuItem.content_data?.form_config as { fields?: Array<{ label: string; type: string; placeholder?: string; options?: Array<{ value: string; label: string }> }>; submitAction?: string } | undefined;
+                const fields = formConfig?.fields;
+                if (fields && fields.length > 0) {
+                  return (
+                    <div className="space-y-4">
+                      {fields.map((field, index) => (
+                        <div key={index} className="border p-4 rounded-lg">
+                          <label className="block font-medium mb-2">{field.label}</label>
+                          {field.type === 'text' && <Input type="text" placeholder={field.placeholder} />}
+                          {field.type === 'email' && <Input type="email" placeholder={field.placeholder} />}
+                          {field.type === 'textarea' && <Textarea placeholder={field.placeholder} />}
+                          {field.type === 'select' && (
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder={field.placeholder} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {field.options?.map((option, optIndex) => (
+                                  <SelectItem key={optIndex} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      ))}
+                      <Button>{formConfig?.submitAction || t("submit")}</Button>
                     </div>
-                  ))}
-                  <Button>{menuItem.content_data.form_config.submitAction || t("submit")}</Button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">{t("no_form_fields_defined")}</p>
-                  <div className="mt-4">
-                    <Button onClick={handleEdit}>
-                      {t("configure_form")}
-                    </Button>
+                  );
+                }
+                return (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">{t("no_form_fields_defined")}</p>
+                    <div className="mt-4">
+                      <Button onClick={handleEdit}>
+                        {t("configure_form")}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ) : menuItem.page_type === 'list' ? (
             <div className="space-y-4">
               <p className="text-muted-foreground">{t("displaying_data_from_api_source")}</p>
-              {menuItem.content_data?.table_config?.columns && menuItem.content_data.table_config.columns.length > 0 ? (
-                <div className="rounded-md border">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        {menuItem.content_data.table_config.columns.map((column, index) => (
-                          <th key={index} className="text-left p-4 font-medium">{column.label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t">
-                        {menuItem.content_data.table_config.columns.map((column, index) => (
-                          <td key={index} className="p-4">{t("sample_data")}</td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">{t("no_columns_defined")}</p>
-                  <div className="mt-4">
-                    <Button onClick={handleEdit}>
-                      {t("configure_table")}
-                    </Button>
+              {(() => {
+                const tableConfig = menuItem.content_data?.table_config as { columns?: Array<{ label: string; key: string }> } | undefined;
+                const columns = tableConfig?.columns;
+                if (columns && columns.length > 0) {
+                  return (
+                    <div className="rounded-md border">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            {columns.map((column, index) => (
+                              <th key={index} className="text-left p-4 font-medium">{column.label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-t">
+                            {columns.map((column, index) => (
+                              <td key={index} className="p-4">{t("sample_data")}</td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">{t("no_columns_defined")}</p>
+                    <div className="mt-4">
+                      <Button onClick={handleEdit}>
+                        {t("configure_table")}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ) : menuItem.page_type === 'dashboard' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {menuItem.content_data?.widgets?.map((widget, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <CardTitle>{widget.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">{t("widget_content_placeholder") + " " + widget.type}</p>
-                  </CardContent>
-                </Card>
-              ))}
+              {(() => {
+                const widgets = menuItem.content_data?.widgets as Array<{ title: string; type: string }> | undefined;
+                return widgets?.map((widget, index) => (
+                  <Card key={index}>
+                    <CardHeader>
+                      <CardTitle>{widget.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground">{t("widget_content_placeholder") + " " + widget.type}</p>
+                    </CardContent>
+                  </Card>
+                ));
+              })()}
             </div>
           ) : (
             <div className="space-y-4">
               <p className="text-muted-foreground">{t("custom_page_with_custom_components")}</p>
-              {menuItem.content_data?.content && (
-                <div className="prose max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: menuItem.content_data.content }} />
-                </div>
-              )}
+              {(() => {
+                const content = menuItem.content_data?.content as string | undefined;
+                return content ? (
+                  <div className="prose max-w-none">
+                    <div dangerouslySetInnerHTML={{ __html: content }} />
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
         </CardContent>

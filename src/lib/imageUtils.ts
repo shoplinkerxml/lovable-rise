@@ -1,16 +1,17 @@
-import { R2Storage } from '@/lib/r2-storage'
+// Worker URL for image resizing
+const WORKER_URL = 'https://image-resize-worker.shoplinkerxml.workers.dev'
 
 export function getImageUrl(originalUrl: string | null | undefined, width?: number): string {
   if (!originalUrl || originalUrl === '' || originalUrl === '#processing' || originalUrl === '#failed') {
     return ''
   }
-  const workerBase = R2Storage.getImageBaseUrl() || R2Storage.getWorkerUrl()
-  const isHttp = typeof originalUrl === 'string' && /^https?:\/\//i.test(originalUrl)
-  const fullSrc = isHttp ? String(originalUrl) : R2Storage.makePublicUrl(String(originalUrl))
-  if (!width) return fullSrc
-  if (!workerBase) return fullSrc
+  
+  // If no width specified, return original URL
+  if (!width) return originalUrl
+  
+  // Use Cloudflare Worker for resizing
   const w = Math.max(1, Math.floor(Number(width)))
-  return `${workerBase}?src=${encodeURIComponent(fullSrc)}&w=${w}`
+  return `${WORKER_URL}?src=${encodeURIComponent(originalUrl)}&w=${w}`
 }
 
 export const IMAGE_SIZES = {
