@@ -13,17 +13,6 @@ const AdminProtected = () => {
   useEffect(() => {
     const validateSession = async () => {
       try {
-        // For development: allow bypass with a simple check
-        const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
-        
-        if (isDevelopment) {
-          console.log('[AdminProtected] Development mode: bypassing authentication');
-          setAuthenticated(true);
-          setHasAdminRole(true);
-          setReady(true);
-          return;
-        }
-        
         // Use enhanced session validation
         const validation = await SessionValidator.ensureValidSession();
         
