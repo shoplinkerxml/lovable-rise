@@ -82,7 +82,7 @@ export function ImageSection(props: Props) {
           <Card className="relative group border border-border overflow-hidden">
             <CardContent className="p-2 sm:p-3 md:p-4">
               <div
-                className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer"
+                className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer p-2 sm:p-3 md:p-4"
                 style={props.getMainAdaptiveImageStyle()}
               >
                 {(() => {

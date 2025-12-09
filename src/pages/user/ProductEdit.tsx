@@ -102,7 +102,7 @@ export const ProductEdit = () => {
   const handleFormSubmit = async ({ formData, images, parameters }: { formData: FormDataInput; images: Array<{ url: string; order_index: number; is_main: boolean; object_key?: string }>; parameters: ProductParam[] }) => {
     if (!id) return;
     try {
-      await ProductService.updateProduct(id, {
+      const payload: any = {
         external_id: formData.external_id,
         category_id: formData.category_id || null,
         category_external_id: formData.category_external_id ? String(formData.category_external_id) : undefined,
@@ -123,13 +123,15 @@ export const ProductEdit = () => {
         description_ua: formData.description_ua || null,
         state: formData.state || 'new',
         params: parameters || [],
-        images: (images || []).map((img, index: number) => ({
-          url: img.url,
-          order_index: typeof img.order_index === 'number' ? img.order_index : index,
-          is_main: !!img.is_main,
-          object_key: img.object_key
-        }))
-      });
+      };
+      const mappedImages = (images || []).map((img, index: number) => ({
+        url: img.url,
+        order_index: typeof img.order_index === 'number' ? img.order_index : index,
+        is_main: !!img.is_main,
+        object_key: img.object_key
+      }));
+      if (mappedImages.length > 0) payload.images = mappedImages;
+      await ProductService.updateProduct(id, payload);
       try {
         const cidNum = formData.category_id ? Number(formData.category_id) : null;
         let catName = '';

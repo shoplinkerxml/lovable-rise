@@ -1322,7 +1322,7 @@ export function ProductFormTabs({
                         <div className="relative flex justify-center">
                           <Card className="relative group border border-border overflow-hidden">
                             <CardContent className="p-2 sm:p-3 md:p-4">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer max-w-full" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
+                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer max-w-full p-2 sm:p-3 md:p-4" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
                                 {(() => {
                                   const original = images[activeImageIndex]?.url || '';
                                   const isVid = isVideoUrl(original);
@@ -1350,6 +1350,10 @@ export function ProductFormTabs({
                                       onError={(e) => {
                                         const el = e.target as HTMLImageElement;
                                         if (original) el.src = original;
+                                        const key = original ? R2Storage.extractObjectKeyFromUrl(original) : null;
+                                        if (key) {
+                                          R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view; }).catch(() => void 0);
+                                        }
                                         handleMainImageError(e);
                                       }}
                                     />
@@ -1393,7 +1397,7 @@ export function ProductFormTabs({
                                             );
                                           }
                                           return (
-                                            <img ref={(el) => (galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} onLoad={(e) => handleGalleryImageLoad(e, index)} onError={(e) => { const el = e.target as HTMLImageElement; if (original) el.src = original; }} />
+                                            <img ref={(el) => (galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} onLoad={(e) => handleGalleryImageLoad(e, index)} onError={(e) => { const el = e.target as HTMLImageElement; if (original) { el.src = original; const key = R2Storage.extractObjectKeyFromUrl(original); if (key) { R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view; }).catch(() => void 0); } } }} />
                                           );
                                         })()}
                                       </div>
