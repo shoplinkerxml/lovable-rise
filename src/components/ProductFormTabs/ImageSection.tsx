@@ -76,7 +76,7 @@ export function ImageSection(props: Props) {
   }
   return (
     <div className="relative space-y-3 md:space-y-4">
-      <div className="mx-auto w-full space-y-3 md:space-y-4" style={{ maxWidth: `calc(${props.getMainAdaptiveImageStyle().width} + 2rem)` }}>
+      <div className="mx-auto w-full space-y-3 md:space-y-4" style={{ maxWidth: `calc(${props.getMainAdaptiveImageStyle().width} + clamp(0.5rem, 2vw, 1rem))` }}>
       {props.images.length > 0 && (
         <div className="relative flex justify-center w-full">
           <Card className="relative group overflow-hidden border-0 shadow-none">
@@ -136,10 +136,10 @@ export function ImageSection(props: Props) {
             </CardContent>
             {props.images.length > 1 && (
               <>
-                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" onClick={props.onPrev}>
+                <Button variant="outline" size="icon" className="absolute top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" style={{ left: 'min(1.75%, 0.5rem)' }} onClick={props.onPrev}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" onClick={props.onNext}>
+                <Button variant="outline" size="icon" className="absolute top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" style={{ right: 'min(1.75%, 0.5rem)' }} onClick={props.onNext}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </>
