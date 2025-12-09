@@ -94,7 +94,7 @@ const TariffPage = () => {
     const sub = subscriptionCtx?.subscription || null;
     const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
     setActiveTariffId(valid ? (sub?.tariff_id ?? null) : null);
-  }, [subscriptionCtx?.subscription?.tariff_id, subscriptionCtx?.subscription?.end_date]);
+  }, [subscriptionCtx?.subscription]);
 
   
 

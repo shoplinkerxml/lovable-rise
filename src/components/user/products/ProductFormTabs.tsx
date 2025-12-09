@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,12 +98,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const [currencies, setCurrencies] = useState<any[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
 
-  useEffect(() => {
-    loadInitialData();
-    if (product) {
-      loadProductData();
-    }
-  }, [product]);
+  
 
   // При входе на страницу пытаться подчистить любые незакрытые временные загрузки
   useEffect(() => {
@@ -166,7 +161,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     };
   }, []);
 
-  const loadProductData = async () => {
+  const loadProductData = useCallback(async () => {
     if (!product) return;
     
     try {
@@ -243,9 +238,9 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       console.error('Load product data error:', error);
       toast.error('Помилка завантаження даних товару');
     }
-  };
+  }, [product]);
 
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       // Загружаем магазины
       const storesData = await ShopService.getShopsAggregated();
@@ -270,7 +265,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       console.error('Load initial data error:', error);
       toast.error('Помилка завантаження початкових даних');
     }
-  };
+  }, [formData.store_id]);
 
   const addParam = () => {
     setParams([...params, { 
@@ -405,7 +400,41 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         is_main: i === 0 && updatedImages.length > 0
       }));
       setImages(reorderedImages);
-      toast.success(t('image_deleted_successfully'));
+      const pid = product?.id ? String(product.id) : '';
+      if (pid) {
+        try {
+          await ProductService.updateProduct(pid, { images: reorderedImages });
+          try {
+            const list = await ProductService.getProductImages(pid);
+            const normalizeImageUrl = (u: string): string => {
+              const s = String(u || '');
+              if (!s) return s;
+              return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
+            };
+            const resolved = await Promise.all((list || []).map(async (img, index2) => {
+              const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+              const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+              const previewUrl = normalizeImageUrl(img.url || '');
+              const base = R2Storage.getR2PublicBaseUrl();
+              const absolutePreview = base ? `${base}/${(objectKeyFixed || objectKeyRaw || previewUrl).replace(/^\/+/, '')}` : previewUrl;
+              return {
+                id: img.id,
+                url: absolutePreview,
+                alt_text: img.alt_text || '',
+                order_index: typeof img.order_index === 'number' ? img.order_index : index2,
+                is_main: !!img.is_main,
+                object_key: objectKeyFixed || undefined,
+              } as ProductImage;
+            }));
+            setImages(resolved);
+          } catch {}
+          toast.success(t('image_deleted_successfully'));
+        } catch (e) {
+          toast.error(t('operation_failed'));
+        }
+      } else {
+        toast.success(t('image_deleted_successfully'));
+      }
     } catch (error) {
       console.error('Failed to delete image from R2:', error);
       toast.error(t('failed_delete_image'));
@@ -500,6 +529,13 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   useEffect(() => {
     R2Storage.cleanupPendingUploads().catch(() => {});
   }, [product]);
+
+  useEffect(() => {
+    loadInitialData();
+    if (product) {
+      loadProductData();
+    }
+  }, [product, loadInitialData, loadProductData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -903,7 +939,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                 {t('product_images')}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 px-2 sm:px-3">
               {/* Додавання зображень */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-4">

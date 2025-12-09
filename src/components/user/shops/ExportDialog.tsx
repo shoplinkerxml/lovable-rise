@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
   const [loading, setLoading] = useState(false);
   
 
-  const loadLinks = async () => {
+  const loadLinks = useCallback(async () => {
     try {
       setLoading(true);
       const data = await ExportService.listForStore(storeId);
@@ -33,13 +33,13 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId]);
 
   useEffect(() => {
     if (open) {
       loadLinks();
     }
-  }, [open]);
+  }, [open, loadLinks]);
 
   // Loading indicator is handled via Spinner; no fake progress increments
 

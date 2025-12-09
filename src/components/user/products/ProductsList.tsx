@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,11 +40,9 @@ export const ProductsList = ({
     product: null
   });
 
-  useEffect(() => {
-    loadProducts();
-  }, [refreshTrigger]);
+  
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
       const data = await ProductService.getProducts();
@@ -56,7 +54,11 @@ export const ProductsList = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [onProductsLoaded, t]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [refreshTrigger, loadProducts]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.product) return;

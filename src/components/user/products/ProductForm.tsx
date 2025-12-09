@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,16 +75,11 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
   const [newImageUrl, setNewImageUrl] = useState('');
   const [categoryInput, setCategoryInput] = useState('');
 
-  useEffect(() => {
-    loadInitialData();
-    if (product) {
-      loadProductData();
-    }
-  }, [product]);
+  
 
   // Debug logging (removed stores logging)
 
-  const loadProductData = async () => {
+  const loadProductData = useCallback(async () => {
     if (!product) return;
     
     try {
@@ -140,7 +135,14 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       console.error('Load product data error:', error);
       toast.error('Помилка завантаження даних товару');
     }
-  };
+  }, [product]);
+
+  useEffect(() => {
+    loadInitialData();
+    if (product) {
+      loadProductData();
+    }
+  }, [product, loadProductData]);
 
   const loadInitialData = async () => {
     try {

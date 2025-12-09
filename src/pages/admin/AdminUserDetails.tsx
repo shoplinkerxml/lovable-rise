@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
@@ -78,12 +78,8 @@ const AdminUserDetails = () => {
     label: user?.name || '...',
     current: true
   }];
-  useEffect(() => {
-    if (id) {
-      loadUserData();
-    }
-  }, [id]);
-  const loadUserData = async () => {
+  
+  const loadUserData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -210,7 +206,13 @@ const AdminUserDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadUserData();
+    }
+  }, [id, loadUserData]);
   
   // Handle tariff activation
   const handleActivateTariff = async (tariffId: number) => {

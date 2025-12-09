@@ -76,13 +76,13 @@ export function ImageSection(props: Props) {
   }
   return (
     <div className="relative space-y-3 md:space-y-4">
-      <div className="mx-auto w-full max-w-[31.25rem] space-y-3 md:space-y-4">
+      <div className="mx-auto w-full space-y-3 md:space-y-4" style={{ maxWidth: `calc(${props.getMainAdaptiveImageStyle().width} + 2rem)` }}>
       {props.images.length > 0 && (
         <div className="relative flex justify-center w-full">
-          <Card className="relative group border border-border overflow-hidden">
-            <CardContent className="p-2 sm:p-3 md:p-4">
+          <Card className="relative group overflow-hidden border-0 shadow-none">
+            <CardContent className="p-0">
               <div
-                className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer p-2 sm:p-3 md:p-4"
+                className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer p-0"
                 style={props.getMainAdaptiveImageStyle()}
               >
                 {(() => {
@@ -150,11 +150,11 @@ export function ImageSection(props: Props) {
       {props.images.length > 0 && (
           <div className="relative w-full">
             <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
-              <CarouselContent className="-ml-2">
+              <CarouselContent className="-ml-2 mr-2">
                 {props.images.map((image, index) => (
                   <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
                   <Card
-                    className={`relative group cursor-pointer transition-all ${props.activeIndex === index ? 'border border-emerald-500' : 'border border-border'}`}
+                    className={`relative group cursor-pointer transition-all border-0 shadow-none`}
                     onClick={() => props.onSelectIndex(index)}
                     data-testid={`productFormTabs_imageCard_${index}`}
                   >
@@ -167,11 +167,11 @@ export function ImageSection(props: Props) {
                           if (!src) return null
                           if (isVid) {
                             return (
-                              <video src={src} className="w-full h-full object-cover" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+                              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
                             )
                           }
                           return (
-                            <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-cover" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
+                            <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
                           )
                         })()}
                       </div>

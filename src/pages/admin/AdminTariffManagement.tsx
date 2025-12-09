@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,32 +43,7 @@ const AdminTariffManagement = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tariffToDelete, setTariffToDelete] = useState<Tariff | null>(null);
 
-  useEffect(() => {
-    // Check if we should refresh data
-    const shouldRefresh = new URLSearchParams(location.search).get('refresh') === 'true';
-    
-    if (shouldRefresh) {
-      // Clear cache and fetch fresh data
-      TariffCache.clear();
-      fetchTariffs(false);
-      // Remove the refresh parameter from URL
-      navigate(location.pathname, { replace: true });
-    } else {
-      // Use cache if available
-      fetchTariffs(true);
-    }
-    
-    fetchCurrencies();
-    
-    // Set up periodic refresh
-    const interval = setInterval(() => {
-      if (!loading && document.visibilityState === 'visible') {
-        refreshTariffsInBackground();
-      }
-    }, 30000); // Refresh every 30 seconds when tab is active
-    
-    return () => clearInterval(interval);
-  }, [location.search]);
+  
 
   // Handle initial loading flag once data arrives
   useEffect(() => {
@@ -77,7 +52,18 @@ const AdminTariffManagement = () => {
     }
   }, [loading, isInitialLoad]);
 
-  const fetchTariffs = async (useCache = true) => {
+  const refreshTariffsInBackground = useCallback(async () => {
+    try {
+      const tariffData = await TariffService.getAllTariffs(true, true);
+      setTariffs(tariffData);
+      // Update cache
+      TariffCache.set(tariffData);
+    } catch (error) {
+      console.error('Error refreshing tariffs in background:', error);
+    }
+  }, []);
+
+  const fetchTariffs = useCallback(async (useCache = true) => {
     try {
       // Check if we have valid cached data
       if (useCache) {
@@ -102,20 +88,11 @@ const AdminTariffManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [refreshTariffsInBackground]);
 
-  const refreshTariffsInBackground = async () => {
-    try {
-      const tariffData = await TariffService.getAllTariffs(true, true);
-      setTariffs(tariffData);
-      // Update cache
-      TariffCache.set(tariffData);
-    } catch (error) {
-      console.error('Error refreshing tariffs in background:', error);
-    }
-  };
+  
 
-  const fetchCurrencies = async () => {
+  const fetchCurrencies = useCallback(async () => {
     try {
       const currencyData = await TariffService.getAllCurrencies();
       setCurrencies(currencyData);
@@ -123,7 +100,29 @@ const AdminTariffManagement = () => {
       console.error('Error fetching currencies:', error);
       toast.error('Failed to load currencies');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const shouldRefresh = new URLSearchParams(location.search).get('refresh') === 'true';
+    
+    if (shouldRefresh) {
+      TariffCache.clear();
+      fetchTariffs(false);
+      navigate(location.pathname, { replace: true });
+    } else {
+      fetchTariffs(true);
+    }
+    
+    fetchCurrencies();
+    
+    const interval = setInterval(() => {
+      if (!loading && document.visibilityState === 'visible') {
+        refreshTariffsInBackground();
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [location.search, fetchTariffs, loading, navigate, fetchCurrencies, location.pathname, refreshTariffsInBackground]);
 
   const handleDelete = async (tariff: Tariff) => {
     setTariffToDelete(tariff);

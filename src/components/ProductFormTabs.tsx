@@ -1156,10 +1156,6 @@ export function ProductFormTabs({
     } catch { void 0 }
   };
   const removeImage = async (index: number) => {
-    if (images.length <= 1) {
-      toast.error(t('failed_delete_image'));
-      return;
-    }
     const target = images[index];
     // Попробуем удалить файл из R2, если можем извлечь objectKey из URL
     try {
@@ -1187,6 +1183,17 @@ export function ProductFormTabs({
     }
     setImages(reorderedImages);
     imagesRef.current = reorderedImages;
+
+    const pid = String((product as unknown as { id?: string }).id || '');
+    if (pid) {
+      try {
+        await ProductService.updateProduct(pid, { images: reorderedImages });
+        await reloadImagesFromDb();
+        toast.success(t('image_deleted_successfully'));
+      } catch (e) {
+        toast.error(t('operation_failed'));
+      }
+    }
 
     // Обновляем активный индекс при необходимости
     if (activeImageIndex >= reorderedImages.length) {
@@ -1316,13 +1323,13 @@ export function ProductFormTabs({
               <div className="flex flex-col lg:flex-row lg:flex-nowrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
                 {/* Карусель фото — фиксированная левая колонка */}
                 <div className="shrink-0 space-y-4 relative px-4 sm:px-6" data-testid="productFormTabs_photoContainer" ref={photoBlockRef} onDoubleClick={resetPhotoBlockToDefaultSize}>
-                  <div className="mx-auto w-full space-y-3 md:space-y-4 px-4 sm:px-6" style={{ maxWidth: getAdaptiveImageStyle().width }}>
+                  <div className="mx-auto w-full space-y-3 md:space-y-4 px-4 sm:px-6" style={{ maxWidth: `calc(${getAdaptiveImageStyle().width} + 2rem)` }}>
                     {images.length > 0 ? <div className="space-y-4">
                         {/* Main image display */}
                         <div className="relative flex justify-center">
-                          <Card className="relative group border border-border overflow-hidden">
-                            <CardContent className="p-2 sm:p-3 md:p-4">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer max-w-full p-2 sm:p-3 md:p-4" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
+                          <Card className="relative group overflow-hidden border-0 shadow-none">
+                            <CardContent className="p-0">
+                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer max-w-full p-0" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
                                 {(() => {
                                   const original = images[activeImageIndex]?.url || '';
                                   const isVid = isVideoUrl(original);
@@ -1380,10 +1387,10 @@ export function ProductFormTabs({
                         {/* Thumbnail navigation — внутри общего контейнера, совпадает по левому/правому краям */}
                         <div className="relative w-full">
                           <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
-                            <CarouselContent className="-ml-2">
+                            <CarouselContent className="-ml-2 mr-2">
                               {images.map((image, index) => (
                                 <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLargeScreen ? 5 : 4}rem` }}>
-                                  <Card className={`relative group cursor-pointer transition-all ${activeImageIndex === index ? 'border border-emerald-500' : 'border border-border'}`} onClick={() => setActiveImageIndex(index)}>
+                                  <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => setActiveImageIndex(index)}>
                                     <CardContent className="p-2">
                                       <div className={`aspect-square relative overflow-hidden rounded-md bg-white`}>
                                         {(() => {

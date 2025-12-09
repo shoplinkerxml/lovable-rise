@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,19 +99,7 @@ const AdminTariffEdit = () => {
     popular: false,
     sort_order: 0
   });
-  useEffect(() => {
-    // Fetch currencies and check permissions on component mount
-    fetchCurrencies();
-    fetchAvailableLimits();
-    checkUserPermissions();
-    // Fetch tariff name for breadcrumb if we have an ID
-    if (id) {
-      fetchTariffData(parseInt(id));
-    } else {
-      // For new tariff, set loading to false immediately
-      setIsInitialLoading(false);
-    }
-  }, [id]);
+  
   const checkUserPermissions = async () => {
     try {
       console.log('Checking user permissions...');
@@ -145,7 +133,7 @@ const AdminTariffEdit = () => {
     }
   };
 
-  const fetchAvailableLimits = async () => {
+  const fetchAvailableLimits = useCallback(async () => {
     try {
       const limitsData = await LimitService.getLimits();
       setAvailableLimits(limitsData);
@@ -153,7 +141,7 @@ const AdminTariffEdit = () => {
       console.error('Error loading available limits:', error);
       toast.error(t('failed_load_limits') || 'Failed to load available limits');
     }
-  };
+  }, [t]);
   const validateForm = (): boolean => {
     const errors: {
       [key: string]: string;
@@ -193,7 +181,7 @@ const AdminTariffEdit = () => {
   };
 
   // Load existing tariff data for editing using TariffService.getTariffById as per memory spec
-  const fetchTariffData = async (tariffId: number) => {
+  const fetchTariffData = useCallback(async (tariffId: number) => {
     try {
       setLoading(true);
       setIsInitialLoading(true);
@@ -254,7 +242,7 @@ const AdminTariffEdit = () => {
       setLoading(false);
       setIsInitialLoading(false);
     }
-  };
+  }, [t]);
   // Fetch only tariff name for breadcrumb
   const fetchTariffName = async (tariffId: number) => {
     try {
@@ -284,7 +272,7 @@ const AdminTariffEdit = () => {
 
   // When editing existing tariff, load its data. When creating new, start with empty form
 
-  const fetchCurrencies = async () => {
+  const fetchCurrencies = useCallback(async () => {
     try {
       const currencyData = await TariffService.getAllCurrencies();
       setCurrencies(currencyData);
@@ -292,7 +280,18 @@ const AdminTariffEdit = () => {
       console.error('Error fetching currencies:', error);
       toast.error(t('failed_load_currencies'));
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    fetchCurrencies();
+    fetchAvailableLimits();
+    checkUserPermissions();
+    if (id) {
+      fetchTariffData(parseInt(id));
+    } else {
+      setIsInitialLoading(false);
+    }
+  }, [id, fetchCurrencies, fetchAvailableLimits, fetchTariffData]);
   const handleInputChange = (field: keyof TariffFormData, value: string | number | boolean | null) => {
     setFormData(prev => {
       const newData = {

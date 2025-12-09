@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,12 +67,9 @@ const AdminTariffNew = () => {
     sort_order: 0
   });
 
-  useEffect(() => {
-    fetchCurrencies();
-    fetchAvailableLimits();
-  }, []);
+  
 
-  const fetchCurrencies = async () => {
+  const fetchCurrencies = useCallback(async () => {
     try {
       setIsInitialLoading(true);
       const currencyData = await TariffService.getAllCurrencies();
@@ -83,9 +80,9 @@ const AdminTariffNew = () => {
     } finally {
       setIsInitialLoading(false);
     }
-  };
+  }, [t]);
 
-  const fetchAvailableLimits = async () => {
+  const fetchAvailableLimits = useCallback(async () => {
     try {
       const limitsData = await LimitService.getLimits();
       setAvailableLimits(limitsData);
@@ -93,7 +90,12 @@ const AdminTariffNew = () => {
       console.error('Error loading available limits:', error);
       toast.error(t('failed_load_limits') || 'Failed to load available limits');
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    fetchCurrencies();
+    fetchAvailableLimits();
+  }, [fetchCurrencies, fetchAvailableLimits]);
 
   const handleInputChange = (field: keyof TariffFormData, value: string | number | boolean | null) => {
     setFormData(prev => {
