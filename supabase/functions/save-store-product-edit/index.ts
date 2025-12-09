@@ -166,8 +166,8 @@ async function buildFinalImageUrl(img: ImageInput, productId: string, datePath: 
 }
 
 async function handleImages(productId: string, images: ImageInput[] | undefined): Promise<void> {
-  // Функция воспринимает images как полный список состояния
-  if (!Array.isArray(images) || images.length === 0) {
+  if (!Array.isArray(images)) return
+  if (images.length === 0) {
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }

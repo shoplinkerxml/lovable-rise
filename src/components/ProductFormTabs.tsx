@@ -17,7 +17,7 @@ import ImageSection from './ProductFormTabs/ImageSection';
 import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, ChevronDown, Check, MoreHorizontal, Pencil, Trash, Trash2, Globe, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { type Product } from '@/lib/product-service';
+import { ProductService, type Product } from '@/lib/product-service';
 import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
@@ -783,7 +783,20 @@ export function ProductFormTabs({
         const normalizeImageUrl = (u: string): string => {
           const s = String(u || '');
           if (!s) return s;
-          return s.replace(/\.web(\?|#|$)/, '.webp$1');
+          return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
+        };
+        const ensureAbsoluteUrl = async (previewUrl: string, objectKeyRaw?: string | null): Promise<string> => {
+          const url = String(previewUrl || '');
+          if (/^https?:\/\//i.test(url)) return url;
+          const key = String(objectKeyRaw || url || '').replace(/^\/+/, '');
+          const base = R2Storage.getR2PublicBaseUrl();
+          if (base) return `${base}/${key}`;
+          try {
+            const view = await R2Storage.getViewUrl(key);
+            return String(view || url);
+          } catch {
+            return url;
+          }
         };
         const resolved = await Promise.all(imagesData.map(async (img) => {
           const row = img as unknown as { r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null };
@@ -807,14 +820,16 @@ export function ProductFormTabs({
           previewUrl = normalizeImageUrl(previewUrl);
           if (thumbUrl) thumbUrl = normalizeImageUrl(thumbUrl);
           const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+          const absolutePreview = await ensureAbsoluteUrl(previewUrl, objectKeyFixed || objectKeyRaw);
+          const absoluteThumb = thumbUrl ? await ensureAbsoluteUrl(thumbUrl, thumbKey || objectKeyFixed || objectKeyRaw) : undefined;
           return {
             id: img.id,
-            url: previewUrl,
+            url: absolutePreview,
             alt_text: img.alt_text || '',
             order_index: img.order_index,
             is_main: img.is_main,
             object_key: objectKeyFixed || undefined,
-            thumb_url: thumbUrl || undefined,
+            thumb_url: absoluteThumb || undefined,
           } as ProductImage;
         }));
         setImages(resolved);
@@ -1034,6 +1049,7 @@ export function ProductFormTabs({
       setImages(nextImages);
       imagesRef.current = nextImages;
       toast.success(t('image_uploaded_successfully'));
+      await reloadImagesFromDb();
       
     } catch (error) {
       console.error('Ошибка загрузки изображения в R2:', error);
@@ -1060,6 +1076,50 @@ export function ProductFormTabs({
     const file = event.target.files?.[0];
     if (!file) return;
     await uploadFileDirect(file);
+  };
+  const reloadImagesFromDb = async () => {
+    try {
+      if (!product) return;
+      const list = await ProductService.getProductImages(String((product as unknown as { id?: string }).id || ''));
+      const normalizeImageUrl = (u: string): string => {
+        const s = String(u || '');
+        if (!s) return s;
+        return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
+      };
+      const ensureAbsoluteUrl = async (previewUrl: string, objectKeyRaw?: string | null): Promise<string> => {
+        const url = String(previewUrl || '');
+        if (/^https?:\/\//i.test(url)) return url;
+        const key = String(objectKeyRaw || url || '').replace(/^\/+/, '');
+        const base = R2Storage.getR2PublicBaseUrl();
+        if (base) return `${base}/${key}`;
+        try {
+          const view = await R2Storage.getViewUrl(key);
+          return String(view || url);
+        } catch {
+          return url;
+        }
+      };
+      const resolved = await Promise.all((list || []).map(async (img, index) => {
+        const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+        const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+        const previewUrl = normalizeImageUrl(img.url || '');
+        const thumbUrlRaw = (img as unknown as { thumb_url?: string }).thumb_url;
+        const thumbUrl = thumbUrlRaw ? normalizeImageUrl(thumbUrlRaw) : undefined;
+        const absolutePreview = await ensureAbsoluteUrl(previewUrl, objectKeyFixed || objectKeyRaw);
+        const absoluteThumb = thumbUrl ? await ensureAbsoluteUrl(thumbUrl, objectKeyFixed || objectKeyRaw) : undefined;
+        return {
+          id: img.id,
+          url: absolutePreview,
+          alt_text: img.alt_text || '',
+          order_index: typeof img.order_index === 'number' ? img.order_index : index,
+          is_main: !!img.is_main,
+          object_key: objectKeyFixed || undefined,
+          thumb_url: absoluteThumb || undefined,
+        } as ProductImage;
+      }));
+      setImages(resolved);
+      imagesRef.current = resolved;
+    } catch { void 0 }
   };
   const removeImage = async (index: number) => {
     const target = images[index];

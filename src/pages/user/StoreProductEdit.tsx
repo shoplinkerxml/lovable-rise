@@ -205,6 +205,14 @@ export const StoreProductEdit = () => {
       }
 
       await ProductService.saveStoreProductEdit(pid, storeId, { ...productPayload, linkPatch: patch });
+      // Обновим значения на клиенте для списка товаров магазина
+      ProductService.patchProductCaches(pid, {
+        price: patch.custom_price,
+        price_old: patch.custom_price_old,
+        price_promo: patch.custom_price_promo,
+        stock_quantity: patch.custom_stock_quantity ?? undefined,
+        available: patch.custom_available,
+      }, storeId);
       if (productPayload.category_id != null) {
         const num = Number(productPayload.category_id);
         const storeExtId = String(patch.custom_category_id || "") || null;

@@ -4,8 +4,11 @@ export function getImageUrl(originalUrl: string | null | undefined, width?: numb
   const raw = originalUrl || ''
   if (raw === '' || raw === '#processing' || raw === '#failed') return ''
   const isAbsolute = /^https?:\/\//i.test(raw)
-  const resolved = isAbsolute ? raw : R2Storage.makePublicUrl(raw)
+  let resolved = isAbsolute ? raw : R2Storage.makePublicUrl(raw)
+  // Если воркер не подключен, а URL указывает на превью (thumb/card), отдаём оригинал
+  resolved = resolved.replace(/\/(thumb|card)\.webp(\?|#|$)/i, '/original.webp$2')
   const worker = R2Storage.getWorkerUrl()
+  if (/supabase\.co\/functions\/v1\//i.test(resolved)) return resolved
   if (!worker || !width) return resolved
   const w = Math.max(1, Math.floor(Number(width)))
   const key = R2Storage.extractObjectKeyFromUrl(resolved) || resolved.replace(/^https?:\/\/[^/]+\/?/, '')

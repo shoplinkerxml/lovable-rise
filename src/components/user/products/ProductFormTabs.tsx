@@ -223,17 +223,13 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         if (productImagesRaw) {
           const rows = (productImagesRaw || []) as StoreProductImageRow[];
           const resolved = await Promise.all(rows.map(async (img) => {
-            const originalFull = img.r2_key_original
-              ? R2Storage.makePublicUrl(String(img.r2_key_original))
-              : (typeof img.url === 'string' && /^https?:\/\//.test(img.url)
-                  ? String(img.url)
+            const originalFull = (typeof img.url === 'string' && /^https?:\/\//.test(img.url))
+              ? String(img.url)
+              : (img.r2_key_original
+                  ? R2Storage.makePublicUrl(String(img.r2_key_original))
                   : (img.url
                       ? R2Storage.makePublicUrl(String(img.url))
-                      : (img.r2_key_card
-                          ? R2Storage.makePublicUrl(String(img.r2_key_card))
-                          : (img.r2_key_thumb
-                              ? R2Storage.makePublicUrl(String(img.r2_key_thumb))
-                              : ''))));
+                      : ''));
             const objectKey = originalFull ? (R2Storage.extractObjectKeyFromUrl(originalFull) || undefined) : undefined;
             const objectKeyFixed = objectKey ? String(objectKey).replace(/\.web$/, '.webp') : undefined;
             return {

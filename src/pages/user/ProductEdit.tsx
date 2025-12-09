@@ -126,7 +126,8 @@ export const ProductEdit = () => {
         images: (images || []).map((img, index: number) => ({
           url: img.url,
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
-          is_main: !!img.is_main
+          is_main: !!img.is_main,
+          object_key: img.object_key
         }))
       });
       try {
