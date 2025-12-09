@@ -1320,9 +1320,9 @@ export function ProductFormTabs({
                     {images.length > 0 ? <div className="space-y-4">
                         {/* Main image display */}
                         <div className="relative flex justify-center">
-                          <Card className="relative group border border-border">
+                          <Card className="relative group border border-border overflow-hidden">
                             <CardContent className="p-2 sm:p-3 md:p-4">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
+                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer max-w-full" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
                                 {(() => {
                                   const original = images[activeImageIndex]?.url || '';
                                   const isVid = isVideoUrl(original);
@@ -1361,10 +1361,10 @@ export function ProductFormTabs({
                             
                             {/* Navigation arrows for main image */}
                             {images.length > 1 && <>
-                                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={goToPrevious} data-testid="productFormTabs_prevButton">
+                                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" onClick={goToPrevious} data-testid="productFormTabs_prevButton">
                                   <ChevronLeft className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={goToNext} data-testid="productFormTabs_nextButton">
+                                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" onClick={goToNext} data-testid="productFormTabs_nextButton">
                                   <ChevronRight className="h-4 w-4" />
                                 </Button>
                               </>}

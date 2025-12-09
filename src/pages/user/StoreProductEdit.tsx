@@ -245,11 +245,14 @@ export const StoreProductEdit = () => {
           <div className="text-lg">{t("edit_product")}</div>
           <Link
             to={`/user/shops/${storeId}/products`}
-            className="text-muted-foreground inline-flex items-center gap-1.5"
+            className="text-muted-foreground inline-flex items-center gap-1.5 group hover:bg-transparent active:bg-transparent"
             data-testid="store_product_edit_back"
             aria-label={t("back_to_products")}
           >
-            <ArrowLeft className="h-4 w-4 text-foreground hover:text-emerald-600" />
+            <span className="inline sm:hidden">{t("back_to_products")}</span>
+            <span className="inline-flex items-center justify-center rounded-full bg-transparent border border-border text-foreground w-8 h-8 transition-colors group-hover:border-emerald-500 group-hover:text-emerald-600 group-active:scale-95 group-active:shadow-inner">
+              <ArrowLeft className="h-4 w-4" />
+            </span>
           </Link>
         </div>
         <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="product-edit" />} delay={100}>

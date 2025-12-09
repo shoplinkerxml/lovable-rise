@@ -79,7 +79,7 @@ export function ImageSection(props: Props) {
       <div className="mx-auto w-full max-w-[31.25rem] space-y-3 md:space-y-4">
       {props.images.length > 0 && (
         <div className="relative flex justify-center w-full">
-          <Card className="relative group border border-border">
+          <Card className="relative group border border-border overflow-hidden">
             <CardContent className="p-2 sm:p-3 md:p-4">
               <div
                 className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer"
@@ -136,10 +136,10 @@ export function ImageSection(props: Props) {
             </CardContent>
             {props.images.length > 1 && (
               <>
-                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={props.onPrev}>
+                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" onClick={props.onPrev}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={props.onNext}>
+                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" onClick={props.onNext}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </>

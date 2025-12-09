@@ -107,9 +107,11 @@ export const Shops = () => {
               </>
             )}
             {viewMode !== 'list' && (
-              <Button variant="ghost" onClick={handleBackToList}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                {t('back_to_shops')}
+              <Button variant="ghost" onClick={handleBackToList} className="group inline-flex items-center gap-2 hover:bg-transparent focus-visible:bg-transparent active:bg-transparent">
+                <span className="inline sm:hidden">{t('back_to_shops')}</span>
+                <span className="inline-flex items-center justify-center rounded-full bg-transparent border border-border text-foreground w-8 h-8 transition-colors group-hover:border-emerald-500 group-hover:text-emerald-600 group-active:scale-95 group-active:shadow-inner">
+                  <ArrowLeft className="h-4 w-4" />
+                </span>
               </Button>
             )}
           </div>
