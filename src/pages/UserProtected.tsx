@@ -217,20 +217,6 @@ const UserProtected = () => {
 
   return (
     <div className="min-h-screen">
-      {prefetchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="w-[420px] rounded-lg border-0 bg-background p-6 shadow-lg">
-            <div className="space-y-3">
-              <div className="font-medium">Завантажуємо кабінет</div>
-              <div className="text-sm text-muted-foreground">Будь ласка, зачекайте. Йде підготовка даних.</div>
-              <div className="mt-2 h-2 w-full rounded bg-muted">
-                <div className="h-2 rounded bg-primary transition-all" style={{ width: `${prefetchProgress}%` }} />
-              </div>
-              <div className="text-xs text-muted-foreground">{prefetchProgress}%</div>
-            </div>
-          </div>
-        </div>
-      )}
       <Outlet context={{ hasAccess, user, uiUserProfile, subscription, tariffLimits, refresh }} />
     </div>
   );

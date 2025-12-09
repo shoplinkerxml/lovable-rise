@@ -67,22 +67,90 @@ export const ShopsList = ({
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
     }
   }, [refreshTrigger, queryClient]);
+  const refetchDebounceRef = useRef<number | null>(null);
   useEffect(() => {
-    let debounceTimer: number | null = null;
-    const scheduleInvalidate = () => {
-      if (debounceTimer != null) window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-        debounceTimer = null;
-      }, 150);
+    const mutateCounts = (storeId: string, deltaProducts: number, deltaCategories?: number) => {
+      try {
+        queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+          const arr = Array.isArray(prev) ? prev : [];
+          return arr.map((s) => {
+            if (String(s.id) !== String(storeId)) return s;
+            const nextProducts = Math.max(0, (s.productsCount ?? 0) + (deltaProducts || 0));
+            const nextCategoriesRaw = Math.max(0, (s.categoriesCount ?? 0) + (deltaCategories || 0));
+            const nextCategories = nextProducts === 0 ? 0 : nextCategoriesRaw;
+            return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopWithMarketplace;
+          });
+        });
+        if (refetchDebounceRef.current != null) window.clearTimeout(refetchDebounceRef.current);
+        refetchDebounceRef.current = window.setTimeout(() => {
+          queryClient.refetchQueries({ queryKey: ['shopsList'], exact: false });
+          refetchDebounceRef.current = null;
+        }, 750);
+      } catch { /* ignore */ }
     };
 
     const ch = (supabase as SupabaseClient)
       .channel('shops_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores' }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_product_links' }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_products' }, scheduleInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_store_categories' }, scheduleInvalidate)
+      // Stores table → invalidate for structural changes
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+      })
+      // Product links → adjust productsCount fast and guard categories when 0
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'store_product_links' }, (payload: any) => {
+        const row = payload?.new || {};
+        const active = row?.is_active !== false;
+        const sid = row?.store_id ? String(row.store_id) : '';
+        if (sid && active) mutateCounts(sid, +1, 0);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'store_product_links' }, (payload: any) => {
+        const row = payload?.old || {};
+        const active = row?.is_active !== false;
+        const sid = row?.store_id ? String(row.store_id) : '';
+        if (sid && active) mutateCounts(sid, -1, 0);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'store_product_links' }, (payload: any) => {
+        const oldRow = payload?.old || {};
+        const newRow = payload?.new || {};
+        const sidOld = oldRow?.store_id ? String(oldRow.store_id) : '';
+        const sidNew = newRow?.store_id ? String(newRow.store_id) : '';
+        const wasActive = oldRow?.is_active !== false;
+        const isActive = newRow?.is_active !== false;
+        if (sidOld && sidNew && sidOld !== sidNew) {
+          if (wasActive) mutateCounts(sidOld, -1, 0);
+          if (isActive) mutateCounts(sidNew, +1, 0);
+        } else if (sidNew) {
+          if (wasActive && !isActive) mutateCounts(sidNew, -1, 0);
+          if (!wasActive && isActive) mutateCounts(sidNew, +1, 0);
+        }
+      })
+      // Store categories → adjust categoriesCount fast
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'store_store_categories' }, (payload: any) => {
+        const row = payload?.new || {};
+        const active = row?.is_active !== false;
+        const sid = row?.store_id ? String(row.store_id) : '';
+        if (sid && active) mutateCounts(sid, 0, +1);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'store_store_categories' }, (payload: any) => {
+        const row = payload?.old || {};
+        const active = row?.is_active !== false;
+        const sid = row?.store_id ? String(row.store_id) : '';
+        if (sid && active) mutateCounts(sid, 0, -1);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'store_store_categories' }, (payload: any) => {
+        const oldRow = payload?.old || {};
+        const newRow = payload?.new || {};
+        const sidOld = oldRow?.store_id ? String(oldRow.store_id) : '';
+        const sidNew = newRow?.store_id ? String(newRow.store_id) : '';
+        const wasActive = oldRow?.is_active !== false;
+        const isActive = newRow?.is_active !== false;
+        if (sidOld && sidNew && sidOld !== sidNew) {
+          if (wasActive) mutateCounts(sidOld, 0, -1);
+          if (isActive) mutateCounts(sidNew, 0, +1);
+        } else if (sidNew) {
+          if (wasActive && !isActive) mutateCounts(sidNew, 0, -1);
+          if (!wasActive && isActive) mutateCounts(sidNew, 0, +1);
+        }
+      })
       .subscribe();
     return () => { try { (supabase as SupabaseClient).removeChannel(ch); } catch { void 0; } };
   }, [queryClient]);
