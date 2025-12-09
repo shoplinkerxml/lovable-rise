@@ -39,7 +39,6 @@ interface ProductImage {
   alt_text?: string;
   is_main?: boolean;
   object_key?: string;
-  thumb_url?: string;
 }
 
 // Тип строки из store_product_images с R2-ключами
@@ -50,8 +49,6 @@ type StoreProductImageRow = {
   order_index: number;
   is_main?: boolean;
   alt_text?: string | null;
-  r2_key_card?: string | null;
-  r2_key_thumb?: string | null;
   r2_key_original?: string | null;
 }
 
@@ -348,16 +345,15 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     }
     try {
       setLoading(true);
-      const res = await R2Storage.uploadViaWorkerFromUrl(pid, newImageUrl.trim());
-      const previewKey = res.originalKey || res.cardKey || res.thumbKey || '';
-      const previewUrlFull = res.publicCardUrl || res.publicThumbUrl || '';
+      const res = await R2Storage.uploadProductImageFromUrl(pid, newImageUrl.trim());
+      const previewKey = res.r2KeyOriginal || '';
+      const previewUrlFull = res.originalUrl || '';
       const urlForRender = previewKey || previewUrlFull;
       const newImage: ProductImage = {
         url: urlForRender,
         order_index: images.length,
         is_main: images.length === 0,
         object_key: previewKey || undefined,
-        thumb_url: res.publicThumbUrl || undefined,
       };
       setImages([...images, newImage]);
       setNewImageUrl('');
@@ -418,13 +414,12 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       setLoading(true);
       
       const pid = product ? String(product.id) : ''
-      const result = await R2Storage.uploadViaWorkerFromFile(pid, file)
+      const result = await R2Storage.uploadProductImage(pid, file)
       const newImage = {
-        url: result.publicCardUrl,
+        url: result.originalUrl,
         order_index: images.length,
         is_main: images.length === 0,
-        object_key: result.cardKey,
-        thumb_url: result.publicThumbUrl,
+        object_key: result.r2KeyOriginal,
       } as ProductImage
       setImages([...images, newImage]);
       toast.success(t('image_uploaded_successfully'));

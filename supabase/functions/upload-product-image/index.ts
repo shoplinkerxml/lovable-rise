@@ -333,7 +333,11 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           image_id: imageId,
+          // единый URL для всех вариантов, т.к. используем одно фото
           url: originalUrl,
+          original_url: originalUrl,
+          card_url: originalUrl,
+          thumb_url: originalUrl,
           is_main: isFirstImage,
           order_index: nextOrder,
         }),

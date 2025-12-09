@@ -272,18 +272,13 @@ export class ProductService {
     if (ids.length) {
       const { data: imgData } = await supabase
         .from('store_product_images')
-        .select('product_id,r2_key_original,r2_key_card,r2_key_thumb,card_url,thumb_url,url,is_main,order_index')
+        .select('product_id,r2_key_original,url,is_main,order_index')
         .in('product_id', ids);
       images = ((imgData || []) as any[]).map((r) => {
         const key = String(((r as any).r2_key_original || ''))
-        const cardKey = String(((r as any).r2_key_card || ''))
-        const directCard = String(((r as any).card_url || ''))
         const direct = String(((r as any).url || ''))
-        let u = directCard || direct
-        if (!u) {
-          const preferKey = cardKey || key
-          u = preferKey ? R2Storage.makePublicUrl(preferKey) : ''
-        }
+        let u = direct
+        if (!u) { u = key ? R2Storage.makePublicUrl(key) : '' }
         return {
           product_id: String((r as any).product_id),
           url: u,
@@ -424,18 +419,13 @@ export class ProductService {
     if (ids.length) {
       const { data: imgData } = await supabase
         .from('store_product_images')
-        .select('product_id,r2_key_original,r2_key_card,r2_key_thumb,card_url,thumb_url,url,is_main,order_index')
+        .select('product_id,r2_key_original,url,is_main,order_index')
         .in('product_id', ids);
       images = ((imgData || []) as any[]).map((r) => {
         const key = String(((r as any).r2_key_original || ''))
-        const cardKey = String(((r as any).r2_key_card || ''))
-        const directCard = String(((r as any).card_url || ''))
         const direct = String(((r as any).url || ''))
-        let u = directCard || direct
-        if (!u) {
-          const preferKey = cardKey || key
-          u = preferKey ? R2Storage.makePublicUrl(preferKey) : ''
-        }
+        let u = direct
+        if (!u) { u = key ? R2Storage.makePublicUrl(key) : '' }
         return {
           product_id: String((r as any).product_id),
           url: u,

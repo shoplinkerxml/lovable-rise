@@ -10,11 +10,7 @@ export type UploadResponse = {
 export type UploadProductImageResult = {
   imageId: string;
   originalUrl: string;
-  cardUrl: string;
-  thumbUrl: string;
   r2KeyOriginal: string;
-  r2KeyCard: string;
-  r2KeyThumb: string;
   isMain: boolean;
   orderIndex: number;
 };
@@ -22,12 +18,9 @@ export type UploadProductImageResult = {
 type UploadProductImageResponse = {
   success?: boolean;
   image_id?: number;
+  url?: string;
   original_url?: string;
-  card_url?: string;
-  thumb_url?: string;
   r2_key_original?: string;
-  r2_key_card?: string;
-  r2_key_thumb?: string;
   is_main?: boolean;
   order_index?: number;
 };
@@ -244,14 +237,11 @@ export const R2Storage = {
     if (error) throw parseEdgeError(error, 'upload_failed');
     
     const json = data as UploadProductImageResponse;
+    const singleUrl = json.url || json.original_url || '';
     return {
       imageId: String(json.image_id || ''),
-      originalUrl: json.original_url || '',
-      cardUrl: json.card_url || '',
-      thumbUrl: json.thumb_url || '',
+      originalUrl: singleUrl,
       r2KeyOriginal: json.r2_key_original || '',
-      r2KeyCard: json.r2_key_card || '',
-      r2KeyThumb: json.r2_key_thumb || '',
       isMain: json.is_main || false,
       orderIndex: json.order_index || 0,
     };
@@ -272,43 +262,17 @@ export const R2Storage = {
     if (error) throw parseEdgeError(error, 'upload_failed');
     
     const json = data as UploadProductImageResponse;
+    const singleUrl = json.url || json.original_url || '';
     return {
       imageId: String(json.image_id || ''),
-      originalUrl: json.original_url || '',
-      cardUrl: json.card_url || '',
-      thumbUrl: json.thumb_url || '',
+      originalUrl: singleUrl,
       r2KeyOriginal: json.r2_key_original || '',
-      r2KeyCard: json.r2_key_card || '',
-      r2KeyThumb: json.r2_key_thumb || '',
       isMain: json.is_main || false,
       orderIndex: json.order_index || 0,
     };
   },
 
-  // Legacy methods for backwards compatibility
-  async uploadViaWorkerFromUrl(productId: string, url: string): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }> {
-    const result = await R2Storage.uploadProductImageFromUrl(productId, url);
-    return {
-      imageId: result.imageId,
-      originalKey: result.r2KeyOriginal,
-      cardKey: result.r2KeyCard,
-      thumbKey: result.r2KeyThumb,
-      publicCardUrl: result.cardUrl,
-      publicThumbUrl: result.thumbUrl,
-    };
-  },
-
-  async uploadViaWorkerFromFile(productId: string, file: File): Promise<{ imageId: string; originalKey: string; cardKey: string; thumbKey: string; publicCardUrl: string; publicThumbUrl: string }> {
-    const result = await R2Storage.uploadProductImage(productId, file);
-    return {
-      imageId: result.imageId,
-      originalKey: result.r2KeyOriginal,
-      cardKey: result.r2KeyCard,
-      thumbKey: result.r2KeyThumb,
-      publicCardUrl: result.cardUrl,
-      publicThumbUrl: result.thumbUrl,
-    };
-  },
+  
 
   async cleanupPendingUploads(): Promise<void> {
     const { data: { session } } = await supabase.auth.getSession();

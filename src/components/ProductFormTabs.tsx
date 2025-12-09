@@ -57,7 +57,6 @@ interface ProductImage {
   order_index: number;
   is_main: boolean;
   object_key?: string;
-  thumb_url?: string;
 }
 // Shallow lookup types to avoid deep Supabase generics
 type SupplierOption = {
@@ -799,29 +798,17 @@ export function ProductFormTabs({
           }
         };
         const resolved = await Promise.all(imagesData.map(async (img) => {
-          const row = img as unknown as { r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null };
-          const cardKey = row.r2_key_card || undefined;
-          const thumbKey = row.r2_key_thumb || undefined;
+          const row = img as unknown as { r2_key_original?: string | null };
           const origKey = row.r2_key_original || undefined;
           let previewUrl: string = img.url;
-          let thumbUrl: string | undefined = (img as unknown as { thumb_url?: string }).thumb_url;
           let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          if (!previewUrl && cardKey) {
-            previewUrl = R2Storage.makePublicUrl(cardKey);
-            objectKeyRaw = cardKey;
-          }
-          if (!previewUrl && !cardKey && origKey) {
+          if (!previewUrl && origKey) {
             previewUrl = R2Storage.makePublicUrl(origKey);
             objectKeyRaw = origKey;
           }
-          if (!thumbUrl && thumbKey) {
-            thumbUrl = R2Storage.makePublicUrl(thumbKey);
-          }
           previewUrl = normalizeImageUrl(previewUrl);
-          if (thumbUrl) thumbUrl = normalizeImageUrl(thumbUrl);
           const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
           const absolutePreview = await ensureAbsoluteUrl(previewUrl, objectKeyFixed || objectKeyRaw);
-          const absoluteThumb = thumbUrl ? await ensureAbsoluteUrl(thumbUrl, thumbKey || objectKeyFixed || objectKeyRaw) : undefined;
           return {
             id: img.id,
             url: absolutePreview,
@@ -829,7 +816,6 @@ export function ProductFormTabs({
             order_index: img.order_index,
             is_main: img.is_main,
             object_key: objectKeyFixed || undefined,
-            thumb_url: absoluteThumb || undefined,
           } as ProductImage;
         }));
         setImages(resolved);
@@ -952,8 +938,8 @@ export function ProductFormTabs({
     (async () => {
       setUploadingImage(true);
       try {
-        const res = await R2Storage.uploadViaWorkerFromUrl(String((product as unknown as { id?: string }).id || ''), imageUrl.trim());
-        const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey, thumb_url: res.publicThumbUrl };
+        const res = await R2Storage.uploadProductImageFromUrl(String((product as unknown as { id?: string }).id || ''), imageUrl.trim());
+        const newImage: ProductImage = { url: res.originalUrl, order_index: images.length, is_main: images.length === 0, object_key: res.r2KeyOriginal };
         const nextImages = [...images, newImage];
         setImages(nextImages);
         imagesRef.current = nextImages;
@@ -1043,8 +1029,8 @@ export function ProductFormTabs({
     setUploadingImage(true);
     try {
       if (!product) { toast.error(t('failed_load_product_data')); return; }
-      const res = await R2Storage.uploadViaWorkerFromFile(String((product as unknown as { id?: string }).id || ''), file);
-      const newImage: ProductImage = { url: res.publicCardUrl, order_index: images.length, is_main: images.length === 0, object_key: res.cardKey, thumb_url: res.publicThumbUrl };
+      const res = await R2Storage.uploadProductImage(String((product as unknown as { id?: string }).id || ''), file);
+      const newImage: ProductImage = { url: res.originalUrl, order_index: images.length, is_main: images.length === 0, object_key: res.r2KeyOriginal };
       const nextImages = [...images, newImage];
       setImages(nextImages);
       imagesRef.current = nextImages;
@@ -1103,10 +1089,7 @@ export function ProductFormTabs({
         const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
         const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
         const previewUrl = normalizeImageUrl(img.url || '');
-        const thumbUrlRaw = (img as unknown as { thumb_url?: string }).thumb_url;
-        const thumbUrl = thumbUrlRaw ? normalizeImageUrl(thumbUrlRaw) : undefined;
         const absolutePreview = await ensureAbsoluteUrl(previewUrl, objectKeyFixed || objectKeyRaw);
-        const absoluteThumb = thumbUrl ? await ensureAbsoluteUrl(thumbUrl, objectKeyFixed || objectKeyRaw) : undefined;
         return {
           id: img.id,
           url: absolutePreview,
@@ -1114,7 +1097,6 @@ export function ProductFormTabs({
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: !!img.is_main,
           object_key: objectKeyFixed || undefined,
-          thumb_url: absoluteThumb || undefined,
         } as ProductImage;
       }));
       setImages(resolved);

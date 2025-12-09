@@ -31,7 +31,6 @@ interface ProductImage {
   order_index: number;
   alt_text?: string;
   is_main?: boolean;
-  thumb_url?: string;
 }
 
 export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) => {
@@ -127,10 +126,9 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         .eq('product_id', product.id)
         .order('order_index');
       setImages((imagesData || []).map((img: any) => {
-        const cardUrl = img.card_url || ''
         const directUrl = img.url || ''
         const origKey = img.r2_key_original || ''
-        const url = cardUrl || directUrl || (origKey ? R2Storage.makePublicUrl(origKey) : '')
+        const url = directUrl || (origKey ? R2Storage.makePublicUrl(origKey) : '')
         return {
           url,
           order_index: img.order_index,
@@ -236,12 +234,10 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       try {
         setLoading(true);
         const result = await R2Storage.uploadProductImageFromUrl(product.id, newImageUrl.trim());
-        
         setImages([...images, { 
-          url: result.cardUrl,
+          url: result.originalUrl,
           order_index: result.orderIndex,
           is_main: result.isMain,
-          thumb_url: result.thumbUrl,
         }]);
         setNewImageUrl('');
         toast.success('Зображення завантажено');
@@ -294,12 +290,10 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       // Если редактируем существующий товар - загружаем напрямую в R2 с ресайзом
       if (product?.id) {
         const result = await R2Storage.uploadProductImage(product.id, file);
-        
         setImages([...images, {
-          url: result.cardUrl,
+          url: result.originalUrl,
           order_index: result.orderIndex,
           is_main: result.isMain,
-          thumb_url: result.thumbUrl,
         }]);
         
         toast.success('Зображення завантажено');

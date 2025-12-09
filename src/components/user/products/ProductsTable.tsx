@@ -161,7 +161,7 @@ export const ProductsTable = ({
     requestedOffsets.current.clear();
     try {
       const initialFetchSize = Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize);
-      const { products, page } = await ProductService.getProductsFirstPage(storeId ?? null, initialFetchSize);
+      const { products, page } = await ProductService.getProductsFirstPage(storeId ?? null, initialFetchSize, { bypassCache: true });
       setItems(products as ProductRow[]);
       setPageInfo(page);
       onProductsLoadedRef.current?.(page?.total ?? products.length);

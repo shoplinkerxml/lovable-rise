@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js"
-import { S3Client, CopyObjectCommand } from "npm:@aws-sdk/client-s3"
+import { S3Client } from "npm:@aws-sdk/client-s3"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,15 +37,8 @@ const decodeJwtSub = (authHeader: string | null) => {
 function extractObjectKeyFromUrl(url: string): string | null {
   try {
     const u = new URL(url)
-    const pathname = (u.pathname || "/").replace(/^\/+/, "")
-    if (!pathname) return null
-    const idxProducts = pathname.indexOf("products/")
-    const idxUploads = pathname.indexOf("uploads/")
-    if (idxProducts >= 0) return pathname.slice(idxProducts)
-    if (idxUploads >= 0) return pathname.slice(idxUploads)
-    const parts = pathname.split("/").filter(Boolean)
-    if (parts.length <= 1) return parts[0] || null
-    return parts.slice(1).join("/")
+    const path = (u.pathname || "/").replace(/^\/+/, "")
+    return path || null
   } catch {
     return null
   }
@@ -91,6 +84,9 @@ type Body = {
   params?: ParamInput[]
 }
 
+const MAX_IMAGES = 20
+const MAX_PARAMS = 50
+
 // ENV и клиенты один раз
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -128,70 +124,37 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
 
-const s3 =
-  accountId && bucket && accessKeyId && secretAccessKey
-    ? new S3Client({
-        region: "auto",
-        endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-        credentials: { accessKeyId, secretAccessKey },
-      })
-    : null
+//
 
-function buildDatePath() {
-  const now = new Date()
-  const yyyy = now.getUTCFullYear()
-  const mm = String(now.getUTCMonth() + 1).padStart(2, "0")
-  const dd = String(now.getUTCDate()).padStart(2, "0")
-  return `${yyyy}/${mm}/${dd}`
-}
-
-async function toPreferredUrl(img: ImageInput): Promise<{ url: string; r2_card?: string; r2_thumb?: string; r2_original?: string }> {
+async function toPreferredUrl(img: ImageInput): Promise<{ url: string; r2_original?: string }> {
   const srcKey = (img.key && String(img.key)) || (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url!) : null)
-  const k = srcKey ? String(srcKey) : ""
-  let cardKey = ""
-  let thumbKey = ""
-  let originalKey = ""
-  if (k) {
-    if (k.endsWith("/card.webp")) {
-      cardKey = k
-      thumbKey = k.replace("/card.webp", "/thumb.webp")
-      originalKey = k.replace("/card.webp", "/original.webp")
-    } else if (k.endsWith("/thumb.webp")) {
-      thumbKey = k
-      cardKey = k.replace("/thumb.webp", "/card.webp")
-      originalKey = k.replace("/thumb.webp", "/original.webp")
-    } else if (k.endsWith("/original.webp")) {
-      originalKey = k
-      cardKey = k.replace("/original.webp", "/card.webp")
-      thumbKey = k.replace("/original.webp", "/thumb.webp")
-    }
+  if (!srcKey) {
+    return { url: String(img.url || "").trim() }
   }
   const base = IMAGE_BASE_URL || ""
-  const preferred = base && cardKey ? `${base}/${cardKey}` : String(img.url || "").trim()
-  return { url: preferred, r2_card: cardKey || undefined, r2_thumb: thumbKey || undefined, r2_original: originalKey || undefined }
+  const url = base ? `${base}/${srcKey}` : String(img.url || "").trim()
+  return { url, r2_original: srcKey }
 }
 
 async function handleImages(
   productId: string,
   images: ImageInput[] | undefined,
 ): Promise<void> {
-  console.log(`[handleImages] productId=${productId}, images count=${images?.length ?? 0}`)
-  
-  if (!Array.isArray(images) || images.length === 0) {
-    console.log(`[handleImages] No images provided, deleting all for product`)
+  if (!Array.isArray(images)) {
+    return
+  }
+  if (images.length === 0) {
     await supabase.from("store_product_images").delete().eq("product_id", productId)
     return
   }
 
   let hasMain = images.some((i) => i.is_main === true)
   let assigned = false
-  const normalized: Array<{ product_id: string; url: string; is_main: boolean; order_index: number; r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null }> = []
+  const normalized: Array<{ product_id: string; url: string; is_main: boolean; order_index: number; r2_key_original?: string | null }> = []
 
   for (let index = 0; index < images.length; index++) {
     const raw = images[index]
-    console.log(`[handleImages] Processing image ${index}:`, JSON.stringify(raw))
     const preferred = await toPreferredUrl(raw)
-    console.log(`[handleImages] Preferred result:`, JSON.stringify(preferred))
     let isMain = raw.is_main === true && !assigned
     if (hasMain) {
       if (raw.is_main === true && !assigned) assigned = true
@@ -201,11 +164,9 @@ async function handleImages(
     }
     const oi = typeof raw.order_index === "number" ? raw.order_index : index
     if (preferred.url && preferred.url.trim() !== "") {
-      normalized.push({ product_id: productId, url: preferred.url, is_main: isMain, order_index: oi, r2_key_card: preferred.r2_card ?? null, r2_key_thumb: preferred.r2_thumb ?? null, r2_key_original: preferred.r2_original ?? null })
+      normalized.push({ product_id: productId, url: preferred.url, is_main: isMain, order_index: oi, r2_key_original: preferred.r2_original ?? null })
     }
   }
-
-  console.log(`[handleImages] Normalized count: ${normalized.length}`)
 
   const mainIdx = normalized.findIndex((i) => i.is_main === true)
   const ordered = (() => {
@@ -216,8 +177,6 @@ async function handleImages(
     }
     return arr.map((i, idx) => ({ ...i, order_index: idx }))
   })()
-
-  console.log(`[handleImages] Ordered images to insert:`, JSON.stringify(ordered))
 
   // Delete existing images first
   const { error: deleteErr } = await supabase.from("store_product_images").delete().eq("product_id", productId)
@@ -231,7 +190,6 @@ async function handleImages(
       console.error(`[handleImages] Insert error:`, insertErr)
       throw new Error(`Failed to insert images: ${insertErr.message}`)
     }
-    console.log(`[handleImages] Inserted images:`, JSON.stringify(insertData))
   }
 }
 
@@ -298,9 +256,23 @@ serve(async (req) => {
       )
     }
 
+    if (Array.isArray(body.images) && body.images.length > MAX_IMAGES) {
+      return new Response(
+        JSON.stringify({ error: "too_many_images", max: MAX_IMAGES }),
+        { status: 400, headers: jsonHeaders },
+      )
+    }
+    if (Array.isArray(body.params) && body.params.length > MAX_PARAMS) {
+      return new Response(
+        JSON.stringify({ error: "too_many_params", max: MAX_PARAMS }),
+        { status: 400, headers: jsonHeaders },
+      )
+    }
+
+
     const { data: productRow } = await supabase
       .from("store_products")
-      .select("id,store_id,category_id,category_external_id")
+      .select("id,store_id,category_id,category_external_id,user_stores!inner(id,user_id,is_active)")
       .eq("id", productId)
       .maybeSingle()
 
@@ -312,21 +284,16 @@ serve(async (req) => {
     }
 
     const storeId = String((productRow as { store_id: string }).store_id)
-
-    const { data: storeRow } = await supabase
-      .from("user_stores")
-      .select("id,user_id,is_active")
-      .eq("id", storeId)
-      .maybeSingle()
-
-    if (!storeRow || String(storeRow.user_id) !== String(userId)) {
+    const userStoreRaw: any = (productRow as any).user_stores
+    const userStore = Array.isArray(userStoreRaw) ? (userStoreRaw[0] || null) : userStoreRaw
+    if (!userStore || String(userStore.user_id) !== String(userId)) {
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403,
         headers: jsonHeaders,
       })
     }
 
-    const isActive = (storeRow as { is_active?: boolean }).is_active
+    const isActive = (userStore as { is_active?: boolean }).is_active
     if (isActive === false) {
       return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403,

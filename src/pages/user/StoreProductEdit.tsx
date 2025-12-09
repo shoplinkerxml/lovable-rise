@@ -60,7 +60,7 @@ export const StoreProductEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [baseProduct, setBaseProduct] = useState<Product | null>(null);
-  type FormImage = { id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string; thumb_url?: string };
+  type FormImage = { id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string };
   const [images, setImages] = useState<FormImage[]>([]);
   const [params, setParams] = useState<ProductParam[]>([]);
   const [imagesLoading, setImagesLoading] = useState<boolean>(false);

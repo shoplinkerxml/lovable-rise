@@ -4,6 +4,7 @@ import type { Table as TanTable } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
+import { R2Storage } from "@/lib/r2-storage";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { SortToggle } from "./SortToggle";
@@ -138,7 +139,6 @@ export function createColumns({
       size: 56,
       cell: ({ row }) => {
         const product = row.original;
-        const img = product.mainImageUrl;
         const initials = (product.name || product.name_ua || "?")
           .split(" ")
           .map((n) => n[0])
@@ -149,22 +149,42 @@ export function createColumns({
         const sizeCls = hasStores
           ? "h-[clamp(2.25rem,4vw,3rem)] w-[clamp(2.25rem,4vw,3rem)]"
           : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
+        const RawThumb: React.FC<{ p: ProductRow }> = ({ p }) => {
+          const base = p.mainImageUrl || '';
+          const initialUrl = base ? getImageUrl(base, IMAGE_SIZES.THUMB) : '';
+          const [src, setSrc] = React.useState<string>(initialUrl);
+          React.useEffect(() => {
+            const isAbs = /^https?:\/\//i.test(initialUrl);
+            if (isAbs && initialUrl) { setSrc(initialUrl); return; }
+            const key = base ? (R2Storage.extractObjectKeyFromUrl(base) || base) : '';
+            if (!key) { setSrc(''); return; }
+            let cancelled = false;
+            (async () => {
+              try {
+                const view = await R2Storage.getViewUrl(key, 900);
+                if (!cancelled && view) setSrc(view);
+              } catch { /* ignore */ }
+            })();
+            return () => { cancelled = true; };
+          }, [base, initialUrl]);
+          return (
+            <Avatar className={`${sizeCls} rounded-md cursor-pointer`}>
+              <AvatarImage
+                src={src}
+                alt={p.name_ua || p.name || ''}
+                onError={(e) => {
+                  const el = e.target as HTMLImageElement;
+                  if (base) el.src = base;
+                }}
+              />
+              <AvatarFallback className="bg-primary/10 text-primary rounded-md">{initials}</AvatarFallback>
+            </Avatar>
+          );
+        };
         return (
           <div className="flex items-center justify-start" data-testid="user_products_photo">
             <button type="button" className="inline-flex" onClick={() => onEdit?.(product)} aria-label={t("edit")} title={t("edit")}>
-              <Avatar className={`${sizeCls} rounded-md cursor-pointer`}>
-                <AvatarImage
-                  src={img ? getImageUrl(img, IMAGE_SIZES.THUMB) : ''}
-                  alt={product.name_ua || product.name || ''}
-                  onError={(e) => {
-                    const el = e.target as HTMLImageElement;
-                    if (img) {
-                      el.src = img;
-                    }
-                  }}
-                />
-                <AvatarFallback className="bg-primary/10 text-primary rounded-md">{initials}</AvatarFallback>
-              </Avatar>
+              <RawThumb p={product} />
             </button>
           </div>
         );

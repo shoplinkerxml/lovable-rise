@@ -16,7 +16,6 @@ export type ProductImage = {
   order_index: number
   is_main: boolean
   object_key?: string
-  thumb_url?: string
 }
 
 type Props = {

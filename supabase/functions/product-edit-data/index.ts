@@ -56,8 +56,6 @@ type ProductImage = {
   url: string
   order_index: number
   is_main: boolean
-  r2_key_card?: string | null
-  r2_key_thumb?: string | null
   r2_key_original?: string | null
 }
 
@@ -261,7 +259,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const imagesPromise = supabase
       .from('store_product_images')
-      .select('id,product_id,url,order_index,is_main,r2_key_card,r2_key_thumb,r2_key_original')
+      .select('id,product_id,url,order_index,is_main,r2_key_original')
       .eq('product_id', productId)
       .order('order_index')
 
@@ -315,7 +313,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (imageRowsResolved.length === 0 && storeId) {
       const alt = await supabase
         .from('store_product_links')
-        .select('images:store_product_images(id,product_id,url,order_index,is_main,r2_key_card,r2_key_thumb,r2_key_original)')
+        .select('images:store_product_images(id,product_id,url,order_index,is_main,r2_key_original)')
         .eq('product_id', productId)
         .eq('store_id', storeId)
         .maybeSingle()
@@ -388,28 +386,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
     const imageBase = resolvePublicBase()
 
-    const images: (ProductImage & { images?: { original: string | null; card: string | null; thumb: string | null } })[] = (imageRowsResolved as any[]).map(
+    const images: (ProductImage & { images?: { original: string | null } })[] = (imageRowsResolved as any[]).map(
       (img, index) => {
         const r2o = img.r2_key_original ? String(img.r2_key_original) : ''
-        const r2c = img.r2_key_card ? String(img.r2_key_card) : ''
-        const r2t = img.r2_key_thumb ? String(img.r2_key_thumb) : ''
         const originalUrl = r2o && imageBase ? `${imageBase}/${r2o}` : null
-        const cardUrl = r2c && imageBase ? `${imageBase}/${r2c}` : null
-        const thumbUrl = r2t && imageBase ? `${imageBase}/${r2t}` : null
         const fallbackUrl = String(img.url || '')
-        const finalCard = cardUrl || (thumbUrl ? thumbUrl : (fallbackUrl || null))
-        const finalThumb = thumbUrl || (cardUrl ? cardUrl : (fallbackUrl || null))
         return {
           id: img.id != null ? String(img.id) : undefined,
           product_id: img.product_id != null ? String(img.product_id) : productId,
-          url: finalCard || fallbackUrl,
+          url: originalUrl || fallbackUrl,
           order_index: typeof img.order_index === 'number' ? img.order_index : index,
           is_main: img.is_main === true,
-          r2_key_card: r2c || null,
-          r2_key_thumb: r2t || null,
           r2_key_original: r2o || null,
-          thumb_url: finalThumb || null,
-          images: { original: originalUrl, card: finalCard, thumb: finalThumb },
+          images: { original: originalUrl },
         }
       },
     )
