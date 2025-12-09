@@ -239,22 +239,21 @@ export const StoreProductEdit = () => {
           { label: t("products_title"), href: `/user/shops/${storeId}/products` },
           { label: categoryName || "—", current: true },
         ]}
-      />
-      <Card className="p-6 space-y-6">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-lg">{t("edit_product")}</div>
+        actions={
           <Link
             to={`/user/shops/${storeId}/products`}
-            className="text-muted-foreground inline-flex items-center gap-1.5 group hover:bg-transparent active:bg-transparent"
+            className="text-muted-foreground inline-flex items-center p-0 group hover:bg-transparent active:bg-transparent"
             data-testid="store_product_edit_back"
             aria-label={t("back_to_products")}
+            title={t("back_to_products")}
           >
-            <span className="inline sm:hidden">{t("back_to_products")}</span>
-            <span className="inline-flex items-center justify-center rounded-full bg-transparent border border-border text-foreground w-8 h-8 transition-colors group-hover:border-emerald-500 group-hover:text-emerald-600 group-active:scale-95 group-active:shadow-inner">
+            <span className="inline-flex items-center justify-center rounded-full bg-transparent border border-border text-foreground w-7 h-7 transition-colors group-hover:border-emerald-500 group-hover:text-emerald-600 group-active:scale-95 group-active:shadow-inner">
               <ArrowLeft className="h-4 w-4" />
             </span>
           </Link>
-        </div>
+        }
+      />
+      <Card className="p-6 space-y-6">
         <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="product-edit" />} delay={100}>
           <div className="space-y-6">
             {baseProduct ? (

@@ -22,19 +22,18 @@ export function PageHeader({
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbItems} />
       
-      {/* Title and Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl xs:text-3xl sm:text-3xl md:text-4xl font-bold tracking-tight">{title}</h1>
-          {description && (
-            <p className="text-sm xs:text-base sm:text-muted-foreground">{description}</p>
+      {/* Title row with inline actions, description below */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl xs:text-3xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">{title}</h1>
+          {actions && (
+            <div className="flex items-center gap-2 shrink-0">
+              {actions}
+            </div>
           )}
         </div>
-        
-        {actions && (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {actions}
-          </div>
+        {description && (
+          <p className="text-sm xs:text-base sm:text-muted-foreground">{description}</p>
         )}
       </div>
     </div>

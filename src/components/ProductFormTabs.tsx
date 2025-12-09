@@ -473,9 +473,9 @@ export function ProductFormTabs({
     const minRem = Math.max(baseRem * 0.5, 12);
     let sizeRem = Math.max(baseRem * photoBlockScale, minRem);
     if (typeof window !== 'undefined') {
-      const containerPx = photoBlockRef.current?.clientWidth ?? window.innerWidth;
-      const padPx = Math.max(8, Math.min(16, containerPx * 0.02));
-      const vwRem = (containerPx - padPx) / 16;
+      const envWidthPx = window.innerWidth;
+      const padPx = Math.max(8, Math.min(16, envWidthPx * 0.02));
+      const vwRem = (envWidthPx - padPx) / 16;
       if (vwRem > 0) sizeRem = Math.min(sizeRem, vwRem);
     }
     return { width: `${sizeRem}rem`, height: `${sizeRem}rem` };
@@ -1325,7 +1325,7 @@ export function ProductFormTabs({
               <div className="flex flex-col lg:flex-row lg:flex-nowrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
                 {/* Карусель фото — фиксированная левая колонка */}
                 <div className="shrink-0 space-y-4 relative px-4 sm:px-6" data-testid="productFormTabs_photoContainer" ref={photoBlockRef} onDoubleClick={resetPhotoBlockToDefaultSize}>
-                  <div className="mx-auto w-full space-y-3 md:space-y-4 px-4 sm:px-6" style={{ maxWidth: `calc(${getAdaptiveImageStyle().width} + clamp(0.5rem, 2vw, 1rem))` }}>
+                  <div className="mx-auto w-full space-y-3 md:space-y-4" style={{ maxWidth: `calc(${getAdaptiveImageStyle().width} + clamp(0.5rem, 2vw, 1rem))` }}>
                     {images.length > 0 ? <div className="space-y-4">
                         {/* Main image display */}
                         <div className="relative flex justify-center">
