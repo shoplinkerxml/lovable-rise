@@ -1285,6 +1285,47 @@ export class ProductService {
     if (!productId) throw new Error("create_failed");
     const product = await this.getProductById(productId);
     if (!product) throw new Error("create_failed");
+
+    const origImages = (productData.images || []).map((img, index) => {
+      const input = img as ImageInput;
+      return {
+        object_key: input.object_key || undefined,
+        url: input.url,
+        order_index: typeof input.order_index === "number" ? input.order_index : index,
+        is_main: !!input.is_main,
+      };
+    });
+    const processed = await Promise.all(
+      origImages.map(async (i) => {
+        const key = i.object_key || undefined;
+        const u = String(i.url || "").trim();
+        if (key) {
+          return { object_key: key, url: u, order_index: i.order_index, is_main: i.is_main };
+        }
+        if (!u) {
+          return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
+        }
+        if (/^(https?:\/\/|data:)/i.test(u)) {
+          try {
+            const res = await R2Storage.uploadProductImageFromUrl(String(productId), u);
+            const nextKey = res.r2KeyOriginal || undefined;
+            const nextUrl = res.originalUrl || u;
+            return { object_key: nextKey, url: nextUrl, order_index: i.order_index, is_main: i.is_main };
+          } catch {
+            return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
+          }
+        }
+        return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
+      })
+    );
+    const needUpdate = processed.some((p, idx) => {
+      const oi = origImages[idx];
+      const changedKey = !!(p as { object_key?: string }).object_key && !oi.object_key;
+      return changedKey;
+    });
+    if (needUpdate) {
+      await ProductService.updateProduct(String(productId), { images: processed as unknown as ProductImage[] });
+    }
     removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();

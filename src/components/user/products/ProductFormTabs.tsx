@@ -357,6 +357,30 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       };
       setImages([...images, newImage]);
       setNewImageUrl('');
+      try {
+        const list = await ProductService.getProductImages(pid);
+        const normalizeImageUrl = (u: string): string => {
+          const s = String(u || '');
+          if (!s) return s;
+          return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
+        };
+        const resolved = await Promise.all((list || []).map(async (img, index) => {
+          const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+          const previewUrl = normalizeImageUrl(img.url || '');
+          const base = R2Storage.getR2PublicBaseUrl();
+          const absolutePreview = base ? `${base}/${(objectKeyFixed || objectKeyRaw || previewUrl).replace(/^\/+/, '')}` : previewUrl;
+          return {
+            id: img.id,
+            url: absolutePreview,
+            alt_text: img.alt_text || '',
+            order_index: typeof img.order_index === 'number' ? img.order_index : index,
+            is_main: !!img.is_main,
+            object_key: objectKeyFixed || undefined,
+          } as ProductImage;
+        }));
+        setImages(resolved);
+      } catch {}
       toast.success('Зображення додано');
     } catch (e) {
       console.error(e);
@@ -422,6 +446,30 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         object_key: result.r2KeyOriginal,
       } as ProductImage
       setImages([...images, newImage]);
+      try {
+        const list = await ProductService.getProductImages(pid);
+        const normalizeImageUrl = (u: string): string => {
+          const s = String(u || '');
+          if (!s) return s;
+          return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
+        };
+        const resolved = await Promise.all((list || []).map(async (img, index) => {
+          const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+          const previewUrl = normalizeImageUrl(img.url || '');
+          const base = R2Storage.getR2PublicBaseUrl();
+          const absolutePreview = base ? `${base}/${(objectKeyFixed || objectKeyRaw || previewUrl).replace(/^\/+/, '')}` : previewUrl;
+          return {
+            id: img.id,
+            url: absolutePreview,
+            alt_text: img.alt_text || '',
+            order_index: typeof img.order_index === 'number' ? img.order_index : index,
+            is_main: !!img.is_main,
+            object_key: objectKeyFixed || undefined,
+          } as ProductImage;
+        }));
+        setImages(resolved);
+      } catch {}
       toast.success(t('image_uploaded_successfully'));
     } catch (error) {
       console.error('Error uploading image to R2:', error);

@@ -1,13 +1,13 @@
 import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2 } from 'lucide-react'
+import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useI18n } from '@/providers/i18n-provider'
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 
 export type ProductImage = {
   id?: string
@@ -35,76 +35,158 @@ type Props = {
   onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void
   getGalleryAdaptiveImageStyle: (index: number) => React.CSSProperties
+  getMainAdaptiveImageStyle: () => React.CSSProperties
   galleryImgRefs: React.MutableRefObject<Array<HTMLImageElement | null>>
   onGalleryImageLoad: (e: React.SyntheticEvent<HTMLImageElement>, index: number) => void
   onGalleryImageError: (e: React.SyntheticEvent<HTMLImageElement>, index: number) => void
   onGalleryVideoLoaded: (e: React.SyntheticEvent<HTMLVideoElement>, index: number) => void
+  activeIndex: number
+  onSelectIndex: (index: number) => void
+  onMainImageLoad: (e: React.SyntheticEvent<HTMLImageElement>) => void
+  onMainImageError: (e: React.SyntheticEvent<HTMLImageElement>) => void
+  onMainVideoLoaded: (e: React.SyntheticEvent<HTMLVideoElement>) => void
+  onPrev: () => void
+  onNext: () => void
 }
 
 export function ImageSection(props: Props) {
   const { t } = useI18n()
+  const [isLarge, setIsLarge] = React.useState(false)
+  React.useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const h = (e: any) => setIsLarge(e.matches ?? mq.matches)
+    h(mq)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  React.useEffect(() => {
+    const el = props.galleryImgRefs.current[props.activeIndex];
+    if (el && typeof el.scrollIntoView === 'function') {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      } catch {}
+    }
+  }, [props.activeIndex]);
+  const getThumbFlexBasis = (count: number): string => {
+    if (count <= 4) return '25%'
+    if (count === 5) return '20%'
+    if (count === 6) return '16.6667%'
+    if (count === 7) return '14.2857%'
+    return '12.5%'
+  }
   return (
     <div className="relative space-y-3 md:space-y-4">
-      <div className="flex flex-wrap gap-3 md:gap-4">
-        {props.images.map((image, index) => (
-          <Card key={index} className="relative group" data-testid={`productFormTabs_imageCard_${index}`}>
-            <CardContent className="p-2">
-              <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={props.getGalleryAdaptiveImageStyle(index)}>
+      <div className="mx-auto w-full max-w-[31.25rem] space-y-3 md:space-y-4">
+      {props.images.length > 0 && (
+        <div className="relative flex justify-center w-full">
+          <Card className="relative group border border-border">
+            <CardContent className="p-2 sm:p-3 md:p-4">
+              <div
+                className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer"
+                style={props.getMainAdaptiveImageStyle()}
+              >
                 {(() => {
-                  const original = image.url
+                  const original = props.images[props.activeIndex]?.url || ''
                   const isVid = isVideoUrl(original)
-                  const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+                  const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.CARD)
                   if (!src) return null
                   if (isVid) {
                     return (
                       <video
                         src={src}
-                        className="w-full h-full object-contain"
-                        preload="metadata"
-                        onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)}
+                        className="w-full h-full object-contain select-none"
+                        controls
+                        onLoadedMetadata={props.onMainVideoLoaded}
                       />
                     )
                   }
                   return (
                     <img
-                      ref={(el) => (props.galleryImgRefs.current[index] = el)}
                       src={src}
-                      alt={image.alt_text || `Изображение ${index + 1}`}
-                      className="w-full h-full object-contain"
-                      onLoad={(e) => props.onGalleryImageLoad(e, index)}
-                      onError={(e) => props.onGalleryImageError(e, index)}
+                      alt={props.images[props.activeIndex]?.alt_text || `Фото ${props.activeIndex + 1}`}
+                      className="w-full h-full object-contain select-none"
+                      onLoad={props.onMainImageLoad}
+                      onError={(e) => {
+                        const el = e.target as HTMLImageElement
+                        if (original) el.src = original
+                        props.onMainImageError(e)
+                      }}
                     />
                   )
                 })()}
-                {props.readOnly ? null : (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+              </div>
+              {!props.readOnly && (
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                  {props.images[props.activeIndex]?.is_main ? null : (
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => props.onSetMainImage(index)}
-                      aria-label={image.is_main ? t('main_photo') : t('set_as_main_photo')}
-                      data-testid={`productFormTabs_setMainButton_${index}`}
-                      className={`rounded-md ${image.is_main ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-success text-primary-foreground hover:bg-success/90'}`}
+                      onClick={() => props.onSetMainImage(props.activeIndex)}
+                      aria-label={t('set_as_main_photo')}
+                      className="rounded-md bg-success text-primary-foreground hover:bg-success/90"
                     >
                       <Check className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="destructive" onClick={() => props.onRemoveImage(index)} data-testid={`productFormTabs_removeImageButton_${index}`}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-              {image.is_main && (
-                <Badge className="absolute top-2 left-2" variant="default">
-                  {t('main_photo')}
-                </Badge>
+                  )}
+                  <Button size="icon" variant="destructive" onClick={() => props.onRemoveImage(props.activeIndex)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
             </CardContent>
+            {props.images.length > 1 && (
+              <>
+                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={props.onPrev}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={props.onNext}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </Card>
-        ))}
+        </div>
+      )}
+      {props.images.length > 0 && (
+          <div className="relative w-full">
+            <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
+              <CarouselContent className="-ml-2">
+                {props.images.map((image, index) => (
+                  <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
+                  <Card
+                    className={`relative group cursor-pointer transition-all ${props.activeIndex === index ? 'border border-emerald-500' : 'border border-border'}`}
+                    onClick={() => props.onSelectIndex(index)}
+                    data-testid={`productFormTabs_imageCard_${index}`}
+                  >
+                    <CardContent className="p-2">
+                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white`}>
+                        {(() => {
+                          const original = image.url
+                          const isVid = isVideoUrl(original)
+                          const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+                          if (!src) return null
+                          if (isVid) {
+                            return (
+                              <video src={src} className="w-full h-full object-cover" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+                            )
+                          }
+                          return (
+                            <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-cover" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
+                          )
+                        })()}
+                      </div>
+                      {null}
+                    </CardContent>
+                  </Card>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
+        </div>
+      )}
       </div>
 
-      <Separator />
+      
 
       {props.readOnly ? null : (
         <Card className="relative group w-full" data-testid="productFormTabs_dropZone">

@@ -168,10 +168,11 @@ export function createColumns({
             return () => { cancelled = true; };
           }, [base, initialUrl]);
           return (
-            <Avatar className={`${sizeCls} rounded-md cursor-pointer`}>
+            <Avatar className={`${sizeCls} rounded-md cursor-pointer border border-border bg-white`}>
               <AvatarImage
                 src={src}
                 alt={p.name_ua || p.name || ''}
+                className="object-contain"
                 onError={(e) => {
                   const el = e.target as HTMLImageElement;
                   if (base) el.src = base;

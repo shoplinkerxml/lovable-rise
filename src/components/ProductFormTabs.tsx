@@ -319,6 +319,13 @@ export function ProductFormTabs({
   const galleryImgRefs = useRef<Array<HTMLImageElement | null>>([]);
   const [mainImageLoaded, setMainImageLoaded] = useState<boolean>(true);
   const mainImgRef = useRef<HTMLImageElement | null>(null);
+  const getThumbFlexBasis = (count: number): string => {
+    if (count <= 4) return '25%';
+    if (count === 5) return '20%';
+    if (count === 6) return '16.6667%';
+    if (count === 7) return '14.2857%';
+    return '12.5%';
+  };
   const notifyImagesLoading = (flag: boolean) => {
     setTimeout(() => onImagesLoadingChange?.(flag), 0);
   };
@@ -461,20 +468,15 @@ export function ProductFormTabs({
     }
   }, [activeTab, images]);
 
-  // Calculate adaptive container style
   const getAdaptiveImageStyle = () => {
-    // Prefer current image dimensions, fallback to square
-    const dims = imageDimensions || maxContainerSize;
-    const aspect = dims ? `${dims.width} / ${dims.height}` : '1 / 1';
-
-    // Fill the available column width, keep large height and center image
-    return {
-      width: '100%',
-      maxWidth: '100%',
-      height: 'auto',
-      maxHeight: 'clamp(28rem, 65vh, 40rem)',
-      aspectRatio: aspect
-    };
+    const baseRem = photoBlockInitialRem ?? DEFAULT_PHOTO_SIZE_REM;
+    const minRem = Math.max(baseRem * 0.5, 15.625);
+    let sizeRem = Math.max(baseRem * photoBlockScale, minRem);
+    if (typeof window !== 'undefined') {
+      const vwRem = (window.innerWidth - 32) / 16;
+      if (vwRem > 0) sizeRem = Math.min(sizeRem, vwRem);
+    }
+    return { width: `${sizeRem}rem`, height: `${sizeRem}rem` };
   };
 
   // Calculate adaptive container style for gallery images
@@ -505,6 +507,15 @@ export function ProductFormTabs({
     setImageDimensions(null);
     setGalleryImageDimensions(new Map());
   }, [activeImageIndex, images]);
+
+  useEffect(() => {
+    const el = galleryImgRefs.current[activeImageIndex];
+    if (el && typeof el.scrollIntoView === 'function') {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      } catch {}
+    }
+  }, [activeImageIndex]);
 
   // Keep a live ref of images for cleanup during navigation/unload
   useEffect(() => {
@@ -944,6 +955,7 @@ export function ProductFormTabs({
         setImages(nextImages);
         imagesRef.current = nextImages;
         setImageUrl('');
+        await reloadImagesFromDb();
         toast.success(t('image_uploaded_successfully'));
       } catch (e) { console.error(e); toast.error(t('operation_failed')); }
       finally { setUploadingImage(false); }
@@ -1012,15 +1024,55 @@ export function ProductFormTabs({
       }
     }
     if (droppedUrl) {
-      const newImage: ProductImage = {
-        url: droppedUrl,
-        order_index: images.length,
-        is_main: images.length === 0
-      };
-      const nextImages = [...images, newImage];
-      setImages(nextImages);
-      imagesRef.current = nextImages;
-      toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
+      const pid = String((product as unknown as { id?: string }).id || '');
+      if (!pid) {
+        const newImage: ProductImage = { url: droppedUrl, order_index: images.length, is_main: images.length === 0 };
+        const nextImages = [...images, newImage];
+        setImages(nextImages);
+        imagesRef.current = nextImages;
+        toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
+        return;
+      }
+      if (droppedUrl.startsWith('data:image/')) {
+        try {
+          const arr = droppedUrl.split(',');
+          const mimeMatch = /^data:(.*?);base64/.exec(arr[0] || '');
+          const mime = (mimeMatch && mimeMatch[1]) || 'image/webp';
+          const b64 = arr[1] || '';
+          const byteStr = atob(b64);
+          const len = byteStr.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) bytes[i] = byteStr.charCodeAt(i);
+          const file = new File([bytes], `dropped.${mime.includes('jpeg') ? 'jpg' : mime.includes('png') ? 'png' : 'webp'}`, { type: mime });
+          await uploadFileDirect(file);
+        } catch {
+          const newImage: ProductImage = { url: droppedUrl, order_index: images.length, is_main: images.length === 0 };
+          const nextImages = [...images, newImage];
+          setImages(nextImages);
+          imagesRef.current = nextImages;
+          toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
+        }
+        return;
+      }
+      setUploadingImage(true);
+      try {
+        const res = await R2Storage.uploadProductImageFromUrl(pid, droppedUrl);
+        const newImage: ProductImage = { url: res.originalUrl, order_index: images.length, is_main: images.length === 0, object_key: res.r2KeyOriginal };
+        const nextImages = [...images, newImage];
+        setImages(nextImages);
+        imagesRef.current = nextImages;
+        await reloadImagesFromDb();
+        toast.success(t('image_uploaded_successfully'));
+      } catch (e) {
+        console.error(e);
+        const newImage: ProductImage = { url: droppedUrl, order_index: images.length, is_main: images.length === 0 };
+        const nextImages = [...images, newImage];
+        setImages(nextImages);
+        imagesRef.current = nextImages;
+        toast.error(t('failed_upload_image'));
+      } finally {
+        setUploadingImage(false);
+      }
     } else {
       toast.error(t('invalid_image_format') || 'Неверный формат изображения');
     }
@@ -1104,6 +1156,10 @@ export function ProductFormTabs({
     } catch { void 0 }
   };
   const removeImage = async (index: number) => {
+    if (images.length <= 1) {
+      toast.error(t('failed_delete_image'));
+      return;
+    }
     const target = images[index];
     // Попробуем удалить файл из R2, если можем извлечь objectKey из URL
     try {
@@ -1121,14 +1177,24 @@ export function ProductFormTabs({
       ...img,
       order_index: i
     }));
+    if (target?.is_main && reorderedImages.length > 0) {
+      reorderedImages[0] = { ...reorderedImages[0], is_main: true };
+      for (let i = 1; i < reorderedImages.length; i++) {
+        if (reorderedImages[i].is_main) {
+          reorderedImages[i] = { ...reorderedImages[i], is_main: false };
+        }
+      }
+    }
     setImages(reorderedImages);
     imagesRef.current = reorderedImages;
 
     // Обновляем активный индекс при необходимости
-    if (activeImageIndex >= newImages.length) {
-      setActiveImageIndex(Math.max(0, newImages.length - 1));
+    if (activeImageIndex >= reorderedImages.length) {
+      setActiveImageIndex(Math.max(0, reorderedImages.length - 1));
     } else if (activeImageIndex > index) {
       setActiveImageIndex(activeImageIndex - 1);
+    } else if (activeImageIndex === index) {
+      setActiveImageIndex(Math.min(index, reorderedImages.length - 1));
     }
   };
   const setMainImage = (index: number) => {
@@ -1247,21 +1313,16 @@ export function ProductFormTabs({
             {/* Tab 1: Basic Information */}
             <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
               {/* Основной контейнер с каруселью слева и полями справа */}
-              <div className="flex flex-col lg:flex-row lg:flex-wrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
+              <div className="flex flex-col lg:flex-row lg:flex-nowrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
                 {/* Карусель фото — фиксированная левая колонка */}
-                <div className="lg:basis-[36rem] xl:basis-[40rem] shrink-0 space-y-4 mx-auto relative" data-testid="productFormTabs_photoContainer" ref={photoBlockRef} onDoubleClick={resetPhotoBlockToDefaultSize} style={photoBlockInitialRem ? {
-                flexBasis: `${photoBlockInitialRem * photoBlockScale}rem`,
-                width: `${photoBlockInitialRem * photoBlockScale}rem`,
-                // Минимум: не меньше 50% базовой ширины и не меньше 15.625rem (250px)
-                minWidth: `${Math.max(photoBlockInitialRem * 0.5, 15.625)}rem`
-              } : undefined}>
-                  <div className={`p-2 sm:p-3 rounded-lg ${images.length === 0 ? 'border' : ''} aspect-square`}>
+                <div className="shrink-0 space-y-4 relative px-4 sm:px-6" data-testid="productFormTabs_photoContainer" ref={photoBlockRef} onDoubleClick={resetPhotoBlockToDefaultSize}>
+                  <div className="mx-auto w-full space-y-3 md:space-y-4 px-4 sm:px-6" style={{ maxWidth: getAdaptiveImageStyle().width }}>
                     {images.length > 0 ? <div className="space-y-4">
                         {/* Main image display */}
                         <div className="relative flex justify-center">
-                          <Card className="relative group">
+                          <Card className="relative group border border-border">
                             <CardContent className="p-2 sm:p-3 md:p-4">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
+                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
                                 {(() => {
                                   const original = images[activeImageIndex]?.url || '';
                                   const isVid = isVideoUrl(original);
@@ -1295,17 +1356,15 @@ export function ProductFormTabs({
                                   );
                                 })()}
                               </div>
-                              {images[activeImageIndex]?.is_main && <Badge className="absolute top-2 left-2" variant="default" data-testid="productFormTabs_mainBadge">
-                                  {t('main_image')}
-                                </Badge>}
+                              
                             </CardContent>
                             
                             {/* Navigation arrows for main image */}
                             {images.length > 1 && <>
-                                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md" onClick={goToPrevious} data-testid="productFormTabs_prevButton">
+                                <Button variant="outline" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={goToPrevious} data-testid="productFormTabs_prevButton">
                                   <ChevronLeft className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md" onClick={goToNext} data-testid="productFormTabs_nextButton">
+                                <Button variant="outline" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white/90 shadow-md rounded-full" onClick={goToNext} data-testid="productFormTabs_nextButton">
                                   <ChevronRight className="h-4 w-4" />
                                 </Button>
                               </>}
@@ -1314,54 +1373,38 @@ export function ProductFormTabs({
                           </Card>
                         </div>
 
-                        {/* Thumbnail navigation */}
-                        {images.length > 1 && <div className="relative">
-                            <Carousel className="w-full">
-                              <CarouselContent className="-ml-2">
-                                {images.map((image, index) => <CarouselItem key={index} className="pl-2 basis-1/4 sm:basis-1/5 md:basis-1/6">
-                                    <Card className={`relative group cursor-pointer transition-all ${activeImageIndex === index ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-gray-300'}`} onClick={() => setActiveImageIndex(index)}>
-                                      <CardContent className="p-1">
-                                        <div className="aspect-square relative overflow-hidden rounded-md">
-                                          {(() => {
-                                            const original = image.url || '';
-                                            const isVid = isVideoUrl(original);
-                                            const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB);
-                                            if (!src) return null;
-                                            if (isVid) {
-                                              return (
-                                                <video
-                                                  src={src}
-                                                  className="w-full h-full object-cover"
-                                                  preload="metadata"
-                                                  onLoadedMetadata={(e) => handleGalleryVideoLoaded(e, index)}
-                                                />
-                                              );
-                                            }
+                        {/* Thumbnail navigation — внутри общего контейнера, совпадает по левому/правому краям */}
+                        <div className="relative w-full">
+                          <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
+                            <CarouselContent className="-ml-2">
+                              {images.map((image, index) => (
+                                <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLargeScreen ? 5 : 4}rem` }}>
+                                  <Card className={`relative group cursor-pointer transition-all ${activeImageIndex === index ? 'border border-emerald-500' : 'border border-border'}`} onClick={() => setActiveImageIndex(index)}>
+                                    <CardContent className="p-2">
+                                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white`}>
+                                        {(() => {
+                                          const original = image.url || '';
+                                          const isVid = isVideoUrl(original);
+                                          const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB);
+                                          if (!src) return null;
+                                          if (isVid) {
                                             return (
-                                              <img
-                                                src={src}
-                                                alt={image.alt_text || `Превью ${index + 1}`}
-                                                className="w-full h-full object-cover"
-                                                data-testid={`productFormTabs_thumbnail_${index}`}
-                                                onLoad={(e) => handleGalleryImageLoad(e, index)}
-                                                onError={(e) => {
-                                                  const el = e.target as HTMLImageElement;
-                                                  if (original) el.src = original;
-                                                }}
-                                              />
+                                              <video src={src} className="w-full h-full object-cover" preload="metadata" onLoadedMetadata={(e) => handleGalleryVideoLoaded(e, index)} />
                                             );
-                                          })()}
-                                          </div>
-                                        {image.is_main && <Badge className="absolute -top-1 -left-1 text-xs px-1 py-0" variant="default">
-                                            Г
-                                          </Badge>}
-                                      </CardContent>
-                                    </Card>
-                                  </CarouselItem>)}
-                              </CarouselContent>
-                            </Carousel>
-                          </div>}
-                      </div> : <div className="aspect-square flex items-center justify-center p-0 cursor-pointer" onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoPlaceholder">
+                                          }
+                                          return (
+                                            <img ref={(el) => (galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} onLoad={(e) => handleGalleryImageLoad(e, index)} onError={(e) => { const el = e.target as HTMLImageElement; if (original) el.src = original; }} />
+                                          );
+                                        })()}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </CarouselItem>
+                              ))}
+                            </CarouselContent>
+                          </Carousel>
+                        </div>
+                  </div> : <div className="aspect-square flex items-center justify-center p-0 cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoPlaceholder">
                         <ProductPlaceholder className="w-full h-full" />
                       </div>}
                   </div>
@@ -1372,9 +1415,7 @@ export function ProductFormTabs({
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
                   {/* Секция: Редактор деревa категорій — перемещено в правую колонку на место "Основні дані" */}
-                  <div className="space-y-[0.5rem] overflow-y-auto" style={{
-                  maxHeight: photoBlockHeight ? `${photoBlockHeight}px` : undefined
-                }} data-testid="productFormTabs_categoryTreeEditorSection">
+                  <div className="space-y-[0.5rem] overflow-y-auto" data-testid="productFormTabs_categoryTreeEditorSection">
                     <Collapsible defaultOpen>
                       <div className="flex items-center gap-2 h-9">
                         <h3 className="text-sm font-semibold leading-none">{t('category_editor_title')}</h3>
@@ -1757,6 +1798,14 @@ export function ProductFormTabs({
                 onGalleryImageLoad={handleGalleryImageLoad}
                 onGalleryImageError={handleGalleryImageError}
                 onGalleryVideoLoaded={handleGalleryVideoLoaded}
+                activeIndex={activeImageIndex}
+                onSelectIndex={(i) => setActiveImageIndex(i)}
+                getMainAdaptiveImageStyle={getAdaptiveImageStyle}
+                onMainImageLoad={handleImageLoad}
+                onMainImageError={handleMainImageError}
+                onMainVideoLoaded={handleMainVideoLoaded}
+                onPrev={goToPrevious}
+                onNext={goToNext}
               />
             </TabsContent>
 

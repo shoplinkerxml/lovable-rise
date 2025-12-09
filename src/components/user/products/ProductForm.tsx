@@ -248,13 +248,8 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         setLoading(false);
       }
     } else {
-      // Для нового товара - просто добавляем URL (будет обработан при сохранении)
-      setImages([...images, { 
-        url: newImageUrl.trim(), 
-        order_index: images.length,
-        is_main: images.length === 0
-      }]);
-      setNewImageUrl('');
+      toast.error('Спочатку збережіть товар, щоб додати фото за URL');
+      return;
     }
   };
 
@@ -298,16 +293,8 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         
         toast.success('Зображення завантажено');
       } else {
-        // Для нового товара - используем временную загрузку
-        const result = await R2Storage.uploadFile(file, formData.external_id);
-
-        setImages([...images, {
-          url: result.publicUrl,
-          order_index: images.length,
-          is_main: images.length === 0
-        }]);
-
-        toast.success('Зображення завантажено');
+        toast.error('Спочатку збережіть товар, щоб додати фото');
+        return;
       }
     } catch (error) {
       console.error('Upload error:', error);
