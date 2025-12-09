@@ -1380,7 +1380,7 @@ export function ProductFormTabs({
                                 </Button>
                               </>}
                             {/* Resize handle on the photo card frame */}
-                            <button type="button" aria-label="Resize photo block" className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 border border-primary/40 hover:bg-primary/30 cursor-nwse-resize hidden sm:block" onMouseDown={handlePhotoResizeStart} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="resize_handle_photo_card" />
+                            <button type="button" aria-label="Resize photo block" className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 hover:bg-primary/30 cursor-nwse-resize hidden sm:block" onMouseDown={handlePhotoResizeStart} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="resize_handle_photo_card" />
                           </Card>
                         </div>
 
@@ -1400,11 +1400,11 @@ export function ProductFormTabs({
                                           if (!src) return null;
                                           if (isVid) {
                                             return (
-                                              <video src={src} className="w-full h-full object-cover" preload="metadata" onLoadedMetadata={(e) => handleGalleryVideoLoaded(e, index)} />
+                                              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => handleGalleryVideoLoaded(e, index)} />
                                             );
                                           }
                                           return (
-                                            <img ref={(el) => (galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-cover" data-testid={`productFormTabs_thumbnail_${index}`} onLoad={(e) => handleGalleryImageLoad(e, index)} onError={(e) => { const el = e.target as HTMLImageElement; if (original) { el.src = original; const key = R2Storage.extractObjectKeyFromUrl(original); if (key) { R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view; }).catch(() => void 0); } } }} />
+                                            <img ref={(el) => (galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-contain" data-testid={`productFormTabs_thumbnail_${index}`} onLoad={(e) => handleGalleryImageLoad(e, index)} onError={(e) => { const el = e.target as HTMLImageElement; if (original) { el.src = original; const key = R2Storage.extractObjectKeyFromUrl(original); if (key) { R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view; }).catch(() => void 0); } } }} />
                                           );
                                         })()}
                                       </div>
@@ -1420,7 +1420,7 @@ export function ProductFormTabs({
                       </div>}
                   </div>
                   {/* Resize handle for entire photo block when there are no images */}
-                  {images.length === 0 && <button type="button" aria-label="Resize photo block" className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 border border-primary/40 hover:bg-primary/30 cursor-nwse-resize hidden sm:block" onMouseDown={handlePhotoResizeStart} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="resize_handle_photo_block" />}
+                  {images.length === 0 && <button type="button" aria-label="Resize photo block" className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 hover:bg-primary/30 cursor-nwse-resize hidden sm:block" onMouseDown={handlePhotoResizeStart} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="resize_handle_photo_block" />}
                 </div>
 
                 {/* Правая часть — гибкая колонка с данными */}
