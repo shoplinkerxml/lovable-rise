@@ -255,8 +255,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const loadInitialData = async () => {
     try {
       // Загружаем магазины
-      const storesData = await ShopService.getShops();
-      console.log('STORES DEBUG:', storesData);
+      const storesData = await ShopService.getShopsAggregated();
       setStores(storesData || []);
       
       if (storesData && storesData.length > 0 && !formData.store_id) {

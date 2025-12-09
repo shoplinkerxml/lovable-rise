@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { useI18n } from '@/providers/i18n-provider'
-import { getImageUrl, IMAGE_SIZES } from '@/lib/imageUtils'
+import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
 
 export type ProductImage = {
   id?: string
@@ -39,6 +39,7 @@ type Props = {
   galleryImgRefs: React.MutableRefObject<Array<HTMLImageElement | null>>
   onGalleryImageLoad: (e: React.SyntheticEvent<HTMLImageElement>, index: number) => void
   onGalleryImageError: (e: React.SyntheticEvent<HTMLImageElement>, index: number) => void
+  onGalleryVideoLoaded: (e: React.SyntheticEvent<HTMLVideoElement>, index: number) => void
 }
 
 export function ImageSection(props: Props) {
@@ -51,8 +52,21 @@ export function ImageSection(props: Props) {
             <CardContent className="p-2">
               <div className="relative overflow-hidden rounded-md flex items-center justify-center" style={props.getGalleryAdaptiveImageStyle(index)}>
                 {(() => {
-                  const src = getImageUrl(image.url, IMAGE_SIZES.THUMB)
-                  return src ? (
+                  const original = image.url
+                  const isVid = isVideoUrl(original)
+                  const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+                  if (!src) return null
+                  if (isVid) {
+                    return (
+                      <video
+                        src={src}
+                        className="w-full h-full object-contain"
+                        preload="metadata"
+                        onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)}
+                      />
+                    )
+                  }
+                  return (
                     <img
                       ref={(el) => (props.galleryImgRefs.current[index] = el)}
                       src={src}
@@ -61,7 +75,7 @@ export function ImageSection(props: Props) {
                       onLoad={(e) => props.onGalleryImageLoad(e, index)}
                       onError={(e) => props.onGalleryImageError(e, index)}
                     />
-                  ) : null
+                  )
                 })()}
                 {props.readOnly ? null : (
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">

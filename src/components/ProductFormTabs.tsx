@@ -23,7 +23,7 @@ import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
 import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
 import ParametersDataTable from '@/components/products/ParametersDataTable';
-import { getImageUrl, IMAGE_SIZES } from '@/lib/imageUtils';
+import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -378,6 +378,23 @@ export function ProductFormTabs({
     setMainImageLoaded(true);
   };
 
+  const handleMainVideoLoaded = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const vid = event.currentTarget;
+    const dimensions = { width: vid.videoWidth, height: vid.videoHeight };
+    setImageDimensions(dimensions);
+    setAllImageDimensions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(activeImageIndex, dimensions);
+      return newMap;
+    });
+    updatePhotoHeight();
+    setMainImageLoaded(true);
+  };
+
+  const handleMainVideoError = (_event: React.SyntheticEvent<HTMLVideoElement>) => {
+    setMainImageLoaded(true);
+  };
+
   // Handle gallery image load to get dimensions
   const handleGalleryImageLoad = (event: React.SyntheticEvent<HTMLImageElement>, index: number) => {
     const img = event.currentTarget;
@@ -397,6 +414,21 @@ export function ProductFormTabs({
     });
   };
   const handleGalleryImageError = (_event: React.SyntheticEvent<HTMLImageElement>, _index: number) => {
+    setGalleryLoadCount(prev => {
+      const next = prev + 1;
+      if (next >= images.length) setGalleryLoaded(true);
+      if (next >= images.length) notifyImagesLoading(false);
+      return next;
+    });
+  };
+
+  const handleGalleryVideoLoaded = (event: React.SyntheticEvent<HTMLVideoElement>, index: number) => {
+    const vid = event.currentTarget;
+    setGalleryImageDimensions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(index, { width: vid.videoWidth, height: vid.videoHeight });
+      return newMap;
+    });
     setGalleryLoadCount(prev => {
       const next = prev + 1;
       if (next >= images.length) setGalleryLoaded(true);
@@ -757,12 +789,17 @@ export function ProductFormTabs({
           const row = img as unknown as { r2_key_card?: string | null; r2_key_thumb?: string | null; r2_key_original?: string | null };
           const cardKey = row.r2_key_card || undefined;
           const thumbKey = row.r2_key_thumb || undefined;
+          const origKey = row.r2_key_original || undefined;
           let previewUrl: string = img.url;
           let thumbUrl: string | undefined = (img as unknown as { thumb_url?: string }).thumb_url;
           let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
           if (!previewUrl && cardKey) {
             previewUrl = R2Storage.makePublicUrl(cardKey);
             objectKeyRaw = cardKey;
+          }
+          if (!previewUrl && !cardKey && origKey) {
+            previewUrl = R2Storage.makePublicUrl(origKey);
+            objectKeyRaw = origKey;
           }
           if (!thumbUrl && thumbKey) {
             thumbUrl = R2Storage.makePublicUrl(thumbKey);
@@ -1185,8 +1222,21 @@ export function ProductFormTabs({
                               <div className="relative overflow-hidden rounded-md flex items-center justify-center w-full aspect-square cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
                                 {(() => {
                                   const original = images[activeImageIndex]?.url || '';
-                                  const src = getImageUrl(original, IMAGE_SIZES.CARD);
-                                  return src ? (
+                                  const isVid = isVideoUrl(original);
+                                  const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.CARD);
+                                  if (!src) return null;
+                                  if (isVid) {
+                                    return (
+                                      <video
+                                        src={src}
+                                        className="w-full h-full object-contain select-none"
+                                        controls
+                                        onLoadedMetadata={handleMainVideoLoaded}
+                                        onError={handleMainVideoError}
+                                      />
+                                    );
+                                  }
+                                  return (
                                     <img
                                       ref={mainImgRef}
                                       src={src}
@@ -1200,7 +1250,7 @@ export function ProductFormTabs({
                                         handleMainImageError(e);
                                       }}
                                     />
-                                  ) : null;
+                                  );
                                 })()}
                               </div>
                               {images[activeImageIndex]?.is_main && <Badge className="absolute top-2 left-2" variant="default" data-testid="productFormTabs_mainBadge">
@@ -1232,19 +1282,32 @@ export function ProductFormTabs({
                                         <div className="aspect-square relative overflow-hidden rounded-md">
                                           {(() => {
                                             const original = image.url || '';
-                                            const src = getImageUrl(original, IMAGE_SIZES.THUMB);
-                                            return src ? (
+                                            const isVid = isVideoUrl(original);
+                                            const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB);
+                                            if (!src) return null;
+                                            if (isVid) {
+                                              return (
+                                                <video
+                                                  src={src}
+                                                  className="w-full h-full object-cover"
+                                                  preload="metadata"
+                                                  onLoadedMetadata={(e) => handleGalleryVideoLoaded(e, index)}
+                                                />
+                                              );
+                                            }
+                                            return (
                                               <img
                                                 src={src}
                                                 alt={image.alt_text || `Превью ${index + 1}`}
                                                 className="w-full h-full object-cover"
                                                 data-testid={`productFormTabs_thumbnail_${index}`}
+                                                onLoad={(e) => handleGalleryImageLoad(e, index)}
                                                 onError={(e) => {
                                                   const el = e.target as HTMLImageElement;
                                                   if (original) el.src = original;
                                                 }}
                                               />
-                                            ) : null;
+                                            );
                                           })()}
                                           </div>
                                         {image.is_main && <Badge className="absolute -top-1 -left-1 text-xs px-1 py-0" variant="default">
@@ -1631,7 +1694,7 @@ export function ProductFormTabs({
 
             {/* Tab 2: Images */}
             <TabsContent value="images" className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
-              <ImageSection
+                <ImageSection
                 images={images}
                 readOnly={readOnly}
                 isDragOver={isDragOver}
@@ -1651,6 +1714,7 @@ export function ProductFormTabs({
                 galleryImgRefs={galleryImgRefs}
                 onGalleryImageLoad={handleGalleryImageLoad}
                 onGalleryImageError={handleGalleryImageError}
+                onGalleryVideoLoaded={handleGalleryVideoLoaded}
               />
             </TabsContent>
 

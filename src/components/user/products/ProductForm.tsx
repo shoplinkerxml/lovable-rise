@@ -126,12 +126,18 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         .select('*')
         .eq('product_id', product.id)
         .order('order_index');
-      setImages(imagesData?.map((img: any) => ({ 
-        url: img.r2_key_original || img.url, 
-        order_index: img.order_index,
-        alt_text: img.alt_text,
-        is_main: img.is_main
-      })) || []);
+      setImages((imagesData || []).map((img: any) => {
+        const cardUrl = img.card_url || ''
+        const directUrl = img.url || ''
+        const origKey = img.r2_key_original || ''
+        const url = cardUrl || directUrl || (origKey ? R2Storage.makePublicUrl(origKey) : '')
+        return {
+          url,
+          order_index: img.order_index,
+          alt_text: img.alt_text,
+          is_main: img.is_main
+        }
+      }))
     } catch (error) {
       console.error('Load product data error:', error);
       toast.error('Помилка завантаження даних товару');

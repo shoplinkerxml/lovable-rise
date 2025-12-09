@@ -203,21 +203,17 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // Быстрый путь: не на страницах магазинов/товаров — пробуем взять кэш, не дергаем сеть
+    // Быстрый путь: на страницах, где не требуется свежие данные, используем валидный кэш
     try {
       if (typeof window !== "undefined") {
         const p = window.location.pathname.toLowerCase();
-        const allowed = p.includes("/user/shops") || p.includes("/user/products");
-        if (!allowed) {
-          const cached = ShopService.readShopsCache(true);
-          if (cached?.items && Array.isArray(cached.items)) {
-            return cached.items;
-          }
-          return [];
+        const requireFresh = p.includes("/user/shops");
+        const cached = ShopService.readShopsCache(false);
+        if (!requireFresh && cached?.items && Array.isArray(cached.items)) {
+          return cached.items;
         }
       }
     } catch {
-      /* ignore */
     }
 
     // Offline → только кэш

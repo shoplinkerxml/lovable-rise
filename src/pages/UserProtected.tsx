@@ -53,10 +53,13 @@ const UserProtected = () => {
   useNavigationRefetch(refresh);
 
   useEffect(() => {
-    if (authenticated) {
-      ProductService.getUserStores().catch(() => void 0);
-    }
-  }, [authenticated]);
+    if (!authenticated) return;
+    const p = location.pathname.toLowerCase();
+    const isProductEdit = p.includes('/user/products/edit');
+    const needsShops = p.includes('/user/shops') || (p.includes('/user/products') && !isProductEdit);
+    if (!needsShops) return;
+    ProductService.getUserStores().catch(() => void 0);
+  }, [authenticated, location.pathname]);
 
   useEffect(() => {
     const checkAuthentication = async () => {

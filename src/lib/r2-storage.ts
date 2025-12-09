@@ -201,20 +201,43 @@ export const R2Storage = {
   async uploadProductImage(productId: string, file: File): Promise<UploadProductImageResult> {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
-    
-    // Convert file to base64
+
+    async function convertToWebpIfNeeded(input: File): Promise<File> {
+      try {
+        const type = String(input.type || '')
+        const isImage = /^image\//i.test(type)
+        const isWebp = /webp/i.test(type)
+        if (!isImage || isWebp) return input
+        const bitmap = await createImageBitmap(input)
+        const canvas = document.createElement('canvas')
+        canvas.width = bitmap.width
+        canvas.height = bitmap.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return input
+        ctx.drawImage(bitmap, 0, 0)
+        const blob: Blob | null = await new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/webp', 0.85))
+        if (!blob) return input
+        const webpFile = new File([blob], input.name.replace(/\.[a-zA-Z0-9]+$/, '.webp'), { type: 'image/webp' })
+        return webpFile
+      } catch {
+        return input
+      }
+    }
+
+    const normalizedFile = await convertToWebpIfNeeded(file)
+
     const base64File: string = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        resolve(result); // Include full data URL
+        resolve(result);
       };
       reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(normalizedFile);
     });
 
     const { data, error } = await supabase.functions.invoke('upload-product-image', {
-      body: { productId, fileData: base64File, fileName: file.name, fileType: file.type },
+      body: { productId, fileData: base64File, fileName: normalizedFile.name, fileType: normalizedFile.type },
       headers,
     });
 
