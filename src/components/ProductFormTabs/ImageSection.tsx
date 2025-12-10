@@ -159,7 +159,7 @@ export function ImageSection(props: Props) {
                     data-testid={`productFormTabs_imageCard_${index}`}
                   >
                     <CardContent className="p-2">
-                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white`}>
+                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
                         {(() => {
                           const original = image.url
                           const isVid = isVideoUrl(original)

@@ -1394,7 +1394,7 @@ export function ProductFormTabs({
                                 <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLargeScreen ? 5 : 4}rem` }}>
                                   <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => setActiveImageIndex(index)}>
                                     <CardContent className="p-2">
-                                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white`}>
+                                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === activeImageIndex ? 'border-2 border-emerald-500' : ''}`}>
                                         {(() => {
                                           const original = image.url || '';
                                           const isVid = isVideoUrl(original);
