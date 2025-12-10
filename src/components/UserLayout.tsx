@@ -231,7 +231,7 @@ const UserLayout = () => {
   const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile, subscription, tariffLimits, refresh } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; refresh: () => Promise<void> }>();
   const signOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/user-auth";
+    navigate("/user-auth", { replace: true });
   };
   const handleProfileNavigation = (path: string) => {
     setProfileSheetOpen(false);

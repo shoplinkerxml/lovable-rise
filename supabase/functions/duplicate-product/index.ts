@@ -195,7 +195,7 @@ serve(async (req) => {
           error: "limit_reached",
           message: "Ліміт товарів вичерпано",
         }),
-        { status: 403, headers: jsonHeaders },
+        { status: 400, headers: jsonHeaders },
       )
     }
 
@@ -215,7 +215,7 @@ serve(async (req) => {
           error: "limit_reached",
           message: "Ліміт товарів вичерпано",
         }),
-        { status: 403, headers: jsonHeaders },
+        { status: 400, headers: jsonHeaders },
       )
     }
 
@@ -237,7 +237,7 @@ serve(async (req) => {
           error: "limit_reached",
           message: "Ліміт товарів вичерпано",
         }),
-        { status: 403, headers: jsonHeaders },
+        { status: 400, headers: jsonHeaders },
       )
     }
 

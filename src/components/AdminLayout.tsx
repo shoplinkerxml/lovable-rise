@@ -32,7 +32,7 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/admin-auth";
+    navigate("/admin-auth", { replace: true });
   };
 
   const handleProfileNavigation = (path: string) => {

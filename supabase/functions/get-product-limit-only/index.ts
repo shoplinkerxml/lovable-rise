@@ -13,16 +13,14 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") || ""
-    const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "missing_api_key" }), { status: 400, headers: corsHeaders })
+    if (!supabaseUrl || !serviceKey) {
+      return new Response(JSON.stringify({ error: "server_misconfig" }), { status: 500, headers: corsHeaders })
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") || "",
-      apiKey,
-    )
+    const supabase = createClient(supabaseUrl, serviceKey)
 
     function decodeJwtSub(h: string): string | null {
       try {
@@ -40,7 +38,7 @@ Deno.serve(async (req) => {
 
     const { data: subscriptions, error: subscriptionError } = await supabase
       .from("user_subscriptions")
-      .select("tariff_id")
+      .select("tariff_id,end_date,is_active,start_date")
       .eq("user_id", userId)
       .eq("is_active", true)
       .order("start_date", { ascending: false })
@@ -50,7 +48,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ value: 0 }), { headers: corsHeaders })
     }
 
-    const tariffId = subscriptions[0].tariff_id
+    let active = subscriptions[0]
+    if (active?.end_date) {
+      const endMs = new Date(active.end_date as unknown as string).getTime()
+      if (Number.isFinite(endMs) && endMs < Date.now()) {
+        await supabase
+          .from("user_subscriptions")
+          .update({ is_active: false })
+          .eq("user_id", userId)
+          .eq("id", active.id as unknown as string)
+        return new Response(JSON.stringify({ value: 0 }), { headers: corsHeaders })
+      }
+    }
+
+    const tariffId = (active as any).tariff_id
 
     const { data: limitData, error: limitError } = await supabase
       .from("tariff_limits")

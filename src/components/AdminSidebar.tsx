@@ -112,7 +112,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       await supabase.auth.signOut();
-      window.location.href = "/admin-auth";
+      navigate('/admin-auth', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -176,5 +176,4 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
 };
 
 export default AdminSidebar;
-
 
