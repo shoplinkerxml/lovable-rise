@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../_shared/database-types.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing Supabase environment variables')
+  throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
 }
 
 const corsHeaders = {
@@ -14,46 +15,23 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 }
 
-const jsonResponse = (body: unknown, init?: ResponseInit) => {
-  const headers = new Headers(corsHeaders)
-  if (init?.headers) {
-    const extra = new Headers(init.headers)
-    extra.forEach((value, key) => headers.set(key, value))
-  }
-  return new Response(JSON.stringify(body), {
+const jsonResponse = (body: unknown, init?: ResponseInit) =>
+  new Response(JSON.stringify(body), {
     ...init,
-    headers,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers ?? {}),
+    },
   })
-}
 
 type RequestBody = {
-  includeConfig?: boolean | null
-  store_id?: string | null
-}
-
-type Shop = {
-  id: string
-  user_id: string
-  store_name: string
-  store_company?: string | null
-  store_url?: string | null
-  template_id?: string | null
-  xml_config?: unknown
-  custom_mapping?: unknown
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-type ShopAggregated = Shop & {
-  marketplace?: string
-  productsCount?: number
-  categoriesCount?: number
+  includeConfig?: boolean
+  store_id?: string
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   if (req.method !== 'POST') {
@@ -61,125 +39,172 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const token =
-      authHeader.startsWith('Bearer ') ?
-        authHeader.slice('Bearer '.length).trim() :
-        ''
+    const authHeader = req.headers.get('Authorization')
 
-    const body: RequestBody = await req.json().catch(() => ({} as RequestBody))
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return jsonResponse(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
+      )
+    }
 
-    const storeId = body.store_id ? String(body.store_id) : null
-    const includeConfig = body.includeConfig === true || !!storeId
-
-    const supabase = createClient(
+    const supabaseClient = createClient<Database>(
       SUPABASE_URL,
       SUPABASE_ANON_KEY,
       {
-        global: authHeader && token
-          ? { headers: { Authorization: `Bearer ${token}` } }
-          : {},
-      },
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
     )
 
-    const baseSelect = includeConfig
-      ? 'id,user_id,store_name,store_company,store_url,template_id,xml_config,custom_mapping,is_active,created_at,updated_at'
-      : 'id,user_id,store_name,store_company,store_url,template_id,is_active,created_at,updated_at'
+    // Проверка аутентификации пользователя
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser()
 
-    let storesQuery = (supabase as any)
+    if (userError || !user) {
+      console.log('User authentication failed', {
+        error: userError?.message,
+      })
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    console.log('User authenticated successfully', {
+      userId: user.id,
+    })
+
+    // Парсинг body
+    let body: RequestBody = {}
+    try {
+      body = await req.json()
+    } catch {
+      // Если body пустой или невалидный, используем дефолтные значения
+    }
+
+    const storeId = body.store_id || null
+    const includeConfig = body.includeConfig === true || !!storeId
+
+    // Определяем поля для выборки
+    const baseSelect = includeConfig
+      ? 'id, user_id, store_name, store_company, store_url, template_id, xml_config, custom_mapping, is_active, created_at, updated_at'
+      : 'id, user_id, store_name, store_company, store_url, template_id, is_active, created_at, updated_at'
+
+    // Получение магазинов с фильтрацией по user_id
+    let storesQuery = supabaseClient
       .from('user_stores')
-      .select(baseSelect as any)
+      .select(baseSelect)
+      .eq('user_id', user.id) // КРИТИЧНО: фильтр по пользователю
       .eq('is_active', true)
+      .order('store_name', { ascending: true })
 
     if (storeId) {
       storesQuery = storesQuery.eq('id', storeId)
     }
 
-    const { data: stores, error: storesError } = await storesQuery.order(
-      'store_name',
-      { ascending: true },
-    )
+    const { data: stores, error: storesError } = await storesQuery
 
     if (storesError) {
-      console.error('Stores fetch error:', storesError)
-      return jsonResponse({ error: 'shops_fetch_failed' }, { status: 500 })
+      console.log('Stores fetch error', { error: storesError.message })
+      return jsonResponse({ error: 'Failed to fetch shops' }, { status: 500 })
     }
 
-    const shops: Shop[] = (stores ?? []) as Shop[]
-
-    if (shops.length === 0) {
-      return jsonResponse({ shops: [] }, { status: 200 })
+    if (!stores || stores.length === 0) {
+      return jsonResponse({ shops: [] })
     }
 
-    const storeIds = shops.map((s) => s.id)
+    const storeIds = stores.map((s: any) => s.id)
     const templateIds = Array.from(
       new Set(
-        shops
-          .map((s) => s.template_id)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0),
-      ),
+        stores
+          .map((s: any) => s.template_id)
+          .filter((id): id is string => !!id)
+      )
     )
 
-    const templatesPromise =
+    // Параллельное получение связанных данных
+    const [
+      { data: templates },
+      { data: links },
+      { data: categories }
+    ] = await Promise.all([
       templateIds.length > 0
-        ? (supabase as any)
+        ? supabaseClient
             .from('store_templates')
-            .select('id,marketplace')
+            .select('id, marketplace')
             .in('id', templateIds)
-            .then((res: any) => ({ data: res?.data ?? [], error: res?.error ?? null }))
-        : Promise.resolve({ data: [], error: null })
-    const templatesMap: Record<string, string> = {}
-
-    const linksQuery = (supabase as any)
-      .from('store_product_links')
-      .select('store_id,is_active')
-    const catsQuery = (supabase as any)
-      .from('store_store_categories')
-      .select('store_id,is_active')
-    const linksPromise =
+        : Promise.resolve({ data: [] }),
       storeId
-        ? linksQuery.eq('store_id', storeId).then((res: any) => ({ data: res?.data ?? [], error: res?.error ?? null }))
-        : linksQuery.in('store_id', storeIds).then((res: any) => ({ data: res?.data ?? [], error: res?.error ?? null }))
-    const catsPromise =
+        ? supabaseClient
+            .from('store_product_links')
+            .select('store_id, is_active')
+            .eq('store_id', storeId)
+        : supabaseClient
+            .from('store_product_links')
+            .select('store_id, is_active')
+            .in('store_id', storeIds),
       storeId
-        ? catsQuery.eq('store_id', storeId).then((res: any) => ({ data: res?.data ?? [], error: res?.error ?? null }))
-        : catsQuery.in('store_id', storeIds).then((res: any) => ({ data: res?.data ?? [], error: res?.error ?? null }))
-    const [{ data: templates }, { data: links }, { data: cats }] = await Promise.all([
-      templatesPromise,
-      linksPromise,
-      catsPromise,
+        ? supabaseClient
+            .from('store_store_categories')
+            .select('store_id, is_active')
+            .eq('store_id', storeId)
+        : supabaseClient
+            .from('store_store_categories')
+            .select('store_id, is_active')
+            .in('store_id', storeIds)
     ])
-    for (const r of (templates || [])) {
-      const id = (r as any).id
-      const name = (r as any).marketplace
-      if (id) templatesMap[String(id)] = name || 'Не вказано'
-    }
-    const productsCountByStore: Record<string, number> = {}
-    for (const r of ((links as any[]) || [])) {
-      const sid = (r as any)?.store_id != null ? String((r as any).store_id) : ''
-      const active = (r as any)?.is_active !== false
-      if (sid && active) productsCountByStore[sid] = (productsCountByStore[sid] || 0) + 1
-    }
-    const categoriesCountByStore: Record<string, number> = {}
-    for (const r of ((cats as any[]) || [])) {
-      const sid = (r as any)?.store_id != null ? String((r as any).store_id) : ''
-      const active = (r as any)?.is_active !== false
-      if (sid && active) categoriesCountByStore[sid] = (categoriesCountByStore[sid] || 0) + 1
+
+    // Построение map для templates
+    const templatesMap: Record<string, string> = {}
+    for (const template of templates || []) {
+      if ((template as any).id) {
+        templatesMap[String((template as any).id)] = 
+          (template as any).marketplace || 'Не вказано'
+      }
     }
 
-    const aggregated: ShopAggregated[] = shops.map((s) => ({
-      ...s,
-      marketplace: s.template_id
-        ? templatesMap[String(s.template_id)] ?? 'Не вказано'
+    // Подсчет активных продуктов по магазинам
+    const productsCountByStore: Record<string, number> = {}
+    for (const link of links || []) {
+      const storeId = (link as any)?.store_id
+      const isActive = (link as any)?.is_active !== false
+      if (storeId && isActive) {
+        const key = String(storeId)
+        productsCountByStore[key] = (productsCountByStore[key] || 0) + 1
+      }
+    }
+
+    // Подсчет активных категорий по магазинам
+    const categoriesCountByStore: Record<string, number> = {}
+    for (const category of categories || []) {
+      const storeId = (category as any)?.store_id
+      const isActive = (category as any)?.is_active !== false
+      if (storeId && isActive) {
+        const key = String(storeId)
+        categoriesCountByStore[key] = (categoriesCountByStore[key] || 0) + 1
+      }
+    }
+
+    // Агрегация данных
+    const aggregated = stores.map((store: any) => ({
+      ...store,
+      marketplace: store.template_id
+        ? templatesMap[String(store.template_id)] ?? 'Не вказано'
         : 'Не вказано',
-      productsCount: productsCountByStore[String(s.id)] ?? 0,
-      categoriesCount: categoriesCountByStore[String(s.id)] ?? 0,
+      productsCount: productsCountByStore[String(store.id)] ?? 0,
+      categoriesCount: categoriesCountByStore[String(store.id)] ?? 0,
     }))
 
-    return jsonResponse({ shops: aggregated }, { status: 200 })
-  } catch (e: any) {
-    console.error('Unexpected error in shops aggregation:', e)
-    const msg = e?.message || 'shops_aggregation_failed'
-    return jsonResponse({ error: msg }, { status: 500 })
+    console.log('Shops fetched successfully', { count: aggregated.length })
+
+    return jsonResponse({ shops: aggregated })
+
+  } catch (error) {
+    console.error('Unexpected error:', error)
+    return jsonResponse(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 })

@@ -127,28 +127,20 @@ Deno.serve(async (req) => {
           error: limitsError.message,
         })
       } else if (limits) {
-        tariffLimits = limits.map((l: any) => ({
-          limit_name: String(l.limit_name),
-          value: Number(l.value),
-        }))
+        tariffLimits = limits
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        user: {
-          id: user.id,
-          email: user.email,
-          ...(profile && typeof profile === 'object' ? profile : {})
-        },
-        subscription,
-        tariffLimits,
-        menuItems: menuItems || []
-      }),
-      { 
-        headers: { ...corsHeaders }
-      }
-    )
+    return jsonResponse({
+      user: {
+        id: user.id,
+        email: user.email,
+        ...(profile && typeof profile === 'object' ? profile : {})
+      },
+      subscription,
+      tariffLimits,
+      menuItems: menuItems || []
+    })
   } catch (error) {
     console.error('Unexpected error:', error)
     return jsonResponse({ error: 'Internal server error' }, { status: 500 })

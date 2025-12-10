@@ -1,4 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../_shared/database-types.ts'
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,43 +15,83 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 }
 
-type Supplier = {
-  id: number
-  user_id: string
-  supplier_name: string
-  website_url: string | null
-  xml_feed_url: string | null
-  phone: string | null
-  created_at: string | null
-  updated_at: string | null
-  address?: string | null
-  is_active?: boolean | null
-}
+const jsonResponse = (body: unknown, init?: ResponseInit) =>
+  new Response(JSON.stringify(body), {
+    ...init,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers ?? {}),
+    },
+  })
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
 
   try {
-    const authHeader = req.headers.get('Authorization') || ''
-    const token = authHeader.replace('Bearer ', '')
+    const authHeader = req.headers.get('Authorization')
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
-      { global: { headers: authHeader ? { Authorization: `Bearer ${token}` } : {} } }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return jsonResponse(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
+      )
+    }
+
+    const supabaseClient = createClient<Database>(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
     )
 
-    const { data, error } = await supabase
+    // Проверка аутентификации пользователя
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser()
+
+    if (userError || !user) {
+      console.log('User authentication failed', {
+        error: userError?.message,
+      })
+      return jsonResponse({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    console.log('User authenticated successfully', {
+      userId: user.id,
+    })
+
+    // Получение поставщиков только текущего пользователя
+    const { data: suppliers, error: suppliersError } = await supabaseClient
       .from('user_suppliers')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (error) return new Response(JSON.stringify({ error: 'suppliers_fetch_failed' }), { status: 500, headers: corsHeaders })
+    if (suppliersError) {
+      console.log('Suppliers fetch error', {
+        error: suppliersError.message,
+      })
+      return jsonResponse(
+        { error: 'Failed to fetch suppliers' },
+        { status: 500 }
+      )
+    }
 
-    const rows = (data || []) as Supplier[]
-    return new Response(JSON.stringify({ suppliers: rows }), { status: 200, headers: corsHeaders })
-  } catch (e) {
-    const msg = (e as any)?.message || 'aggregation_failed'
-    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders })
+    return jsonResponse({
+      suppliers: suppliers || []
+    })
+
+  } catch (error) {
+    console.error('Unexpected error:', error)
+    return jsonResponse(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 })
