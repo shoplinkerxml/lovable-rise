@@ -14,6 +14,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import ImageSection from './ProductFormTabs/ImageSection';
+import NamesDescriptionSection from './ProductFormTabs/NamesDescriptionSection';
+import BasicSection from './ProductFormTabs/BasicSection';
+import CategoryEditorSection from './ProductFormTabs/CategoryEditorSection';
+import PricesSection from './ProductFormTabs/PricesSection';
+import ImagePreviewSection from './ProductFormTabs/ImagePreviewSection';
+import ParamsSection from './ProductFormTabs/ParamsSection';
+import TabsHeader from './ProductFormTabs/TabsHeader';
+import FormActions from './ProductFormTabs/FormActions';
 import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, ChevronDown, Check, MoreHorizontal, Pencil, Trash, Trash2, Globe, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,9 +29,9 @@ import { ProductService, type Product } from '@/lib/product-service';
 import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
-import { CategoryTreeEditor } from '@/components/CategoryTreeEditor';
 import ParametersDataTable from '@/components/products/ParametersDataTable';
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils';
+import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData } from './ProductFormTabs/types';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -41,63 +49,6 @@ interface ProductFormTabsProps {
   preloadedImages?: ProductImage[];
   preloadedParams?: ProductParam[];
   preloadedSupplierCategoriesMap?: Record<string, CategoryOption[]>;
-}
-interface ProductParam {
-  id?: string;
-  name: string;
-  value: string;
-  order_index: number;
-  paramid?: string;
-  valueid?: string;
-}
-interface ProductImage {
-  id?: string;
-  url: string;
-  alt_text?: string;
-  order_index: number;
-  is_main: boolean;
-  object_key?: string;
-}
-// Shallow lookup types to avoid deep Supabase generics
-type SupplierOption = {
-  id: string;
-  supplier_name: string;
-};
-type CategoryOption = {
-  id: string;
-  name: string;
-  external_id: string;
-  supplier_id: string;
-  parent_external_id: string | null;
-};
-type CurrencyOption = {
-  id: number;
-  name: string;
-  code: string;
-  status: boolean | null;
-};
-interface FormData {
-  name: string;
-  name_ua: string;
-  description: string;
-  description_ua: string;
-  docket: string;
-  docket_ua: string;
-  vendor: string;
-  article: string;
-  external_id: string;
-  supplier_id: string;
-  category_id: string;
-  category_external_id: string;
-  category_name?: string;
-  currency_code: string;
-  price: number;
-  price_old: number;
-  price_promo: number;
-  stock_quantity: number;
-  available: boolean;
-  state: string;
-  store_id: string;
 }
 export function ProductFormTabs({
   product,
@@ -1296,221 +1247,36 @@ export function ProductFormTabs({
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="relative" data-testid="productFormTabs_tabsWrapper">
-              {/* Subtle gradient edges on mobile to hint scrolling */}
-              {tabsOverflow && <>
-                  <div className="pointer-events-none absolute left-0 top-0 h-full w-6 md:hidden bg-gradient-to-r from-background to-transparent" />
-                  <div className="pointer-events-none absolute right-0 top-0 h-full w-6 md:hidden bg-gradient-to-l from-background to-transparent" />
-                </>}
-
-              <TabsList ref={tabsScrollRef as any} className="flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="productFormTabs_tabsList">
-              <TabsTrigger value="info" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_infoTab">
-                <Package className="h-4 w-4" />
-                {t('product_tab_main')}
-              </TabsTrigger>
-              <TabsTrigger value="images" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_imagesTab">
-                <ImageIcon className="h-4 w-4" />
-                {t('product_tab_images')}
-              </TabsTrigger>
-              <TabsTrigger value="params" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_paramsTab">
-                <Settings className="h-4 w-4" />
-                {t('product_tab_parameters')}
-              </TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsHeader t={t} tabsOverflow={tabsOverflow} tabsScrollRef={tabsScrollRef} />
 
             {/* Tab 1: Basic Information */}
             <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
               {/* Основной контейнер с каруселью слева и полями справа */}
               <div className="flex flex-col lg:flex-row lg:flex-nowrap gap-8 lg:items-start" data-testid="productFormTabs_mainRow">
-                {/* Карусель фото — фиксированная левая колонка */}
                 <div className="shrink-0 space-y-4 relative px-4 sm:px-6" data-testid="productFormTabs_photoContainer" ref={photoBlockRef} onDoubleClick={resetPhotoBlockToDefaultSize}>
-                  <div className="mx-auto w-full space-y-3 md:space-y-4" style={{ maxWidth: `calc(${getAdaptiveImageStyle().width} + clamp(0.5rem, 2vw, 1rem))` }}>
-                    {images.length > 0 ? <div className="space-y-4">
-                        {/* Main image display */}
-                        <div className="relative flex justify-center">
-                          <Card className="relative group overflow-hidden border-0 shadow-none">
-                            <CardContent className="p-0">
-                              <div className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer max-w-full p-0" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoMain">
-                                {(() => {
-                                  const original = images[activeImageIndex]?.url || '';
-                                  const isVid = isVideoUrl(original);
-                                  const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.CARD);
-                                  if (!src) return null;
-                                  if (isVid) {
-                                    return (
-                                      <video
-                                        src={src}
-                                        className="w-full h-full object-contain select-none"
-                                        controls
-                                        onLoadedMetadata={handleMainVideoLoaded}
-                                        onError={handleMainVideoError}
-                                      />
-                                    );
-                                  }
-                                  return (
-                                    <img
-                                      ref={mainImgRef}
-                                      src={src}
-                                      alt={images[activeImageIndex]?.alt_text || `Фото ${activeImageIndex + 1}`}
-                                      className="w-full h-full object-contain select-none"
-                                      data-testid={`productFormTabs_mainImage`}
-                                      onLoad={handleImageLoad}
-                                      onError={(e) => {
-                                        const el = e.target as HTMLImageElement;
-                                        if (original) el.src = original;
-                                        const key = original ? R2Storage.extractObjectKeyFromUrl(original) : null;
-                                        if (key) {
-                                          R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view; }).catch(() => void 0);
-                                        }
-                                        handleMainImageError(e);
-                                      }}
-                                    />
-                                  );
-                                })()}
-                              </div>
-                              
-                            </CardContent>
-                            
-                            {/* Navigation arrows for main image */}
-                            {images.length > 1 && <>
-                                <Button variant="outline" size="icon" className="absolute top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" style={{ left: 'min(1.75%, 0.5rem)' }} onClick={goToPrevious} data-testid="productFormTabs_prevButton">
-                                  <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <Button variant="outline" size="icon" className="absolute top-1/2 -translate-y-1/2 rounded-full bg-transparent border border-border text-foreground hover:border-emerald-500 hover:text-emerald-600 active:scale-95 active:shadow-inner transition-colors" style={{ right: 'min(1.75%, 0.5rem)' }} onClick={goToNext} data-testid="productFormTabs_nextButton">
-                                  <ChevronRight className="h-4 w-4" />
-                                </Button>
-                              </>}
-                            {/* Resize handle on the photo card frame */}
-                            <button type="button" aria-label="Resize photo block" className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 hover:bg-primary/30 cursor-nwse-resize hidden sm:block" onMouseDown={handlePhotoResizeStart} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="resize_handle_photo_card" />
-                          </Card>
-                        </div>
-
-                        {/* Thumbnail navigation — внутри общего контейнера, совпадает по левому/правому краям */}
-                        <div className="relative w-full">
-                          <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
-                            <CarouselContent className="-ml-2 mr-2">
-                              {images.map((image, index) => (
-                                <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLargeScreen ? 5 : 4}rem` }}>
-                                  <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => setActiveImageIndex(index)}>
-                                    <CardContent className="p-2">
-                                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === activeImageIndex ? 'border-2 border-emerald-500' : ''}`}>
-                                        {(() => {
-                                          const original = image.url || '';
-                                          const isVid = isVideoUrl(original);
-                                          const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB);
-                                          if (!src) return null;
-                                          if (isVid) {
-                                            return (
-                                              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => handleGalleryVideoLoaded(e, index)} />
-                                            );
-                                          }
-                                          return (
-                                            <img ref={(el) => (galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-contain" data-testid={`productFormTabs_thumbnail_${index}`} onLoad={(e) => handleGalleryImageLoad(e, index)} onError={(e) => { const el = e.target as HTMLImageElement; if (original) { el.src = original; const key = R2Storage.extractObjectKeyFromUrl(original); if (key) { R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view; }).catch(() => void 0); } } }} />
-                                          );
-                                        })()}
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                </CarouselItem>
-                              ))}
-                            </CarouselContent>
-                          </Carousel>
-                        </div>
-                  </div> : <div className="aspect-square flex items-center justify-center p-0 cursor-pointer" style={getAdaptiveImageStyle()} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="productFormTabs_photoPlaceholder">
-                        <ProductPlaceholder className="w-full h-full" />
-                      </div>}
-                  </div>
-                  {/* Resize handle for entire photo block when there are no images */}
-                  {images.length === 0 && <button type="button" aria-label="Resize photo block" className="absolute bottom-2 right-2 size-4 rounded-sm bg-primary/20 hover:bg-primary/30 cursor-nwse-resize hidden sm:block" onMouseDown={handlePhotoResizeStart} onDoubleClick={resetPhotoBlockToDefaultSize} data-testid="resize_handle_photo_block" />}
+                  <ImagePreviewSection
+                    images={images}
+                    activeIndex={activeImageIndex}
+                    onSelectIndex={(i) => setActiveImageIndex(i)}
+                    getMainAdaptiveImageStyle={getAdaptiveImageStyle}
+                    isLargeScreen={isLargeScreen}
+                    galleryImgRefs={galleryImgRefs}
+                    onGalleryImageLoad={handleGalleryImageLoad}
+                    onGalleryImageError={handleGalleryImageError}
+                    onGalleryVideoLoaded={handleGalleryVideoLoaded}
+                    onPrev={goToPrevious}
+                    onNext={goToNext}
+                    onMainImageLoad={handleImageLoad}
+                    onMainImageError={handleMainImageError}
+                    onMainVideoLoaded={handleMainVideoLoaded}
+                    onResizeStart={handlePhotoResizeStart}
+                    onResetSize={resetPhotoBlockToDefaultSize}
+                  />
                 </div>
 
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
-                  {/* Секция: Назви та опис — перенесена в правую колонку вместо редактора категорій */}
-                  <div className="space-y-[0.5rem] overflow-y-auto" data-testid="productFormTabs_namesDescriptionRight">
-                    <Collapsible defaultOpen>
-                      <div className="flex items-center gap-2 h-9">
-                        <h3 className="text-sm font-semibold leading-none">{t('product_names_description')}</h3>
-                        <Separator className="flex-1" />
-                        <CollapsibleTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t('toggle_section')}
-                            aria-controls="namesDescContent"
-                            data-testid="productFormTabs_namesDescToggle"
-                            className="h-7 w-7 [&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180"
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                          </Button>
-                        </CollapsibleTrigger>
-                      </div>
-                      <CollapsibleContent id="namesDescContent">
-                        <Tabs defaultValue="ukrainian" className="w-full">
-                          <TabsList className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="productFormTabs_langTabsList">
-                            <TabsTrigger value="ukrainian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_ukrainianTab" aria-label={t('product_name_ukrainian_tab')}>
-                              <span className="truncate">{t('product_name')}</span>
-                              <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
-                              <span className="sr-only">UA</span>
-                            </TabsTrigger>
-                            <TabsTrigger value="russian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_russianTab" aria-label={t('product_name_russian_tab')}>
-                              <span className="truncate">{t('product_name')}</span>
-                              <Globe aria-hidden="true" className="inline-block h-[0.9rem] w-[0.9rem] text-success" />
-                              <span className="sr-only">RU</span>
-                            </TabsTrigger>
-                          </TabsList>
-                          <TabsContent value="ukrainian" className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="name_ua">{t('product_name')} *</Label>
-                              <Textarea id="name_ua" name="name_ua" autoComplete="off" value={formData.name_ua} onChange={e => setFormData({
-                                ...formData,
-                                name_ua: e.target.value
-                              })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameUaInput" disabled={!!readOnly} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="docket_ua">{t('short_name')}</Label>
-                              <Textarea id="docket_ua" name="docket_ua" autoComplete="off" value={formData.docket_ua} onChange={e => setFormData({
-                                ...formData,
-                                docket_ua: e.target.value
-                              })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketUaInput" disabled={!!readOnly} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="description_ua">{t('product_description')}</Label>
-                              <Textarea id="description_ua" name="description_ua" autoComplete="off" value={formData.description_ua} onChange={e => setFormData({
-                                ...formData,
-                                description_ua: e.target.value
-                              })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" disabled={!!readOnly} />
-                            </div>
-                          </TabsContent>
-                          <TabsContent value="russian" className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="name">{t('product_name')}</Label>
-                              <Textarea id="name" name="name" autoComplete="off" value={formData.name} onChange={e => setFormData({
-                                ...formData,
-                                name: e.target.value
-                              })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameInput" disabled={!!readOnly} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="docket">{t('short_name')}</Label>
-                              <Textarea id="docket" name="docket" autoComplete="off" value={formData.docket} onChange={e => setFormData({
-                                ...formData,
-                                docket: e.target.value
-                              })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketInput" disabled={!!readOnly} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="description">{t('product_description')}</Label>
-                              <Textarea id="description" name="description" autoComplete="off" value={formData.description} onChange={e => setFormData({
-                                ...formData,
-                                description: e.target.value
-                              })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" disabled={!!readOnly} />
-                            </div>
-                          </TabsContent>
-                        </Tabs>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
+                  <NamesDescriptionSection t={t} formData={formData} setFormData={setFormData} readOnly={readOnly} />
 
                   {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
 
@@ -1518,266 +1284,11 @@ export function ProductFormTabs({
 
                 </div>
               </div>
-              {/* Секция: Основні дані — перенесено ниже, на место редактора категорій */}
-              <div className="space-y-4 px-2 sm:px-3" data-testid="productFormTabs_basicSection">
-                <Collapsible defaultOpen>
-                  <div className="flex items-center gap-2 h-9">
-                    <h3 className="text-sm font-semibold leading-none">{t('product_main_data')}</h3>
-                    <Separator className="flex-1" />
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t('toggle_section')}
-                        aria-controls="basicSectionContent"
-                        data-testid="productFormTabs_basicToggle"
-                        className="h-7 w-7 [&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  
-                  <CollapsibleContent id="basicSectionContent">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Удалены блоки выбора магазина и постачальника на странице нового товара */}
+              <BasicSection t={t} formData={formData} setFormData={setFormData} readOnly={readOnly} editableKeys={editableKeys} categories={categories} selectedCategoryName={selectedCategoryName} onChange={onChange} />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="external_id">{t('external_id')}</Label>
-                    <Input id="external_id" name="external_id" autoComplete="off" value={formData.external_id} onChange={e => setFormData({
-                    ...formData,
-                    external_id: e.target.value
-                  })} placeholder={t('external_id_placeholder')} data-testid="productFormTabs_externalIdInput" />
-                  </div>
+              <CategoryEditorSection t={t} suppliers={suppliers} categories={categories} setCategories={setCategories} preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap} formData={formData} setFormData={setFormData} />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="article">{t('article')}</Label>
-                    <Input id="article" name="article" autoComplete="off" value={formData.article} onChange={e => setFormData({
-                    ...formData,
-                    article: e.target.value
-                  })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
-                  </div>
-
-                  {/* Категорія — перенесено у "Основні дані" та размещено слева от виробника */}
-                  <div className="space-y-2">
-                    <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
-                    <Select value={formData.category_id} onValueChange={value => {
-                    const cat = categories.find(c => String(c.id) === String(value));
-                    setFormData({
-                      ...formData,
-                      category_id: value,
-                      category_external_id: cat?.external_id || '',
-                      category_name: cat?.name || ''
-                    });
-                    onChange?.({
-                      category_id: value,
-                      category_external_id: cat?.external_id || '',
-                      category_name: cat?.name || ''
-                    });
-                  }}>
-                      <SelectTrigger aria-labelledby="category_label" data-testid="productFormTabs_categorySelect">
-                        <SelectValue placeholder={selectedCategoryName || t('select_category')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(category => <SelectItem key={category.id} value={String(category.id)}>
-                            {category.name}
-                          </SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Перенесено: виробник */}
-                  <div className="space-y-2">
-                    <Label htmlFor="vendor">{t('manufacturer')}</Label>
-                    <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
-                    ...formData,
-                    vendor: e.target.value
-                  })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" disabled={!!readOnly} />
-                  </div>
-
-                  {/* Перенесено: статус товара */}
-                  <div className="space-y-2">
-                    <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
-                    <Select value={formData.state} onValueChange={value => setFormData({
-                    ...formData,
-                    state: value
-                  })}>
-                      <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect" disabled={!!readOnly}>
-                        <SelectValue placeholder={t('select_status')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">{t('status_new')}</SelectItem>
-                        <SelectItem value="stock">{t('status_stock')}</SelectItem>
-                        <SelectItem value="used">{t('status_used')}</SelectItem>
-                        <SelectItem value="refurbished">{t('status_refurbished')}</SelectItem>
-                      </SelectContent>
-              </Select>
-            </div>
-
-            {/* Кількість на складі — перенесено справа от статуса */}
-            <div className="space-y-2">
-              <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-              <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => {
-                const v = parseInt(e.target.value) || 0;
-                setFormData({
-                  ...formData,
-                  stock_quantity: v
-                });
-                onChange?.({
-                  stock_quantity: v
-                });
-              }} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" disabled={!!readOnly && !(editableKeys || []).includes('stock_quantity')} />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="available"
-                checked={!!formData.available}
-                onChange={(e) => {
-                  const val = !!e.target.checked;
-                  setFormData({ ...formData, available: val });
-                  onChange?.({ available: val });
-                }}
-                className="rounded border-gray-300 accent-emerald-600"
-                data-testid="productFormTabs_available"
-                disabled={!!readOnly && !(editableKeys || []).includes('available')}
-              />
-              <Label htmlFor="available">{t('product_available')}</Label>
-            </div>
-          </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-
-              {/* Редактор категорій — перенесён туда, где был блок назви та опис, на всю ширину */}
-              <div className="space-y-4 mt-2 w-full px-2 sm:px-3" data-testid="productFormTabs_categoryTreeEditorFullWidth">
-                <Collapsible defaultOpen>
-                  <div className="flex items-center gap-2 h-9">
-                    <h3 className="text-sm font-semibold leading-none">{t('category_editor_title')}</h3>
-                    <Separator className="flex-1" />
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t('toggle_section')}
-                        aria-controls="categoryEditorContent"
-                        data-testid="productFormTabs_categoryEditorToggle"
-                        className="h-7 w-7 [&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  <CollapsibleContent id="categoryEditorContent">
-                    <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} supplierCategoriesMap={preloadedSupplierCategoriesMap as any} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
-                      ...prev,
-                      supplier_id: id
-                    }))} onCategoryCreated={async cat => {
-                      setCategories(prev => {
-                        const exists = prev?.some(c => String(c.external_id) === String(cat.external_id));
-                        if (exists) return prev;
-                        const next = [...(prev || []), {
-                          id: String(cat.external_id || `${Date.now()}`),
-                          name: cat.name || '',
-                          external_id: String(cat.external_id || ''),
-                          supplier_id: String(formData.supplier_id || ''),
-                          parent_external_id: null
-                        }];
-                        return next;
-                      });
-                    }} />
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-
-              {/* Секция: Категорія та ціни — перемещено ниже назви та опис */}
-              <div className="space-y-4 px-2 sm:px-3">
-                <Collapsible defaultOpen>
-                  <div className="flex items-center gap-2 h-9">
-                    <h3 className="text-sm font-semibold leading-none">{t('category_prices')}</h3>
-                    <Separator className="flex-1" />
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t('toggle_section')}
-                        aria-controls="pricesSectionContent"
-                        data-testid="productFormTabs_pricesToggle"
-                        className="h-7 w-7 [&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  
-                  <CollapsibleContent id="pricesSectionContent">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                  <div className="space-y-2">
-                    <span id="currency_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_currencyText">{t('currency')} *</span>
-                    <Select value={formData.currency_code} onValueChange={value => setFormData({
-                    ...formData,
-                    currency_code: value
-                  })}>
-                      <SelectTrigger aria-labelledby="currency_label" data-testid="productFormTabs_currencySelect" disabled={!!readOnly}>
-                        <SelectValue placeholder={t('select_currency')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currencies.map(currency => <SelectItem key={currency.code} value={currency.code}>
-                            {currency.name} ({currency.code})
-                          </SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="price">{t('price')} *</Label>
-                    <Input id="price" name="price" autoComplete="off" type="number" step="0.01" value={formData.price} onChange={e => {
-                    const v = parseFloat(e.target.value) || 0;
-                    setFormData({
-                      ...formData,
-                      price: v
-                    });
-                    onChange?.({
-                      price: v
-                    });
-                  }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" disabled={!!readOnly && !(editableKeys || []).includes('price')} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="price_old">{t('old_price')}</Label>
-                    <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => {
-                    const v = parseFloat(e.target.value) || 0;
-                    setFormData({
-                      ...formData,
-                      price_old: v
-                    });
-                    onChange?.({
-                      price_old: v
-                    });
-                  }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" disabled={!!readOnly && !(editableKeys || []).includes('price_old')} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="price_promo">{t('promo_price')}</Label>
-                    <Input id="price_promo" name="price_promo" autoComplete="off" type="number" step="0.01" value={formData.price_promo} onChange={e => {
-                    const v = parseFloat(e.target.value) || 0;
-                    setFormData({
-                      ...formData,
-                      price_promo: v
-                    });
-                    onChange?.({
-                      price_promo: v
-                    });
-                  }} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" disabled={!!readOnly && !(editableKeys || []).includes('price_promo')} />
-                  </div>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
+              <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} formData={formData} setFormData={setFormData} onChange={onChange} />
             </TabsContent>
 
             {/* Tab 2: Images */}
@@ -1816,86 +1327,28 @@ export function ProductFormTabs({
 
             {/* Tab 3: Parameters */}
             <TabsContent value="params" className="space-y-6" data-testid="productFormTabs_paramsContent">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{t('product_characteristics')}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {((readOnly && !forceParamsEditable)) ? <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {parameters.map(p => <div key={`${p.name}_${p.order_index}`} className="border rounded-md p-2">
-                          <div className="text-xs text-muted-foreground">{p.name}</div>
-                          <div className="text-sm break-words">{p.value}</div>
-                        </div>)}
-                    </div> : <ParametersDataTable data={parameters} onEditRow={index => openEditParamModal(index)} onDeleteRow={index => deleteParam(index)} onDeleteSelected={deleteSelectedParams} onSelectionChange={setSelectedParamRows} onAddParam={openAddParamModal} onReplaceData={(rows) => { setParameters(rows); onParamsChange?.(rows); }} />}
-
-                  {(readOnly && !forceParamsEditable) ? null : <Dialog open={isParamModalOpen} onOpenChange={setIsParamModalOpen}>
-                      <DialogContent data-testid="productForm_paramModal">
-                        <DialogHeader>
-                          <DialogTitle>
-                            {editingParamIndex === null ? t('add_characteristic') : t('edit_characteristic')}
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="param-name-modal">{t('characteristic_name')}</Label>
-                            <Input id="param-name-modal" value={paramForm.name} onChange={e => setParamForm({
-                          ...paramForm,
-                          name: e.target.value
-                        })} placeholder={t('characteristic_name_placeholder')} data-testid="productForm_modal_paramName" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="param-value-modal">{t('value')}</Label>
-                            <Input id="param-value-modal" value={paramForm.value} onChange={e => setParamForm({
-                          ...paramForm,
-                          value: e.target.value
-                        })} placeholder={t('characteristic_value_placeholder')} data-testid="productForm_modal_paramValue" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="param-paramid-modal">{t('param_id_optional')}</Label>
-                            <Input id="param-paramid-modal" value={paramForm.paramid || ''} onChange={e => setParamForm({
-                          ...paramForm,
-                          paramid: e.target.value
-                        })} placeholder={t('param_id_placeholder')} data-testid="productForm_modal_paramId" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="param-valueid-modal">{t('value_id_optional')}</Label>
-                            <Input id="param-valueid-modal" value={paramForm.valueid || ''} onChange={e => setParamForm({
-                          ...paramForm,
-                          valueid: e.target.value
-                        })} placeholder={t('value_id_placeholder')} data-testid="productForm_modal_valueId" />
-                          </div>
-                        </div>
-                        <DialogFooter className="gap-2">
-                          <Button type="button" variant="outline" onClick={() => setIsParamModalOpen(false)} data-testid="productForm_modal_cancel">
-                            {t('btn_cancel')}
-                          </Button>
-                          <Button type="button" onClick={saveParamModal} data-testid="productForm_modal_save">
-                            {editingParamIndex === null ? t('btn_create') : t('btn_update')}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>}
-                </CardContent>
-              </Card>
+              <ParamsSection
+                t={t}
+                readOnly={readOnly}
+                forceParamsEditable={forceParamsEditable}
+                parameters={parameters}
+                onEditRow={(index) => openEditParamModal(index)}
+                onDeleteRow={(index) => deleteParam(index)}
+                onDeleteSelected={deleteSelectedParams}
+                onSelectionChange={setSelectedParamRows}
+                onAddParam={openAddParamModal}
+                onReplaceData={(rows) => { setParameters(rows); onParamsChange?.(rows) }}
+                isParamModalOpen={isParamModalOpen}
+                setIsParamModalOpen={setIsParamModalOpen}
+                paramForm={paramForm}
+                setParamForm={setParamForm as any}
+                saveParamModal={saveParamModal}
+                editingParamIndex={editingParamIndex}
+              />
             </TabsContent>
           </Tabs>
           
-          <div className="mt-4 sm:mt-6 pt-1 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end">
-            {readOnly ? null : (
-              <>
-                {onCancel ? (
-                  <Button type="button" variant="outline" onClick={onCancel} data-testid="productFormTabs_cancelButton">
-                    {t('btn_cancel')}
-                  </Button>
-                ) : null}
-                <Button onClick={handleSubmit} disabled={loading || !formData.name_ua.trim()} data-testid="productFormTabs_submitButton">
-                  {loading ? (product ? t('loading_updating') : t('loading_creating')) : (product ? t('btn_update') : t('btn_create'))}
-                </Button>
-              </>
-            )}
-          </div>
+          <FormActions t={t} readOnly={readOnly} loading={loading} product={product} onCancel={onCancel} onSubmit={handleSubmit} disabledSubmit={loading || !formData.name_ua.trim()} />
         </CardContent>
       </Card>
     </div>;
