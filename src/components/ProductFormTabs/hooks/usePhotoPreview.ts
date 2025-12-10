@@ -7,6 +7,8 @@ export function usePhotoPreview(activeImageIndex: number) {
   const [isLargeScreen, setIsLargeScreen] = React.useState<boolean>(false)
   const photoBlockRef = React.useRef<HTMLDivElement | null>(null)
   const photoBlockInitialRemRef = React.useRef<number | null>(null)
+  const initialViewportWidthRef = React.useRef<number | null>(null)
+  const [viewportWidth, setViewportWidth] = React.useState<number>(typeof window !== 'undefined' ? window.innerWidth : 0)
   const isPhotoResizingRef = React.useRef(false)
   const startXRef = React.useRef(0)
   const startScaleRef = React.useRef(1)
@@ -65,6 +67,10 @@ export function usePhotoPreview(activeImageIndex: number) {
         const desiredScale = DEFAULT_PHOTO_SIZE_REM / rem
         setPhotoBlockScale(clampScale(desiredScale))
       }
+      if (initialViewportWidthRef.current == null) {
+        initialViewportWidthRef.current = window.innerWidth
+        setViewportWidth(window.innerWidth)
+      }
     }
     measure()
     const mq = window.matchMedia('(min-width: 1024px)')
@@ -74,9 +80,13 @@ export function usePhotoPreview(activeImageIndex: number) {
     }
     handler(mq)
     mq.addEventListener('change', handler as any)
-    window.addEventListener('resize', measure)
+    const onResize = () => {
+      setViewportWidth(window.innerWidth)
+      measure()
+    }
+    window.addEventListener('resize', onResize)
     return () => {
-      window.removeEventListener('resize', measure)
+      window.removeEventListener('resize', onResize)
       mq.removeEventListener('change', handler as any)
     }
   }, [clampScale])
@@ -98,10 +108,13 @@ export function usePhotoPreview(activeImageIndex: number) {
     }
   }, [activeImageIndex])
 
+  const BASE_VIEWPORT_PX = 1280
   const getAdaptiveImageStyle = () => {
     const baseRem = photoBlockInitialRem ?? DEFAULT_PHOTO_SIZE_REM
     const minRem = Math.max(baseRem * 0.5, 12)
-    let sizeRem = Math.max(baseRem * photoBlockScale, minRem)
+    // Пропорциональное уменьшение относительно базовой ширины экрана
+    const vwScale = Math.min(1, viewportWidth / BASE_VIEWPORT_PX)
+    let sizeRem = Math.max(baseRem * photoBlockScale * vwScale, minRem)
     if (typeof window !== 'undefined') {
       const envWidthPx = window.innerWidth
       const padPx = Math.max(8, Math.min(16, envWidthPx * 0.02))
@@ -111,13 +124,20 @@ export function usePhotoPreview(activeImageIndex: number) {
     return { width: `${sizeRem}rem`, height: `${sizeRem}rem` }
   }
 
+  const getThumbSizeRem = (large: boolean) => {
+    const base = large ? 5 : 4
+    const vwScale = Math.min(1, viewportWidth / BASE_VIEWPORT_PX)
+    const size = Math.max(base * vwScale, 3)
+    return size
+  }
+
   return {
     photoBlockRef,
     isLargeScreen,
     getAdaptiveImageStyle,
+    getThumbSizeRem,
     handlePhotoResizeStart,
     resetPhotoBlockToDefaultSize,
     galleryImgRefs,
   }
 }
-

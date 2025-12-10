@@ -121,7 +121,7 @@ export function ProductFormTabs({
   const [imageUrl, setImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const { photoBlockRef, isLargeScreen, getAdaptiveImageStyle, handlePhotoResizeStart, resetPhotoBlockToDefaultSize, galleryImgRefs } = usePhotoPreview(activeImageIndex);
+  const { photoBlockRef, isLargeScreen, getAdaptiveImageStyle, getThumbSizeRem, handlePhotoResizeStart, resetPhotoBlockToDefaultSize, galleryImgRefs } = usePhotoPreview(activeImageIndex);
   const [imageDimensions, setImageDimensions] = useState<{
     width: number;
     height: number;
@@ -1061,6 +1061,7 @@ export function ProductFormTabs({
                     getMainAdaptiveImageStyle={getAdaptiveImageStyle}
                     isLargeScreen={isLargeScreen}
                     galleryImgRefs={galleryImgRefs}
+                    getThumbSizeRem={getThumbSizeRem}
                     onGalleryImageLoad={handleGalleryImageLoad}
                     onGalleryImageError={handleGalleryImageError}
                     onGalleryVideoLoaded={handleGalleryVideoLoaded}

@@ -14,6 +14,7 @@ type Props = {
   onSelectIndex: (index: number) => void
   getMainAdaptiveImageStyle: () => React.CSSProperties
   isLargeScreen: boolean
+  getThumbSizeRem: (large: boolean) => number
   galleryImgRefs: React.MutableRefObject<Array<HTMLImageElement | null>>
   onGalleryImageLoad: (e: React.SyntheticEvent<HTMLImageElement>, index: number) => void
   onGalleryImageError: (e: React.SyntheticEvent<HTMLImageElement>, index: number) => void
@@ -90,7 +91,7 @@ export default function ImagePreviewSection(props: Props) {
             <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
               <CarouselContent className="-ml-2 mr-2">
                 {props.images.map((image, index) => (
-                  <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${props.isLargeScreen ? 5 : 4}rem` }}>
+                  <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${props.getThumbSizeRem(props.isLargeScreen)}rem` }}>
                     <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)}>
                       <CardContent className="p-2">
                         <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
@@ -125,4 +126,3 @@ export default function ImagePreviewSection(props: Props) {
     </div>
   )
 }
-
