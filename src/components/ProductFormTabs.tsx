@@ -1427,11 +1427,11 @@ export function ProductFormTabs({
 
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
-                  {/* Секция: Редактор деревa категорій — перемещено в правую колонку на место "Основні дані" */}
-                  <div className="space-y-[0.5rem] overflow-y-auto" data-testid="productFormTabs_categoryTreeEditorSection">
+                  {/* Секция: Назви та опис — перенесена в правую колонку вместо редактора категорій */}
+                  <div className="space-y-[0.5rem] overflow-y-auto" data-testid="productFormTabs_namesDescriptionRight">
                     <Collapsible defaultOpen>
                       <div className="flex items-center gap-2 h-9">
-                        <h3 className="text-sm font-semibold leading-none">{t('category_editor_title')}</h3>
+                        <h3 className="text-sm font-semibold leading-none">{t('product_names_description')}</h3>
                         <Separator className="flex-1" />
                         <CollapsibleTrigger asChild>
                           <Button
@@ -1439,32 +1439,75 @@ export function ProductFormTabs({
                             variant="ghost"
                             size="icon"
                             aria-label={t('toggle_section')}
-                            aria-controls="categoryEditorContent"
-                            data-testid="productFormTabs_categoryEditorToggle"
+                            aria-controls="namesDescContent"
+                            data-testid="productFormTabs_namesDescToggle"
                             className="h-7 w-7 [&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180"
                           >
                             <ChevronDown className="h-4 w-4" />
                           </Button>
                         </CollapsibleTrigger>
                       </div>
-                      <CollapsibleContent id="categoryEditorContent">
-                        <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} supplierCategoriesMap={preloadedSupplierCategoriesMap as any} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
-                          ...prev,
-                          supplier_id: id
-                        }))} onCategoryCreated={async cat => {
-                          setCategories(prev => {
-                            const exists = prev?.some(c => String(c.external_id) === String(cat.external_id));
-                            if (exists) return prev;
-                            const next = [...(prev || []), {
-                              id: String(cat.external_id || `${Date.now()}`),
-                              name: cat.name || '',
-                              external_id: String(cat.external_id || ''),
-                              supplier_id: String(formData.supplier_id || ''),
-                              parent_external_id: null
-                            }];
-                            return next;
-                          });
-                        }} />
+                      <CollapsibleContent id="namesDescContent">
+                        <Tabs defaultValue="ukrainian" className="w-full">
+                          <TabsList className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="productFormTabs_langTabsList">
+                            <TabsTrigger value="ukrainian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_ukrainianTab" aria-label={t('product_name_ukrainian_tab')}>
+                              <span className="truncate">{t('product_name')}</span>
+                              <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
+                              <span className="sr-only">UA</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="russian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_russianTab" aria-label={t('product_name_russian_tab')}>
+                              <span className="truncate">{t('product_name')}</span>
+                              <Globe aria-hidden="true" className="inline-block h-[0.9rem] w-[0.9rem] text-success" />
+                              <span className="sr-only">RU</span>
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="ukrainian" className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="name_ua">{t('product_name')} *</Label>
+                              <Textarea id="name_ua" name="name_ua" autoComplete="off" value={formData.name_ua} onChange={e => setFormData({
+                                ...formData,
+                                name_ua: e.target.value
+                              })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameUaInput" disabled={!!readOnly} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="docket_ua">{t('short_name')}</Label>
+                              <Textarea id="docket_ua" name="docket_ua" autoComplete="off" value={formData.docket_ua} onChange={e => setFormData({
+                                ...formData,
+                                docket_ua: e.target.value
+                              })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketUaInput" disabled={!!readOnly} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="description_ua">{t('product_description')}</Label>
+                              <Textarea id="description_ua" name="description_ua" autoComplete="off" value={formData.description_ua} onChange={e => setFormData({
+                                ...formData,
+                                description_ua: e.target.value
+                              })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" disabled={!!readOnly} />
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="russian" className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="name">{t('product_name')}</Label>
+                              <Textarea id="name" name="name" autoComplete="off" value={formData.name} onChange={e => setFormData({
+                                ...formData,
+                                name: e.target.value
+                              })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameInput" disabled={!!readOnly} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="docket">{t('short_name')}</Label>
+                              <Textarea id="docket" name="docket" autoComplete="off" value={formData.docket} onChange={e => setFormData({
+                                ...formData,
+                                docket: e.target.value
+                              })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketInput" disabled={!!readOnly} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="description">{t('product_description')}</Label>
+                              <Textarea id="description" name="description" autoComplete="off" value={formData.description} onChange={e => setFormData({
+                                ...formData,
+                                description: e.target.value
+                              })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" disabled={!!readOnly} />
+                            </div>
+                          </TabsContent>
+                        </Tabs>
                       </CollapsibleContent>
                     </Collapsible>
                   </div>
@@ -1607,11 +1650,11 @@ export function ProductFormTabs({
                 </Collapsible>
               </div>
 
-              {/* Блок назви та опис — вынесен ниже редактора категорій, на всю ширину */}
-              <div className="space-y-4 mt-2 w-full px-2 sm:px-3" data-testid="productFormTabs_namesDescriptionFullWidth">
+              {/* Редактор категорій — перенесён туда, где был блок назви та опис, на всю ширину */}
+              <div className="space-y-4 mt-2 w-full px-2 sm:px-3" data-testid="productFormTabs_categoryTreeEditorFullWidth">
                 <Collapsible defaultOpen>
                   <div className="flex items-center gap-2 h-9">
-                    <h3 className="text-sm font-semibold leading-none">{t('product_names_description')}</h3>
+                    <h3 className="text-sm font-semibold leading-none">{t('category_editor_title')}</h3>
                     <Separator className="flex-1" />
                     <CollapsibleTrigger asChild>
                       <Button
@@ -1619,83 +1662,32 @@ export function ProductFormTabs({
                         variant="ghost"
                         size="icon"
                         aria-label={t('toggle_section')}
-                        aria-controls="namesDescContent"
-                        data-testid="productFormTabs_namesDescToggle"
+                        aria-controls="categoryEditorContent"
+                        data-testid="productFormTabs_categoryEditorToggle"
                         className="h-7 w-7 [&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180"
                       >
                         <ChevronDown className="h-4 w-4" />
                       </Button>
                     </CollapsibleTrigger>
                   </div>
-                  
-                  <CollapsibleContent id="namesDescContent">
-                    <Tabs defaultValue="ukrainian" className="w-full">
-                  <TabsList className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="productFormTabs_langTabsList">
-                    <TabsTrigger value="ukrainian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_ukrainianTab" aria-label={t('product_name_ukrainian_tab')}>
-                      <span className="truncate">{t('product_name')}</span>
-                      <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-success/10 text-success text-[0.7rem] font-semibold">UA</span>
-                      
-                      <span className="sr-only">UA</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="russian" className="shrink-0 md:shrink snap-start md:snap-none w-auto truncate leading-tight text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid="productFormTabs_russianTab" aria-label={t('product_name_russian_tab')}>
-                      <span className="truncate">{t('product_name')}</span>
-                      <Globe aria-hidden="true" className="inline-block h-[0.9rem] w-[0.9rem] text-success" />
-                      <span className="sr-only">RU</span>
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="ukrainian" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name_ua">{t('product_name')} *</Label>
-                      <Input id="name_ua" name="name_ua" autoComplete="off" value={formData.name_ua} onChange={e => setFormData({
-                      ...formData,
-                      name_ua: e.target.value
-                    })} placeholder={t('product_name_placeholder')} data-testid="productFormTabs_nameUaInput" disabled={!!readOnly} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="docket_ua">{t('short_name')}</Label>
-                      <Input id="docket_ua" name="docket_ua" autoComplete="off" value={formData.docket_ua} onChange={e => setFormData({
-                      ...formData,
-                      docket_ua: e.target.value
-                    })} placeholder={t('short_name_placeholder')} data-testid="productFormTabs_docketUaInput" disabled={!!readOnly} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description_ua">{t('product_description')}</Label>
-                      <Textarea id="description_ua" name="description_ua" autoComplete="off" value={formData.description_ua} onChange={e => setFormData({
-                      ...formData,
-                      description_ua: e.target.value
-                    })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" disabled={!!readOnly} />
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="russian" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">{t('product_name')}</Label>
-                      <Input id="name" name="name" autoComplete="off" value={formData.name} onChange={e => setFormData({
-                      ...formData,
-                      name: e.target.value
-                    })} placeholder={t('product_name_placeholder')} data-testid="productFormTabs_nameInput" disabled={!!readOnly} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="docket">{t('short_name')}</Label>
-                      <Input id="docket" name="docket" autoComplete="off" value={formData.docket} onChange={e => setFormData({
-                      ...formData,
-                      docket: e.target.value
-                    })} placeholder={t('short_name_placeholder')} data-testid="productFormTabs_docketInput" disabled={!!readOnly} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description">{t('product_description')}</Label>
-                      <Textarea id="description" name="description" autoComplete="off" value={formData.description} onChange={e => setFormData({
-                      ...formData,
-                      description: e.target.value
-                    })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" disabled={!!readOnly} />
-                    </div>
-                  </TabsContent>
-                    </Tabs>
+                  <CollapsibleContent id="categoryEditorContent">
+                    <CategoryTreeEditor suppliers={suppliers} stores={[]} categories={categories} supplierCategoriesMap={preloadedSupplierCategoriesMap as any} defaultSupplierId={formData.supplier_id} showStoreSelect={false} onSupplierChange={id => setFormData(prev => ({
+                      ...prev,
+                      supplier_id: id
+                    }))} onCategoryCreated={async cat => {
+                      setCategories(prev => {
+                        const exists = prev?.some(c => String(c.external_id) === String(cat.external_id));
+                        if (exists) return prev;
+                        const next = [...(prev || []), {
+                          id: String(cat.external_id || `${Date.now()}`),
+                          name: cat.name || '',
+                          external_id: String(cat.external_id || ''),
+                          supplier_id: String(formData.supplier_id || ''),
+                          parent_external_id: null
+                        }];
+                        return next;
+                      });
+                    }} />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
