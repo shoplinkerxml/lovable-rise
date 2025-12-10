@@ -957,13 +957,20 @@ export function ProductFormTabs({
       setActiveImageIndex(Math.min(index, reorderedImages.length - 1));
     }
   };
-  const setMainImage = (index: number) => {
+  const setMainImage = async (index: number) => {
     const newImages = images.map((img, i) => ({
       ...img,
       is_main: i === index
     }));
     setImages(newImages);
     imagesRef.current = newImages;
+    setActiveImageIndex(index);
+    try {
+      const pid = String((product as unknown as { id?: string }).id || '');
+      if (pid) {
+        await ProductService.updateProduct(pid, { images: newImages as any });
+      }
+    } catch { void 0 }
   };
 
   // Parameter handling functions
