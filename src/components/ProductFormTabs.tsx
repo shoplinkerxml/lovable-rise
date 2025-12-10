@@ -1,18 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import ImageSection from './ProductFormTabs/ImageSection';
 import NamesDescriptionSection from './ProductFormTabs/NamesDescriptionSection';
 import BasicSection from './ProductFormTabs/BasicSection';
@@ -22,15 +11,12 @@ import ImagePreviewSection from './ProductFormTabs/ImagePreviewSection';
 import ParamsSection from './ProductFormTabs/ParamsSection';
 import TabsHeader from './ProductFormTabs/TabsHeader';
 import FormActions from './ProductFormTabs/FormActions';
-import { Plus, Upload, Link, X, Image as ImageIcon, Settings, Package, ChevronLeft, ChevronRight, ChevronDown, Check, MoreHorizontal, Pencil, Trash, Trash2, Globe, Loader2 } from 'lucide-react';
+import { usePhotoPreview } from './ProductFormTabs/hooks/usePhotoPreview';
+import { Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { ProductService, type Product } from '@/lib/product-service';
-import { ProductPlaceholder } from '@/components/ProductPlaceholder';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
-import ParametersDataTable from '@/components/products/ParametersDataTable';
-import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils';
 import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData } from './ProductFormTabs/types';
 interface ProductFormTabsProps {
   product?: Product | null;
@@ -68,113 +54,7 @@ export function ProductFormTabs({
   preloadedParams,
   preloadedSupplierCategoriesMap
 }: ProductFormTabsProps) {
-  // 500px in rem (to avoid fixed px in CSS): 500 / 16 = 31.25
-  const DEFAULT_PHOTO_SIZE_REM = 31.25;
-  // Resize state for the entire photo block (shrink-only up to initial size)
-  const [photoBlockScale, setPhotoBlockScale] = useState(1);
-  const [photoBlockInitialRem, setPhotoBlockInitialRem] = useState<number | null>(null);
-  const [isLargeScreen, setIsLargeScreen] = useState<boolean>(false);
-  const photoBlockRef = useRef<HTMLDivElement | null>(null);
-  const photoBlockInitialRemRef = useRef<number | null>(null);
-  const isPhotoResizingRef = useRef(false);
-  const startXRef = useRef(0);
-  const startYRef = useRef(0);
-  const startScaleRef = useRef(1);
-  const startWidthPxRef = useRef(0);
-  const photoBlockInitialPxRef = useRef<number | null>(null);
-  // Высота фото-блока для ограничения правой колонки
-  const [photoBlockHeight, setPhotoBlockHeight] = useState<number>(0);
-  const updatePhotoHeight = useCallback(() => {
-    if (!photoBlockRef.current) return;
-    setPhotoBlockHeight(photoBlockRef.current.offsetHeight);
-  }, []);
-  const clampScale = useCallback((value: number) => {
-    // Абсолютный минимум: 250px (15.625rem) и не меньше 50% от базовой ширины
-    const MIN_ABS_PX = 250;
-    const baselinePx = photoBlockInitialPxRef.current ?? startWidthPxRef.current;
-    const ratioMin = baselinePx ? MIN_ABS_PX / baselinePx : 0.5;
-    const MIN_SCALE = Math.max(0.5, ratioMin);
-    if (value < MIN_SCALE) return MIN_SCALE;
-    if (value > 1) return 1;
-    return value;
-  }, []);
-  const resetPhotoBlockToDefaultSize = useCallback(() => {
-    const initialRem = photoBlockInitialRemRef.current;
-    if (!initialRem) return;
-    const desiredScale = DEFAULT_PHOTO_SIZE_REM / initialRem;
-    setPhotoBlockScale(clampScale(desiredScale));
-  }, [clampScale]);
-  const handlePhotoResizeMove = useCallback((e: MouseEvent) => {
-    if (!isPhotoResizingRef.current) return;
-    const dx = e.clientX - startXRef.current;
-    const denom = Math.max(photoBlockInitialPxRef.current ?? startWidthPxRef.current, 1);
-    const SENSITIVITY = 1.0; // более отзывчивое изменение размера
-    const deltaRatio = dx / denom * SENSITIVITY; // width-proportional change
-    const next = clampScale(startScaleRef.current + deltaRatio);
-    setPhotoBlockScale(next);
-  }, [clampScale]);
-  const handlePhotoResizeEnd = useCallback(() => {
-    if (!isPhotoResizingRef.current) return;
-    isPhotoResizingRef.current = false;
-    document.removeEventListener('mousemove', handlePhotoResizeMove);
-    document.removeEventListener('mouseup', handlePhotoResizeEnd);
-  }, [handlePhotoResizeMove]);
-  const handlePhotoResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!photoBlockRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-    isPhotoResizingRef.current = true;
-    startXRef.current = (e as React.MouseEvent).clientX;
-    startYRef.current = (e as React.MouseEvent).clientY;
-    startScaleRef.current = photoBlockScale;
-    startWidthPxRef.current = photoBlockRef.current.offsetWidth;
-    document.addEventListener('mousemove', handlePhotoResizeMove);
-    document.addEventListener('mouseup', handlePhotoResizeEnd);
-  }, [handlePhotoResizeMove, handlePhotoResizeEnd, photoBlockScale]);
-
-  // Measure initial block width once (baseline) and set up listeners
-  useEffect(() => {
-    const measure = () => {
-      if (!photoBlockRef.current) return;
-      const px = photoBlockRef.current.offsetWidth;
-      const rem = px / 16;
-      // Lock baselines only once
-      if (photoBlockInitialPxRef.current == null) {
-        photoBlockInitialPxRef.current = px; // baseline in px
-      }
-      if (photoBlockInitialRemRef.current == null) {
-        photoBlockInitialRemRef.current = rem; // baseline in rem
-        setPhotoBlockInitialRem(rem);
-        // Set initial size to 500x500 (31.25rem) relative to baseline
-        const desiredScale = DEFAULT_PHOTO_SIZE_REM / rem;
-        setPhotoBlockScale(clampScale(desiredScale));
-      }
-    };
-    measure();
-    updatePhotoHeight();
-    const mq = window.matchMedia('(min-width: 1024px)');
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
-      const matches = 'matches' in e ? e.matches : (e as MediaQueryList).matches;
-      setIsLargeScreen(matches);
-    };
-    handler(mq);
-    mq.addEventListener('change', handler as any);
-    window.addEventListener('resize', measure);
-    window.addEventListener('resize', updatePhotoHeight);
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('resize', updatePhotoHeight);
-      mq.removeEventListener('change', handler as any);
-    };
-  }, [updatePhotoHeight]);
-
-  // Cleanup listeners if unmounts mid-resize
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handlePhotoResizeMove);
-      document.removeEventListener('mouseup', handlePhotoResizeEnd);
-    };
-  }, [handlePhotoResizeMove, handlePhotoResizeEnd]);
+  
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
   const [tabsOverflow, setTabsOverflow] = useState(false);
   useEffect(() => {
@@ -241,6 +121,7 @@ export function ProductFormTabs({
   const [imageUrl, setImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const { photoBlockRef, isLargeScreen, getAdaptiveImageStyle, handlePhotoResizeStart, resetPhotoBlockToDefaultSize, galleryImgRefs } = usePhotoPreview(activeImageIndex);
   const [imageDimensions, setImageDimensions] = useState<{
     width: number;
     height: number;
@@ -267,7 +148,7 @@ export function ProductFormTabs({
   const [isDragOver, setIsDragOver] = useState(false);
   const [galleryLoaded, setGalleryLoaded] = useState(false);
   const [galleryLoadCount, setGalleryLoadCount] = useState(0);
-  const galleryImgRefs = useRef<Array<HTMLImageElement | null>>([]);
+  
   const [mainImageLoaded, setMainImageLoaded] = useState<boolean>(true);
   const mainImgRef = useRef<HTMLImageElement | null>(null);
   const getThumbFlexBasis = (count: number): string => {
@@ -327,8 +208,6 @@ export function ProductFormTabs({
       newMap.set(activeImageIndex, dimensions);
       return newMap;
     });
-    // После загрузки изображения обновляем высоту фото-блока
-    updatePhotoHeight();
     setMainImageLoaded(true);
   };
   const handleMainImageError = (_event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -344,7 +223,6 @@ export function ProductFormTabs({
       newMap.set(activeImageIndex, dimensions);
       return newMap;
     });
-    updatePhotoHeight();
     setMainImageLoaded(true);
   };
 
@@ -393,44 +271,10 @@ export function ProductFormTabs({
       return next;
     });
   };
-  useEffect(() => {
-    if (activeTab === 'images') {
-      notifyImagesLoading(images.length > 0 && !galleryLoaded);
-    } else {
-      notifyImagesLoading(false);
-    }
-  }, [activeTab, galleryLoaded, images.length]);
-  useEffect(() => {
-    if (activeTab !== 'images') return;
-    const total = images.length;
-    if (total === 0) {
-      setGalleryLoaded(true);
-      notifyImagesLoading(false);
-      return;
-    }
-    const done = images.map((it, i) => {
-      const el = galleryImgRefs.current[i];
-      const hasUrl = !!it?.url;
-      return hasUrl ? (el && el.complete ? 1 : 0) : 1;
-    }).reduce((a, b) => a + b, 0);
-    if (done >= total) {
-      setGalleryLoaded(true);
-      notifyImagesLoading(false);
-    }
-  }, [activeTab, images]);
+  
+  
 
-  const getAdaptiveImageStyle = () => {
-    const baseRem = photoBlockInitialRem ?? DEFAULT_PHOTO_SIZE_REM;
-    const minRem = Math.max(baseRem * 0.5, 12);
-    let sizeRem = Math.max(baseRem * photoBlockScale, minRem);
-    if (typeof window !== 'undefined') {
-      const envWidthPx = window.innerWidth;
-      const padPx = Math.max(8, Math.min(16, envWidthPx * 0.02));
-      const vwRem = (envWidthPx - padPx) / 16;
-      if (vwRem > 0) sizeRem = Math.min(sizeRem, vwRem);
-    }
-    return { width: `${sizeRem}rem`, height: `${sizeRem}rem` };
-  };
+  
 
   // Calculate adaptive container style for gallery images
   const getGalleryAdaptiveImageStyle = (index: number) => {
@@ -455,63 +299,19 @@ export function ProductFormTabs({
     };
   };
 
-  // Reset image dimensions when active image changes
-  useEffect(() => {
-    setImageDimensions(null);
-    setGalleryImageDimensions(new Map());
-  }, [activeImageIndex, images]);
+  
 
-  useEffect(() => {
-    const el = galleryImgRefs.current[activeImageIndex];
-    if (el && typeof el.scrollIntoView === 'function') {
-      try {
-        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      } catch {}
-    }
-  }, [activeImageIndex]);
+  
 
   // Keep a live ref of images for cleanup during navigation/unload
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
 
-  // Обновляем высоту фото-блока при изменении масштаба/брейкпоинта
-  useEffect(() => {
-    updatePhotoHeight();
-  }, [photoBlockScale, isLargeScreen, updatePhotoHeight]);
+  
 
   // Calculate maximum container size from all images
-  useEffect(() => {
-    if (allImageDimensions.size === 0) {
-      setMaxContainerSize(null);
-      return;
-    }
-    const maxSize = 600;
-    let maxWidth = 0;
-    let maxHeight = 0;
-
-    // Find the maximum dimensions after scaling
-    allImageDimensions.forEach(({
-      width,
-      height
-    }) => {
-      let scaledWidth = width;
-      let scaledHeight = height;
-
-      // If image is larger than max size, scale it down proportionally
-      if (width > maxSize || height > maxSize) {
-        const scale = Math.min(maxSize / width, maxSize / height);
-        scaledWidth = width * scale;
-        scaledHeight = height * scale;
-      }
-      maxWidth = Math.max(maxWidth, scaledWidth);
-      maxHeight = Math.max(maxHeight, scaledHeight);
-    });
-    setMaxContainerSize({
-      width: maxWidth,
-      height: maxHeight
-    });
-  }, [allImageDimensions]);
+  
 
   // Parameters state
   const [parameters, setParameters] = useState<ProductParam[]>([]);
