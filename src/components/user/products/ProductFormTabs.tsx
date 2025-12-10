@@ -1060,7 +1060,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
 
         {/* Характеристики */}
         <TabsContent value="params" className="space-y-6" data-testid="productFormTabs_paramsContent">
-          <Card data-testid="productFormTabs_paramsCard">
+          <Card data-testid="productFormTabs_paramsCard" className="border-0 shadow-none">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

@@ -60,7 +60,12 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
   const { t } = useI18n();
 
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
+    select: true,
+    paramid: false,
+    valueid: false,
+    order_index: false,
+  });
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
@@ -74,7 +79,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
     {
       id: "select",
       header: ({ table }) => (
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-start">
           <Checkbox
             checked={
               table.getIsAllPageRowsSelected()
@@ -89,7 +94,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
         </div>
       ),
       cell: ({ row }) => (
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-start">
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -134,24 +139,26 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
       header: t("actions"),
       enableSorting: false,
       enableHiding: false,
-      size: 96,
+      size: 56,
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" data-testid="parametersDataTable_rowActions">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEditRow(row.index)} data-testid="parametersDataTable_rowAction_edit">
-              <Pencil className="h-4 w-4 mr-2" /> {t("edit_characteristic")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => onDeleteRow(row.index)} data-testid="parametersDataTable_rowAction_delete">
-              <Trash2 className="h-4 w-4 mr-2" /> {t("delete_characteristic")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex justify-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" data-testid="parametersDataTable_rowActions">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEditRow(row.index)} data-testid="parametersDataTable_rowAction_edit">
+                <Pencil className="h-4 w-4 mr-2" /> {t("edit_characteristic")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={() => onDeleteRow(row.index)} data-testid="parametersDataTable_rowAction_delete">
+                <Trash2 className="h-4 w-4 mr-2" /> {t("delete_characteristic")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ),
     },
   ], [onEditRow, onDeleteRow, t]);
@@ -185,6 +192,23 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
   React.useEffect(() => {
     setRowSelection({});
   }, [data]);
+
+  React.useEffect(() => {
+    const mq = window.matchMedia("(max-width: 520px)");
+    const apply = () => {
+      const valueCol = table.getColumn("value");
+      const paramCol = table.getColumn("paramid");
+      if (mq.matches) {
+        valueCol?.toggleVisibility(false);
+        paramCol?.toggleVisibility(false);
+      } else {
+        valueCol?.toggleVisibility(true);
+      }
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [table]);
 
   const buildCsv = (rows: ProductParam[]) => {
     const header = ["name","value","paramid","valueid","order_index"].join(",");
@@ -347,12 +371,12 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
             placeholder={t("search_placeholder")}
             value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
             onChange={(event) => table.getColumn("name")?.setFilterValue(event.target.value)}
-            className="w-[clamp(12rem,40vw,24rem)]"
+            className="w-[clamp(12rem,40vw,24rem)] hidden sm:block"
             data-testid="parametersDataTable_filter"
           />
         </div>
         <div
-          className={`flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm ${dragActive ? 'ring-2 ring-primary border-primary' : ''}`}
+          className={`flex items-center gap-2 bg-card/70 backdrop-blur-sm rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm ${dragActive ? 'ring-2 ring-primary' : ''}`}
           data-testid="parametersDataTable_actions_block"
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -496,13 +520,17 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
       </Dialog>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-hidden rounded-lg">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} colSpan={header.colSpan}>
+                  <TableHead
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    className={header.column.id === "actions" ? "text-center w-[3.5rem] px-0 pr-2 whitespace-nowrap" : header.column.id === "select" ? "text-left w-[3rem] pl-2 pr-0" : "text-left"}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -516,7 +544,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-testid={`parametersDataTable_row_${row.index}`}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className={cell.column.id === "actions" ? "w-[3.5rem] px-0 pr-2 text-center" : cell.column.id === "select" ? "w-[3rem] pl-2 pr-0" : ""}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -535,17 +563,8 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
 
       {/* Footer: selection status + rows per page + pagination (single row) */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1 pt-2" data-testid="parametersDataTable_footer">
-        <div className="text-xs text-muted-foreground" data-testid="parametersDataTable_selectionStatus">
-          {(() => {
-            const selected = table.getSelectedRowModel().rows.length;
-            const total = table.getFilteredRowModel().rows.length || 0;
-            return t("rows_selected") === "Вибрано"
-              ? `Вибрано ${selected} з ${total} рядків.`
-              : `${selected} of ${total} row(s) selected.`;
-          })()}
-        </div>
         <div className="flex items-center gap-2" data-testid="parametersDataTable_rowsPerPage">
-          <div className="text-sm" data-testid="parametersDataTable_rowsPerPageLabel">{t("page_size")}</div>
+          <div className="text-sm hidden sm:block" data-testid="parametersDataTable_rowsPerPageLabel">{t("page_size")}</div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8" data-testid="parametersDataTable_pageSize">
