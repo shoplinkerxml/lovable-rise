@@ -973,6 +973,17 @@ export function ProductFormTabs({
     } catch { void 0 }
   };
 
+  const handleReorderImages = async (list: ProductImage[]) => {
+    setImages(list);
+    imagesRef.current = list;
+    try {
+      const pid = String((product as unknown as { id?: string }).id || '');
+      if (pid) {
+        await ProductService.updateProduct(pid, { images: list as any });
+      }
+    } catch { void 0 }
+  };
+
   // Parameter handling functions
   // Characteristic modal handlers
   const openAddParamModal = () => {
@@ -1111,6 +1122,7 @@ export function ProductFormTabs({
                 onAddImageFromUrl={addImageFromUrl}
                 onRemoveImage={(index) => removeImage(index)}
                 onSetMainImage={(index) => setMainImage(index)}
+                onReorderImages={handleReorderImages}
                 onFileUpload={handleFileUpload}
                 onDropZoneClick={() => document.getElementById('fileUpload')?.click()}
                 onDragEnter={handleDragEnter}

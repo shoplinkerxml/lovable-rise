@@ -1187,6 +1187,8 @@ const toastDictionary = {
   main_photo: { uk: "Головне", en: "Main" },
   set_as_main_photo: { uk: "Зробити головним", en: "Set as main" },
   uploading_image: { uk: "Завантаження зображення...", en: "Uploading image..." },
+  reorder: { uk: "Змінити порядок", en: "Reorder" },
+  drag_to_reorder: { uk: "Перетягніть, щоб змінити порядок", en: "Drag to reorder" },
   product_characteristics: { uk: "Характеристики товару", en: "Product Characteristics" },
   add_characteristic: { uk: "Додати характеристику", en: "Add Characteristic" },
   no_characteristics_added: { uk: "Характеристики не додані", en: "No Characteristics Added" },

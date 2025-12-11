@@ -4,10 +4,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2, ChevronLeft, ChevronRight, ListOrdered } from 'lucide-react'
 import { useI18n } from '@/providers/i18n-provider'
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DialogDescription } from '@/components/ui/dialog'
 
 export type ProductImage = {
   id?: string
@@ -28,6 +33,7 @@ type Props = {
   onAddImageFromUrl: () => void
   onRemoveImage: (index: number) => void
   onSetMainImage: (index: number) => void
+  onReorderImages?: (images: ProductImage[]) => void
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   onDropZoneClick: () => void
   onDragEnter: (e: React.DragEvent<HTMLDivElement>) => void
@@ -73,6 +79,77 @@ export function ImageSection(props: Props) {
     if (count === 6) return '16.6667%'
     if (count === 7) return '14.2857%'
     return '12.5%'
+  }
+
+  const sensors = useSensors(useSensor(PointerSensor))
+
+  const [reorderOpen, setReorderOpen] = React.useState(false)
+  const [reorderList, setReorderList] = React.useState<ProductImage[]>([])
+
+  function SortableThumb({ image, index }: { image: ProductImage; index: number }) {
+    const id = String(image.object_key || image.url || index)
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.8 : 1,
+      cursor: 'grab',
+    }
+    const original = image.url
+    const isVid = isVideoUrl(original)
+    const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
+          {src ? (
+            isVid ? (
+              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+            ) : (
+              <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
+            )
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const ids = props.images.map((im) => String(im.object_key || im.url))
+    const oldIndex = ids.indexOf(String(active.id))
+    const newIndex = ids.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    const moved = arrayMove(props.images, oldIndex, newIndex).map((img, i) => ({ ...img, order_index: i }))
+    props.onReorderImages?.(moved)
+  }
+
+  function handleModalDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const ids = reorderList.map((im) => String(im.object_key || im.url))
+    const oldIndex = ids.indexOf(String(active.id))
+    const newIndex = ids.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    setReorderList((prev) => arrayMove(prev, oldIndex, newIndex).map((img, i) => ({ ...img, order_index: i })))
+  }
+
+  function ModalSortableThumb({ image, index }: { image: ProductImage; index: number }) {
+    const id = (image.object_key || image.url || index).toString()
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
+    const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
+    const original = image.url
+    const isVid = isVideoUrl(original)
+    const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="aspect-square rounded-md overflow-hidden border">
+        {src ? (isVid ? (
+          <video src={src} className="w-full h-full object-contain" preload="metadata" />
+        ) : (
+          <img src={src} className="w-full h-full object-contain" alt={image.alt_text || ''} />
+        )) : null}
+      </div>
+    )
   }
   return (
     <div className="relative space-y-3 md:space-y-4">
@@ -128,6 +205,14 @@ export function ImageSection(props: Props) {
                       <Check className="h-4 w-4" />
                     </Button>
                   )}
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label={t('reorder') || 'Змінити порядок'}
+                    onClick={() => { setReorderList(props.images.slice()); setReorderOpen(true) }}
+                  >
+                    <ListOrdered className="h-4 w-4" />
+                  </Button>
                   <Button size="icon" variant="destructive" onClick={() => props.onRemoveImage(props.activeIndex)}>
                     <X className="h-4 w-4" />
                   </Button>
@@ -148,41 +233,56 @@ export function ImageSection(props: Props) {
         </div>
       )}
       {props.images.length > 0 && (
+          <>
           <div className="relative w-full">
-            <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
-              <CarouselContent className="-ml-2 mr-2">
-                {props.images.map((image, index) => (
-                  <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
-                  <Card
-                    className={`relative group cursor-pointer transition-all border-0 shadow-none`}
-                    onClick={() => props.onSelectIndex(index)}
-                    data-testid={`productFormTabs_imageCard_${index}`}
-                  >
-                    <CardContent className="p-2">
-                      <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
-                        {(() => {
-                          const original = image.url
-                          const isVid = isVideoUrl(original)
-                          const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
-                          if (!src) return null
-                          if (isVid) {
-                            return (
-                              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
-                            )
-                          }
-                          return (
-                            <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
-                          )
-                        })()}
-                      </div>
-                      {null}
-                    </CardContent>
-                  </Card>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
-        </div>
+            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+              <SortableContext items={props.images.map((im) => String(im.object_key || im.url || ''))} strategy={horizontalListSortingStrategy}>
+                <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
+                  <CarouselContent className="-ml-2 mr-2">
+                    {props.images.map((image, index) => (
+                      <CarouselItem key={(image.object_key || image.url || index).toString()} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
+                        <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)} data-testid={`productFormTabs_imageCard_${index}`}>
+                          <CardContent className="p-2">
+                            <SortableThumb image={image} index={index} />
+                          </CardContent>
+                        </Card>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                </Carousel>
+              </SortableContext>
+            </DndContext>
+          </div>
+
+          <Dialog open={reorderOpen} onOpenChange={(o) => setReorderOpen(!!o)}>
+            <DialogContent className="max-w-3xl sm:max-w-4xl p-3 sm:p-4 max-h-[85vh] sm:max-h-[80vh] overflow-y-auto" overlayClassName="bg-black/50">
+              <DialogHeader>
+                <DialogTitle>{t('reorder') || 'Змінити порядок зображень'}</DialogTitle>
+                <DialogDescription>{t('drag_to_reorder') || 'Перетягніть зображення, щоб змінити порядок. Максимум 15 фото.'}</DialogDescription>
+              </DialogHeader>
+              <DndContext sensors={sensors} onDragEnd={handleModalDragEnd}>
+                <SortableContext items={reorderList.map((im) => String(im.object_key || im.url || ''))} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
+                    {reorderList.slice(0, 15).map((image, index) => (
+                      <ModalSortableThumb key={(image.object_key || image.url || index).toString()} image={image} index={index} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              <DialogFooter className="mt-4">
+                <Button variant="outline" onClick={() => setReorderOpen(false)}>{t('cancel') || 'Скасувати'}</Button>
+                <Button
+                  onClick={() => {
+                    props.onReorderImages?.(reorderList.map((img, i) => ({ ...img, order_index: i })))
+                    setReorderOpen(false)
+                  }}
+                >
+                  {t('save') || 'Зберегти'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          </>
       )}
       </div>
 
