@@ -78,9 +78,9 @@ export const MappingTable: React.FC<MappingTableProps> = ({
   };
 
   // Отримати поточний маппінг для XML поля
-  const getMappingForField = (xmlPath: string): MappingRule | undefined => {
+  const getMappingForField = React.useCallback((xmlPath: string): MappingRule | undefined => {
     return mappings.find(m => m.sourceField === xmlPath);
-  };
+  }, [mappings]);
 
   // Оновити маппінг
   const updateMapping = (xmlPath: string, systemFieldId: string | null, transformation?: TransformationType | string) => {
@@ -132,7 +132,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
     }
     
     return fields;
-  }, [xmlFields, showOnlyUnmapped, searchQuery, mappings]);
+  }, [xmlFields, showOnlyUnmapped, searchQuery, getMappingForField]);
 
   // Підрахунок прогресу
   const requiredFieldsCount = systemFields.filter(f => f.required).length;

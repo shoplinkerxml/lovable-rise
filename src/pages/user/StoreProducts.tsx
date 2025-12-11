@@ -36,7 +36,7 @@ export const StoreProducts = () => {
         setShopName("");
       }
     })();
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     (async () => {

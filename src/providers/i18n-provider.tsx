@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, ReactNode, useCallback } from "react";
 
 type Lang = "uk" | "en";
 
@@ -1304,7 +1304,7 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const [lang, setLang] = useState<Lang>("uk");
-  const t = (key: keyof typeof dictionary) => {
+  const t = useCallback((key: keyof typeof dictionary) => {
     const entry = dictionary[key];
     if (!entry) {
       console.error(`Translation key "${key}" not found in dictionary`);
@@ -1320,7 +1320,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
       return `[${key}]`;
     }
     return value;
-  };
+  }, [lang]);
   const value = useMemo(() => ({ lang, t, setLang }), [lang, t]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };

@@ -12,6 +12,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
+import { FormFieldContext, FormItemContext, useFormField } from "@/components/ui/use-form-field"
 
 const Form = FormProvider
 
@@ -22,9 +23,7 @@ type FormFieldContextValue<
   name: TName
 }
 
-const FormFieldContext = React.createContext<FormFieldContextValue>(
-  {} as FormFieldContextValue
-)
+// moved to use-form-field.ts
 
 const FormField = <
   TFieldValues extends FieldValues = FieldValues,
@@ -39,36 +38,13 @@ const FormField = <
   )
 }
 
-const useFormField = () => {
-  const fieldContext = React.useContext(FormFieldContext)
-  const itemContext = React.useContext(FormItemContext)
-  const { getFieldState, formState } = useFormContext()
-
-  const fieldState = getFieldState(fieldContext.name, formState)
-
-  if (!fieldContext) {
-    throw new Error("useFormField should be used within <FormField>")
-  }
-
-  const { id } = itemContext
-
-  return {
-    id,
-    name: fieldContext.name,
-    formItemId: `${id}-form-item`,
-    formDescriptionId: `${id}-form-item-description`,
-    formMessageId: `${id}-form-item-message`,
-    ...fieldState,
-  }
-}
+// moved to use-form-field.ts
 
 type FormItemContextValue = {
   id: string
 }
 
-const FormItemContext = React.createContext<FormItemContextValue>(
-  {} as FormItemContextValue
-)
+// moved to use-form-field.ts
 
 const FormItem = React.forwardRef<
   HTMLDivElement,
@@ -165,7 +141,6 @@ const FormMessage = React.forwardRef<
 FormMessage.displayName = "FormMessage"
 
 export {
-  useFormField,
   Form,
   FormItem,
   FormLabel,

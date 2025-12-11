@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -179,11 +179,7 @@ export const LimitsList = ({
     }
   };
 
-  useEffect(() => {
-    loadLimits();
-  }, [refreshTrigger]);
-
-  const loadLimits = async () => {
+  const loadLimits = useCallback(async () => {
     try {
       setLoading(true);
       const data = await LimitService.getLimits();
@@ -195,7 +191,11 @@ export const LimitsList = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [t, onLimitsLoaded]);
+
+  useEffect(() => {
+    loadLimits();
+  }, [loadLimits, refreshTrigger]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.limit) return;

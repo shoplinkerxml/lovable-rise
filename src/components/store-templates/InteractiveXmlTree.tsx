@@ -369,9 +369,9 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     });
     
     return buildTree(obj);
-  }, []);
+  }, [buildTree]);
 
-  const buildTree = (obj: any, parentPath = '', parentName = ''): TreeNode[] => {
+  const buildTree = React.useCallback((obj: any, parentPath = '', parentName = ''): TreeNode[] => {
     const nodes: TreeNode[] = [];
     let textValue: string | null = null;
     let nodeId = 0;
@@ -668,7 +668,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
     }
 
     return nodes;
-  };
+  }, []);
 
   const buildTreeFromFields = (fields: XMLField[]): TreeNode[] => {
     // Fallback если нет XML
@@ -693,7 +693,7 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
       prevXmlRef.current = currentXml;
       setTreeData(buildTreeFromStructure(structure, currentXml));
     }
-  }, [structure.originalXml, xmlContent]);
+  }, [structure, xmlContent, buildTreeFromStructure]);
 
   // Автосохранение при изменении дерева (с защитой от зацикливания)
   const isSavingRef = React.useRef(false);

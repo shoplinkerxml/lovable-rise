@@ -44,11 +44,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { data: storeRow, error: storeErr } = await supabase
       .from('user_stores')
-      .select('id, user_id, store_name, store_company, store_url, template_id, xml_config, custom_mapping, marketplace, is_active, created_at, updated_at')
+      .select('id, user_id, store_name, store_company, store_url, template_id, xml_config, custom_mapping, is_active, created_at, updated_at')
       .eq('id', storeId)
       .maybeSingle()
     if (storeErr) return json({ error: 'db_error' }, { status: 500 })
     if (!storeRow || String((storeRow as any).user_id) !== userRes.user.id) return json({ error: 'forbidden' }, { status: 403 })
+
+    let shopMarketplace: string | null = null
+    if ((storeRow as any).template_id) {
+      const { data: tpl, error: tplErr } = await supabase
+        .from('store_templates')
+        .select('marketplace')
+        .eq('id', String((storeRow as any).template_id))
+        .maybeSingle()
+      if (!tplErr && tpl && (tpl as any)?.marketplace) {
+        shopMarketplace = String((tpl as any).marketplace)
+      }
+    }
 
     const [productsRes, storeCurrenciesRes, availCurRes, storeCatsRes, marketplacesRes] = await Promise.all([
       supabase.from('store_products').select('*', { count: 'exact', head: true }).eq('store_id', storeId),
@@ -123,7 +135,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     ).sort((a, b) => a.localeCompare(b))
 
     return json({
-      shop: storeRow,
+      shop: { ...(storeRow as any), marketplace: shopMarketplace },
       productsCount,
       storeCurrencies,
       availableCurrencies,
@@ -134,4 +146,3 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: (e as any)?.message || 'failed' }, { status: 500 })
   }
 })
-

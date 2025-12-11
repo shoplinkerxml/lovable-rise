@@ -48,5 +48,11 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
+  },
+  {
+    files: ["src/providers/**/*.{ts,tsx}", "src/components/ui/sidebar.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
   }
 );

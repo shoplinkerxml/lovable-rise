@@ -183,7 +183,7 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
     return table
       .getSelectedRowModel()
       .flatRows.map((r) => r.index);
-  }, [rowSelection, table]);
+  }, [table]);
 
   React.useEffect(() => {
     onSelectionChange?.(selectedIndices);

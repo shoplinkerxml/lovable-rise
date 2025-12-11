@@ -105,7 +105,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 
-export const schema = z.object({
+const schema = z.object({
   id: z.number(),
   header: z.string(),
   type: z.string(),

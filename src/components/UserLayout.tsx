@@ -68,7 +68,7 @@ interface UserMenuContextState {
   hasAccess: boolean;
 }
 const UserMenuContext = createContext<UserMenuContextState | null>(null);
-export const useUserMenu = () => {
+const useUserMenu = () => {
   const context = useContext(UserMenuContext);
   if (!context) {
     throw new Error('useUserMenu must be used within UserMenuProvider');
@@ -117,7 +117,7 @@ const UserMenuProvider: React.FC<{
     refetchOnReconnect: false,
     placeholderData: (prev) => prev as UserMenuItem[] | undefined,
   });
-  const menuItems: UserMenuItem[] = menuItemsData ?? [];
+  const menuItems: UserMenuItem[] = useMemo(() => menuItemsData ?? [], [menuItemsData]);
   const refreshMenuItems = useCallback(async () => {
     queryClient.invalidateQueries({ queryKey: ['userMenu', userId] });
   }, [queryClient, userId]);
@@ -179,7 +179,7 @@ const UserMenuProvider: React.FC<{
         replace: false
       });
     }
-  }, [navigate]);
+  }, [navigate, setActiveMenuItem]);
 
   // Subscription access is provided via props; reactive updates handled higher up
 

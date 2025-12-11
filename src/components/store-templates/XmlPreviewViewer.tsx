@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
@@ -33,55 +33,14 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
   const [treeData, setTreeData] = useState<TreeNode[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (xmlContent) {
-      parseXmlToTree(xmlContent);
+  const truncateValue = useCallback((value: string, maxLength = 50): string => {
+    if (value.length > maxLength) {
+      return value.substring(0, maxLength) + '...';
     }
-  }, [xmlContent]);
+    return value;
+  }, []);
 
-  const parseXmlToTree = (xml: string) => {
-    try {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@',
-        textNodeName: '_text',
-        parseAttributeValue: true,
-        parseTagValue: true
-      });
-
-      const parsed = parser.parse(xml);
-      console.log('[XmlPreviewViewer] Parsed XML:', parsed);
-      console.log('[XmlPreviewViewer] Keys:', Object.keys(parsed));
-      const tree = buildTree(parsed);
-      console.log('[XmlPreviewViewer] Built tree:', tree);
-      console.log('[XmlPreviewViewer] Tree length:', tree.length);
-      if (tree.length > 0 && tree[0].children) {
-        console.log('[XmlPreviewViewer] First node children:', tree[0].children.length);
-        console.log('[XmlPreviewViewer] First child:', tree[0].children[0]);
-      }
-      setTreeData(tree);
-      
-      // Разворачиваем все узлы по умолчанию
-      const allExpanded = new Set<string>();
-      const expandAll = (nodes: TreeNode[], prefix = '') => {
-        nodes.forEach((node, idx) => {
-          const path = prefix ? `${prefix}-${idx}` : String(idx);
-          allExpanded.add(path);
-          console.log('[expandAll] Added path:', path, 'children:', node.children?.length || 0);
-          if (node.children && node.children.length > 0) {
-            expandAll(node.children, path);
-          }
-        });
-      };
-      expandAll(tree);
-      console.log('[XmlPreviewViewer] Total expanded paths:', allExpanded.size);
-      setExpanded(allExpanded);
-    } catch (error) {
-      console.error('Error parsing XML:', error);
-    }
-  };
-
-  const buildTree = (obj: any, parentPath = '', parentName = ''): TreeNode[] => {
+  const buildTree = useCallback((obj: any, parentPath = '', parentName = ''): TreeNode[] => {
     const nodes: TreeNode[] = [];
     let textValue: string | null = null;
 
@@ -89,7 +48,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
       textValue = truncateValue(String(obj._text));
     }
 
-    // Спочатку збираємо атрибути (@date, @version, @id і т.д.), потім інші
     const attributes: [string, any][] = [];
     const others: [string, any][] = [];
     
@@ -101,17 +59,14 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
       }
     }
     
-    // Для param - показываем в формате: @name → _text → @paramid → @valueid
     const isParam = parentName === 'param';
     
     if (isParam) {
-      // Специальная обработка для param
       const nameAttr = attributes.find(([k]) => k === '@name');
       const paramidAttr = attributes.find(([k]) => k === '@paramid');
       const valueidAttr = attributes.find(([k]) => k === '@valueid');
       const valueField = others.find(([k]) => k === 'value');
       
-      // 1. Название характеристики (@name)
       if (nameAttr) {
         nodes.push({
           name: '@name',
@@ -120,7 +75,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         });
       }
       
-      // 2. Значение (_text или value)
       if (textValue !== null) {
         nodes.push({
           name: 'value',
@@ -144,7 +98,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         }
       }
       
-      // 3. ID параметра (@paramid)
       if (paramidAttr) {
         nodes.push({
           name: '@paramid',
@@ -153,7 +106,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         });
       }
       
-      // 4. ID значения (@valueid)
       if (valueidAttr) {
         nodes.push({
           name: '@valueid',
@@ -162,7 +114,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         });
       }
       
-      // Обработка остальных атрибутов и полей
       for (const [key, value] of attributes) {
         if (!['@name', '@paramid', '@valueid'].includes(key)) {
           nodes.push({
@@ -215,8 +166,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         }
       }
     } else {
-      // Обычная обработка для не-param элементов
-      // Обрабатываем атрибуты ПЕРВЫМИ
       for (const [key, value] of attributes) {
         nodes.push({
           name: key,
@@ -225,7 +174,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         });
       }
       
-      // Потом обрабатываем остальные поля
       for (const [key, value] of others) {
         const currentPath = parentPath ? `${parentPath}.${key}` : key;
         
@@ -238,9 +186,7 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
         } else if (key === '_text') {
           continue;
         } else if (Array.isArray(value)) {
-          // МАСИВ - РОЗГОРТАЄМО ВСІ ЕЛЕМЕНТИ НАПРЯМУ
           if (key === 'param') {
-            // Кожен param окремо
             value.forEach((item, idx) => {
               if (typeof item === 'object') {
                 nodes.push({
@@ -257,7 +203,6 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
               }
             });
           } else {
-            // Всі інші масиви - кожен елемент як окремий вузол
             value.forEach((item, idx) => {
               if (typeof item === 'object') {
                 nodes.push({
@@ -299,14 +244,45 @@ export const XmlPreviewViewer = ({ xmlContent, className = '' }: XmlPreviewViewe
     }
 
     return nodes;
-  };
+  }, [truncateValue]);
 
-  const truncateValue = (value: string, maxLength = 50): string => {
-    if (value.length > maxLength) {
-      return value.substring(0, maxLength) + '...';
+  const parseXmlToTree = useCallback((xml: string) => {
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@',
+        textNodeName: '_text',
+        parseAttributeValue: true,
+        parseTagValue: true
+      });
+
+      const parsed = parser.parse(xml);
+      const tree = buildTree(parsed);
+      setTreeData(tree);
+      const allExpanded = new Set<string>();
+      const expandAll = (nodes: TreeNode[], prefix = '') => {
+        nodes.forEach((node, idx) => {
+          const path = prefix ? `${prefix}-${idx}` : String(idx);
+          allExpanded.add(path);
+          if (node.children && node.children.length > 0) {
+            expandAll(node.children, path);
+          }
+        });
+      };
+      expandAll(tree);
+      setExpanded(allExpanded);
+    } catch (error) {
+      console.error('Error parsing XML:', error);
     }
-    return value;
-  };
+  }, [buildTree]);
+
+  useEffect(() => {
+    if (xmlContent) {
+      parseXmlToTree(xmlContent);
+    }
+  }, [xmlContent, parseXmlToTree]);
+
+ 
 
   const getIcon = (node: TreeNode) => {
     const iconClass = 'h-4 w-4 text-primary';

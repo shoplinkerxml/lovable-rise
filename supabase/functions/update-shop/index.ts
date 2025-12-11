@@ -29,9 +29,15 @@ Deno.serve(async (req) => {
 
   try {
     const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey)
-    const userId = decodeJwtSub(authHeader)
-    if (!userId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders })
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    const { data: userRes, error: userErr } = await supabase.auth.getUser()
+    if (userErr || !userRes?.user?.id) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders })
+    }
+    const userId = String(userRes.user.id)
 
     const body = await req.json().catch(() => ({}))
     const id = String((body as any)?.id || "")
@@ -45,13 +51,16 @@ Deno.serve(async (req) => {
 
     const { data: shop, error: selErr } = await supabase
       .from("user_stores")
-      .select("id,user_id")
+      .select("id,user_id,is_active")
       .eq("id", id)
       .maybeSingle()
     if (selErr) {
       return new Response(JSON.stringify({ error: "db_error" }), { status: 500, headers: corsHeaders })
     }
     if (!shop || String(shop.user_id) !== String(userId)) {
+      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: corsHeaders })
+    }
+    if ((shop as any)?.is_active === false) {
       return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: corsHeaders })
     }
 

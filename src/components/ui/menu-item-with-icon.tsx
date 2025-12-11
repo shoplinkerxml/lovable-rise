@@ -1,6 +1,7 @@
 import React from 'react';
 import { MenuItemData } from '@/providers/admin-provider';
-import { DynamicIcon, getAutoIcon } from './dynamic-icon';
+import { DynamicIcon } from './dynamic-icon';
+import { getAutoIcon } from './dynamic-icon-utils';
 import { Badge } from './badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 import { cn } from '@/lib/utils';

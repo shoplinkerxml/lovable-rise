@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,11 +44,7 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
     template: null
   });
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
      
       const { data, error } = await (supabase as any)
@@ -66,7 +62,11 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
     } finally {
       setLoading(false);
     }
-  };
+  }, [t, onTemplatesLoaded]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const handleDelete = async (templateId: string, templateName: string) => {
     try {

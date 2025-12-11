@@ -361,6 +361,114 @@ export function ProductFormTabs({
     }
   }, [preloadedSuppliers, preloadedCurrencies, preloadedCategories, basicData.supplier_id, getCategoriesFromMap, t]);
 
+  const loadProductData = useCallback(async (signal?: AbortSignal) => {
+    if (!product) return;
+    try {
+      isLoadingProductRef.current = true;
+      const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
+      const supplierId = (product as any).supplier_id ?? null;
+      const categoryId = product.category_id ?? null;
+      const categoryExternalId = (product as any).category_external_id ?? null;
+
+      initialSupplierIdRef.current = supplierId ? String(supplierId) : '';
+      console.log('[ProductFormTabs] Loading product data:', {
+        productId: product.id,
+        supplierId,
+        categoryId,
+        categoryExternalId
+      });
+      if (signal?.aborted) return;
+      setBasicData({
+        name: product.name || '',
+        name_ua: product.name_ua || '',
+        description: product.description || '',
+        description_ua: product.description_ua || '',
+        docket: (product as any).docket || '',
+        docket_ua: (product as any).docket_ua || '',
+        vendor: product.vendor || '',
+        article: product.article || '',
+        external_id: product.external_id || '',
+        supplier_id: supplierId ? String(supplierId) : '',
+        category_id: categoryId ? String(categoryId) : '',
+        category_external_id: categoryExternalId ? String(categoryExternalId) : '',
+        state: product.state || 'new',
+        store_id: product.store_id || ''
+      });
+      setPriceData({
+        currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
+        price: product.price || 0,
+        price_old: product.price_old || 0,
+        price_promo: product.price_promo || 0,
+      });
+      setStockData({
+        stock_quantity: product.stock_quantity || 0,
+        available: product.available ?? true,
+      });
+
+      const imagesData: ProductImage[] | null = preloadedImages ?? null;
+      if (imagesData) {
+        const normalizeImageUrl = (u: string): string => {
+          const s = String(u || '');
+          if (!s) return s;
+          return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
+        };
+        const ensureAbsoluteUrl = async (previewUrl: string, objectKeyRaw?: string | null): Promise<string> => {
+          const url = String(previewUrl || '');
+          if (/^https?:\/\//i.test(url)) return url;
+          const key = String(objectKeyRaw || url || '').replace(/^\/+/, '');
+          const base = R2Storage.getR2PublicBaseUrl();
+          if (base) return `${base}/${key}`;
+          try {
+            const view = await R2Storage.getViewUrl(key);
+            return String(view || url);
+          } catch {
+            return url;
+          }
+        };
+        const resolved = await Promise.all(imagesData.map(async (img) => {
+          const row = img as unknown as { r2_key_original?: string | null };
+          const origKey = row.r2_key_original || undefined;
+          let previewUrl: string = img.url;
+          let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          if (!previewUrl && origKey) {
+            previewUrl = R2Storage.makePublicUrl(origKey);
+            objectKeyRaw = origKey;
+          }
+          previewUrl = normalizeImageUrl(previewUrl);
+          const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
+          const absolutePreview = await ensureAbsoluteUrl(previewUrl, objectKeyFixed || objectKeyRaw);
+          return {
+            id: img.id,
+            url: absolutePreview,
+            alt_text: img.alt_text || '',
+            order_index: img.order_index,
+            is_main: img.is_main,
+            object_key: objectKeyFixed || undefined,
+          } as ProductImage;
+        }));
+        if (signal?.aborted) return;
+        setImages(resolved);
+      }
+
+      const paramsData: ProductParam[] | null = preloadedParams ?? null;
+      if (paramsData) {
+        const mapped = paramsData.map((param) => ({
+          id: param.id ? String(param.id) : undefined,
+          name: param.name,
+          value: param.value,
+          order_index: param.order_index,
+          paramid: param.paramid || '',
+          valueid: param.valueid || ''
+        }));
+        setParameters(mapped);
+        onParamsChange?.(mapped);
+      }
+    } catch (error) {
+      console.error('Error loading product data:', error);
+      toast.error(t('failed_load_product_data'));
+    }
+  }, [product, currencies, preloadedImages, preloadedParams, onParamsChange, t]);
+
   // Load initial data
   useEffect(() => {
     const controller = new AbortController();
@@ -373,7 +481,7 @@ export function ProductFormTabs({
     return () => {
       controller.abort();
     };
-  }, [product, loadLookupData]);
+  }, [product, loadLookupData, loadProductData]);
 
   useEffect(() => {
     if (preloadedSuppliers && preloadedSuppliers.length) {
@@ -442,7 +550,7 @@ export function ProductFormTabs({
       isLoadingProductRef.current = false;
       setCategories(list);
     }
-  }, [product, basicData.category_external_id, basicData.supplier_id, basicData.category_id]);
+  }, [product, basicData.category_external_id, basicData.supplier_id, basicData.category_id, preloadedCategories, getCategoriesFromMap]);
 
   // Track initial hydration to avoid clearing category on first population
   const isHydratingRef = useRef<boolean>(true);
@@ -500,118 +608,7 @@ export function ProductFormTabs({
       isLoadingProductRef.current = false;
     }
   }, [basicData.category_id, categories]);
-  const loadProductData = async (signal?: AbortSignal) => {
-    if (!product) return;
-    try {
-      // Mark loading to suppress supplier change side-effects during hydration
-      isLoadingProductRef.current = true;
-      // Load product data
-      // Try to resolve currency_code from loaded currencies
-      const selectedCurrency = currencies.find(cur => String(cur.id) === String(product.currency_id));
-      const supplierId = (product as any).supplier_id ?? null;
-      const categoryId = product.category_id ?? null;
-      const categoryExternalId = (product as any).category_external_id ?? null;
-
-      // Set initial supplier BEFORE updating formData to avoid race with supplier change effect
-      initialSupplierIdRef.current = supplierId ? String(supplierId) : '';
-      console.log('[ProductFormTabs] Loading product data:', {
-        productId: product.id,
-        supplierId,
-        categoryId,
-        categoryExternalId
-      });
-      if (signal?.aborted) return;
-      setBasicData({
-        name: product.name || '',
-        name_ua: product.name_ua || '',
-        description: product.description || '',
-        description_ua: product.description_ua || '',
-        docket: (product as any).docket || '',
-        docket_ua: (product as any).docket_ua || '',
-        vendor: product.vendor || '',
-        article: product.article || '',
-        external_id: product.external_id || '',
-        supplier_id: supplierId ? String(supplierId) : '',
-        category_id: categoryId ? String(categoryId) : '',
-        category_external_id: categoryExternalId ? String(categoryExternalId) : '',
-        state: product.state || 'new',
-        store_id: product.store_id || ''
-      });
-      setPriceData({
-        currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
-        price: product.price || 0,
-        price_old: product.price_old || 0,
-        price_promo: product.price_promo || 0,
-      });
-      setStockData({
-        stock_quantity: product.stock_quantity || 0,
-        available: product.available ?? true,
-      });
-      // Do not end hydration here; wait for category resolution/label sync
-
-      const imagesData: ProductImage[] | null = preloadedImages ?? null;
-      if (imagesData) {
-        const normalizeImageUrl = (u: string): string => {
-          const s = String(u || '');
-          if (!s) return s;
-          return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
-        };
-        const ensureAbsoluteUrl = async (previewUrl: string, objectKeyRaw?: string | null): Promise<string> => {
-          const url = String(previewUrl || '');
-          if (/^https?:\/\//i.test(url)) return url;
-          const key = String(objectKeyRaw || url || '').replace(/^\/+/, '');
-          const base = R2Storage.getR2PublicBaseUrl();
-          if (base) return `${base}/${key}`;
-          try {
-            const view = await R2Storage.getViewUrl(key);
-            return String(view || url);
-          } catch {
-            return url;
-          }
-        };
-        const resolved = await Promise.all(imagesData.map(async (img) => {
-          const row = img as unknown as { r2_key_original?: string | null };
-          const origKey = row.r2_key_original || undefined;
-          let previewUrl: string = img.url;
-          let objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          if (!previewUrl && origKey) {
-            previewUrl = R2Storage.makePublicUrl(origKey);
-            objectKeyRaw = origKey;
-          }
-          previewUrl = normalizeImageUrl(previewUrl);
-          const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
-          const absolutePreview = await ensureAbsoluteUrl(previewUrl, objectKeyFixed || objectKeyRaw);
-          return {
-            id: img.id,
-            url: absolutePreview,
-            alt_text: img.alt_text || '',
-            order_index: img.order_index,
-            is_main: img.is_main,
-            object_key: objectKeyFixed || undefined,
-          } as ProductImage;
-        }));
-        if (signal?.aborted) return;
-        setImages(resolved);
-      }
-
-      const paramsData: ProductParam[] | null = preloadedParams ?? null;
-      if (paramsData) {
-        const mapped = paramsData.map((param) => ({
-          id: param.id ? String(param.id) : undefined,
-          name: param.name,
-          value: param.value,
-          order_index: param.order_index,
-          paramid: param.paramid || '',
-          valueid: param.valueid || ''
-        }));
-        setParameters(mapped);
-        onParamsChange?.(mapped);
-      }
-    } catch (error) {
-      console.error('Error loading product data:', error);
-      toast.error(t('failed_load_product_data'));
-    }
-  };
+  
   const handleSubmit = async () => {
     if (!basicData.name_ua.trim()) {
       toast.error(t('product_name_required'));

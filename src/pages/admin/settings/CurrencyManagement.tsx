@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,11 +40,7 @@ const CurrencyManagement = () => {
     status: true,
   });
 
-  useEffect(() => {
-    loadCurrencies();
-  }, []);
-
-  const loadCurrencies = async () => {
+  const loadCurrencies = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -74,7 +70,11 @@ const CurrencyManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadCurrencies();
+  }, [loadCurrencies]);
 
   const handleCreateCurrency = () => {
     setEditingCurrency(null);

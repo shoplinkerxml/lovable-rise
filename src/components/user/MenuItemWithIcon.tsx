@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserMenuItem } from '@/lib/user-menu-service';
-import { DynamicIcon, getAutoIcon } from '@/components/ui/dynamic-icon';
+import { DynamicIcon } from '@/components/ui/dynamic-icon';
+import { getAutoIcon } from '@/components/ui/dynamic-icon-utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/providers/i18n-provider';

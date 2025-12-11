@@ -73,7 +73,7 @@ export function ImageSection(props: Props) {
         el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       } catch {}
     }
-  }, [props.activeIndex]);
+  }, [props.activeIndex, props.galleryImgRefs]);
   const getThumbFlexBasis = (count: number): string => {
     if (count <= 4) return '25%'
     if (count === 5) return '20%'

@@ -85,7 +85,7 @@ export const ListPage = ({ config, title }: ListPageProps) => {
     };
 
     fetchData();
-  }, [config, title]);
+  }, [config, title, t]);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
