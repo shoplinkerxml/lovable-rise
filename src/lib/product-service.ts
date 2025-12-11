@@ -258,7 +258,13 @@ export class ProductService {
   }
 
   private static async getProductsAggregatedFallback(storeId?: string | null): Promise<ProductAggregated[]> {
-    const storeIds = storeId ? [String(storeId)] : await ProductService.getUserStoreIds();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) throw new Error("User not authenticated");
+    const allowedStoreIds = await ProductService.getUserStoreIds();
+    const storeIds = storeId ? [String(storeId)] : allowedStoreIds;
+    if (storeId && !allowedStoreIds.includes(String(storeId))) {
+      throw new Error("Store access denied");
+    }
     if (!storeIds.length) return [];
     const { data: rows, error } = await supabase
       .from('store_products')
@@ -401,7 +407,13 @@ export class ProductService {
     limit: number,
     offset: number,
   ): Promise<{ products: ProductAggregated[]; page: ProductListPage }> {
-    const storeIds = storeId ? [String(storeId)] : await ProductService.getUserStoreIds();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) throw new Error("User not authenticated");
+    const allowedStoreIds = await ProductService.getUserStoreIds();
+    const storeIds = storeId ? [String(storeId)] : allowedStoreIds;
+    if (storeId && !allowedStoreIds.includes(String(storeId))) {
+      throw new Error("Store access denied");
+    }
     if (!storeIds.length) return { products: [], page: { limit, offset, hasMore: false, nextOffset: null, total: 0 } };
     const { count } = await supabase
       .from('store_products')
@@ -876,6 +888,9 @@ export class ProductService {
 
   /** Максимальный лимит продуктов: через отдельную функцию get-product-limit-only */
   static async getProductLimitOnly(): Promise<number> {
+    const cacheKey = "rq:product-limit";
+    const cached = readCache<number>(cacheKey, false);
+    if (cached && cached.data !== undefined && cached.data !== null) return Number(cached.data) || 0;
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
@@ -883,6 +898,7 @@ export class ProductService {
     try {
       const resp = await ProductService.invokeEdge<{ value?: number }>("get-product-limit-only", {});
       const v = Number(resp?.value ?? 0) || 0;
+      writeCache(cacheKey, v, CACHE_TTL.limits);
       return v;
     } catch (e) {
       return 0;
@@ -899,6 +915,10 @@ export class ProductService {
       max: maxProducts,
       canCreate: currentCount < maxProducts,
     };
+  }
+
+  static invalidateProductLimitCache() {
+    try { removeCache("rq:product-limit"); } catch { void 0; }
   }
 
   /** Количество продуктов текущего пользователя: только функция user-products-list */
@@ -926,6 +946,23 @@ export class ProductService {
       console.error("Get products count error:", error);
       return 0;
     }
+  }
+
+  static async getProductsCountCached(): Promise<number> {
+    try {
+      if (typeof window === "undefined") return 0;
+      const prefix = `rq:products:first:all`;
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        if (k === prefix || k.startsWith(`${prefix}:`)) {
+          const env = readCache<{ items: unknown[]; page?: { total?: number } }>(k, false);
+          const total = typeof env?.data?.page?.total === "number" ? Number(env.data.page.total) || 0 : 0;
+          if (total > 0) return total;
+        }
+      }
+    } catch { /* ignore */ }
+    return 0;
   }
 
   /** Полный список продуктов текущего пользователя (по функциям с пагинацией + кэш) */
@@ -1227,12 +1264,16 @@ export class ProductService {
     await this.ensureCanCreateProduct();
 
     let effectiveStoreId = productData.store_id;
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user) throw new Error("User not authenticated");
+    const allowedStoreIds = await this.getUserStoreIds();
     if (!effectiveStoreId || effectiveStoreId.trim() === "") {
-      const storeIds = await this.getUserStoreIds();
-      effectiveStoreId = storeIds[0];
+      effectiveStoreId = allowedStoreIds[0];
       if (!effectiveStoreId) {
         throw new Error("Активний магазин не знайдено");
       }
+    } else if (!allowedStoreIds.includes(String(effectiveStoreId))) {
+      throw new Error("Store access denied");
     }
 
     const payload: Record<string, unknown> = {

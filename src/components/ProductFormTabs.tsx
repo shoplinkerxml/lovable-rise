@@ -18,6 +18,7 @@ import { ProductService, type Product } from '@/lib/product-service';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
 import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData } from './ProductFormTabs/types';
+import { CategoryService } from '@/lib/category-service';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -380,6 +381,23 @@ export function ProductFormTabs({
     }
   };
 
+  useEffect(() => {
+    if (preloadedSuppliers && preloadedSuppliers.length) {
+      setSuppliers(preloadedSuppliers);
+      if (!formData.supplier_id) {
+        const firstId = String(preloadedSuppliers[0].id);
+        setFormData(prev => ({ ...prev, supplier_id: firstId }));
+      }
+    }
+    if (preloadedCurrencies && preloadedCurrencies.length) {
+      setCurrencies(preloadedCurrencies);
+    }
+    const sid = Number(formData.supplier_id || 0);
+    if (sid) {
+      setCategories(getCategoriesFromMap(sid));
+    }
+  }, [preloadedSuppliers, preloadedCurrencies, preloadedSupplierCategoriesMap, formData.supplier_id]);
+
   // Auto-select category by external_id when categories list is loaded
   useEffect(() => {
     if (!product) return;
@@ -451,7 +469,10 @@ export function ProductFormTabs({
 
     // Refresh categories from preloaded map when supplier changes
     const supplierIdNum = Number(formData.supplier_id || 0);
-    if (supplierIdNum) setCategories(getCategoriesFromMap(supplierIdNum));
+    if (supplierIdNum) {
+      const fromMap = getCategoriesFromMap(supplierIdNum);
+      setCategories(fromMap);
+    }
     const currentSupplier = String(formData.supplier_id || '');
     const initialSupplier = String(initialSupplierIdRef.current || '');
 

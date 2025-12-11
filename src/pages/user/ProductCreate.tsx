@@ -7,21 +7,35 @@ import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type ProductLimitInfo, type ProductImage, type ProductParam } from '@/lib/product-service';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { toast } from 'sonner';
+import { SupplierService } from '@/lib/supplier-service';
+import { CategoryService } from '@/lib/category-service';
+import { TariffService } from '@/lib/tariff-service';
+import type { SupplierOption, CategoryOption, CurrencyOption } from '@/components/ProductFormTabs/types';
 
 export const ProductCreate = () => {
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
+  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
+  const [preloadedSuppliers, setPreloadedSuppliers] = useState<SupplierOption[]>([]);
+  const [preloadedCurrencies, setPreloadedCurrencies] = useState<CurrencyOption[]>([]);
+  const [preloadedSupplierCategoriesMap, setPreloadedSupplierCategoriesMap] = useState<Record<string, CategoryOption[]>>({});
 
   useEffect(() => {
     (async () => {
       try {
-        const info = await ProductService.getProductLimit();
-        setLimitInfo(info);
-        if (!info.canCreate) {
+        const productLimit = (tariffLimits || [])
+          .find((l) => {
+            const n = String(l.limit_name || '').toLowerCase();
+            return n.includes('товар') || n.includes('product');
+          })?.value ?? 0;
+        const current = await ProductService.getProductsCountCached();
+        const canCreate = current < productLimit;
+        setLimitInfo({ current, max: productLimit, canCreate });
+        if (!canCreate) {
           toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
         }
       } catch {
@@ -29,23 +43,38 @@ export const ProductCreate = () => {
         toast.error(t('failed_load_limit'));
       }
     })();
-  }, [t]);
+  }, [tariffLimits, t]);
 
-  // Убрана страничная очистка временных загрузок, чтобы не путаться
+  useEffect(() => {
+    (async () => {
+      try {
+        const suppliersRaw = await SupplierService.getSuppliers();
+        const suppliers: SupplierOption[] = (suppliersRaw || []).map((s) => ({ id: String(s.id), supplier_name: String(s.supplier_name || '') }));
+        setPreloadedSuppliers(suppliers);
 
-  const loadLimitInfo = async () => {
-    try {
-      const info = await ProductService.getProductLimit();
-      setLimitInfo(info);
-      if (!info.canCreate) {
-        toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
+        const catsMapFull = await CategoryService.getCategoriesMapForSuppliers(suppliers.map(s => s.id));
+        const categoriesMap: Record<string, CategoryOption[]> = Object.fromEntries(Object.entries(catsMapFull).map(([sid, list]) => [sid, (list || []).map((c: any) => ({
+          id: String(c.id),
+          name: String(c.name || ''),
+          external_id: String(c.external_id || ''),
+          supplier_id: String(c.supplier_id || ''),
+          parent_external_id: c.parent_external_id == null ? null : String(c.parent_external_id)
+        }))]));
+        setPreloadedSupplierCategoriesMap(categoriesMap);
+
+        const currenciesRaw = await TariffService.getAllCurrencies();
+        const currencies: CurrencyOption[] = (currenciesRaw || []).map((c: any) => ({
+          id: Number(c.id),
+          name: String(c.name || ''),
+          code: String(c.code || ''),
+          status: c.status ?? null
+        }));
+        setPreloadedCurrencies(currencies);
+      } catch {
+        toast.error(t('failed_load_data'));
       }
-    } catch {
-      setLimitInfo({ current: 0, max: 0, canCreate: false });
-      toast.error(t('failed_load_limit'));
-    }
-  };
-
+    })();
+  }, [t]);
   const handleSuccess = () => {
     toast.success(t('product_created'));
     navigate('/user/products');
@@ -146,6 +175,9 @@ export const ProductCreate = () => {
         product={undefined}
         onSubmit={handleFormSubmit}
         onCancel={handleCancel}
+        preloadedSuppliers={preloadedSuppliers}
+        preloadedCurrencies={preloadedCurrencies}
+        preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap}
       />
     </div>
   );

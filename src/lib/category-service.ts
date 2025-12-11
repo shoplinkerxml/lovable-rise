@@ -125,6 +125,52 @@ export const CategoryService = {
     return rows.map(toFull);
   },
 
+  // Aggregated: read categories for multiple suppliers in one request and return a map
+  async getCategoriesMapForSuppliers(supplierIds: Array<string | number>): Promise<Record<string, StoreCategoryFull[]>> {
+    const ids = Array.from(new Set((supplierIds || []).map(String).filter(Boolean)));
+    if (ids.length === 0) return {};
+
+    // Try cache first
+    try {
+      const cacheKey = 'rq:supplierCategoriesMap';
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { data: Record<string, StoreCategoryFull[]>; expiresAt: number };
+        if (parsed && parsed.expiresAt > Date.now() && parsed.data && typeof parsed.data === 'object') {
+          return parsed.data;
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Single query for all categories of the given suppliers
+    const { data, error } = await supabase
+      .from('store_categories')
+      .select('id,external_id,name,parent_external_id,supplier_id')
+      .in('supplier_id', ids.map((v) => Number(v)))
+      .order('supplier_id', { ascending: true });
+    if (error) throw error;
+    const rows = (data || []) as Array<{ id: number; external_id: string; name: string; parent_external_id: string | null; supplier_id: number }>;
+    const map: Record<string, StoreCategoryFull[]> = {};
+    for (const r of rows) {
+      const sid = String(r.supplier_id);
+      if (!map[sid]) map[sid] = [];
+      map[sid].push({
+        id: String(r.id),
+        external_id: r.external_id,
+        name: r.name,
+        parent_external_id: r.parent_external_id,
+        supplier_id: String(r.supplier_id),
+      });
+    }
+
+    // Cache with TTL 10 minutes
+    try {
+      const payload = JSON.stringify({ data: map, expiresAt: Date.now() + 10 * 60 * 1000 });
+      if (typeof window !== 'undefined') window.localStorage.setItem('rq:supplierCategoriesMap', payload);
+    } catch { /* ignore */ }
+    return map;
+  },
+
   // 5. Read subcategories of a specific category
   async getSubcategories(supplierId: string | number, parentExternalId: string): Promise<StoreCategoryFull[]> {
     const normalized = castNullableNumber(supplierId);
