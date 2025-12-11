@@ -191,23 +191,17 @@ export function AddToStoresMenu({
                                 if (dec > 0) ShopService.bumpProductsCountInCache(String(id), -dec);
                                 try {
                                   await ProductService.recomputeStoreCategoryFilterCache(String(id));
+                                  const names = await ProductService.getStoreCategoryFilterOptions(String(id));
+                                  const cnt = Array.isArray(names) ? names.length : 0;
+                                  ShopService.setCategoriesCountInCache(String(id), cnt);
                                   try {
-                                    const key = `rq:filters:categories:${String(id)}`;
-                                    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-                                    if (raw) {
-                                      const parsed = JSON.parse(raw) as { items?: string[] };
-                                      const cnt = Array.isArray(parsed?.items) ? parsed.items.length : 0;
-                                      ShopService.setCategoriesCountInCache(String(id), cnt);
-                                      try {
-                                        q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                                          const arr = Array.isArray(prev) ? prev : (stores || []);
-                                          const idStr = String(id);
-                                          return (arr || []).map((s0) => s0.id === idStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
-                                        });
-                                        const updatedCats = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
-                                        setStores(updatedCats);
-                                      } catch { void 0; }
-                                    }
+                                    q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                                      const arr = Array.isArray(prev) ? prev : (stores || []);
+                                      const idStr = String(id);
+                                      return (arr || []).map((s0) => s0.id === idStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
+                                    });
+                                    const updatedCats = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
+                                    setStores(updatedCats);
                                   } catch { void 0; }
                                 } catch { void 0; }
                                 try {
@@ -319,23 +313,24 @@ export function AddToStoresMenu({
                           await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
                           try {
                             const addedMap = addedByStore || {};
+                            const sidList = Array.from(new Set(storeIds.map(String)));
+                            const catsCounts: Record<string, number> = {};
+                            for (const sid of sidList) {
+                              try {
+                                const names = await ProductService.getStoreCategoryFilterOptions(String(sid));
+                                const cntCats = Array.isArray(names) ? names.length : 0;
+                                catsCounts[String(sid)] = cntCats;
+                                ShopService.setCategoriesCountInCache(String(sid), cntCats);
+                              } catch { /* ignore */ }
+                            }
                             q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
                               const arr = Array.isArray(prev) ? prev : (stores || []);
                               return (arr || []).map((s0) => {
                                 const sidStr = String(s0.id);
                                 const inc = Number(addedMap[sidStr] || 0);
-                                let nextCats = s0.categoriesCount;
-                                try {
-                                  const key = `rq:filters:categories:${sidStr}`;
-                                  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-                                  if (raw) {
-                                    const parsed = JSON.parse(raw) as { items?: string[] };
-                                    const cntCats = Array.isArray(parsed?.items) ? parsed.items.length : 0;
-                                    ShopService.setCategoriesCountInCache(sidStr, cntCats);
-                                    nextCats = Math.max(0, Number(cntCats) || 0);
-                                  }
-                                } catch { /* ignore */ }
-                                return { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) + inc)), categoriesCount: typeof nextCats === 'number' ? nextCats : s0.categoriesCount };
+                                const cntCats = catsCounts[sidStr];
+                                const nextCats = typeof cntCats === 'number' ? Math.max(0, Number(cntCats) || 0) : s0.categoriesCount;
+                                return { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) + inc)), categoriesCount: nextCats };
                               });
                             });
                             const updated = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
@@ -402,20 +397,16 @@ export function AddToStoresMenu({
                               await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
                               try {
                                 for (const sid of storeIds) {
-                                  const key = `rq:filters:categories:${String(sid)}`;
-                                  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-                                  if (raw) {
-                                    const parsed = JSON.parse(raw) as { items?: string[] };
-                                    const cnt = Array.isArray(parsed?.items) ? parsed.items.length : 0;
-                                    ShopService.setCategoriesCountInCache(String(sid), cnt);
-                                    try {
-                                      q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                                        const arr = Array.isArray(prev) ? prev : (stores || []);
-                                        const sidStr = String(sid);
-                                        return (arr || []).map((s0) => s0.id === sidStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
-                                      });
-                                    } catch { void 0; }
-                                  }
+                                  const names = await ProductService.getStoreCategoryFilterOptions(String(sid));
+                                  const cnt = Array.isArray(names) ? names.length : 0;
+                                  ShopService.setCategoriesCountInCache(String(sid), cnt);
+                                  try {
+                                    q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+                                      const arr = Array.isArray(prev) ? prev : (stores || []);
+                                      const sidStr = String(sid);
+                                      return (arr || []).map((s0) => s0.id === sidStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
+                                    });
+                                  } catch { void 0; }
                                 }
                               } catch { void 0; }
                               try {
