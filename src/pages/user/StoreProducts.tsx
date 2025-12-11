@@ -35,9 +35,8 @@ export const StoreProducts = () => {
       } catch (_) {
         setShopName("");
       }
-      
     })();
-  }, [storeId, t]);
+  }, [storeId]);
 
   useEffect(() => {
     (async () => {

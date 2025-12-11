@@ -65,3 +65,6 @@ verify_jwt = true
 
 [functions.categories]
 verify_jwt = true
+
+[functions.shop-settings-aggregated]
+verify_jwt = true

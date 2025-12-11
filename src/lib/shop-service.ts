@@ -3,8 +3,12 @@ import type { Json } from "@/integrations/supabase/types";
 import { SessionValidator } from "./session-validation";
 import { CACHE_TTL, readCache, writeCache, removeCache } from "./cache-utils";
 
+// ============================================================================
+// ТИПЫ И ИНТЕРФЕЙСЫ
+// ============================================================================
+
 export interface Shop {
-  id: string; // UUID
+  id: string;
   user_id: string;
   store_name: string;
   store_company?: string | null;
@@ -49,344 +53,626 @@ export interface ShopAggregated extends Shop {
   categoriesCount?: number;
 }
 
-export class ShopService {
-  private static inFlightShopsAggregated: Promise<ShopAggregated[]> | null = null;
-  private static readonly SHOPS_CACHE_KEY = "rq:shopsList";
+export interface ShopSettingsAggregated {
+  shop: Shop;
+  productsCount: number;
+  storeCurrencies: Array<{ code: string; rate: number; is_base: boolean }>;
+  availableCurrencies: Array<{ code: string; rate?: number }>;
+  marketplaces: string[];
+  categories: Array<{
+    store_category_id: number;
+    store_id: string;
+    category_id: number;
+    name: string;
+    base_external_id: string | null;
+    parent_external_id: string | null;
+    base_rz_id: string | null;
+    store_external_id: string | null;
+    store_rz_id_value: string | null;
+    is_active: boolean;
+  }>;
+}
 
+// Строго типизированные ответы API для лучшей проверки типов
+interface EdgeResponse<T> {
+  data?: T;
+  error?: string;
+}
+
+interface ShopsListResponse {
+  shops: ShopAggregated[];
+}
+
+interface ShopLimitResponse {
+  value: number;
+}
+
+interface ShopResponse {
+  shop: Shop;
+}
+
+interface CategoryRow {
+  id: number;
+  store_id: string;
+  category_id: number;
+  custom_name?: string | null;
+  external_id?: string | null;
+  rz_id_value?: string | null;
+  is_active: boolean;
+  store_categories?: {
+    name?: string;
+    external_id?: string | null;
+    parent_external_id?: string | null;
+    rz_id?: string | null;
+  };
+}
+
+// ============================================================================
+// ОСНОВНОЙ КЛАСС СЕРВИСА
+// ============================================================================
+
+export class ShopService {
+  private static readonly SHOPS_CACHE_KEY = "rq:shopsList";
+  
+  // Вместо статического поля используем WeakMap для изоляции состояния
+  private static requestDeduplication = new Map<string, Promise<any>>();
+
+  // ============================================================================
+  // ПРИВАТНЫЕ УТИЛИТЫ
+  // ============================================================================
+
+  /**
+   * Проверяет, находится ли приложение в offline режиме.
+   * Безопасная проверка с обработкой возможных исключений.
+   */
   private static isOffline(): boolean {
+    if (typeof navigator === "undefined") return false;
     try {
-      return typeof navigator !== "undefined" && navigator.onLine === false;
-    } catch {
+      return !navigator.onLine;
+    } catch (error) {
+      console.warn("Unable to check online status:", error);
       return false;
     }
   }
 
-  private static readShopsCache(allowStale: boolean): { items: ShopAggregated[]; expiresAt: number } | null {
-    const env = readCache<ShopAggregated[]>(ShopService.SHOPS_CACHE_KEY, allowStale);
-    if (env?.data && Array.isArray(env.data)) return { items: env.data, expiresAt: env.expiresAt };
-    try {
-      if (typeof window === "undefined") return null;
-      const raw = window.localStorage.getItem(ShopService.SHOPS_CACHE_KEY);
-      if (!raw) return null;
-      const legacy = JSON.parse(raw) as { items?: ShopAggregated[]; expiresAt?: number };
-      if (legacy && Array.isArray(legacy.items) && typeof legacy.expiresAt === "number") {
-        writeCache(ShopService.SHOPS_CACHE_KEY, legacy.items, CACHE_TTL.shopsList);
-        return { items: legacy.items, expiresAt: legacy.expiresAt };
+  /**
+   * Универсальный метод для обеспечения валидной сессии.
+   * Выносим повторяющуюся логику в одно место.
+   */
+  private static async ensureSession(): Promise<void> {
+    const validation = await SessionValidator.ensureValidSession();
+    if (!validation.isValid) {
+      throw new Error(`Session invalid: ${validation.error || "Session expired"}`);
+    }
+  }
+
+  /**
+   * Получение access token с проверкой сессии.
+   * Объединяем два частых действия в один метод.
+   */
+  private static async getAccessToken(): Promise<string> {
+    await this.ensureSession();
+    
+    const { data: authData, error } = await supabase.auth.getSession();
+    if (error) {
+      throw new Error(`Failed to get session: ${error.message}`);
+    }
+    
+    const token = authData?.session?.access_token;
+    if (!token) {
+      throw new Error("No access token available");
+    }
+    
+    return token;
+  }
+
+  /**
+   * Улучшенная обработка ошибок Edge Functions.
+   * Безопасный парсинг с логированием для отладки.
+   */
+  private static handleEdgeError(error: unknown, functionName: string): never {
+    // Всегда логируем ошибки для отладки
+    console.error(`Edge function "${functionName}" failed:`, error);
+
+    // Пытаемся извлечь понятное сообщение
+    let message = `${functionName} failed`;
+    
+    if (error && typeof error === "object") {
+      const err = error as Record<string, any>;
+      
+      // Проверяем базовое сообщение
+      if (err.message) {
+        message = err.message;
       }
-    } catch { /* ignore */ }
+      
+      // Пытаемся извлечь детали из контекста
+      try {
+        const context = err.context;
+        if (context) {
+          const body = context.body || context.error;
+          if (body) {
+            const parsed = typeof body === "string" ? JSON.parse(body) : body;
+            const serverMessage = parsed?.message || parsed?.error;
+            if (serverMessage) {
+              message = `${functionName}: ${serverMessage}`;
+            }
+          }
+        }
+      } catch (parseError) {
+        // Если парсинг не удался, используем базовое сообщение
+        console.warn("Could not parse error details:", parseError);
+      }
+    }
+
+    throw new Error(message);
+  }
+
+  /**
+   * Универсальный метод вызова Edge Functions.
+   * Инкапсулирует всю логику работы с API в одном месте.
+   */
+  private static async invokeEdge<T>(
+    functionName: string,
+    body: Record<string, unknown> = {}
+  ): Promise<T> {
+    const token = await this.getAccessToken();
+    
+    const { data, error } = await supabase.functions.invoke<T>(functionName, {
+      body,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (error) {
+      this.handleEdgeError(error, functionName);
+    }
+
+    if (!data) {
+      throw new Error(`${functionName} returned no data`);
+    }
+
+    // Обрабатываем случай, когда data — строка (некоторые Edge Functions возвращают JSON-строку)
+    return typeof data === "string" ? JSON.parse(data) : data;
+  }
+
+  /**
+   * Дедупликация одновременных запросов к одному endpoint.
+   * Предотвращает множественные идентичные запросы.
+   */
+  private static async deduplicateRequest<T>(
+    key: string,
+    request: () => Promise<T>
+  ): Promise<T> {
+    // Если запрос уже выполняется, возвращаем существующий Promise
+    const existing = this.requestDeduplication.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    // Создаем новый запрос
+    const promise = request().finally(() => {
+      // Очищаем после завершения (успешного или с ошибкой)
+      this.requestDeduplication.delete(key);
+    });
+
+    this.requestDeduplication.set(key, promise);
+    return promise;
+  }
+
+  /**
+   * Чтение кэша магазинов с поддержкой legacy формата.
+   * Миграция старого формата в новый происходит автоматически.
+   */
+  private static readShopsCache(allowStale: boolean): ShopAggregated[] | null {
+    // Сначала пытаемся прочитать из нового кэша
+    const cached = readCache<ShopAggregated[]>(this.SHOPS_CACHE_KEY, allowStale);
+    if (cached?.data && Array.isArray(cached.data)) {
+      return cached.data;
+    }
+
+    // Fallback на legacy localStorage (только в браузере)
+    if (typeof window === "undefined") return null;
+
+    try {
+      const raw = window.localStorage.getItem(this.SHOPS_CACHE_KEY);
+      if (!raw) return null;
+
+      const legacy = JSON.parse(raw) as { items?: ShopAggregated[]; expiresAt?: number };
+      
+      if (Array.isArray(legacy.items) && typeof legacy.expiresAt === "number") {
+        // Мигрируем в новый формат
+        writeCache(this.SHOPS_CACHE_KEY, legacy.items, CACHE_TTL.shopsList);
+        return legacy.items;
+      }
+    } catch (error) {
+      console.warn("Failed to read legacy cache:", error);
+    }
+
     return null;
   }
 
-  private static edgeError(error: unknown, code: string): never {
-    const base = (error as { message?: string } | null)?.message || code;
-    let serverMsg = '';
-    try {
-      const ctx: any = (error as any)?.context || {};
-      const body = ctx?.body ?? ctx?.error ?? '';
-      const parsed = typeof body === 'string' ? JSON.parse(body) : body;
-      serverMsg = parsed?.message || parsed?.error || '';
-    } catch { /* ignore */ }
-    const msg = serverMsg ? `${code}: ${serverMsg}` : base;
-    throw new Error(msg);
-  }
-
-  private static async getAccessToken(): Promise<string | null> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = (authData?.session?.access_token as string | null) || null;
-    return accessToken;
-  }
-
-  private static async invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
-    const token = await ShopService.getAccessToken();
-    const { data, error } = await supabase.functions.invoke<T | string>(name, {
-      body,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (error) ShopService.edgeError(error, name);
-    const resp = typeof data === "string" ? (JSON.parse(data as unknown as string) as T) : (data as T);
-    return resp;
-  }
-
+  /**
+   * Запись в кэш с типобезопасностью
+   */
   private static writeShopsCache(items: ShopAggregated[]): void {
-    writeCache(ShopService.SHOPS_CACHE_KEY, items, CACHE_TTL.shopsList);
+    writeCache(this.SHOPS_CACHE_KEY, items, CACHE_TTL.shopsList);
   }
 
-  private static updateShopsCache(mutator: (items: ShopAggregated[]) => ShopAggregated[]) {
-    const env = readCache<ShopAggregated[]>(ShopService.SHOPS_CACHE_KEY, true);
-    if (!env?.data || !Array.isArray(env.data)) return;
-    const nextItems = mutator(env.data);
-    writeCache(ShopService.SHOPS_CACHE_KEY, nextItems, CACHE_TTL.shopsList);
-  }
-
-  static bumpProductsCountInCache(storeId: string, delta: number) {
-    ShopService.updateShopsCache((items) =>
-      items.map((s) =>
-        s.id === storeId
-          ? { ...s, productsCount: Math.max(0, (s.productsCount ?? 0) + delta) }
-          : s,
-      ),
-    );
-  }
-
-  static bumpCategoriesCountInCache(storeId: string, delta: number) {
-    ShopService.updateShopsCache((items) =>
-      items.map((s) =>
-        s.id === storeId
-          ? { ...s, categoriesCount: Math.max(0, (s.categoriesCount ?? 0) + delta) }
-          : s,
-      ),
-    );
-  }
-
-  static setCategoriesCountInCache(storeId: string, nextCount: number) {
-    ShopService.updateShopsCache((items) =>
-      items.map((s) => {
-        if (s.id !== storeId) return s;
-        const products = s.productsCount ?? 0;
-        const guarded = products === 0 ? 0 : Math.max(0, Number(nextCount) || 0);
-        return { ...s, categoriesCount: guarded };
-      }),
-    );
-  }
-
-  /** Получение только максимального лимита магазинов (без подсчета текущих) */
-  static async getShopLimitOnly(): Promise<number> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-    const resp = await ShopService.invokeEdge<{ value?: number }>("get-shop-limit-only", {});
-    return Number(resp.value ?? 0) || 0;
-  }
-
-  /** Получение лимита магазинов для текущего пользователя */
-  static async getShopLimit(): Promise<ShopLimitInfo> {
-    const maxShops = await this.getShopLimitOnly();
-    const currentCount = await this.getShopsCount();
-
-    return {
-      current: currentCount,
-      max: maxShops,
-      canCreate: currentCount < maxShops,
-    };
-  }
-
-  /** Получение количества магазинов текущего пользователя */
-  static async getShopsCount(): Promise<number> {
-    if (ShopService.isOffline()) {
-      return 0;
-    }
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-    const resp = await ShopService.invokeEdge<{ shops?: unknown[] }>("user-shops-list", {});
-    const arr = Array.isArray(resp.shops) ? (resp.shops as unknown[]) : [];
-    return arr.length;
-  }
-
-  /** Получение списка магазинов текущего пользователя */
-  static async getShops(): Promise<Shop[]> {
-    if (ShopService.isOffline()) {
-      return [];
-    }
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-    const payload = await ShopService.invokeEdge<Record<string, unknown>>("user-shops-list", {});
-    const rows = Array.isArray((payload as { shops?: Shop[] }).shops)
-      ? ((payload as { shops?: Shop[] }).shops as Shop[])
-      : [];
-    return rows as Shop[];
-  }
-
-  static async getShopsAggregated(): Promise<ShopAggregated[]> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+  /**
+   * Обновление кэша с помощью функции-трансформера.
+   * Применяет изменения атомарно к существующему кэшу.
+   */
+  private static updateShopsCache(
+    mutator: (items: ShopAggregated[]) => ShopAggregated[]
+  ): void {
+    const current = this.readShopsCache(true);
+    if (!current) return;
 
     try {
-      const cached = ShopService.readShopsCache(false);
-      if (cached?.items && Array.isArray(cached.items)) {
-        return cached.items;
-      }
-    } catch {
-    }
-
-    // Offline → только кэш
-    if (ShopService.isOffline()) {
-      const cached = ShopService.readShopsCache(true);
-      return cached?.items ?? [];
-    }
-
-    // Свежий кэш → используем как fallback, но всё равно обновляем с сервера
-    const fresh = ShopService.readShopsCache(false);
-    const cachedItems = fresh?.items && Array.isArray(fresh.items) ? fresh.items : null;
-
-    // Уже есть in-flight запрос → переиспользуем
-    if (ShopService.inFlightShopsAggregated) {
-      return ShopService.inFlightShopsAggregated;
-    }
-
-    const task = (async () => {
-      try {
-        const normalized = await ShopService.invokeEdge<{ shops?: ShopAggregated[] }>(
-          "user-shops-list",
-          {},
-        );
-        const rows = Array.isArray(normalized?.shops) ? (normalized!.shops as ShopAggregated[]) : [];
-        ShopService.writeShopsCache(rows);
-        return rows;
-      } catch {
-        if (cachedItems) return cachedItems;
-        const rows = await ShopService.getShopsAggregatedFallback();
-        ShopService.writeShopsCache(rows);
-        return rows;
-      }
-    })();
-
-    ShopService.inFlightShopsAggregated = task;
-    try {
-      return await task;
-    } finally {
-      ShopService.inFlightShopsAggregated = null;
+      const updated = mutator(current);
+      this.writeShopsCache(updated);
+    } catch (error) {
+      console.error("Failed to update shops cache:", error);
     }
   }
 
-  private static async getShopsAggregatedFallback(): Promise<ShopAggregated[]> {
-    const baseShops: Shop[] = await this.getShops();
-    return baseShops.map((s) => ({
-      ...s,
-      marketplace: "Не вказано",
-      productsCount: 0,
-      categoriesCount: 0,
+  /**
+   * Fallback для получения магазинов без агрегированных данных.
+   * Используется когда основной endpoint недоступен.
+   */
+  private static async getShopsFallback(): Promise<ShopAggregated[]> {
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+    const shops = response.shops || [];
+    
+    return shops.map(shop => ({
+      ...shop,
+      marketplace: shop.marketplace || "Не вказано",
+      productsCount: shop.productsCount || 0,
+      categoriesCount: shop.categoriesCount || 0,
     }));
   }
 
-  /** Получение одного магазина по ID */
+  // ============================================================================
+  // ПУБЛИЧНЫЕ МЕТОДЫ - УПРАВЛЕНИЕ МАГАЗИНАМИ
+  // ============================================================================
+
+  /**
+   * Получение лимита магазинов для текущего пользователя.
+   * Возвращает максимальное количество и возможность создания новых.
+   */
+  static async getShopLimit(): Promise<ShopLimitInfo> {
+    await this.ensureSession();
+
+    // Оптимизация: получаем оба значения параллельно
+    const [max, current] = await Promise.all([
+      this.getShopLimitOnly(),
+      this.getShopsCount(),
+    ]);
+
+    return {
+      current,
+      max,
+      canCreate: current < max,
+    };
+  }
+
+  /**
+   * Получение только максимального лимита магазинов.
+   */
+  static async getShopLimitOnly(): Promise<number> {
+    await this.ensureSession();
+    
+    const response = await this.invokeEdge<ShopLimitResponse>(
+      "get-shop-limit-only",
+      {}
+    );
+    
+    return Number(response.value) || 0;
+  }
+
+  /**
+   * Получение количества магазинов текущего пользователя.
+   */
+  static async getShopsCount(): Promise<number> {
+    if (this.isOffline()) return 0;
+
+    await this.ensureSession();
+    
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+    return Array.isArray(response.shops) ? response.shops.length : 0;
+  }
+
+  /**
+   * Получение списка магазинов текущего пользователя (базовая информация).
+   */
+  static async getShops(): Promise<Shop[]> {
+    if (this.isOffline()) return [];
+
+    await this.ensureSession();
+    
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+    return response.shops || [];
+  }
+
+  /**
+   * Получение агрегированных данных магазинов с кэшированием и дедупликацией.
+   * Это основной метод для получения списка магазинов в UI.
+   */
+  static async getShopsAggregated(): Promise<ShopAggregated[]> {
+    await this.ensureSession();
+
+    // Проверяем валидный кэш
+    const cached = this.readShopsCache(false);
+    if (cached) return cached;
+
+    // В offline режиме используем устаревший кэш
+    if (this.isOffline()) {
+      const stale = this.readShopsCache(true);
+      return stale || [];
+    }
+
+    // Дедуплицируем запросы
+    return this.deduplicateRequest("shops-aggregated", async () => {
+      try {
+        const response = await this.invokeEdge<ShopsListResponse>(
+          "user-shops-list",
+          {}
+        );
+        
+        const shops = response.shops || [];
+        this.writeShopsCache(shops);
+        return shops;
+      } catch (error) {
+        console.error("Failed to fetch aggregated shops, using fallback:", error);
+        
+        // Пытаемся использовать устаревший кэш
+        const stale = this.readShopsCache(true);
+        if (stale) return stale;
+        
+        // Последний вариант — fallback запрос
+        const fallback = await this.getShopsFallback();
+        this.writeShopsCache(fallback);
+        return fallback;
+      }
+    });
+  }
+
+  /**
+   * Получение одного магазина по ID с полной конфигурацией.
+   */
   static async getShop(id: string): Promise<Shop> {
     if (!id) throw new Error("Shop ID is required");
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await this.ensureSession();
 
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = (authData?.session?.access_token as string | null) || null;
-    const payload = await ShopService.invokeEdge<Record<string, unknown>>("user-shops-list", {
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
       store_id: id,
       includeConfig: true,
     });
-    const rows = Array.isArray((payload as { shops?: Shop[] }).shops)
-      ? ((payload as { shops?: Shop[] }).shops as Shop[])
-      : [];
-    const shop = rows[0] as Shop | undefined;
-    if (!shop) throw new Error("Shop not found");
+
+    const shop = response.shops?.[0];
+    if (!shop) throw new Error(`Shop with ID ${id} not found`);
+
     return shop;
   }
 
-  /** Создание нового магазина */
+  /**
+   * Агрегированные данные настроек магазина одной функцией.
+   */
+  static async getShopSettingsAggregated(storeId: string): Promise<ShopSettingsAggregated> {
+    if (!storeId) throw new Error("Store ID is required");
+    await this.ensureSession();
+
+    const response = await this.invokeEdge<ShopSettingsAggregated>(
+      "shop-settings-aggregated",
+      { store_id: storeId }
+    );
+
+    return {
+      shop: response.shop,
+      productsCount: Number(response.productsCount ?? 0),
+      storeCurrencies: Array.isArray(response.storeCurrencies)
+        ? response.storeCurrencies.map((r) => ({
+            code: String(r.code),
+            rate: Number(r.rate ?? 1),
+            is_base: Boolean(r.is_base),
+          }))
+        : [],
+      availableCurrencies: Array.isArray(response.availableCurrencies)
+        ? response.availableCurrencies.map((r) => ({
+            code: String(r.code),
+            rate: r.rate != null ? Number(r.rate) : undefined,
+          }))
+        : [],
+      marketplaces: Array.isArray(response.marketplaces)
+        ? response.marketplaces.map((m) => String(m))
+        : [],
+      categories: Array.isArray(response.categories)
+        ? response.categories.map((row) => ({
+            store_category_id: Number(row.store_category_id),
+            store_id: String(row.store_id),
+            category_id: Number(row.category_id),
+            name: String(row.name || ""),
+            base_external_id: row.base_external_id ?? null,
+            parent_external_id: row.parent_external_id ?? null,
+            base_rz_id: row.base_rz_id ?? null,
+            store_external_id: row.store_external_id ?? null,
+            store_rz_id_value: row.store_rz_id_value ?? null,
+            is_active: Boolean(row.is_active),
+          }))
+        : [],
+    };
+  }
+
+  /**
+   * Создание нового магазина с валидацией лимитов.
+   */
   static async createShop(shopData: CreateShopData): Promise<Shop> {
-    if (!shopData.store_name?.trim()) {
+    const storeName = shopData.store_name?.trim();
+    if (!storeName) {
       throw new Error("Назва магазину обов'язкова");
     }
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await this.ensureSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
+    // Проверяем лимит перед созданием
     const limitInfo = await this.getShopLimit();
     if (!limitInfo.canCreate) {
-      throw new Error(`Досягнуто ліміту магазинів (${limitInfo.max}). Оновіть тарифний план.`);
+      throw new Error(
+        `Досягнуто ліміту магазинів (${limitInfo.max}). Оновіть тарифний план.`
+      );
     }
 
-    const resp = await ShopService.invokeEdge<{ shop?: Shop }>("create-shop", {
-      store_name: shopData.store_name.trim(),
+    const response = await this.invokeEdge<ShopResponse>("create-shop", {
+      store_name: storeName,
       template_id: shopData.template_id ?? null,
       xml_config: shopData.xml_config ?? null,
       custom_mapping: shopData.custom_mapping ?? null,
       store_company: shopData.store_company ?? null,
       store_url: shopData.store_url ?? null,
     });
-    removeCache(ShopService.SHOPS_CACHE_KEY);
-    return (resp.shop as Shop);
+
+    // Инвалидируем кэш после создания
+    removeCache(this.SHOPS_CACHE_KEY);
+
+    return response.shop;
   }
 
-  /** Обновление магазина */
+  /**
+   * Обновление магазина с валидацией и очисткой кэша.
+   */
   static async updateShop(id: string, shopData: UpdateShopData): Promise<Shop> {
     if (!id) throw new Error("Shop ID is required");
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await this.ensureSession();
 
-    const cleanData: Record<string, unknown> = {};
+    // Подготавливаем данные для обновления
+    const patch: Record<string, unknown> = {};
+
     if (shopData.store_name !== undefined) {
-      if (!shopData.store_name.trim()) {
-        throw new Error("Назва магазину обов'язкова");
-      }
-      cleanData.store_name = shopData.store_name.trim();
-    }
-    if (shopData.store_company !== undefined) {
-      cleanData.store_company = shopData.store_company ?? null;
-    }
-    if (shopData.store_url !== undefined) {
-      cleanData.store_url = shopData.store_url ?? null;
-    }
-    if (shopData.template_id !== undefined) {
-      cleanData.template_id = shopData.template_id || null;
-    }
-    if (shopData.xml_config !== undefined) {
-      cleanData.xml_config = shopData.xml_config || null;
-    }
-    if (shopData.custom_mapping !== undefined) {
-      cleanData.custom_mapping = shopData.custom_mapping || null;
-    }
-    if (shopData.is_active !== undefined) {
-      cleanData.is_active = shopData.is_active;
+      const trimmed = shopData.store_name.trim();
+      if (!trimmed) throw new Error("Назва магазину обов'язкова");
+      patch.store_name = trimmed;
     }
 
-    if (Object.keys(cleanData).length === 0) {
+    if (shopData.store_company !== undefined) {
+      patch.store_company = shopData.store_company ?? null;
+    }
+
+    if (shopData.store_url !== undefined) {
+      patch.store_url = shopData.store_url ?? null;
+    }
+
+    if (shopData.template_id !== undefined) {
+      patch.template_id = shopData.template_id || null;
+    }
+
+    if (shopData.xml_config !== undefined) {
+      patch.xml_config = shopData.xml_config || null;
+    }
+
+    if (shopData.custom_mapping !== undefined) {
+      patch.custom_mapping = shopData.custom_mapping || null;
+    }
+
+    if (shopData.is_active !== undefined) {
+      patch.is_active = shopData.is_active;
+    }
+
+    if (Object.keys(patch).length === 0) {
       throw new Error("No fields to update");
     }
 
-    cleanData.updated_at = new Date().toISOString();
+    patch.updated_at = new Date().toISOString();
 
-    const resp = await ShopService.invokeEdge<{ shop?: Shop }>("update-shop", { id, patch: cleanData });
-    removeCache(ShopService.SHOPS_CACHE_KEY);
-    return (resp.shop as Shop);
+    const response = await this.invokeEdge<ShopResponse>("update-shop", {
+      id,
+      patch,
+    });
+
+    // Инвалидируем кэш после обновления
+    removeCache(this.SHOPS_CACHE_KEY);
+
+    return response.shop;
   }
 
-  /** Удаление магазина */
+  /**
+   * Удаление магазина с очисткой кэша.
+   */
   static async deleteShop(id: string): Promise<void> {
     if (!id) throw new Error("Shop ID is required");
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await this.ensureSession();
 
-    await ShopService.invokeEdge<{ ok: boolean }>("delete-shop", { id });
-    removeCache(ShopService.SHOPS_CACHE_KEY);
+    await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
+
+    // Инвалидируем кэш после удаления
+    removeCache(this.SHOPS_CACHE_KEY);
   }
 
-  /** Категории магазина: объединённые данные ssc + sc */
+  // ============================================================================
+  // ПУБЛИЧНЫЕ МЕТОДЫ - ОПТИМИСТИЧНЫЕ ОБНОВЛЕНИЯ КЭША
+  // ============================================================================
+
+  /**
+   * Увеличение счетчика товаров в кэше (оптимистичное обновление).
+   */
+  static bumpProductsCountInCache(storeId: string, delta: number): void {
+    this.updateShopsCache(shops =>
+      shops.map(shop =>
+        shop.id === storeId
+          ? {
+              ...shop,
+              productsCount: Math.max(0, (shop.productsCount || 0) + delta),
+            }
+          : shop
+      )
+    );
+  }
+
+  /**
+   * Увеличение счетчика категорий в кэше (оптимистичное обновление).
+   */
+  static bumpCategoriesCountInCache(storeId: string, delta: number): void {
+    this.updateShopsCache(shops =>
+      shops.map(shop =>
+        shop.id === storeId
+          ? {
+              ...shop,
+              categoriesCount: Math.max(0, (shop.categoriesCount || 0) + delta),
+            }
+          : shop
+      )
+    );
+  }
+
+  /**
+   * Установка точного количества категорий в кэше.
+   * Сбрасывает счетчик в 0, если в магазине нет товаров.
+   */
+  static setCategoriesCountInCache(storeId: string, count: number): void {
+    this.updateShopsCache(shops =>
+      shops.map(shop => {
+        if (shop.id !== storeId) return shop;
+
+        const productsCount = shop.productsCount || 0;
+        // Если нет товаров, категорий тоже не должно быть
+        const finalCount = productsCount === 0 ? 0 : Math.max(0, count);
+
+        return {
+          ...shop,
+          categoriesCount: finalCount,
+        };
+      })
+    );
+  }
+
+  // ============================================================================
+  // ПУБЛИЧНЫЕ МЕТОДЫ - КАТЕГОРИИ МАГАЗИНА
+  // ============================================================================
+
+  /**
+   * Получение категорий магазина с объединенными данными.
+   */
   static async getStoreCategories(storeId: string): Promise<
     Array<{
       store_category_id: number;
@@ -402,32 +688,37 @@ export class ShopService {
     }>
   > {
     if (!storeId) throw new Error("Store ID is required");
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) throw new Error("Invalid session");
 
-    const resp = await ShopService.invokeEdge<{ rows?: Array<Record<string, unknown>> }>(
+    await this.ensureSession();
+
+    const response = await this.invokeEdge<{ rows: CategoryRow[] }>(
       "store-categories-list",
-      { store_id: storeId },
+      { store_id: storeId }
     );
-    const rows = (resp?.rows || []) as Array<Record<string, unknown>>;
-    return rows.map((r) => {
-      const sc = ((r as Record<string, unknown>).store_categories as Record<string, unknown> | undefined) || {};
+
+    const rows = response.rows || [];
+
+    return rows.map(row => {
+      const baseCategory = row.store_categories || {};
+
       return {
-        store_category_id: Number((r as Record<string, unknown>).id),
-        store_id: String((r as Record<string, unknown>).store_id),
-        category_id: Number((r as Record<string, unknown>).category_id),
-        name: String(((r as Record<string, unknown>).custom_name ?? sc["name"] ?? "")),
-        base_external_id: (sc["external_id"] as string | null) ?? null,
-        parent_external_id: (sc["parent_external_id"] as string | null) ?? null,
-        base_rz_id: (sc["rz_id"] as string | null) ?? null,
-        store_external_id: ((r as Record<string, unknown>).external_id as string | null) ?? null,
-        store_rz_id_value: ((r as Record<string, unknown>).rz_id_value as string | null) ?? null,
-        is_active: !!(r as Record<string, unknown>).is_active,
+        store_category_id: row.id,
+        store_id: row.store_id,
+        category_id: row.category_id,
+        name: row.custom_name || baseCategory.name || "",
+        base_external_id: baseCategory.external_id || null,
+        parent_external_id: baseCategory.parent_external_id || null,
+        base_rz_id: baseCategory.rz_id || null,
+        store_external_id: row.external_id || null,
+        store_rz_id_value: row.rz_id_value || null,
+        is_active: row.is_active,
       };
     });
   }
 
-  /** Обновление полей категории магазина */
+  /**
+   * Обновление полей категории магазина.
+   */
   static async updateStoreCategory(payload: {
     id: number;
     rz_id_value?: string | null;
@@ -435,106 +726,235 @@ export class ShopService {
     custom_name?: string | null;
     external_id?: string | null;
   }): Promise<void> {
-    if (!payload?.id) throw new Error("Category row id is required");
-    const clean: Record<string, unknown> = {};
-    if (payload.rz_id_value !== undefined) clean.rz_id_value = payload.rz_id_value;
-    if (payload.is_active !== undefined) clean.is_active = !!payload.is_active;
-    if (payload.custom_name !== undefined) clean.custom_name = payload.custom_name ?? null;
-    if (payload.external_id !== undefined) clean.external_id = payload.external_id ?? null;
+    if (!payload?.id) throw new Error("Category ID is required");
 
-    await ShopService.invokeEdge<unknown>("update-store-category", { id: payload.id, patch: clean });
+    const patch: Record<string, unknown> = {};
+
+    if (payload.rz_id_value !== undefined) {
+      patch.rz_id_value = payload.rz_id_value;
+    }
+    if (payload.is_active !== undefined) {
+      patch.is_active = payload.is_active;
+    }
+    if (payload.custom_name !== undefined) {
+      patch.custom_name = payload.custom_name;
+    }
+    if (payload.external_id !== undefined) {
+      patch.external_id = payload.external_id;
+    }
+
+    await this.invokeEdge("update-store-category", {
+      id: payload.id,
+      patch,
+    });
   }
 
-  /** Удаление категории магазина и всех её товаров в магазине */
+  /**
+   * Удаление категории магазина со всеми товарами.
+   */
   static async deleteStoreCategoryWithProducts(
     storeId: string,
-    categoryId: number,
+    categoryId: number
   ): Promise<void> {
-    if (!storeId || !categoryId) throw new Error("storeId and categoryId required");
-    await ShopService.invokeEdge<unknown>("delete-store-category-with-products", { store_id: storeId, category_id: categoryId });
-  }
+    if (!storeId || !categoryId) {
+      throw new Error("Store ID and Category ID are required");
+    }
 
-  /** Массовое удаление категорий магазина и их товаров */
-  static async deleteStoreCategoriesWithProducts(
-    storeId: string,
-    categoryIds: number[],
-  ): Promise<void> {
-    if (!storeId || !Array.isArray(categoryIds) || categoryIds.length === 0) return;
-    const ids = categoryIds;
-    await ShopService.invokeEdge<unknown>("delete-store-categories-with-products", { store_id: storeId, category_ids: ids });
-  }
-
-  /** Убедиться, что категория привязана к магазину (апсерт) */
-  static async ensureStoreCategory(
-    storeId: string,
-    categoryId: number,
-    options?: { external_id?: string | null; custom_name?: string | null },
-  ): Promise<number | null> {
-    if (!storeId || !Number.isFinite(categoryId)) throw new Error("storeId and categoryId required");
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) throw new Error("Invalid session");
-
-    const resp = await ShopService.invokeEdge<{ id?: number | string }>("ensure-store-category", {
-      store_id: storeId,
-      category_id: Number(categoryId),
-      external_id: options?.external_id ?? null,
-      custom_name: options?.custom_name ?? null,
-    });
-    return resp?.id != null ? Number(resp.id) : null;
-  }
-
-  /** Получить внешний ID категории магазина для пары (store_id, category_id) */
-  static async getStoreCategoryExternalId(
-    storeId: string,
-    categoryId: number,
-  ): Promise<string | null> {
-    if (!storeId || !Number.isFinite(categoryId)) throw new Error("storeId and categoryId required");
-    const resp = await ShopService.invokeEdge<{ external_id?: string | null }>("get-store-category-external-id", {
+    await this.invokeEdge("delete-store-category-with-products", {
       store_id: storeId,
       category_id: categoryId,
     });
-    return resp?.external_id ?? null;
   }
 
-  static async cleanupUnusedStoreCategory(storeId: string, categoryId: number): Promise<void> {
-    if (!storeId || !Number.isFinite(categoryId)) return;
-    await ShopService.invokeEdge<unknown>("cleanup-unused-store-category", { store_id: storeId, category_id: categoryId });
+  /**
+   * Массовое удаление категорий со всеми товарами.
+   */
+  static async deleteStoreCategoriesWithProducts(
+    storeId: string,
+    categoryIds: number[]
+  ): Promise<void> {
+    if (!storeId || !Array.isArray(categoryIds) || categoryIds.length === 0) {
+      return;
+    }
+
+    await this.invokeEdge("delete-store-categories-with-products", {
+      store_id: storeId,
+      category_ids: categoryIds,
+    });
   }
 
-  /** Валюты магазина */
-  static async getStoreCurrencies(storeId: string): Promise<Array<{ code: string; rate: number; is_base: boolean }>> {
-    const resp = await ShopService.invokeEdge<{ rows?: Array<{ code: string; rate?: number; is_base?: boolean }> }>(
-      "store-currencies-list",
-      { store_id: storeId },
+  /**
+   * Привязка категории к магазину (upsert).
+   * Возвращает ID записи store_categories.
+   */
+  static async ensureStoreCategory(
+    storeId: string,
+    categoryId: number,
+    options?: {
+      external_id?: string | null;
+      custom_name?: string | null;
+    }
+  ): Promise<number | null> {
+    if (!storeId || !Number.isFinite(categoryId)) {
+      throw new Error("Valid Store ID and Category ID are required");
+    }
+
+    await this.ensureSession();
+
+    const response = await this.invokeEdge<{ id?: number }>(
+      "ensure-store-category",
+      {
+        store_id: storeId,
+        category_id: categoryId,
+        external_id: options?.external_id ?? null,
+        custom_name: options?.custom_name ?? null,
+      }
     );
-    const rows = (resp?.rows || []) as Array<{ code: string; rate?: number; is_base?: boolean }>;
-    return rows.map((r) => ({ code: String(r.code), rate: Number(r.rate ?? 1), is_base: !!r.is_base }));
+
+    return response.id != null ? Number(response.id) : null;
   }
 
-  static async addStoreCurrency(storeId: string, code: string, rate: number): Promise<void> {
-    await ShopService.invokeEdge<unknown>("add-store-currency", { store_id: storeId, code, rate });
+  /**
+   * Получение внешнего ID категории магазина.
+   */
+  static async getStoreCategoryExternalId(
+    storeId: string,
+    categoryId: number
+  ): Promise<string | null> {
+    if (!storeId || !Number.isFinite(categoryId)) {
+      throw new Error("Valid Store ID and Category ID are required");
+    }
+
+    const response = await this.invokeEdge<{ external_id?: string | null }>(
+      "get-store-category-external-id",
+      {
+        store_id: storeId,
+        category_id: categoryId,
+      }
+    );
+
+    return response.external_id || null;
   }
 
-  static async updateStoreCurrencyRate(storeId: string, code: string, rate: number): Promise<void> {
-    await ShopService.invokeEdge<unknown>("update-store-currency-rate", { store_id: storeId, code, rate });
+  /**
+   * Очистка неиспользуемой категории магазина.
+   */
+  static async cleanupUnusedStoreCategory(
+    storeId: string,
+    categoryId: number
+  ): Promise<void> {
+    if (!storeId || !Number.isFinite(categoryId)) return;
+
+    await this.invokeEdge("cleanup-unused-store-category", {
+      store_id: storeId,
+      category_id: categoryId,
+    });
   }
 
+  // ============================================================================
+  // ПУБЛИЧНЫЕ МЕТОДЫ - ВАЛЮТЫ МАГАЗИНА
+  // ============================================================================
+
+  /**
+   * Получение списка валют магазина.
+   */
+  static async getStoreCurrencies(
+    storeId: string
+  ): Promise<Array<{ code: string; rate: number; is_base: boolean }>> {
+    const response = await this.invokeEdge<{
+      rows: Array<{ code: string; rate?: number; is_base?: boolean }>;
+    }>("store-currencies-list", { store_id: storeId });
+
+    const rows = response.rows || [];
+
+    return rows.map(row => ({
+      code: row.code,
+      rate: Number(row.rate) || 1,
+      is_base: Boolean(row.is_base),
+    }));
+  }
+
+  /**
+   * Добавление валюты в магазин.
+   */
+  static async addStoreCurrency(
+    storeId: string,
+    code: string,
+    rate: number
+  ): Promise<void> {
+    await this.invokeEdge("add-store-currency", {
+      store_id: storeId,
+      code,
+      rate,
+    });
+  }
+
+  /**
+   * Обновление курса валюты.
+   */
+  static async updateStoreCurrencyRate(
+    storeId: string,
+    code: string,
+    rate: number
+  ): Promise<void> {
+    await this.invokeEdge("update-store-currency-rate", {
+      store_id: storeId,
+      code,
+      rate,
+    });
+  }
+
+  /**
+   * Установка базовой валюты магазина.
+   */
   static async setBaseStoreCurrency(storeId: string, code: string): Promise<void> {
-    await ShopService.invokeEdge<unknown>("set-base-store-currency", { store_id: storeId, code });
+    await this.invokeEdge("set-base-store-currency", {
+      store_id: storeId,
+      code,
+    });
   }
 
+  /**
+   * Удаление валюты из магазина.
+   */
   static async deleteStoreCurrency(storeId: string, code: string): Promise<void> {
-    await ShopService.invokeEdge<unknown>("delete-store-currency", { store_id: storeId, code });
+    await this.invokeEdge("delete-store-currency", {
+      store_id: storeId,
+      code,
+    });
   }
 
-  static async getAvailableCurrencies(): Promise<Array<{ code: string; rate?: number }>> {
-    const resp = await ShopService.invokeEdge<{ rows?: Array<{ code: string; rate?: number }> }>("get-available-currencies", {});
-    const rows = (resp.rows || []) as Array<{ code: string; rate?: number }>;
-    return rows.map((c) => ({ code: String(c.code), rate: typeof c.rate === "number" ? c.rate : undefined }));
+  /**
+   * Получение списка доступных валют.
+   */
+  static async getAvailableCurrencies(): Promise<
+    Array<{ code: string; rate?: number }>
+  > {
+    const response = await this.invokeEdge<{
+      rows: Array<{ code: string; rate?: number }>;
+    }>("get-available-currencies", {});
+
+    const rows = response.rows || [];
+
+    return rows.map(row => ({
+      code: row.code,
+      rate: row.rate,
+    }));
   }
 
+  // ============================================================================
+  // ПУБЛИЧНЫЕ МЕТОДЫ - ПРОЧЕЕ
+  // ============================================================================
+
+  /**
+   * Получение количества товаров в магазине.
+   */
   static async getStoreProductsCount(storeId: string): Promise<number> {
-    const resp = await ShopService.invokeEdge<{ count?: number }>("get-store-products-count", { store_id: storeId });
-    return Number(resp.count ?? 0) || 0;
+    const response = await this.invokeEdge<{ count?: number }>(
+      "get-store-products-count",
+      { store_id: storeId }
+    );
+
+    return Number(response.count) || 0;
   }
 }

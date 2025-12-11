@@ -170,6 +170,17 @@ export class ProductService {
 
   private static inFlightLinksByProduct: Map<string, Promise<string[]>> = new Map();
   private static inFlightRecomputeByStore: Map<string, Promise<void>> = new Map();
+  private static readonly FIRST_PAGE_INDEX_KEY = "rq:index:products:first";
+
+  private static addFirstPageKeyToIndex(key: string) {
+    try {
+      if (typeof window === "undefined") return;
+      const raw = window.localStorage.getItem(ProductService.FIRST_PAGE_INDEX_KEY);
+      const arr = raw ? (JSON.parse(raw) as string[]) : [];
+      const next = Array.from(new Set([...(Array.isArray(arr) ? arr : []), key]));
+      window.localStorage.setItem(ProductService.FIRST_PAGE_INDEX_KEY, JSON.stringify(next));
+    } catch { /* ignore */ }
+  }
 
   private static castNullableNumber(value: unknown): number | null {
     if (value === undefined || value === null || value === "") return null;
@@ -253,87 +264,11 @@ export class ProductService {
       const rows = Array.isArray(resp?.products) ? resp!.products! : [];
       return rows;
     } catch (e) {
-      return await ProductService.getProductsAggregatedFallback(storeId ?? null);
+      const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, 50, 0);
+      return fb.products;
     }
   }
-
-  private static async getProductsAggregatedFallback(storeId?: string | null): Promise<ProductAggregated[]> {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth?.user) throw new Error("User not authenticated");
-    const allowedStoreIds = await ProductService.getUserStoreIds();
-    const storeIds = storeId ? [String(storeId)] : allowedStoreIds;
-    if (storeId && !allowedStoreIds.includes(String(storeId))) {
-      throw new Error("Store access denied");
-    }
-    if (!storeIds.length) return [];
-    const { data: rows, error } = await supabase
-      .from('store_products')
-      .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at')
-      .in('store_id', storeIds)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (error) throw new Error((error as { message?: string } | null)?.message || 'fallback_failed');
-    const ids = (rows || []).map((r) => String((r as any).id));
-    let images: Array<{ product_id: string; url: string; is_main: boolean; order_index: number }> = [];
-    if (ids.length) {
-      const { data: imgData } = await supabase
-        .from('store_product_images')
-        .select('product_id,r2_key_original,url,is_main,order_index')
-        .in('product_id', ids);
-      images = ((imgData || []) as any[]).map((r) => {
-        const key = String(((r as any).r2_key_original || ''))
-        const direct = String(((r as any).url || ''))
-        let u = direct
-        if (!u) { u = key ? R2Storage.makePublicUrl(key) : '' }
-        return {
-          product_id: String((r as any).product_id),
-          url: u,
-          is_main: !!(r as any).is_main,
-          order_index: Number((r as any).order_index || 0),
-        }
-      });
-    }
-    const imgByPid: Record<string, { url: string; is_main: boolean; order_index: number }> = {};
-    for (const im of images) {
-      const prev = imgByPid[im.product_id];
-      if (!prev || (im.is_main && !prev.is_main) || im.order_index === 0) {
-        imgByPid[im.product_id] = im;
-      }
-    }
-    const out = ((rows || []) as any[]).map((r) => {
-      const pid = String((r as any).id);
-      const mr = imgByPid[pid];
-      return {
-        id: pid,
-        store_id: String((r as any).store_id),
-        supplier_id: (r as any).supplier_id ?? null,
-        external_id: (r as any).external_id ?? null,
-        name: (r as any).name ?? null,
-        name_ua: (r as any).name_ua ?? null,
-        docket: (r as any).docket ?? null,
-        docket_ua: (r as any).docket_ua ?? null,
-        description: (r as any).description ?? null,
-        description_ua: (r as any).description_ua ?? null,
-        vendor: (r as any).vendor ?? null,
-        article: (r as any).article ?? null,
-        category_id: (r as any).category_id ?? null,
-        category_external_id: (r as any).category_external_id ?? null,
-        currency_id: null,
-        currency_code: (r as any).currency_code ?? null,
-        price: (r as any).price ?? null,
-        price_old: (r as any).price_old ?? null,
-        price_promo: (r as any).price_promo ?? null,
-        stock_quantity: Number((r as any).stock_quantity ?? 0),
-        available: (r as any).available ?? true,
-        state: (r as any).state ?? 'new',
-        created_at: (r as any).created_at ?? new Date().toISOString(),
-        updated_at: (r as any).updated_at ?? new Date().toISOString(),
-        is_active: true,
-        mainImageUrl: mr?.url || undefined,
-      } as ProductAggregated;
-    });
-    return out;
-  }
+  
 
   static async getProductsFirstPage(
     storeId: string | null,
@@ -353,29 +288,6 @@ export class ProductService {
     if (!options?.bypassCache) {
       const cached = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(sizedKey, false);
       if (cached?.data && Array.isArray(cached.data.items)) {
-        (async () => {
-          try {
-            const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-              store_id: storeId ?? null,
-              limit,
-              offset: 0,
-            });
-            const productsN = Array.isArray(fresh?.products) ? fresh.products! : [];
-            const pageN: ProductListPage = {
-              limit,
-              offset: 0,
-              hasMore: !!fresh?.page?.hasMore,
-              nextOffset: fresh?.page?.nextOffset ?? null,
-              total: fresh?.page?.total ?? productsN.length,
-            };
-            writeCache(sizedKey, { items: productsN, page: pageN }, CACHE_TTL.productsPage);
-          } catch {
-            try {
-              const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
-              writeCache(sizedKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
-            } catch { /* ignore */ }
-          }
-        })();
         return { products: cached.data.items, page: cached.data.page };
       }
     }
@@ -394,10 +306,12 @@ export class ProductService {
         total: fresh?.page?.total ?? products.length,
       };
       writeCache(sizedKey, { items: products, page }, CACHE_TTL.productsPage);
+      ProductService.addFirstPageKeyToIndex(sizedKey);
       return { products, page };
     } catch {
       const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
       writeCache(sizedKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
+      ProductService.addFirstPageKeyToIndex(sizedKey);
       return fb;
     }
   }
@@ -415,17 +329,20 @@ export class ProductService {
       throw new Error("Store access denied");
     }
     if (!storeIds.length) return { products: [], page: { limit, offset, hasMore: false, nextOffset: null, total: 0 } };
-    const { count } = await supabase
-      .from('store_products')
-      .select('id', { count: 'exact', head: true })
-      .in('store_id', storeIds);
-    const total = Number(count || 0);
-    const { data: rows } = await supabase
-      .from('store_products')
-      .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at')
-      .in('store_id', storeIds)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const [countRes, rowsRes] = await Promise.all([
+      supabase
+        .from('store_products')
+        .select('id', { count: 'exact', head: true })
+        .in('store_id', storeIds),
+      supabase
+        .from('store_products')
+        .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at')
+        .in('store_id', storeIds)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1),
+    ]);
+    const total = Number((countRes as { count?: number } | null)?.count || 0);
+    const rows = (rowsRes as { data?: any[] } | null)?.data || [];
     const ids = ((rows || []) as any[]).map((r) => String((r as any).id));
     let images: Array<{ product_id: string; url: string; is_main: boolean; order_index: number }> = [];
     if (ids.length) {
@@ -529,12 +446,9 @@ export class ProductService {
     try {
       if (typeof window === "undefined") return;
       const prefix = `rq:products:first:${storeId ?? "all"}`;
-      const keysToUpdate: string[] = [];
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const k = window.localStorage.key(i);
-        if (!k) continue;
-        if (k === prefix || k.startsWith(`${prefix}:`)) keysToUpdate.push(k);
-      }
+      const raw = window.localStorage.getItem(ProductService.FIRST_PAGE_INDEX_KEY);
+      const indexKeys = raw ? (JSON.parse(raw) as string[]) : [];
+      const keysToUpdate = (Array.isArray(indexKeys) ? indexKeys : []).filter((k) => k === prefix || k.startsWith(`${prefix}:`));
       for (const key of keysToUpdate) {
         const cached = readCache<{ items: unknown[]; page?: unknown }>(key, true);
         if (!cached || !Array.isArray(cached.data.items)) continue;

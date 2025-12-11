@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMarketplaces } from "@/hooks/useMarketplaces";
+import type { ShopSettingsAggregated } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 type StoreCategoryRow = {
@@ -45,10 +45,6 @@ export default function ShopSettings() {
   const [storeUrl, setStoreUrl] = useState<string>("");
   const [activeTab, setActiveTab] = useState<'info' | 'currencies' | 'categories'>('categories');
   const [productsCount, setProductsCount] = useState(0);
-  const {
-    marketplaces,
-    isLoading: marketplacesLoading
-  } = useMarketplaces();
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
   const queryClient = useQueryClient();
   const [search, setSearch] = useState<string>("");
@@ -71,60 +67,55 @@ export default function ShopSettings() {
   const [editExternalId, setEditExternalId] = useState<string>("");
   const [editRzIdValue, setEditRzIdValue] = useState<string>("");
   const [editActive, setEditActive] = useState<boolean>(true);
-  const { data: shopData } = useQuery({
-    queryKey: ['shop', id],
+  const { data: aggData, isLoading: aggLoading } = useQuery<ShopSettingsAggregated | null>({
+    queryKey: ['shopSettingsAgg', id!],
     queryFn: async () => {
-      const shop = await ShopService.getShop(id!);
-      return shop;
+      if (!id) return null;
+      const payload = await ShopService.getShopSettingsAggregated(id!);
+      return payload;
     },
     enabled: !!id,
     staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as ShopSettingsAggregated | null | undefined,
   });
   useEffect(() => {
     if (!id) {
       navigate('/user/shops');
       return;
     }
-    if (shopData) {
-      setShopName(shopData.store_name);
-      setStoreCompany(String(shopData.store_company || ''));
-      setStoreUrl(String(shopData.store_url || ''));
+    if (aggData?.shop) {
+      setShopName(aggData.shop.store_name);
+      setStoreCompany(String(aggData.shop.store_company || ''));
+      setStoreUrl(String(aggData.shop.store_url || ''));
+      if (aggData.shop.marketplace) setSelectedMarketplace(String(aggData.shop.marketplace));
+      setProductsCount(Number(aggData.productsCount || 0));
+      setAvailableCurrencies(aggData.availableCurrencies || []);
+      setStoreCurrencies(aggData.storeCurrencies || []);
     }
-  }, [id, shopData, navigate]);
-  useEffect(() => {
-    if (shopData && shopData.marketplace) {
-      setSelectedMarketplace(String(shopData.marketplace));
-    }
-  }, [shopData]);
-  const { data: rowsData, isLoading: loading } = useQuery<StoreCategoryRow[]>({
-    queryKey: ['storeCategories', id!],
-    queryFn: async () => {
-      const cats = await ShopService.getStoreCategories(id!);
-      return cats;
-    },
-    enabled: !!id,
-    staleTime: 900_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    placeholderData: (prev) => prev as StoreCategoryRow[] | undefined,
-  });
-  const rows: StoreCategoryRow[] = useMemo(() => rowsData ?? [], [rowsData]);
-  useEffect(() => {
-    const checkProducts = async () => {
-      const count = await ShopService.getStoreProductsCount(id!);
-      setProductsCount(count || 0);
-    };
-    if (id) checkProducts();
-  }, [id]);
+  }, [id, aggData, navigate]);
+  const rows: StoreCategoryRow[] = useMemo(() => {
+    const src = aggData?.categories ?? [];
+    return src.map((r) => ({
+      store_category_id: r.store_category_id,
+      store_id: r.store_id,
+      category_id: r.category_id,
+      name: r.name,
+      base_external_id: r.base_external_id,
+      store_external_id: r.store_external_id,
+      store_rz_id_value: r.store_rz_id_value,
+      is_active: r.is_active,
+    }));
+  }, [aggData]);
+  
   useEffect(() => {
     if (!id) return;
-    const channel = supabase.channel(`store_categories_${id}`).on(
+    const channel = supabase.channel(`store_store_categories_${id}`).on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'store_categories', filter: `store_id=eq.${id}` },
+      { event: '*', schema: 'public', table: 'store_store_categories', filter: `store_id=eq.${id}` },
       () => {
-        queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
+        queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
       }
     ).subscribe();
     return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
@@ -158,7 +149,7 @@ export default function ShopSettings() {
       id: rowId,
       ...patch
     });
-    queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
+    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
   };
   const [availableCurrencies, setAvailableCurrencies] = useState<Array<{
     code: string;
@@ -170,38 +161,25 @@ export default function ShopSettings() {
     is_base: boolean;
   }>>([]);
   const [addCurrencyCode, setAddCurrencyCode] = useState<string>('');
-  useEffect(() => {
-    const loadCurrencyData = async () => {
-      const sys = await ShopService.getAvailableCurrencies();
-      setAvailableCurrencies(sys);
-      const rows = await ShopService.getStoreCurrencies(id!);
-      setStoreCurrencies(rows);
-    };
-    if (id) loadCurrencyData();
-  }, [id]);
-  const refreshStoreCurrencies = async () => {
-    const rows = await ShopService.getStoreCurrencies(id!);
-    setStoreCurrencies(rows);
-  };
   const handleAddCurrency = async () => {
     if (!addCurrencyCode) return;
     const sys = availableCurrencies.find(c => c.code === addCurrencyCode);
     const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
     await ShopService.addStoreCurrency(id!, addCurrencyCode, defaultRate);
     setAddCurrencyCode('');
-    await refreshStoreCurrencies();
+    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
   };
   const handleUpdateRate = async (code: string, rate: number) => {
     await ShopService.updateStoreCurrencyRate(id!, code, rate);
-    await refreshStoreCurrencies();
+    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
   };
   const handleSetBase = async (code: string) => {
     await ShopService.setBaseStoreCurrency(id!, code);
-    await refreshStoreCurrencies();
+    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
   };
   const handleDeleteCurrency = async (code: string) => {
     await ShopService.deleteStoreCurrency(id!, code);
-    await refreshStoreCurrencies();
+    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
   };
   return <div className="p-6 space-y-6" data-testid="shop_settings_page">
       <PageHeader title={shopName} description={t('breadcrumb_settings')} breadcrumbItems={shopBreadcrumbs} />
@@ -246,12 +224,12 @@ export default function ShopSettings() {
                     custom_mapping: template.mapping_rules
                   });
                 }
-              }} disabled={marketplacesLoading || productsCount > 0}>
+              }} disabled={productsCount > 0}>
                   <SelectTrigger id="marketplace">
                     <SelectValue placeholder="Оберіть формат магазину" />
                   </SelectTrigger>
                   <SelectContent>
-                    {marketplaces.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                    {(aggData?.marketplaces ?? []).map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">{productsCount > 0 ? 'Формат можна змінити тільки якщо не додано жодного товару' : 'Зміна формату скопіює новий шаблон'}</p>
@@ -326,7 +304,7 @@ export default function ShopSettings() {
                         await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
                       }
                     }
-                    queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
+                    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
                     setSelectedRowIds([]);
                   }} data-testid="shop_settings_delete_btn">
                     <Trash2 className="h-4 w-4" />
@@ -409,7 +387,7 @@ export default function ShopSettings() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={async () => {
                                 await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
-                                queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
+                                queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
                                 setSelectedRowIds(prev => prev.filter(pid => pid !== cat.store_category_id));
                               }}>
                                 <Trash2 className="mr-2 h-4 w-4" />{t('delete') || 'Видалити'}
@@ -462,7 +440,7 @@ export default function ShopSettings() {
                           rz_id_value: editRzIdValue || null,
                           is_active: editActive
                         });
-                        queryClient.invalidateQueries({ queryKey: ['storeCategories', id] });
+                        queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
                         setEditOpen(false);
                         setEditRow(null);
                         cleanupDialogArtifacts();
