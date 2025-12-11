@@ -436,7 +436,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         supplierName: product.supplier_id 
           ? supplierNameMap[product.supplier_id]
           : undefined,
-        linkedStoreIds: linkedStoresMap[productId] || [],
+        linkedStoreIds: Array.from(new Set(linkedStoresMap[productId] || [])),
       }
     })
 

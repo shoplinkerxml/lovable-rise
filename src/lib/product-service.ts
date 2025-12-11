@@ -607,9 +607,9 @@ export class ProductService {
     return names;
   }
 
-  static async refreshStoreCategoryFilterOptions(storeIds: string[]): Promise<void> {
+  static async refreshStoreCategoryFilterOptions(storeIds: string[]): Promise<Record<string, string[]>> {
     const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
-    if (unique.length === 0) return;
+    if (unique.length === 0) return {};
     const resp = await ProductService.invokeEdge<{ results?: Record<string, string[]>; names?: string[] }>(
       "store-category-filter-options",
       { store_ids: unique },
@@ -621,6 +621,7 @@ export class ProductService {
         writeCache(`rq:filters:categories:${sid}`, names, CACHE_TTL.categoryFilters);
       }
     } catch { void 0; }
+    return results;
   }
 
   /** Получить и обновить переопределения для пары (product_id, store_id) через product-edit-data */
@@ -848,7 +849,6 @@ export class ProductService {
           });
         });
       }
-      await ProductService.refreshStoreCategoryFilterOptions(sidsUnique);
     } catch { void 0; }
     return { inserted: out.inserted ?? 0, addedByStore: out.addedByStore ?? {} };
   }

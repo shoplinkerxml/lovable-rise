@@ -310,18 +310,16 @@ export function AddToStoresMenu({
                         }));
                         try {
                           Object.entries(addedByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt); });
-                          await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
+                          const results = await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
                           try {
                             const addedMap = addedByStore || {};
                             const sidList = Array.from(new Set(storeIds.map(String)));
                             const catsCounts: Record<string, number> = {};
                             for (const sid of sidList) {
-                              try {
-                                const names = await ProductService.getStoreCategoryFilterOptions(String(sid));
-                                const cntCats = Array.isArray(names) ? names.length : 0;
-                                catsCounts[String(sid)] = cntCats;
-                                ShopService.setCategoriesCountInCache(String(sid), cntCats);
-                              } catch { /* ignore */ }
+                              const names = Array.isArray(results?.[String(sid)]) ? results[String(sid)] : [];
+                              const cntCats = names.length;
+                              catsCounts[String(sid)] = cntCats;
+                              ShopService.setCategoriesCountInCache(String(sid), cntCats);
                             }
                             q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
                               const arr = Array.isArray(prev) ? prev : (stores || []);
@@ -394,11 +392,11 @@ export function AddToStoresMenu({
                                 Object.assign(countsByStore, deletedByStore);
                               }
                               Object.entries(countsByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), -cnt); });
-                              await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
+                              const results = await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
                               try {
                                 for (const sid of storeIds) {
-                                  const names = await ProductService.getStoreCategoryFilterOptions(String(sid));
-                                  const cnt = Array.isArray(names) ? names.length : 0;
+                                  const names = Array.isArray(results?.[String(sid)]) ? results[String(sid)] : [];
+                                  const cnt = names.length;
                                   ShopService.setCategoriesCountInCache(String(sid), cnt);
                                   try {
                                     q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
