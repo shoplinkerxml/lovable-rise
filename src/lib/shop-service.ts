@@ -398,8 +398,6 @@ export class ShopService {
    * Это основной метод для получения списка магазинов в UI.
    */
   static async getShopsAggregated(): Promise<ShopAggregated[]> {
-    await this.ensureSession();
-
     // Проверяем валидный кэш
     const cached = this.readShopsCache(false);
     if (cached) return cached;
@@ -409,6 +407,8 @@ export class ShopService {
       const stale = this.readShopsCache(true);
       return stale || [];
     }
+
+    await this.ensureSession();
 
     // Дедуплицируем запросы
     return this.deduplicateRequest("shops-aggregated", async () => {

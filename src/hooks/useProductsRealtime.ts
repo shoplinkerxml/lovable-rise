@@ -12,7 +12,6 @@ export function useProductsRealtime(storeId: string | undefined, queryClient: Qu
       timeoutId = setTimeout(() => {
         scheduled = false;
         queryClient.invalidateQueries({ queryKey: ["products", storeId ?? "all"] });
-        try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
       }, 300);
     };
     type RealtimeChannelApi = { on: (...args: unknown[]) => RealtimeChannelApi; subscribe: () => unknown };
@@ -32,4 +31,3 @@ export function useProductsRealtime(storeId: string | undefined, queryClient: Qu
     };
   }, [queryClient, storeId]);
 }
-

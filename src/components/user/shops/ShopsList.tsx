@@ -53,7 +53,7 @@ export const ShopsList = ({
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 900_000,
+    staleTime: 2_592_000_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
