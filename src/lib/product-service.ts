@@ -1581,4 +1581,33 @@ export class ProductService {
     removeCache('rq:products:all');
     return { upserted: payload.length };
   }
+  /** Агрегированные справочники для страницы создания товара */
+  static async getNewProductLookup(): Promise<{
+    suppliers: Array<{ id: string; supplier_name: string }>;
+    currencies: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+    supplierCategoriesMap: Record<string, Array<{
+      id: string;
+      name: string;
+      external_id: string;
+      supplier_id: string;
+      parent_external_id: string | null;
+    }>>;
+  }> {
+    const resp = await ProductService.invokeEdge<{
+      suppliers?: Array<{ id: string; supplier_name: string }>;
+      currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+      supplierCategoriesMap?: Record<string, Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>>;
+    }>("new-product-lookup", {});
+    return {
+      suppliers: Array.isArray(resp.suppliers) ? resp.suppliers : [],
+      currencies: Array.isArray(resp.currencies) ? resp.currencies : [],
+      supplierCategoriesMap: resp.supplierCategoriesMap || {},
+    };
+  }
 }

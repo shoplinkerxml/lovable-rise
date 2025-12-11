@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
+import { removeCache } from "@/lib/cache-utils";
 
 export interface Supplier {
   id: number;
@@ -226,6 +227,7 @@ export class SupplierService {
     const row = payload?.supplier as Supplier | undefined;
     if (!row) throw new Error('Create failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
+    try { removeCache('rq:supplierCategoriesMap'); } catch { /* ignore */ }
     return row;
   }
 
@@ -274,6 +276,7 @@ export class SupplierService {
     const row = payload?.supplier as Supplier | undefined;
     if (!row) throw new Error('Update failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
+    try { removeCache('rq:supplierCategoriesMap'); } catch { /* ignore */ }
     return row;
   }
 
@@ -294,5 +297,6 @@ export class SupplierService {
     });
     if (error) throw new Error(error.message ?? 'Delete failed');
     try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
+    try { removeCache('rq:supplierCategoriesMap'); } catch { /* ignore */ }
   }
 }

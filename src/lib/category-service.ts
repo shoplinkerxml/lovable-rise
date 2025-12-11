@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { readCache, writeCache, removeCache, CACHE_TTL } from "@/lib/cache-utils";
 
 // Minimal DTO shape aligned with UI needs
 export type StoreCategory = {
@@ -97,6 +98,7 @@ export const CategoryService = {
       parent_external_id: input.parent_external_id ?? null,
     };
     const resp = await invokeEdge<{ item: StoreCategoryBase }>("categories", { action: "create", data: payload });
+    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
     return toBase(resp.item as StoreCategoryBase);
   },
 
@@ -111,6 +113,7 @@ export const CategoryService = {
     }));
     const resp = await invokeEdge<{ rows?: StoreCategoryBase[] }>("categories", { action: "bulk_create", items: payload });
     const rows = resp.rows ?? [];
+    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
     return rows.map(toBase);
   },
 
@@ -129,18 +132,10 @@ export const CategoryService = {
   async getCategoriesMapForSuppliers(supplierIds: Array<string | number>): Promise<Record<string, StoreCategoryFull[]>> {
     const ids = Array.from(new Set((supplierIds || []).map(String).filter(Boolean)));
     if (ids.length === 0) return {};
-
-    // Try cache first
-    try {
-      const cacheKey = 'rq:supplierCategoriesMap';
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as { data: Record<string, StoreCategoryFull[]>; expiresAt: number };
-        if (parsed && parsed.expiresAt > Date.now() && parsed.data && typeof parsed.data === 'object') {
-          return parsed.data;
-        }
-      }
-    } catch { /* ignore */ }
+    const env = readCache<Record<string, StoreCategoryFull[]>>("rq:supplierCategoriesMap", false);
+    if (env?.data && typeof env.data === "object") {
+      return env.data;
+    }
 
     // Single query for all categories of the given suppliers
     const { data, error } = await supabase
@@ -163,11 +158,7 @@ export const CategoryService = {
       });
     }
 
-    // Cache with TTL 10 minutes
-    try {
-      const payload = JSON.stringify({ data: map, expiresAt: Date.now() + 10 * 60 * 1000 });
-      if (typeof window !== 'undefined') window.localStorage.setItem('rq:supplierCategoriesMap', payload);
-    } catch { /* ignore */ }
+    writeCache("rq:supplierCategoriesMap", map, CACHE_TTL.supplierCategoriesMap);
     return map;
   },
 
@@ -207,6 +198,7 @@ export const CategoryService = {
       external_id: externalId,
       name,
     });
+    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
     return toBase(resp.item as StoreCategoryBase);
   },
 
@@ -221,6 +213,7 @@ export const CategoryService = {
       supplier_id: normalized,
       external_id: externalId,
     });
+    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
     return true;
   },
 
@@ -235,6 +228,7 @@ export const CategoryService = {
       supplier_id: normalized,
       external_id: externalId,
     });
+    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
     return true;
   },
 };

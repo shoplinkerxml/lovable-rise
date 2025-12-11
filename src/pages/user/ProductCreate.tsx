@@ -9,9 +9,7 @@ import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type ProductLimitInfo, type ProductImage, type ProductParam } from '@/lib/product-service';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { toast } from 'sonner';
-import { SupplierService } from '@/lib/supplier-service';
-import { CategoryService } from '@/lib/category-service';
-import { TariffService } from '@/lib/tariff-service';
+ 
 import type { SupplierOption, CategoryOption, CurrencyOption } from '@/components/ProductFormTabs/types';
 
 export const ProductCreate = () => {
@@ -48,12 +46,11 @@ export const ProductCreate = () => {
   useEffect(() => {
     (async () => {
       try {
-        const suppliersRaw = await SupplierService.getSuppliers();
-        const suppliers: SupplierOption[] = (suppliersRaw || []).map((s) => ({ id: String(s.id), supplier_name: String(s.supplier_name || '') }));
+        const { suppliers: aggSuppliers, currencies: aggCurrencies, supplierCategoriesMap } = await ProductService.getNewProductLookup();
+        const suppliers: SupplierOption[] = (aggSuppliers || []).map((s) => ({ id: String(s.id), supplier_name: String(s.supplier_name || '') }));
         setPreloadedSuppliers(suppliers);
 
-        const catsMapFull = await CategoryService.getCategoriesMapForSuppliers(suppliers.map(s => s.id));
-        const categoriesMap: Record<string, CategoryOption[]> = Object.fromEntries(Object.entries(catsMapFull).map(([sid, list]) => [sid, (list || []).map((c: any) => ({
+        const categoriesMap: Record<string, CategoryOption[]> = Object.fromEntries(Object.entries(supplierCategoriesMap || {}).map(([sid, list]) => [sid, (list || []).map((c: any) => ({
           id: String(c.id),
           name: String(c.name || ''),
           external_id: String(c.external_id || ''),
@@ -62,8 +59,7 @@ export const ProductCreate = () => {
         }))]));
         setPreloadedSupplierCategoriesMap(categoriesMap);
 
-        const currenciesRaw = await TariffService.getAllCurrencies();
-        const currencies: CurrencyOption[] = (currenciesRaw || []).map((c: any) => ({
+        const currencies: CurrencyOption[] = (aggCurrencies || []).map((c: any) => ({
           id: Number(c.id),
           name: String(c.name || ''),
           code: String(c.code || ''),

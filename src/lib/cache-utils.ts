@@ -6,6 +6,7 @@ export const CACHE_TTL = {
   uiPrefs: 2_592_000_000,
   tariffsList: 900_000,
   limits: 900_000,
+  supplierCategoriesMap: 600_000,
 } as const;
 
 export type CacheEnvelope<T> = { data: T; expiresAt: number };
