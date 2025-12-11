@@ -92,7 +92,7 @@ export const ShopsList = ({
     const ch = (supabase as SupabaseClient)
       .channel('shops_realtime')
       // Stores table → invalidate for structural changes
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stores' }, () => {
         queryClient.invalidateQueries({ queryKey: ['shopsList'] });
       })
       // Product links → adjust productsCount fast and guard categories when 0
