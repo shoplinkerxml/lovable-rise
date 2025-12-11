@@ -211,15 +211,10 @@ export class ShopService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    // Быстрый путь: на страницах, где не требуется свежие данные, используем валидный кэш
     try {
-      if (typeof window !== "undefined") {
-        const p = window.location.pathname.toLowerCase();
-        const requireFresh = p.includes("/user/shops");
-        const cached = ShopService.readShopsCache(false);
-        if (!requireFresh && cached?.items && Array.isArray(cached.items)) {
-          return cached.items;
-        }
+      const cached = ShopService.readShopsCache(false);
+      if (cached?.items && Array.isArray(cached.items)) {
+        return cached.items;
       }
     } catch {
     }

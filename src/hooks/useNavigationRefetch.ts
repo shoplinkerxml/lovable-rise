@@ -10,10 +10,7 @@ export function useNavigationRefetch(refreshAuth?: () => Promise<void> | void) {
     const p = location.pathname.toLowerCase();
     const delay = 150;
     const timer = setTimeout(async () => {
-      // Shops list
-      if (p.includes("/user/shops")) {
-        await queryClient.refetchQueries({ queryKey: ["shopsList"], exact: false });
-      }
+      
       // Products across app
       if (p.includes("/products")) {
         await queryClient.refetchQueries({ queryKey: ["products"], exact: false });
