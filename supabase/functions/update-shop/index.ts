@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       .select("*")
       .maybeSingle()
     if (error) {
-      return new Response(JSON.stringify({ error: "db_error" }), { status: 500, headers: corsHeaders })
+      return new Response(JSON.stringify({ error: "db_error", message: (error as any)?.message || "" }), { status: 500, headers: corsHeaders })
     }
     return new Response(JSON.stringify({ shop: data }), { headers: corsHeaders })
   } catch (e) {

@@ -187,14 +187,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // Агрегация данных
-    const aggregated = stores.map((store: any) => ({
-      ...store,
-      marketplace: store.template_id
-        ? templatesMap[String(store.template_id)] ?? 'Не вказано'
-        : 'Не вказано',
-      productsCount: productsCountByStore[String(store.id)] ?? 0,
-      categoriesCount: categoriesCountByStore[String(store.id)] ?? 0,
-    }))
+    const aggregated = stores.map((store: any) => {
+      const pid = String(store.id)
+      const products = productsCountByStore[pid] ?? 0
+      const catsRaw = categoriesCountByStore[pid] ?? 0
+      const cats = products === 0 ? 0 : catsRaw
+      return {
+        ...store,
+        marketplace: store.template_id
+          ? templatesMap[String(store.template_id)] ?? 'Не вказано'
+          : 'Не вказано',
+        productsCount: products,
+        categoriesCount: cats,
+      }
+    })
 
     console.log('Shops fetched successfully', { count: aggregated.length })
 

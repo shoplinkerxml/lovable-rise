@@ -78,7 +78,15 @@ export class ShopService {
   }
 
   private static edgeError(error: unknown, code: string): never {
-    const msg = (error as { message?: string } | null)?.message || code;
+    const base = (error as { message?: string } | null)?.message || code;
+    let serverMsg = '';
+    try {
+      const ctx: any = (error as any)?.context || {};
+      const body = ctx?.body ?? ctx?.error ?? '';
+      const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+      serverMsg = parsed?.message || parsed?.error || '';
+    } catch { /* ignore */ }
+    const msg = serverMsg ? `${code}: ${serverMsg}` : base;
     throw new Error(msg);
   }
 

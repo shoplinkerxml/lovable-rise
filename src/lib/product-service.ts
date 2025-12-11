@@ -750,12 +750,13 @@ export class ProductService {
   static async bulkRemoveStoreProductLinks(
     productIds: string[],
     storeIds: string[],
-  ): Promise<{ deleted: number; deletedByStore: Record<string, number> }> {
+  ): Promise<{ deleted: number; deletedByStore: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }> {
     const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const { data, error } = await supabase.functions.invoke<{
       deleted?: number;
       deletedByStore?: Record<string, number>;
+      categoryNamesByStore?: Record<string, string[]>;
     } | string>(
       "bulk-remove-store-product-links",
       {
@@ -766,8 +767,8 @@ export class ProductService {
     if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_delete_failed");
     const out =
       (typeof data === "string"
-        ? (JSON.parse(data) as { deleted?: number; deletedByStore?: Record<string, number> })
-        : (data as { deleted?: number; deletedByStore?: Record<string, number> }));
+        ? (JSON.parse(data) as { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> })
+        : (data as { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }));
     try {
       const sids = (storeIds || []).map(String);
       ProductService.updateFirstPageCaches(null, (arr) => {
@@ -792,7 +793,15 @@ export class ProductService {
     try {
       ProductService.clearAllFirstPageCaches();
     } catch { void 0; }
-    return { deleted: out.deleted ?? 0, deletedByStore: out.deletedByStore ?? {} };
+    try {
+      const { ShopService } = await import("@/lib/shop-service");
+      const catsByStore = out.categoryNamesByStore || {};
+      for (const sid of Object.keys(catsByStore)) {
+        const cnt = Array.isArray(catsByStore[sid]) ? catsByStore[sid].length : 0;
+        ShopService.setCategoriesCountInCache(String(sid), cnt);
+      }
+    } catch { /* ignore */ }
+    return { deleted: out.deleted ?? 0, deletedByStore: out.deletedByStore ?? {}, categoryNamesByStore: out.categoryNamesByStore || {} };
   }
 
   static async bulkAddStoreProductLinks(payload: Array<{
@@ -804,12 +813,13 @@ export class ProductService {
     custom_price_promo?: number | null;
     custom_stock_quantity?: number | null;
     custom_available?: boolean | null;
-  }>): Promise<{ inserted: number; addedByStore: Record<string, number> }> {
+  }>): Promise<{ inserted: number; addedByStore: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }> {
     const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const { data, error } = await supabase.functions.invoke<{
       inserted?: number;
       addedByStore?: Record<string, number>;
+      categoryNamesByStore?: Record<string, string[]>;
     } | string>(
       "bulk-add-store-product-links",
       {
@@ -820,8 +830,8 @@ export class ProductService {
     if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_insert_failed");
     const out =
       (typeof data === "string"
-        ? (JSON.parse(data) as { inserted?: number; addedByStore?: Record<string, number> })
-        : (data as { inserted?: number; addedByStore?: Record<string, number> }));
+        ? (JSON.parse(data) as { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> })
+        : (data as { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }));
     try {
       const links = (payload || []).map((l) => ({ pid: String(l.product_id), sid: String(l.store_id) }));
       const groupedByPid: Record<string, string[]> = {};
@@ -850,7 +860,15 @@ export class ProductService {
         });
       }
     } catch { void 0; }
-    return { inserted: out.inserted ?? 0, addedByStore: out.addedByStore ?? {} };
+    try {
+      const { ShopService } = await import("@/lib/shop-service");
+      const catsByStore = out.categoryNamesByStore || {};
+      for (const sid of Object.keys(catsByStore)) {
+        const cnt = Array.isArray(catsByStore[sid]) ? catsByStore[sid].length : 0;
+        ShopService.setCategoriesCountInCache(String(sid), cnt);
+      }
+    } catch { /* ignore */ }
+    return { inserted: out.inserted ?? 0, addedByStore: out.addedByStore ?? {}, categoryNamesByStore: out.categoryNamesByStore || {} };
   }
 
   static async getStoreLinksForProduct(productId: string): Promise<string[]> {

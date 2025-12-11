@@ -217,6 +217,15 @@ export const StoreProductEdit = () => {
         const num = Number(productPayload.category_id);
         const storeExtId = String(patch.custom_category_id || "") || null;
         ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null, categoryName: freshName || undefined }, storeId);
+        try {
+          const namesByStore = await ProductService.refreshStoreCategoryFilterOptions([String(storeId)]);
+          const names = Array.isArray(namesByStore?.[String(storeId)]) ? namesByStore![String(storeId)] : [];
+          ShopService.setCategoriesCountInCache(String(storeId), names.length);
+          queryClient.setQueryData(['shopsList'], (prev: any) => {
+            const arr = Array.isArray(prev) ? prev : [];
+            return arr.map((s: any) => String(s.id) === String(storeId) ? { ...s, categoriesCount: names.length } : s);
+          });
+        } catch { /* ignore */ }
       }
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}/products`);

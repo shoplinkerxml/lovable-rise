@@ -11,7 +11,9 @@ import { SortToggle } from "./SortToggle";
 import { ColumnFilterMenu } from "./ColumnFilterMenu";
 import { StoresBadgeCell } from "./StoresBadgeCell";
 import { ProductStatusBadge } from "./ProductStatusBadge";
-const ProductActionsDropdownLazy = React.lazy(() => import("./RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown })));
+const ProductActionsDropdownLazy = React.lazy(() => 
+  import("./RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown }))
+);
 import type { Product } from "@/lib/product-service";
 import type { ShopAggregated } from "@/lib/shop-service";
 
@@ -27,48 +29,128 @@ export type ProductRow = Product & {
   currency_code?: string | null;
 };
 
-export function createColumns({
-  t,
-  storeId,
-  categoryFilterOptions,
-  storeNames,
-  stores,
-  loadStoresForMenu,
-  handleRemoveStoreLink,
-  handleStoresUpdate,
-  onEdit,
-  setDeleteDialog,
-  handleDuplicate,
-  canCreate,
-  hideDuplicate,
-  handleToggleAvailable,
-  duplicating,
-}: {
-  t: (k: string) => string;
-  storeId?: string;
-  categoryFilterOptions: string[];
-  storeNames: Record<string, string>;
-  stores: ShopAggregated[];
-  loadStoresForMenu: () => Promise<void>;
-  handleRemoveStoreLink: (productId: string, storeIdToRemove: string) => Promise<boolean> | boolean;
-  handleStoresUpdate: (productId: string, ids: string[], opts?: { storeIdChanged?: string | number; categoryKey?: string | null; added?: boolean }) => void;
-  onEdit?: (p: ProductRow) => void;
-  setDeleteDialog: (v: { open: boolean; product: ProductRow | null }) => void;
-  handleDuplicate: (p: Product) => Promise<void>;
-  canCreate?: boolean;
-  hideDuplicate?: boolean;
-  handleToggleAvailable: (productId: string, checked: boolean) => void;
-  duplicating?: boolean;
-}): ColumnDef<ProductRow>[] {
-  const stringFilter: FilterFn<ProductRow> = (row, id, value) => {
-    const rv = row.getValue(id);
-    const str = rv == null ? "" : String(rv);
-    if (value == null) return true;
-    if (Array.isArray(value)) return (value as unknown[]).map((v) => String(v as unknown as string)).includes(str);
-    return str.toLowerCase().includes(String(value).toLowerCase());
-  };
+// ========== ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ==========
 
-  const renderHeader = (label: string, column: Column<ProductRow, unknown>, table: TanTable<ProductRow>, extra?: React.ReactNode) => (
+// Компонент для отображения изображения продукта
+const ProductThumbnail = React.memo(({ 
+  product, 
+  hasStores, 
+  onClick 
+}: { 
+  product: ProductRow; 
+  hasStores: boolean;
+  onClick: () => void;
+}) => {
+  const initials = (product.name || product.name_ua || "?")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const sizeCls = hasStores
+    ? "h-[clamp(2.25rem,4vw,3rem)] w-[clamp(2.25rem,4vw,3rem)]"
+    : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
+
+  const baseUrl = product.mainImageUrl || '';
+  const initialUrl = baseUrl ? getImageUrl(baseUrl, IMAGE_SIZES.THUMB) : '';
+  const [src, setSrc] = React.useState<string>(initialUrl);
+
+  React.useEffect(() => {
+    const isAbsolute = /^https?:\/\//i.test(initialUrl);
+    if (isAbsolute && initialUrl) {
+      setSrc(initialUrl);
+      return;
+    }
+
+    const key = baseUrl ? (R2Storage.extractObjectKeyFromUrl(baseUrl) || baseUrl) : '';
+    if (!key) {
+      setSrc('');
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const viewUrl = await R2Storage.getViewUrl(key, 900);
+        if (!cancelled && viewUrl) setSrc(viewUrl);
+      } catch (error) {
+        console.error('Failed to load image:', error);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [baseUrl, initialUrl]);
+
+  return (
+    <button type="button" onClick={onClick} className="inline-flex">
+      <Avatar className={`${sizeCls} rounded-md cursor-pointer border border-border bg-white`}>
+        <AvatarImage
+          src={src}
+          alt={product.name_ua || product.name || ''}
+          className="object-contain"
+          onError={(e) => {
+            const el = e.target as HTMLImageElement;
+            if (baseUrl) el.src = baseUrl;
+          }}
+        />
+        <AvatarFallback className="bg-primary/10 text-primary rounded-md">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+    </button>
+  );
+});
+
+ProductThumbnail.displayName = 'ProductThumbnail';
+
+// ========== УТИЛИТЫ ==========
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  UAH: 'грн',
+  USD: '$',
+  EUR: '€',
+};
+
+function getCurrencySymbol(code?: string | null): string {
+  if (!code) return '';
+  return CURRENCY_SYMBOLS[code] || code;
+}
+
+function formatPrice(price: number | null | undefined, currencyCode?: string | null): string {
+  if (price == null) return '—';
+  const symbol = getCurrencySymbol(currencyCode);
+  return `${price} ${symbol}`.trim();
+}
+
+function getProductName(product: ProductRow): string {
+  return product.name_ua || product.name || "—";
+}
+
+// ========== ФИЛЬТРЫ ==========
+
+const stringFilter: FilterFn<ProductRow> = (row, id, value) => {
+  const rowValue = row.getValue(id);
+  const str = rowValue == null ? "" : String(rowValue);
+  
+  if (value == null) return true;
+  
+  if (Array.isArray(value)) {
+    return value.map(v => String(v)).includes(str);
+  }
+  
+  return str.toLowerCase().includes(String(value).toLowerCase());
+};
+
+// ========== РЕНДЕР ХЕДЕРА ==========
+
+function renderHeader(
+  label: string,
+  column: Column<ProductRow, unknown>,
+  table: TanTable<ProductRow>,
+  extra?: React.ReactNode
+) {
+  return (
     <div className="flex items-center gap-2">
       <span className="truncate">{label}</span>
       <div className="flex items-center gap-0 ml-auto">
@@ -77,145 +159,234 @@ export function createColumns({
       </div>
     </div>
   );
+}
 
-  const actionsCell = (row: ProductRow) => (
-    <div className="flex justify-center">
-      <React.Suspense fallback={null}>
-        <ProductActionsDropdownLazy
-          product={row}
-          onEdit={() => onEdit?.(row)}
-          onDelete={() => setDeleteDialog({ open: true, product: row })}
-          onDuplicate={() => handleDuplicate(row)}
-          onTrigger={() => void 0}
-          canCreate={canCreate}
-          hideDuplicate={hideDuplicate}
-          storeId={storeId}
-          onStoresUpdate={handleStoresUpdate}
-          storesList={stores}
-          storeNames={storeNames}
-          prefetchStores={loadStoresForMenu}
-          duplicating={duplicating}
+// ========== ОПРЕДЕЛЕНИЯ КОЛОНОК ==========
+
+type ColumnConfig = {
+  t: (k: string) => string;
+  storeId?: string;
+  categoryFilterOptions: string[];
+  storeNames: Record<string, string>;
+  stores: ShopAggregated[];
+  loadStoresForMenu: () => Promise<void>;
+  handleRemoveStoreLink: (productId: string, storeIdToRemove: string) => Promise<boolean> | boolean;
+  handleStoresUpdate: (productId: string, ids: string[], opts?: { 
+    storeIdChanged?: string | number; 
+    categoryKey?: string | null; 
+    added?: boolean 
+  }) => void;
+  onEdit?: (p: ProductRow) => void;
+  setDeleteDialog: (v: { open: boolean; product: ProductRow | null }) => void;
+  handleDuplicate: (p: Product) => Promise<void>;
+  canCreate?: boolean;
+  hideDuplicate?: boolean;
+  handleToggleAvailable: (productId: string, checked: boolean) => void;
+  duplicating?: boolean;
+};
+
+function createSelectColumn(config: ColumnConfig): ColumnDef<ProductRow> {
+  return {
+    id: "select",
+    header: ({ table }) => (
+      <div className="flex items-center justify-start">
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+              ? "indeterminate"
+              : false
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(value === true)}
+          aria-label={config.t("select_all")}
         />
-      </React.Suspense>
-    </div>
-  );
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="flex items-center justify-start">
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(value === true)}
+          aria-label={config.t("select_row")}
+        />
+      </div>
+    ),
+    enableSorting: false,
+    enableHiding: false,
+    size: 48,
+  };
+}
+
+function createPhotoColumn(config: ColumnConfig): ColumnDef<ProductRow> {
+  return {
+    id: "photo",
+    header: config.t("photo"),
+    enableSorting: false,
+    enableColumnFilter: false,
+    size: 56,
+    cell: ({ row }) => {
+      const product = row.original;
+      const hasStores = Array.isArray(product.linkedStoreIds) && product.linkedStoreIds.length > 0;
+      
+      return (
+        <div className="flex items-center justify-start" data-testid="user_products_photo">
+          <ProductThumbnail
+            product={product}
+            hasStores={hasStores}
+            onClick={() => config.onEdit?.(product)}
+          />
+        </div>
+      );
+    },
+  };
+}
+
+function createNameColumn(config: ColumnConfig): ColumnDef<ProductRow> {
+  return {
+    id: "name_ua",
+    accessorFn: (row) => row.name_ua ?? row.name ?? "",
+    filterFn: stringFilter,
+    header: ({ column, table }) => renderHeader(config.t("table_product"), column, table),
+    cell: ({ row }) => {
+      const name = getProductName(row.original);
+      return (
+        <div className="min-w-0 max-w-full" data-testid="user_products_name">
+          <div className="font-medium break-words line-clamp-2 w-full" title={name}>
+            {name}
+          </div>
+        </div>
+      );
+    },
+  };
+}
+
+function createPriceColumn(
+  id: 'price' | 'price_old' | 'price_promo',
+  labelKey: string,
+  config: ColumnConfig
+): ColumnDef<ProductRow> {
+  const testIdMap = {
+    price: 'user_products_price',
+    price_old: 'user_products_priceOld',
+    price_promo: 'user_products_pricePromo',
+  };
+
+  return {
+    id,
+    accessorFn: (row) => {
+      const value = row[id];
+      return typeof value === "number" ? value : Number.NEGATIVE_INFINITY;
+    },
+    filterFn: stringFilter,
+    header: ({ column, table }) => renderHeader(config.t(labelKey), column, table),
+    cell: ({ row }) => {
+      const value = row.original[id];
+      const formatted = formatPrice(value, row.original.currency_code);
+      const isEmpty = value == null;
+      
+      return (
+        <span 
+          className={isEmpty ? "text-muted-foreground" : "tabular-nums"}
+          data-testid={isEmpty ? `${testIdMap[id]}_empty` : testIdMap[id]}
+        >
+          {formatted}
+        </span>
+      );
+    },
+    enableHiding: true,
+  };
+}
+
+function createStoresColumn(config: ColumnConfig): ColumnDef<ProductRow> {
+  return {
+    id: "stores",
+    enableSorting: true,
+    enableHiding: false,
+    enableColumnFilter: true,
+    sortingFn: (rowA, rowB) => {
+      const a = (rowA.original.linkedStoreIds || []).length > 0 ? 1 : 0;
+      const b = (rowB.original.linkedStoreIds || []).length > 0 ? 1 : 0;
+      return a - b;
+    },
+    filterFn: ((row, id, value) => {
+      const selected = Array.isArray(value) 
+        ? value.map(v => String(v)) 
+        : value == null ? [] : [String(value)];
+      
+      if (selected.length === 0) return true;
+      
+      const storeIds = (row.original.linkedStoreIds || []).map(String);
+      const storeNamesForProduct = storeIds.map(sid => config.storeNames[sid] || sid);
+      
+      return selected.some(name => storeNamesForProduct.includes(name));
+    }) as FilterFn<ProductRow>,
+    header: ({ column, table }) => renderHeader(
+      config.t("stores"), 
+      column, 
+      table, 
+      <ColumnFilterMenu column={column} extraOptions={Object.values(config.storeNames)} />
+    ),
+    size: 96,
+    cell: ({ row }) => (
+      <StoresBadgeCell
+        product={row.original}
+        storeNames={config.storeNames}
+        storesList={config.stores}
+        prefetchStores={config.loadStoresForMenu}
+        onRemove={config.handleRemoveStoreLink}
+        onStoresUpdate={config.handleStoresUpdate}
+      />
+    ),
+  };
+}
+
+function createActionsColumn(config: ColumnConfig): ColumnDef<ProductRow> {
+  return {
+    id: "actions",
+    header: config.t("actions"),
+    enableSorting: false,
+    enableHiding: false,
+    size: 96,
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <React.Suspense fallback={null}>
+          <ProductActionsDropdownLazy
+            product={row.original}
+            onEdit={() => config.onEdit?.(row.original)}
+            onDelete={() => config.setDeleteDialog({ open: true, product: row.original })}
+            onDuplicate={() => config.handleDuplicate(row.original)}
+            onTrigger={() => void 0}
+            canCreate={config.canCreate}
+            hideDuplicate={config.hideDuplicate}
+            storeId={config.storeId}
+            onStoresUpdate={config.handleStoresUpdate}
+            storesList={config.stores}
+            storeNames={config.storeNames}
+            prefetchStores={config.loadStoresForMenu}
+            duplicating={config.duplicating}
+          />
+        </React.Suspense>
+      </div>
+    ),
+  };
+}
+
+// ========== ОСНОВНАЯ ФУНКЦИЯ ==========
+
+export function createColumns(config: ColumnConfig): ColumnDef<ProductRow>[] {
+  const { t, storeId, categoryFilterOptions } = config;
 
   const columns: ColumnDef<ProductRow>[] = [
-    {
-      id: "select",
-      header: ({ table }) => (
-        <div className="flex items-center justify-start">
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected()
-                ? true
-                : table.getIsSomePageRowsSelected()
-                ? "indeterminate"
-                : false
-            }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(value === true)}
-            aria-label={t("select_all")}
-          />
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex items-center justify-start">
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(value === true)}
-            aria-label={t("select_row")}
-          />
-        </div>
-      ),
-      enableSorting: false,
-      enableHiding: false,
-      size: 48,
-    },
-    {
-      id: "photo",
-      header: t("photo"),
-      enableSorting: false,
-      enableColumnFilter: false,
-      size: 56,
-      cell: ({ row }) => {
-        const product = row.original;
-        const initials = (product.name || product.name_ua || "?")
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2);
-        const hasStores = Array.isArray(product.linkedStoreIds) && product.linkedStoreIds.length > 0;
-        const sizeCls = hasStores
-          ? "h-[clamp(2.25rem,4vw,3rem)] w-[clamp(2.25rem,4vw,3rem)]"
-          : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
-        const RawThumb: React.FC<{ p: ProductRow }> = ({ p }) => {
-          const base = p.mainImageUrl || '';
-          const initialUrl = base ? getImageUrl(base, IMAGE_SIZES.THUMB) : '';
-          const [src, setSrc] = React.useState<string>(initialUrl);
-          React.useEffect(() => {
-            const isAbs = /^https?:\/\//i.test(initialUrl);
-            if (isAbs && initialUrl) { setSrc(initialUrl); return; }
-            const key = base ? (R2Storage.extractObjectKeyFromUrl(base) || base) : '';
-            if (!key) { setSrc(''); return; }
-            let cancelled = false;
-            (async () => {
-              try {
-                const view = await R2Storage.getViewUrl(key, 900);
-                if (!cancelled && view) setSrc(view);
-              } catch { /* ignore */ }
-            })();
-            return () => { cancelled = true; };
-          }, [base, initialUrl]);
-          return (
-            <Avatar className={`${sizeCls} rounded-md cursor-pointer border border-border bg-white`}>
-              <AvatarImage
-                src={src}
-                alt={p.name_ua || p.name || ''}
-                className="object-contain"
-                onError={(e) => {
-                  const el = e.target as HTMLImageElement;
-                  if (base) el.src = base;
-                }}
-              />
-              <AvatarFallback className="bg-primary/10 text-primary rounded-md">{initials}</AvatarFallback>
-            </Avatar>
-          );
-        };
-        return (
-          <div className="flex items-center justify-start" data-testid="user_products_photo">
-            <button type="button" className="inline-flex" onClick={() => onEdit?.(product)} aria-label={t("edit")} title={t("edit")}>
-              <RawThumb p={product} />
-            </button>
-          </div>
-        );
-      },
-    },
-    {
-      id: "name_ua",
-      accessorFn: (row) => row.name_ua ?? row.name ?? "",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("table_product"), column, table),
-      cell: ({ row }) => {
-        const product = row.original;
-        const name = product.name_ua || product.name || "—";
-        return (
-          <div className="min-w-0 max-w-full" data-testid="user_products_name">
-            <div className="font-medium break-words line-clamp-2 w-full" title={name}>
-              {name}
-            </div>
-          </div>
-        );
-      },
-    },
+    createSelectColumn(config),
+    createPhotoColumn(config),
+    createNameColumn(config),
     {
       id: "status",
       accessorFn: (row) => row.state ?? "",
       filterFn: stringFilter,
       header: ({ column, table }) => renderHeader(t("table_status"), column, table),
-      cell: ({ row }) => (
-        <ProductStatusBadge state={row.original.state} />
-      ),
+      cell: ({ row }) => <ProductStatusBadge state={row.original.state} />,
       enableHiding: true,
     },
     {
@@ -233,68 +404,31 @@ export function createColumns({
       },
       enableHiding: true,
     },
+    createPriceColumn('price', 'table_price', config),
+    createPriceColumn('price_old', 'old_price', config),
+    createPriceColumn('price_promo', 'promo_price', config),
     {
-      id: "price",
-      accessorFn: (row) => (typeof row.price === "number" ? row.price : Number.NEGATIVE_INFINITY),
+      id: "category",
+      accessorFn: (row) => row.categoryName ?? "",
       filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("table_price"), column, table),
+      header: ({ column, table }) => renderHeader(
+        t("category"), 
+        column, 
+        table, 
+        <ColumnFilterMenu column={column} extraOptions={storeId ? categoryFilterOptions : []} />
+      ),
       cell: ({ row }) => {
-        const currency = row.original.currency_code || "";
-        const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
-        return row.original.price != null ? (
-          <span className="tabular-nums">{row.original.price} {symbol}</span>
+        const name = row.original.categoryName;
+        return name ? (
+          <span className="text-sm">{name}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
       },
     },
     {
-      id: "price_old",
-      accessorFn: (row) => (typeof row.price_old === "number" ? row.price_old : Number.NEGATIVE_INFINITY),
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("old_price"), column, table),
-      cell: ({ row }) => {
-        const currency = row.original.currency_code || "";
-        const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
-        return row.original.price_old != null ? (
-          <span className="tabular-nums" data-testid="user_products_priceOld">{row.original.price_old} {symbol}</span>
-        ) : (
-          <span className="text-muted-foreground" data-testid="user_products_priceOld_empty">—</span>
-        );
-      },
-      enableHiding: true,
-    },
-    {
-      id: "price_promo",
-      accessorFn: (row) => (typeof row.price_promo === "number" ? row.price_promo : Number.NEGATIVE_INFINITY),
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("promo_price"), column, table),
-      cell: ({ row }) => {
-        const currency = row.original.currency_code || "";
-        const symbol = currency === "UAH" ? "грн" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
-        return row.original.price_promo != null ? (
-          <span className="tabular-nums" data-testid="user_products_pricePromo">{row.original.price_promo} {symbol}</span>
-        ) : (
-          <span className="text-muted-foreground" data-testid="user_products_pricePromo_empty">—</span>
-        );
-      },
-      enableHiding: true,
-    },
-    {
-      id: "category",
-      accessorFn: (row) => row.categoryName ?? "",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("category"), column, table, (
-        <ColumnFilterMenu column={column} extraOptions={storeId ? categoryFilterOptions : []} />
-      )),
-      cell: ({ row }) => {
-        const name = row.original.categoryName;
-        return name ? <span className="text-sm">{name}</span> : <span className="text-muted-foreground">—</span>;
-      },
-    },
-    {
       id: "stock_quantity",
-      accessorFn: (row) => (typeof row.stock_quantity === "number" ? row.stock_quantity : Number.NEGATIVE_INFINITY),
+      accessorFn: (row) => typeof row.stock_quantity === "number" ? row.stock_quantity : Number.NEGATIVE_INFINITY,
       filterFn: stringFilter,
       header: ({ column, table }) => renderHeader(t("table_stock"), column, table),
       cell: ({ row }) => (
@@ -311,15 +445,20 @@ export function createColumns({
     {
       id: "created_at",
       accessorFn: (row) => {
-        const v = row.created_at;
-        try { return v ? new Date(v).getTime() : 0; } catch { return 0; }
+        try {
+          return row.created_at ? new Date(row.created_at).getTime() : 0;
+        } catch {
+          return 0;
+        }
       },
       filterFn: stringFilter,
       header: ({ column, table }) => renderHeader(t("table_created"), column, table),
       cell: ({ row }) => (
         row.original.created_at ? (
           <div className="flex flex-col">
-            <span className="tabular-nums">{format(new Date(row.original.created_at), "yyyy-MM-dd")}</span>
+            <span className="tabular-nums">
+              {format(new Date(row.original.created_at), "yyyy-MM-dd")}
+            </span>
             <span className="text-muted-foreground hidden sm:block tabular-nums">
               {format(new Date(row.original.created_at), "HH:mm")}
             </span>
@@ -334,14 +473,18 @@ export function createColumns({
       accessorKey: "article",
       filterFn: stringFilter,
       header: ({ column, table }) => renderHeader(t("article"), column, table),
-      cell: ({ row }) => <span className="text-sm text-foreground">{row.original.article || ""}</span>,
+      cell: ({ row }) => (
+        <span className="text-sm text-foreground">{row.original.article || ""}</span>
+      ),
       enableHiding: true,
     },
     {
       accessorKey: "vendor",
       filterFn: stringFilter,
       header: ({ column, table }) => renderHeader(t("vendor"), column, table),
-      cell: ({ row }) => <span className="text-sm text-foreground">{row.original.vendor || ""}</span>,
+      cell: ({ row }) => (
+        <span className="text-sm text-foreground">{row.original.vendor || ""}</span>
+      ),
       enableHiding: true,
     },
     {
@@ -380,39 +523,16 @@ export function createColumns({
       },
       enableHiding: true,
     },
-    ...(!storeId ? [{
-      id: "stores",
-      enableSorting: true,
-      enableHiding: false,
-      enableColumnFilter: true,
-      sortingFn: (rowA, rowB) => {
-        const a = (rowA.original.linkedStoreIds || []).length > 0 ? 1 : 0;
-        const b = (rowB.original.linkedStoreIds || []).length > 0 ? 1 : 0;
-        return a - b;
-      },
-      filterFn: ((row, id, value) => {
-        const selected = Array.isArray(value) ? (value as unknown[]).map((v) => String(v as unknown as string)) : (value == null ? [] : [String(value)]);
-        if (selected.length === 0) return true;
-        const ids = (row.original.linkedStoreIds || []).map(String);
-        const names = ids.map((sid) => storeNames[sid] || sid);
-        return selected.some((name) => names.includes(name));
-      }) as FilterFn<ProductRow>,
-      header: ({ column, table }) => renderHeader(t("stores"), column, table, (
-        <ColumnFilterMenu column={column} extraOptions={Object.values(storeNames)} />
-      )),
-      size: 96,
-      cell: ({ row }) => (
-        <StoresBadgeCell
-          product={row.original}
-          storeNames={storeNames}
-          storesList={stores}
-          prefetchStores={loadStoresForMenu}
-          onRemove={handleRemoveStoreLink}
-          onStoresUpdate={handleStoresUpdate}
-        />
-      ),
-    }] : []),
-    ...(storeId ? [{
+  ];
+
+  // Добавляем колонку магазинов только для общего списка
+  if (!storeId) {
+    columns.push(createStoresColumn(config));
+  }
+
+  // Добавляем колонку активности только для списка магазина
+  if (storeId) {
+    columns.push({
       id: "active",
       header: t("table_active"),
       enableSorting: false,
@@ -422,22 +542,16 @@ export function createColumns({
         <div className="flex items-center justify-center">
           <Switch
             checked={!!row.original.available}
-            onCheckedChange={(checked) => handleToggleAvailable(row.original.id, checked)}
+            onCheckedChange={(checked) => config.handleToggleAvailable(row.original.id, checked)}
             aria-label={t("table_active")}
             data-testid={`user_store_products_active_${row.original.id}`}
           />
         </div>
       ),
-    }] : []),
-    {
-      id: "actions",
-      header: t("actions"),
-      enableSorting: false,
-      enableHiding: false,
-      size: 96,
-      cell: ({ row }) => actionsCell(row.original),
-    },
-  ];
+    });
+  }
+
+  columns.push(createActionsColumn(config));
 
   return columns;
 }

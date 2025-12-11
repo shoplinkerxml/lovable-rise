@@ -70,12 +70,12 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
 
   if (storeIds.length === 0) {
     return (
-      <div className="w-full flex justify-center">
+      <div className="w-full flex items-center justify-center">
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="h-6 w-6 p-0 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+            className="h-6 w-6 p-0 mx-auto border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
             aria-label={t("menu_stores")}
             onClick={() => { setOpen(true); loadStoresAndLinks(); }}
             data-testid={`user_products_store_add_trigger_${product.id}`}
@@ -111,9 +111,14 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                         onClick={(e) => e.stopPropagation()}
                         onCheckedChange={async (v) => {
                           setTogglingStoreIds((prev) => Array.from(new Set([...prev, id])));
+                          const prevIds = linkedStoreIds.slice();
+                          const nextIds = v ? Array.from(new Set([...linkedStoreIds, id])) : linkedStoreIds.filter((x) => String(x) !== String(id));
+                          setLinkedStoreIds(nextIds);
+                          const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                          try { onStoresUpdate?.(String(product.id), nextIds, { storeIdChanged: id, added: !!v, categoryKey }); } catch { void 0; }
                           try {
                             if (v) {
-                              await ProductService.bulkAddStoreProductLinks([
+                              const { categoryNamesByStore } = await ProductService.bulkAddStoreProductLinks([
                                 {
                                   product_id: String(product.id),
                                   store_id: String(id),
@@ -126,36 +131,46 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                 },
                               ]);
                               ProductService.invalidateStoreLinksCache(String(product.id));
-                              const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                              setLinkedStoreIds(fetched);
-                              const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                              try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: id, added: true, categoryKey }); } catch { void 0; }
                               toast.success(t("product_added_to_store"));
                               ShopService.bumpProductsCountInCache(String(id), 1);
-                              try { await ProductService.refreshStoreCategoryFilterOptions([String(id)]); } catch { void 0; }
                               try {
+                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
+                                ShopService.setCategoriesCountInCache(String(id), names.length);
+                              } catch { void 0; }
+                              try {
+                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
                                 queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                   const arr = Array.isArray(prev) ? prev : (stores || []);
-                                  return (arr || []).map((s) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) + 1)) } : s);
+                                  return (arr || []).map((s) => {
+                                    if (s.id !== String(id)) return s;
+                                    const nextProducts = Math.max(0, ((s.productsCount ?? 0) + 1));
+                                    const nextCategories = nextProducts === 0 ? 0 : names.length;
+                                    return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
+                                  });
                                 });
                                 const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                 setStores(updated);
                               } catch { void 0; }
                               try { /* keep menu open */ setOpen(true); } catch { void 0; }
                             } else {
-                              await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
+                              const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
                               ProductService.invalidateStoreLinksCache(String(product.id));
-                              const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                              setLinkedStoreIds(fetched);
-                              const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                              try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: id, added: false, categoryKey }); } catch { void 0; }
                               toast.success(t("product_removed_from_store"));
                               ShopService.bumpProductsCountInCache(String(id), -1);
-                              try { await ProductService.refreshStoreCategoryFilterOptions([String(id)]); } catch { void 0; }
                               try {
+                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
+                                ShopService.setCategoriesCountInCache(String(id), names.length);
+                              } catch { void 0; }
+                              try {
+                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
                                 queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                   const arr = Array.isArray(prev) ? prev : (stores || []);
-                                  return (arr || []).map((s) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) - 1)) } : s);
+                                  return (arr || []).map((s) => {
+                                    if (s.id !== String(id)) return s;
+                                    const nextProducts = Math.max(0, ((s.productsCount ?? 0) - 1));
+                                    const nextCategories = nextProducts === 0 ? 0 : names.length;
+                                    return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
+                                  });
                                 });
                                 const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                 setStores(updated);
@@ -163,6 +178,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               try { setOpen(true); } catch { void 0; }
                             }
                           } catch {
+                            setLinkedStoreIds(prevIds);
                             toast.error(t("operation_failed"));
                           } finally {
                             setTogglingStoreIds((prev) => prev.filter((sid) => sid !== id));
@@ -238,9 +254,14 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                 onClick={(e) => e.stopPropagation()}
                                 onCheckedChange={async (v) => {
                                   setTogglingStoreIds((prev) => Array.from(new Set([...prev, sid])));
+                                  const prevIds = linkedStoreIds.slice();
+                                  const nextIds = v ? Array.from(new Set([...linkedStoreIds, sid])) : linkedStoreIds.filter((x) => String(x) !== String(sid));
+                                  setLinkedStoreIds(nextIds);
+                                  const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                                  try { onStoresUpdate?.(String(product.id), nextIds, { storeIdChanged: sid, added: !!v, categoryKey }); } catch { void 0; }
                                   try {
                                     if (v) {
-                                      await ProductService.bulkAddStoreProductLinks([
+                                      const { categoryNamesByStore } = await ProductService.bulkAddStoreProductLinks([
                                         {
                                           product_id: String(product.id),
                                           store_id: String(sid),
@@ -253,36 +274,46 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                         },
                                       ]);
                                       ProductService.invalidateStoreLinksCache(String(product.id));
-                                      const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                                      setLinkedStoreIds(fetched);
-                                      const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                      try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: sid, added: true, categoryKey }); } catch { void 0; }
                                       toast.success(t("product_added_to_store"));
                                       ShopService.bumpProductsCountInCache(String(sid), 1);
-                                      try { await ProductService.refreshStoreCategoryFilterOptions([String(sid)]); } catch { void 0; }
                                       try {
+                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
+                                        ShopService.setCategoriesCountInCache(String(sid), names.length);
+                                      } catch { void 0; }
+                                      try {
+                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
                                         queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                           const arr = Array.isArray(prev) ? prev : (stores || []);
-                                          return (arr || []).map((x) => x.id === String(sid) ? { ...x, productsCount: Math.max(0, ((x.productsCount ?? 0) + 1)) } : x);
+                                          return (arr || []).map((x) => {
+                                            if (x.id !== String(sid)) return x;
+                                            const nextProducts = Math.max(0, ((x.productsCount ?? 0) + 1));
+                                            const nextCategories = nextProducts === 0 ? 0 : names.length;
+                                            return { ...x, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
+                                          });
                                         });
                                         const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                         setStores(updated);
                                       } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
                                     } else {
-                                      await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(sid)]);
+                                      const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(sid)]);
                                       ProductService.invalidateStoreLinksCache(String(product.id));
-                                      const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                                      setLinkedStoreIds(fetched);
-                                      const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                      try { onStoresUpdate?.(String(product.id), fetched, { storeIdChanged: sid, added: false, categoryKey }); } catch { void 0; }
                                       toast.success(t("product_removed_from_store"));
                                       ShopService.bumpProductsCountInCache(String(sid), -1);
-                                      try { await ProductService.refreshStoreCategoryFilterOptions([String(sid)]); } catch { void 0; }
                                       try {
+                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
+                                        ShopService.setCategoriesCountInCache(String(sid), names.length);
+                                      } catch { void 0; }
+                                      try {
+                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
                                         queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
                                           const arr = Array.isArray(prev) ? prev : (stores || []);
-                                          return (arr || []).map((x) => x.id === String(sid) ? { ...x, productsCount: Math.max(0, ((x.productsCount ?? 0) - 1)) } : x);
+                                          return (arr || []).map((x) => {
+                                            if (x.id !== String(sid)) return x;
+                                            const nextProducts = Math.max(0, ((x.productsCount ?? 0) - 1));
+                                            const nextCategories = nextProducts === 0 ? 0 : names.length;
+                                            return { ...x, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
+                                          });
                                         });
                                         const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                         setStores(updated);
@@ -290,6 +321,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
                                     }
                                   } catch {
+                                    setLinkedStoreIds(prevIds);
                                     toast.error(t("operation_failed"));
                                   } finally {
                                     setTogglingStoreIds((prev) => prev.filter((sid0) => sid0 !== sid));

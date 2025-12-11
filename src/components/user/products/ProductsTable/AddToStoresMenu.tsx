@@ -13,7 +13,78 @@ import { ShopService } from "@/lib/shop-service";
 import { ProductService, type Product } from "@/lib/product-service";
 
 type ProductRow = Product & { linkedStoreIds?: string[] };
-type StoreAgg = { id: string; store_name?: string | null; store_url?: string | null; productsCount?: number; categoriesCount?: number };
+type StoreAgg = { 
+  id: string; 
+  store_name?: string | null; 
+  store_url?: string | null; 
+  productsCount?: number; 
+  categoriesCount?: number;
+};
+
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+
+function countProductsInStore(products: ProductRow[], storeId: string): number {
+  return products.reduce((count, product) => {
+    const isLinked = (product.linkedStoreIds || []).includes(storeId);
+    return count + (isLinked ? 1 : 0);
+  }, 0);
+}
+
+function hasLinkedProducts(products: ProductRow[], storeIds: string[]): boolean {
+  if (storeIds.length === 0 || products.length === 0) return false;
+  
+  const storeSet = new Set(storeIds);
+  return products.some(product => 
+    (product.linkedStoreIds || []).some(sid => storeSet.has(sid))
+  );
+}
+
+async function updateStoreCounts(
+  queryClient: QueryClient,
+  storeIds: string[],
+  productDelta: Record<string, number>,
+  setStores: (stores: StoreAgg[]) => void,
+  currentStores: StoreAgg[],
+  categoryResultsOverride?: Record<string, string[]>
+) {
+  try {
+    // Обновляем счетчики продуктов
+    Object.entries(productDelta).forEach(([sid, delta]) => {
+      if (delta !== 0) {
+        ShopService.bumpProductsCountInCache(sid, delta);
+      }
+    });
+
+    const categoryResults = categoryResultsOverride || {};
+    
+    storeIds.forEach(sid => {
+      const categories = categoryResults?.[sid] || [];
+      ShopService.setCategoriesCountInCache(sid, categories.length);
+    });
+
+    // Обновляем query cache
+    queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
+      const stores = prev || currentStores;
+      return stores.map(store => {
+        const delta = productDelta[store.id] || 0;
+        const categories = categoryResults?.[store.id] || [];
+        
+        return {
+          ...store,
+          productsCount: Math.max(0, (store.productsCount || 0) + delta),
+          categoriesCount: Math.max(0, categories.length)
+        };
+      });
+    });
+
+    const updated = queryClient.getQueryData<StoreAgg[]>(['shopsList']) || [];
+    setStores(updated);
+  } catch (error) {
+    console.error('Failed to update store counts:', error);
+  }
+}
+
+// ========== ОСНОВНОЙ КОМПОНЕНТ ==========
 
 export function AddToStoresMenu({
   open,
@@ -60,16 +131,181 @@ export function AddToStoresMenu({
   const qc = useQueryClient();
   const q = queryClient || qc;
 
+  const selectedProducts = table.getSelectedRowModel().rows
+    .map(r => r.original)
+    .filter(Boolean) as ProductRow[];
+
+  const hasSelectedProducts = selectedProducts.length > 0;
+  const hasAnyLinkedStores = items.some(p => (p.linkedStoreIds || []).length > 0);
+
   const handleOpenChange = useCallback(async (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
       try {
         await loadStoresForMenu();
-      } catch (e) {
+        const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
+        if (selected.length === 1) {
+          const ids = Array.from(new Set((selected[0].linkedStoreIds || []).map(String)));
+          setSelectedStoreIds(ids);
+        }
+      } catch (error) {
+        console.error('Failed to load stores:', error);
         setStores([]);
       }
     }
-  }, [setOpen, loadStoresForMenu, setStores]);
+  }, [setOpen, loadStoresForMenu, setStores, table, setSelectedStoreIds]);
+
+  const handleAddToStores = async () => {
+    if (!hasSelectedProducts || selectedStoreIds.length === 0) return;
+
+    const productIds = selectedProducts.map(p => String(p.id));
+    setAddingStores(true);
+
+    try {
+      const links = selectedProducts.flatMap(product => {
+        const existingStores = new Set(product.linkedStoreIds || []);
+        return selectedStoreIds
+          .filter(sid => !existingStores.has(sid))
+          .map(sid => ({
+            product_id: String(product.id),
+            store_id: sid,
+            is_active: true,
+            custom_price: product.price ?? null,
+            custom_price_old: product.price_old ?? null,
+            custom_price_promo: product.price_promo ?? null,
+            custom_stock_quantity: product.stock_quantity ?? null,
+            custom_available: product.available ?? true,
+          }));
+      });
+
+      const { inserted, addedByStore, categoryNamesByStore } = await ProductService.bulkAddStoreProductLinks(links);
+
+      if (inserted === 0) {
+        toast.success(t('products_already_linked'));
+        return;
+      }
+
+      toast.success(t('product_added_to_stores'));
+
+      // Обновляем локальный кэш продуктов
+      setProductsCached(prev => prev.map(p => {
+        if (!productIds.includes(String(p.id))) return p;
+        const mergedStores = [...new Set([...(p.linkedStoreIds || []), ...selectedStoreIds])];
+        return { ...p, linkedStoreIds: mergedStores };
+      }));
+
+      // Обновляем счетчики магазинов
+      await updateStoreCounts(q, selectedStoreIds, addedByStore, setStores, stores, categoryNamesByStore);
+
+    } catch (error) {
+      console.error('Failed to add products to stores:', error);
+      toast.error(t('failed_add_product_to_stores'));
+    } finally {
+      setAddingStores(false);
+      table.resetRowSelection();
+      setLastSelectedProductIds?.(productIds);
+    }
+  };
+
+  const handleRemoveFromStores = async (storeIds: string[], productIds: string[]) => {
+    if (storeIds.length === 0) return;
+
+    setRemovingStores(true);
+
+    try {
+      const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(productIds, storeIds);
+
+      toast.success(t('product_removed_from_store'));
+
+      // Обновляем локальный кэш
+      setProductsCached(prev => prev.map(p => {
+        const shouldUpdate = productIds.length === 0 || productIds.includes(String(p.id));
+        if (!shouldUpdate) return p;
+
+        const filteredStores = (p.linkedStoreIds || []).filter(sid => !storeIds.includes(sid));
+        return { ...p, linkedStoreIds: filteredStores };
+      }));
+
+      // Подсчитываем удаленные связи
+      const countsByStore: Record<string, number> = {};
+      if (productIds.length > 0) {
+        storeIds.forEach(sid => {
+          countsByStore[sid] = selectedProducts.filter(p => 
+            (p.linkedStoreIds || []).includes(sid)
+          ).length;
+        });
+      } else {
+        Object.assign(countsByStore, deletedByStore);
+      }
+
+      // Инвертируем дельты для декремента
+      const negativeDeltas = Object.fromEntries(
+        Object.entries(countsByStore).map(([sid, count]) => [sid, -count])
+      );
+
+      await updateStoreCounts(q, storeIds, negativeDeltas, setStores, stores, categoryNamesByStore);
+
+    } catch (error) {
+      console.error('Failed to remove products from stores:', error);
+      toast.error(t('failed_remove_from_store'));
+    } finally {
+      setRemovingStores(false);
+      table.resetRowSelection();
+      setSelectedStoreIds(prev => prev.filter(sid => !storeIds.includes(sid)));
+    }
+  };
+
+  const handleRemoveSingleStore = async (storeId: string) => {
+    const productsInStore = selectedProducts.filter(p =>
+      (p.linkedStoreIds || []).includes(storeId)
+    );
+
+    if (productsInStore.length === 0) return;
+
+    const productIds = productsInStore.map(p => String(p.id));
+    setRemovingStoreId(storeId);
+
+    try {
+      const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(productIds, [storeId]);
+
+      toast.success(t('product_removed_from_store'));
+
+      setProductsCached(prev => prev.map(p => {
+        if (!productIds.includes(String(p.id))) return p;
+        const filtered = (p.linkedStoreIds || []).filter(sid => sid !== storeId);
+        return { ...p, linkedStoreIds: filtered };
+      }));
+
+      const delta = deletedByStore?.[storeId] || productsInStore.length;
+      await updateStoreCounts(q, [storeId], { [storeId]: -delta }, setStores, stores, categoryNamesByStore);
+
+      const remainingCount = countProductsInStore(items, storeId) - delta;
+      if (remainingCount === 0) {
+        setSelectedStoreIds(prev => prev.filter(id => id !== storeId));
+      }
+
+    } catch (error) {
+      console.error('Failed to remove from store:', error);
+      toast.error(t('failed_remove_from_store'));
+    } finally {
+      setRemovingStoreId(null);
+      table.resetRowSelection();
+    }
+  };
+
+  // Вычисляем эффективные магазины для удаления
+  const effectiveStoreIds = selectedStoreIds.length > 0
+    ? selectedStoreIds
+    : [...new Set(selectedProducts.flatMap(p => p.linkedStoreIds || []))];
+
+  const totalInSelectedStores = selectedStoreIds.reduce((sum, sid) => 
+    sum + countProductsInStore(items, sid), 0
+  );
+
+  const canDelete = !removingStores
+    && effectiveStoreIds.length > 0
+    && (hasSelectedProducts || selectedStoreIds.length > 0)
+    && (selectedStoreIds.length > 0 ? totalInSelectedStores > 0 : true);
 
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
@@ -81,8 +317,7 @@ export function AddToStoresMenu({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                disabled={!!disabled || ((table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0))))}
-                aria-disabled={!!disabled || ((table.getSelectedRowModel().rows.length === 0) && !((items as ProductRow[]).some((p) => Array.isArray(p.linkedStoreIds) && (p.linkedStoreIds.length > 0))))}
+                disabled={disabled || (!hasSelectedProducts && !hasAnyLinkedStores)}
                 aria-label={t("add_to_stores")}
                 data-testid="user_products_dataTable_addToStores"
               >
@@ -90,147 +325,89 @@ export function AddToStoresMenu({
               </Button>
             </TooltipTrigger>
           </DropdownMenuTrigger>
-          <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_addToStores">
+          <TooltipContent side="bottom" className="text-sm">
             {t("add_to_stores")}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <DropdownMenuContent align="end" className="p-2" data-testid="user_products_addToStores_menu">
+
+      <DropdownMenuContent align="end" className="p-2">
         <div className="text-sm mb-2">{t("select_stores")}</div>
+        
         <ScrollArea className="max-h-[clamp(12rem,40vh,20rem)]">
           <div className="flex flex-col gap-1">
-            {(stores || []).length === 0 ? (
-              <div className="text-xs text-muted-foreground px-2 py-1">{t("no_active_stores")}</div>
+            {stores.length === 0 ? (
+              <div className="text-xs text-muted-foreground px-2 py-1">
+                {t("no_active_stores")}
+              </div>
             ) : (
-              (stores || []).map((s: StoreAgg) => {
-                const id = String(s.id);
-                const checked = selectedStoreIds.includes(id);
-                const countInStore = (items as ProductRow[]).reduce((acc, p) => {
-                  const links = (p.linkedStoreIds || []).map(String);
-                  return acc + (links.includes(id) ? 1 : 0);
-                }, 0);
-                const aggProducts = typeof s.productsCount === 'number' ? s.productsCount : 0;
-                const aggCategories = typeof s.categoriesCount === 'number' ? (s.categoriesCount as number) : 0;
+              stores.map(store => {
+                const storeId = String(store.id);
+                const isChecked = selectedStoreIds.includes(storeId);
+                const productCount = countProductsInStore(items, storeId);
+                const isRemoving = removingStores || removingStoreId === storeId;
+
                 return (
                   <DropdownMenuItem
-                    key={id}
-                    className="cursor-pointer pr-2 pl-2"
+                    key={storeId}
+                    className="cursor-pointer px-2"
                     onSelect={(e) => {
                       e.preventDefault();
-                      const next = checked
-                        ? selectedStoreIds.filter((v) => v !== id)
-                        : Array.from(new Set([...selectedStoreIds, id]));
-                      setSelectedStoreIds(next);
+                      setSelectedStoreIds(prev =>
+                        isChecked
+                          ? prev.filter(id => id !== storeId)
+                          : [...prev, storeId]
+                      );
                     }}
-                    data-testid={`user_products_addToStores_item_${id}`}
+                    data-testid={`user_products_addToStores_item_${storeId}`}
                   >
-                    <div className="relative mr-2 inline-flex items-center justify-center" aria-busy={removingStores || removingStoreId === id}>
+                    <div className="relative mr-2 inline-flex items-center">
                       <Checkbox
-                        checked={checked}
-                        disabled={removingStores || removingStoreId === id}
+                        checked={isChecked}
+                        disabled={isRemoving}
                         onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={(v) => {
-                          const next = v
-                            ? Array.from(new Set([...selectedStoreIds, id]))
-                            : selectedStoreIds.filter((x) => x !== id);
-                          setSelectedStoreIds(next);
+                        onCheckedChange={(checked) => {
+                          setSelectedStoreIds(prev =>
+                            checked
+                              ? [...prev, storeId]
+                              : prev.filter(id => id !== storeId)
+                          );
                         }}
                         className="mr-2"
                         aria-label={t("select_store")}
                       />
-                      {(removingStores || removingStoreId === id) ? (
-                        <Loader2 className="absolute h-3 w-3 animate-spin text-emerald-600 pointer-events-none" />
-                      ) : null}
+                      {isRemoving && (
+                        <Loader2 className="absolute h-3 w-3 animate-spin text-emerald-600" />
+                      )}
                     </div>
-                    <span className="truncate">{s.store_name || s.store_url || "—"}</span>
+
+                    <span className="truncate">
+                      {store.store_name || store.store_url || "—"}
+                    </span>
+
                     <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <Package className="h-3 w-3" />
-                        <span className="tabular-nums">{aggProducts}</span>
+                        <span className="tabular-nums">{store.productsCount || 0}</span>
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <List className="h-3 w-3" />
-                        <span className="tabular-nums">{aggCategories}</span>
+                        <span className="tabular-nums">
+                          {store.productsCount === 0 ? 0 : (store.categoriesCount || 0)}
+                        </span>
                       </span>
+
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        disabled={removingStores || removingStoreId === id || !checked || countInStore === 0}
-                        aria-disabled={removingStores || removingStoreId === id || !checked || countInStore === 0}
-                        onClick={async (e) => {
+                        disabled={isRemoving || !isChecked || productCount === 0}
+                        onClick={(e) => {
                           e.stopPropagation();
-                          if (countInStore === 0) return;
-                          const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
-                          const productIds = Array.from(new Set(selected
-                            .filter((p) => (p.linkedStoreIds || []).map(String).includes(id))
-                            .map((p) => String(p.id))
-                            .filter(Boolean)));
-                          setRemovingStoreId(id);
-                          try {
-                            const { deletedByStore } = await ProductService.bulkRemoveStoreProductLinks(productIds, [id]);
-                            {
-                              toast.success(t('product_removed_from_store'));
-                              const updateItems = (prev: ProductRow[]) => {
-                                if (productIds.length > 0) {
-                                  return prev.map((p) => {
-                                    const pid = String(p.id);
-                                    if (!productIds.includes(pid)) return p;
-                                    const nextIds = (p.linkedStoreIds || []).filter((sid) => String(sid) !== id);
-                                    return { ...p, linkedStoreIds: nextIds };
-                                  });
-                                }
-                                return prev.map((p) => {
-                                  const nextIds = (p.linkedStoreIds || []).filter((sid) => String(sid) !== id);
-                                  return { ...p, linkedStoreIds: nextIds };
-                                });
-                              };
-                              try { setProductsCached(updateItems); } catch { void 0; }
-                              try {
-                                const dec = deletedByStore?.[String(id)] ?? countInStore;
-                                if (dec > 0) ShopService.bumpProductsCountInCache(String(id), -dec);
-                                try {
-                                  await ProductService.recomputeStoreCategoryFilterCache(String(id));
-                                  const names = await ProductService.getStoreCategoryFilterOptions(String(id));
-                                  const cnt = Array.isArray(names) ? names.length : 0;
-                                  ShopService.setCategoriesCountInCache(String(id), cnt);
-                                  try {
-                                    q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                                      const arr = Array.isArray(prev) ? prev : (stores || []);
-                                      const idStr = String(id);
-                                      return (arr || []).map((s0) => s0.id === idStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
-                                    });
-                                    const updatedCats = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
-                                    setStores(updatedCats);
-                                  } catch { void 0; }
-                                } catch { void 0; }
-                                try {
-                                  q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                                    const arr = Array.isArray(prev) ? prev : (stores || []);
-                                    const idStr = String(id);
-                                    const nextDec = dec > 0 ? dec : 0;
-                                    return (arr || []).map((s0) => s0.id === idStr ? { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) - nextDec)) } : s0);
-                                  });
-                                  const updated = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
-                                  setStores(updated);
-                                } catch { void 0; }
-                              } catch { void 0; }
-                              try {
-                                const idStr = String(id);
-                                const decUi = deletedByStore?.[idStr] ?? (productIds.length > 0 ? productIds.length : countInStore);
-                                const nextCount = Math.max(0, countInStore - decUi);
-                                if (nextCount === 0) setSelectedStoreIds((prev) => prev.filter((v) => v !== idStr));
-                              } catch { void 0; }
-                            }
-                          } catch (e) {
-                            toast.error(t('failed_remove_from_store'));
-                          } finally {
-                            setRemovingStoreId(null);
-                            try { table.resetRowSelection(); } catch { /* ignore */ }
-                          }
+                          handleRemoveSingleStore(storeId);
                         }}
                       >
-                        {removingStoreId === id ? (
+                        {removingStoreId === storeId ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <Trash2 className="h-3 w-3" />
@@ -243,206 +420,54 @@ export function AddToStoresMenu({
             )}
           </div>
         </ScrollArea>
+
         <DropdownMenuSeparator />
-        {(() => {
-          const selectedRows = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
-          const hasLinkedInSelectedStores = (() => {
-            if (selectedStoreIds.length === 0 || selectedRows.length === 0) return false;
-            const set = new Set(selectedStoreIds.map(String));
-            for (const p of selectedRows) {
-              const links = (p.linkedStoreIds || []).map(String);
-              for (const sid of links) { if (set.has(sid)) return true; }
-            }
-            return false;
-          })();
-          const isAnyProductSelected = selectedRows.length > 0;
-          const totalLinksInSelectedProducts = selectedRows.reduce((acc, p) => acc + ((p.linkedStoreIds || []).length), 0);
-          const totalInSelectedStores = selectedStoreIds.reduce((acc, sid) => {
-            const count = (items as ProductRow[]).reduce((inner, p) => {
-              const links = (p.linkedStoreIds || []).map(String);
-              return inner + (links.includes(String(sid)) ? 1 : 0);
-            }, 0);
-            return acc + count;
-          }, 0);
-          const effectiveStoreIds = selectedStoreIds.length > 0
-            ? Array.from(new Set(selectedStoreIds))
-            : Array.from(new Set(selectedRows.flatMap((p) => (p.linkedStoreIds || []).map(String))));
-          const disableDelete = removingStores
-            || (!isAnyProductSelected && selectedStoreIds.length === 0)
-            || (effectiveStoreIds.length === 0)
-            || (selectedStoreIds.length > 0 ? totalInSelectedStores === 0 : totalLinksInSelectedProducts === 0);
-          return (
-            <div className="flex items-center justify-center gap-2 w-full">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
-                aria-disabled={addingStores || selectedStoreIds.length === 0 || !isAnyProductSelected}
-                onClick={async () => {
-                  const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
-                  const storeIds = Array.from(new Set(selectedStoreIds));
-                  const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
-                  if (productIds.length === 0 || storeIds.length === 0) return;
-                  setAddingStores(true);
-                  try {
-                    const payload: Array<{ product_id: string; store_id: string; is_active?: boolean; custom_price?: number | null; custom_price_old?: number | null; custom_price_promo?: number | null; custom_stock_quantity?: number | null; custom_available?: boolean | null }> = [];
-                    for (const p of selected) {
-                      const pid = String(p.id);
-                      const linksSet = new Set((p.linkedStoreIds || []).map(String));
-                      for (const sid of storeIds) {
-                        if (linksSet.has(String(sid))) continue;
-                        payload.push({ product_id: pid, store_id: sid, is_active: true, custom_price: p.price ?? null, custom_price_old: p.price_old ?? null, custom_price_promo: p.price_promo ?? null, custom_stock_quantity: p.stock_quantity ?? null, custom_available: p.available ?? true });
-                      }
-                    }
-                    const toInsert = payload;
-                    const { inserted, addedByStore } = await ProductService.bulkAddStoreProductLinks(toInsert);
-                    if (inserted === 0) {
-                      toast.success(t('products_already_linked'));
-                    } else {
-                      {
-                        toast.success(t('product_added_to_stores'));
-                        setProductsCached((prev) => prev.map((p) => {
-                          const pid = String(p.id);
-                          if (!productIds.includes(pid)) return p;
-                          const merged = Array.from(new Set([...(p.linkedStoreIds || []), ...storeIds.map(String)]));
-                          return { ...p, linkedStoreIds: merged };
-                        }));
-                        try {
-                          Object.entries(addedByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), cnt); });
-                          const results = await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
-                          try {
-                            const addedMap = addedByStore || {};
-                            const sidList = Array.from(new Set(storeIds.map(String)));
-                            const catsCounts: Record<string, number> = {};
-                            for (const sid of sidList) {
-                              const names = Array.isArray(results?.[String(sid)]) ? results[String(sid)] : [];
-                              const cntCats = names.length;
-                              catsCounts[String(sid)] = cntCats;
-                              ShopService.setCategoriesCountInCache(String(sid), cntCats);
-                            }
-                            q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                              const arr = Array.isArray(prev) ? prev : (stores || []);
-                              return (arr || []).map((s0) => {
-                                const sidStr = String(s0.id);
-                                const inc = Number(addedMap[sidStr] || 0);
-                                const cntCats = catsCounts[sidStr];
-                                const nextCats = typeof cntCats === 'number' ? Math.max(0, Number(cntCats) || 0) : s0.categoriesCount;
-                                return { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) + inc)), categoriesCount: nextCats };
-                              });
-                            });
-                            const updated = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
-                            setStores(updated);
-                          } catch { /* ignore */ }
-                          q.invalidateQueries({ queryKey: ['shopsList'] });
-                        } catch { void 0; }
-                      }
-                    }
-                  } catch (e) {
-                    toast.error(t('failed_add_product_to_stores'));
-                  } finally {
-                    setAddingStores(false);
-                    try { table.resetRowSelection(); } catch { void 0; }
-                    try { setLastSelectedProductIds?.(productIds); } catch { void 0; }
-                  }
-                }}
-                data-testid="user_products_addToStores_confirm"
-              >
-                {addingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </Button>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-8 w-8 ${isAnyProductSelected ? 'border border-green-500' : ''}`}
-                      disabled={disableDelete}
-                      aria-disabled={disableDelete}
-                      onClick={async () => {
-                        const selected = table.getSelectedRowModel().rows.map((r) => r.original).filter(Boolean) as ProductRow[];
-                        const productIds = Array.from(new Set(selected.map((p) => String(p.id)).filter(Boolean)));
-                        const storeIds = effectiveStoreIds;
-                        if (storeIds.length === 0) return;
-                        setRemovingStores(true);
-                        try {
-                          const { deletedByStore } = await ProductService.bulkRemoveStoreProductLinks(productIds, storeIds);
-                          {
-                            toast.success(t('product_removed_from_store'));
-                            try {
-                              setProductsCached((prev) => prev.map((p) => {
-                                const pid = String(p.id);
-                                const isTarget = productIds.length > 0 ? productIds.includes(pid) : true;
-                                if (!isTarget) return p;
-                                const nextIds = (p.linkedStoreIds || []).filter((sid) => !storeIds.map(String).includes(String(sid)));
-                                return { ...p, linkedStoreIds: nextIds };
-                              }));
-                            } catch { void 0; }
-                            try {
-                              const countsByStore: Record<string, number> = {};
-                              if (productIds.length > 0) {
-                                for (const sid of storeIds) {
-                                  countsByStore[String(sid)] = 0;
-                                  for (const p of selected) {
-                                    const ids = (p.linkedStoreIds || []).map(String);
-                                    if (ids.includes(String(sid))) countsByStore[String(sid)] += 1;
-                                  }
-                                }
-                              } else {
-                                Object.assign(countsByStore, deletedByStore);
-                              }
-                              Object.entries(countsByStore).forEach(([sid, cnt]) => { if (cnt > 0) ShopService.bumpProductsCountInCache(String(sid), -cnt); });
-                              const results = await ProductService.refreshStoreCategoryFilterOptions(storeIds.map(String));
-                              try {
-                                for (const sid of storeIds) {
-                                  const names = Array.isArray(results?.[String(sid)]) ? results[String(sid)] : [];
-                                  const cnt = names.length;
-                                  ShopService.setCategoriesCountInCache(String(sid), cnt);
-                                  try {
-                                    q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                                      const arr = Array.isArray(prev) ? prev : (stores || []);
-                                      const sidStr = String(sid);
-                                      return (arr || []).map((s0) => s0.id === sidStr ? { ...s0, categoriesCount: Math.max(0, Number(cnt) || 0) } : s0);
-                                    });
-                                  } catch { void 0; }
-                                }
-                              } catch { void 0; }
-                              try {
-                                q.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-                                  const arr = Array.isArray(prev) ? prev : (stores || []);
-                                  const mapDec = new Map(Object.entries(countsByStore));
-                                  return (arr || []).map((s0) => {
-                                    const dec = Number(mapDec.get(String(s0.id)) ?? 0);
-                                    return dec > 0 ? { ...s0, productsCount: Math.max(0, ((s0.productsCount ?? 0) - dec)) } : s0;
-                                  });
-                                });
-                                const updated = (q.getQueryData<StoreAgg[]>(['shopsList']) || []) as StoreAgg[];
-                                setStores(updated);
-                              } catch { void 0; }
-                              q.invalidateQueries({ queryKey: ['shopsList'] });
-                            } catch { void 0; }
-                          }
-                        } catch (e) {
-                          toast.error(t('failed_remove_from_store'));
-                        } finally {
-                          setRemovingStores(false);
-                          try { table.resetRowSelection(); } catch { void 0; }
-                          try { setSelectedStoreIds((prev) => prev.filter((sid) => !storeIds.map(String).includes(String(sid)))); } catch { void 0; }
-                        }
-                      }}
-                      data-testid="user_products_addToStores_delete"
-                    >
-                      {removingStores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    {isAnyProductSelected ? 'Видалити виділені товари з вибраних магазинів' : 'Видалити всі товари з вибраних магазинів'}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          );
-        })()}
+
+        <div className="flex items-center justify-center gap-2 w-full">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            disabled={addingStores || selectedStoreIds.length === 0 || !hasSelectedProducts}
+            onClick={handleAddToStores}
+            data-testid="user_products_addToStores_confirm"
+          >
+            {addingStores ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+          </Button>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-8 w-8 ${hasSelectedProducts ? 'border border-green-500' : ''}`}
+                  disabled={!canDelete}
+                  onClick={() => {
+                    const productIds = selectedProducts.map(p => String(p.id));
+                    handleRemoveFromStores(effectiveStoreIds, productIds);
+                  }}
+                  data-testid="user_products_addToStores_delete"
+                >
+                  {removingStores ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {hasSelectedProducts
+                  ? 'Видалити виділені товари з вибраних магазинів'
+                  : 'Видалити всі товари з вибраних магазинів'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

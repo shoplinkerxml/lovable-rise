@@ -8,6 +8,7 @@ import { useI18n } from '@/providers/i18n-provider';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';
+import { ShopService } from '@/lib/shop-service';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -165,6 +166,24 @@ export const ProductEdit = () => {
             ? { ...p, ...(patch as Partial<ProductAggregated>), categoryName: catName || p.categoryName }
             : p);
         });
+        if (cidNum != null || patch.category_external_id != null) {
+          try {
+            const linked = await ProductService.getStoreLinksForProduct(String(id));
+            const namesByStore = await ProductService.refreshStoreCategoryFilterOptions(linked);
+            for (const sid of linked) {
+              const names = Array.isArray(namesByStore?.[String(sid)]) ? namesByStore![String(sid)] : [];
+              ShopService.setCategoriesCountInCache(String(sid), names.length);
+            }
+            queryClient.setQueryData(['shopsList'], (prev: any) => {
+              const arr = Array.isArray(prev) ? prev : [];
+              return arr.map((s: any) => {
+                const names = Array.isArray(namesByStore?.[String(s.id)]) ? namesByStore![String(s.id)] : undefined;
+                if (!names) return s;
+                return { ...s, categoriesCount: names.length };
+              });
+            });
+          } catch { /* ignore */ }
+        }
       } catch { void 0; }
       toast.success(t('product_updated'));
       navigate('/user/products');
