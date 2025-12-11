@@ -59,3 +59,29 @@ export interface FormData {
   state: string;
   store_id: string;
 }
+
+export type BasicData = Pick<
+  FormData,
+  | 'name'
+  | 'name_ua'
+  | 'description'
+  | 'description_ua'
+  | 'docket'
+  | 'docket_ua'
+  | 'vendor'
+  | 'article'
+  | 'external_id'
+  | 'supplier_id'
+  | 'category_id'
+  | 'category_external_id'
+  | 'category_name'
+  | 'state'
+  | 'store_id'
+>;
+
+export type PriceData = Pick<
+  FormData,
+  'currency_code' | 'price' | 'price_old' | 'price_promo'
+>;
+
+export type StockData = Pick<FormData, 'stock_quantity' | 'available'>;

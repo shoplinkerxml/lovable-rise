@@ -4,7 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Separator } from '@/components/ui/separator'
 import { ChevronDown } from 'lucide-react'
 import { CategoryTreeEditor } from '@/components/CategoryTreeEditor'
-import type { SupplierOption, CategoryOption, FormData } from './types'
+import type { SupplierOption, CategoryOption, BasicData } from './types'
 
 type Props = {
   t: (k: string) => string
@@ -12,11 +12,11 @@ type Props = {
   categories: CategoryOption[]
   setCategories: React.Dispatch<React.SetStateAction<CategoryOption[]>>
   preloadedSupplierCategoriesMap?: Record<string, CategoryOption[]>
-  formData: FormData
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>
+  basicData: BasicData
+  setBasicData: React.Dispatch<React.SetStateAction<BasicData>>
 }
 
-export default function CategoryEditorSection({ t, suppliers, categories, setCategories, preloadedSupplierCategoriesMap, formData, setFormData }: Props) {
+export default function CategoryEditorSection({ t, suppliers, categories, setCategories, preloadedSupplierCategoriesMap, basicData, setBasicData }: Props) {
   return (
     <div className="space-y-4 mt-2 w-full px-2 sm:px-3" data-testid="productFormTabs_categoryTreeEditorFullWidth">
       <Collapsible defaultOpen>
@@ -43,9 +43,9 @@ export default function CategoryEditorSection({ t, suppliers, categories, setCat
             stores={[]}
             categories={categories}
             supplierCategoriesMap={preloadedSupplierCategoriesMap as any}
-            defaultSupplierId={formData.supplier_id}
+            defaultSupplierId={basicData.supplier_id}
             showStoreSelect={false}
-            onSupplierChange={id => setFormData(prev => ({ ...prev, supplier_id: id }))}
+            onSupplierChange={id => setBasicData(prev => ({ ...prev, supplier_id: id }))}
             onCategoryCreated={async cat => {
               setCategories(prev => {
                 const exists = prev?.some(c => String(c.external_id) === String(cat.external_id));
@@ -54,7 +54,7 @@ export default function CategoryEditorSection({ t, suppliers, categories, setCat
                   id: String(cat.external_id || `${Date.now()}`),
                   name: cat.name || '',
                   external_id: String(cat.external_id || ''),
-                  supplier_id: String(formData.supplier_id || ''),
+                  supplier_id: String(basicData.supplier_id || ''),
                   parent_external_id: null
                 }];
                 return next;

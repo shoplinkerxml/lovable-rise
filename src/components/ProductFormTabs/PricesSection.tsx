@@ -6,19 +6,19 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 import { ChevronDown } from 'lucide-react'
-import type { FormData, CurrencyOption } from './types'
+import type { CurrencyOption, PriceData, FormData } from './types'
 
 type Props = {
   t: (k: string) => string
   readOnly?: boolean
   editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity' | 'available'>
   currencies: CurrencyOption[]
-  formData: FormData
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>
+  priceData: PriceData
+  setPriceData: React.Dispatch<React.SetStateAction<PriceData>>
   onChange?: (partial: Partial<FormData>) => void
 }
 
-export default function PricesSection({ t, readOnly, editableKeys, currencies, formData, setFormData, onChange }: Props) {
+const PricesSection = React.memo(function PricesSection({ t, readOnly, editableKeys, currencies, priceData, setPriceData, onChange }: Props) {
   return (
     <div className="space-y-4 px-2 sm:px-3">
       <Collapsible defaultOpen>
@@ -43,10 +43,7 @@ export default function PricesSection({ t, readOnly, editableKeys, currencies, f
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <span id="currency_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_currencyText">{t('currency')} *</span>
-              <Select value={formData.currency_code} onValueChange={value => setFormData({
-                ...formData,
-                currency_code: value
-              })}>
+              <Select value={priceData.currency_code} onValueChange={value => setPriceData(prev => ({ ...prev, currency_code: value }))}>
                 <SelectTrigger aria-labelledby="currency_label" data-testid="productFormTabs_currencySelect" disabled={!!readOnly}>
                   <SelectValue placeholder={t('select_currency')} />
                 </SelectTrigger>
@@ -62,27 +59,27 @@ export default function PricesSection({ t, readOnly, editableKeys, currencies, f
 
             <div className="space-y-2">
               <Label htmlFor="price">{t('price')} *</Label>
-              <Input id="price" name="price" autoComplete="off" type="number" step="0.01" value={formData.price} onChange={e => {
+              <Input id="price" name="price" autoComplete="off" type="number" step="0.01" value={priceData.price} onChange={e => {
                 const v = parseFloat(e.target.value) || 0;
-                setFormData({ ...formData, price: v });
+                setPriceData(prev => ({ ...prev, price: v }));
                 onChange?.({ price: v });
               }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceInput" disabled={!!readOnly && !(editableKeys || []).includes('price')} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="price_old">{t('old_price')}</Label>
-              <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={formData.price_old} onChange={e => {
+              <Input id="price_old" name="price_old" autoComplete="off" type="number" step="0.01" value={priceData.price_old} onChange={e => {
                 const v = parseFloat(e.target.value) || 0;
-                setFormData({ ...formData, price_old: v });
+                setPriceData(prev => ({ ...prev, price_old: v }));
                 onChange?.({ price_old: v });
               }} placeholder={t('price_placeholder')} data-testid="productFormTabs_priceOldInput" disabled={!!readOnly && !(editableKeys || []).includes('price_old')} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="price_promo">{t('promo_price')}</Label>
-              <Input id="price_promo" name="price_promo" autoComplete="off" type="number" step="0.01" value={formData.price_promo} onChange={e => {
+              <Input id="price_promo" name="price_promo" autoComplete="off" type="number" step="0.01" value={priceData.price_promo} onChange={e => {
                 const v = parseFloat(e.target.value) || 0;
-                setFormData({ ...formData, price_promo: v });
+                setPriceData(prev => ({ ...prev, price_promo: v }));
                 onChange?.({ price_promo: v });
               }} placeholder={t('price_placeholder')} data-testid="productFormTabs_pricePromoInput" disabled={!!readOnly && !(editableKeys || []).includes('price_promo')} />
             </div>
@@ -91,4 +88,6 @@ export default function PricesSection({ t, readOnly, editableKeys, currencies, f
       </Collapsible>
     </div>
   )
-}
+})
+
+export default PricesSection

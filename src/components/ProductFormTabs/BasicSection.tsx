@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 import { ChevronDown } from 'lucide-react'
-import type { FormData, CategoryOption } from './types'
+import type { CategoryOption, BasicData, StockData, FormData } from './types'
 
 type Props = {
   t: (k: string) => string
-  formData: FormData
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>
+  basicData: BasicData
+  setBasicData: React.Dispatch<React.SetStateAction<BasicData>>
+  stockData: StockData
+  setStockData: React.Dispatch<React.SetStateAction<StockData>>
   readOnly?: boolean
   editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity' | 'available'>
   categories: CategoryOption[]
@@ -19,7 +21,7 @@ type Props = {
   onChange?: (partial: Partial<FormData>) => void
 }
 
-export default function BasicSection({ t, formData, setFormData, readOnly, editableKeys, categories, selectedCategoryName, onChange }: Props) {
+const BasicSection = React.memo(function BasicSection({ t, basicData, setBasicData, stockData, setStockData, readOnly, editableKeys, categories, selectedCategoryName, onChange }: Props) {
   return (
     <div className="space-y-4 px-2 sm:px-3" data-testid="productFormTabs_basicSection">
       <Collapsible defaultOpen>
@@ -44,30 +46,24 @@ export default function BasicSection({ t, formData, setFormData, readOnly, edita
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="external_id">{t('external_id')}</Label>
-              <Input id="external_id" name="external_id" autoComplete="off" value={formData.external_id} onChange={e => setFormData({
-                ...formData,
-                external_id: e.target.value
-              })} placeholder={t('external_id_placeholder')} data-testid="productFormTabs_externalIdInput" />
+              <Input id="external_id" name="external_id" autoComplete="off" value={basicData.external_id} onChange={e => setBasicData(prev => ({ ...prev, external_id: e.target.value }))} placeholder={t('external_id_placeholder')} data-testid="productFormTabs_externalIdInput" />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="article">{t('article')}</Label>
-              <Input id="article" name="article" autoComplete="off" value={formData.article} onChange={e => setFormData({
-                ...formData,
-                article: e.target.value
-              })} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
+              <Input id="article" name="article" autoComplete="off" value={basicData.article} onChange={e => setBasicData(prev => ({ ...prev, article: e.target.value }))} placeholder={t('article_placeholder')} data-testid="productFormTabs_articleInput" />
             </div>
 
             <div className="space-y-2">
               <span id="category_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_categoryText">{t('category')} *</span>
-              <Select value={formData.category_id} onValueChange={value => {
+              <Select value={basicData.category_id} onValueChange={value => {
                 const cat = categories.find(c => String(c.id) === String(value));
-                setFormData({
-                  ...formData,
+                setBasicData(prev => ({
+                  ...prev,
                   category_id: value,
                   category_external_id: cat?.external_id || '',
                   category_name: cat?.name || ''
-                });
+                }));
                 onChange?.({
                   category_id: value,
                   category_external_id: cat?.external_id || '',
@@ -89,18 +85,12 @@ export default function BasicSection({ t, formData, setFormData, readOnly, edita
 
             <div className="space-y-2">
               <Label htmlFor="vendor">{t('manufacturer')}</Label>
-              <Input id="vendor" name="vendor" autoComplete="organization" value={formData.vendor} onChange={e => setFormData({
-                ...formData,
-                vendor: e.target.value
-              })} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" disabled={!!readOnly} />
+              <Input id="vendor" name="vendor" autoComplete="organization" value={basicData.vendor} onChange={e => setBasicData(prev => ({ ...prev, vendor: e.target.value }))} placeholder={t('manufacturer_placeholder')} data-testid="productFormTabs_vendorInput" disabled={!!readOnly} />
             </div>
 
             <div className="space-y-2">
               <span id="state_label" className="text-sm font-medium leading-none peer-disabled:opacity-70" data-testid="productFormTabs_stateText">{t('product_status')}</span>
-              <Select value={formData.state} onValueChange={value => setFormData({
-                ...formData,
-                state: value
-              })}>
+              <Select value={basicData.state} onValueChange={value => setBasicData(prev => ({ ...prev, state: value }))}>
                 <SelectTrigger aria-labelledby="state_label" data-testid="productFormTabs_stateSelect" disabled={!!readOnly}>
                   <SelectValue placeholder={t('select_status')} />
                 </SelectTrigger>
@@ -115,12 +105,9 @@ export default function BasicSection({ t, formData, setFormData, readOnly, edita
 
             <div className="space-y-2">
               <Label htmlFor="stock_quantity">{t('stock_quantity')}</Label>
-              <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={formData.stock_quantity} onChange={e => {
+              <Input id="stock_quantity" name="stock_quantity" autoComplete="off" type="number" value={stockData.stock_quantity} onChange={e => {
                 const v = parseInt(e.target.value) || 0;
-                setFormData({
-                  ...formData,
-                  stock_quantity: v
-                });
+                setStockData(prev => ({ ...prev, stock_quantity: v }));
                 onChange?.({ stock_quantity: v });
               }} placeholder={t('stock_quantity_placeholder')} data-testid="productFormTabs_stockInput" disabled={!!readOnly && !(editableKeys || []).includes('stock_quantity')} />
             </div>
@@ -129,10 +116,10 @@ export default function BasicSection({ t, formData, setFormData, readOnly, edita
               <input
                 type="checkbox"
                 id="available"
-                checked={!!formData.available}
+                checked={!!stockData.available}
                 onChange={(e) => {
                   const val = !!e.target.checked;
-                  setFormData({ ...formData, available: val });
+                  setStockData(prev => ({ ...prev, available: val }));
                   onChange?.({ available: val });
                 }}
                 className="rounded border-gray-300 accent-emerald-600"
@@ -146,4 +133,6 @@ export default function BasicSection({ t, formData, setFormData, readOnly, edita
       </Collapsible>
     </div>
   )
-}
+})
+
+export default BasicSection

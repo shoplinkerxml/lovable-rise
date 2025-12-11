@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { ProductService, type Product } from '@/lib/product-service';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
-import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData } from './ProductFormTabs/types';
+import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData, BasicData, PriceData, StockData } from './ProductFormTabs/types';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -84,8 +84,7 @@ export function ProductFormTabs({
   const [activeTab, setActiveTab] = useState('info');
   const [loading, setLoading] = useState(false);
 
-  // Form data state
-  const [formData, setFormData] = useState<FormData>({
+  const [basicData, setBasicData] = useState<BasicData>({
     name: '',
     name_ua: '',
     description: '',
@@ -99,21 +98,32 @@ export function ProductFormTabs({
     category_id: '',
     category_external_id: '',
     category_name: '',
+    state: 'new',
+    store_id: ''
+  });
+  const [priceData, setPriceData] = useState<PriceData>({
     currency_code: 'UAH',
     price: 0,
     price_old: 0,
     price_promo: 0,
+  });
+  const [stockData, setStockData] = useState<StockData>({
     stock_quantity: 0,
     available: true,
-    state: 'new',
-    store_id: ''
   });
+  const formData = useMemo<FormData>(() => ({
+    ...basicData,
+    ...priceData,
+    ...stockData,
+  }), [basicData, priceData, stockData]);
+  const updateBasicData = useCallback((partial: Partial<BasicData>) => {
+    setBasicData(prev => ({ ...prev, ...partial }));
+  }, []);
   useEffect(() => {
     if (overrides && Object.keys(overrides).length > 0) {
-      setFormData(prev => ({
-        ...prev,
-        ...overrides
-      }));
+      setBasicData(prev => ({ ...prev, ...overrides }));
+      setPriceData(prev => ({ ...prev, ...overrides } as PriceData));
+      setStockData(prev => ({ ...prev, ...overrides } as StockData));
     }
   }, [overrides]);
 
@@ -339,8 +349,8 @@ export function ProductFormTabs({
           supplier_id: String(c.supplier_id ?? ''),
           parent_external_id: c.parent_external_id === null || c.parent_external_id === undefined ? null : String(c.parent_external_id)
         })));
-      } else if (formData.supplier_id) {
-        const supplierId = Number(formData.supplier_id);
+      } else if (basicData.supplier_id) {
+        const supplierId = Number(basicData.supplier_id);
         setCategories(getCategoriesFromMap(supplierId));
       } else {
         setCategories([]);
@@ -349,7 +359,7 @@ export function ProductFormTabs({
       console.error('Error loading lookup data:', error);
       toast.error(t('failed_load_data'));
     }
-  }, [preloadedSuppliers, preloadedCurrencies, preloadedCategories, formData.supplier_id, getCategoriesFromMap, t]);
+  }, [preloadedSuppliers, preloadedCurrencies, preloadedCategories, basicData.supplier_id, getCategoriesFromMap, t]);
 
   // Load initial data
   useEffect(() => {
@@ -368,29 +378,28 @@ export function ProductFormTabs({
   useEffect(() => {
     if (preloadedSuppliers && preloadedSuppliers.length) {
       setSuppliers(preloadedSuppliers);
-      if (!formData.supplier_id) {
+      if (!basicData.supplier_id) {
         const firstId = String(preloadedSuppliers[0].id);
-        setFormData(prev => ({ ...prev, supplier_id: firstId }));
+        setBasicData(prev => ({ ...prev, supplier_id: firstId }));
       }
     }
     if (preloadedCurrencies && preloadedCurrencies.length) {
       setCurrencies(preloadedCurrencies);
     }
-    const sid = Number(formData.supplier_id || 0);
+    const sid = Number(basicData.supplier_id || 0);
     if (sid) {
       setCategories(getCategoriesFromMap(sid));
     }
-  }, [preloadedSuppliers, preloadedCurrencies, formData.supplier_id, getCategoriesFromMap]);
+  }, [preloadedSuppliers, preloadedCurrencies, basicData.supplier_id, getCategoriesFromMap]);
 
   // Auto-select category by external_id when categories list is loaded
   useEffect(() => {
     if (!product) return;
-    if (formData.category_id) {
-      console.log('[ProductFormTabs] Category already selected:', formData.category_id);
-      // Keep hydration until categories are loaded and label synced
-      return; // already selected
+    if (basicData.category_id) {
+      console.log('[ProductFormTabs] Category already selected:', basicData.category_id);
+      return;
     }
-    if (!formData.category_external_id) {
+    if (!basicData.category_external_id) {
       console.log('[ProductFormTabs] No category_external_id to match');
       return;
     }
@@ -399,16 +408,13 @@ export function ProductFormTabs({
       return;
     }
     console.log('[ProductFormTabs] Searching for category:', {
-      category_external_id: formData.category_external_id,
+      category_external_id: basicData.category_external_id,
       total_categories: categories.length
     });
-    const matched = categories.find(c => String(c.external_id) === String(formData.category_external_id));
+    const matched = categories.find(c => String(c.external_id) === String(basicData.category_external_id));
     if (matched) {
       console.log('[ProductFormTabs] Category matched:', matched);
-      setFormData(prev => ({
-        ...prev,
-        category_id: String(matched.id)
-      }));
+      setBasicData(prev => ({ ...prev, category_id: String(matched.id) }));
       setSelectedCategoryName(matched.name || '');
       // Mark hydration complete after category is resolved
       isHydratingRef.current = false;
@@ -417,29 +423,26 @@ export function ProductFormTabs({
     } else {
       console.log('[ProductFormTabs] No category match found');
     }
-  }, [categories, formData.category_external_id, formData.category_id, product]);
+  }, [categories, basicData.category_external_id, basicData.category_id, product]);
 
   // Fallback: directly fetch category by external_id + supplier_id to set category_id
   useEffect(() => {
     if (!product) return;
-    if (formData.category_id) return; // already selected
-    if (!formData.category_external_id) return;
-    if (!formData.supplier_id) return;
+    if (basicData.category_id) return;
+    if (!basicData.category_external_id) return;
+    if (!basicData.supplier_id) return;
     if (preloadedCategories && preloadedCategories.length > 0) return;
-    const supplierId = Number(formData.supplier_id);
+    const supplierId = Number(basicData.supplier_id);
     const list = getCategoriesFromMap(supplierId);
-    const cat = list.find(c => String(c.external_id) === String(formData.category_external_id));
+    const cat = list.find(c => String(c.external_id) === String(basicData.category_external_id));
     if (cat) {
-      setFormData(prev => ({
-        ...prev,
-        category_id: String(cat.id)
-      }));
+      setBasicData(prev => ({ ...prev, category_id: String(cat.id) }));
       setSelectedCategoryName(cat.name || '');
       isHydratingRef.current = false;
       isLoadingProductRef.current = false;
       setCategories(list);
     }
-  }, [product, formData.category_external_id, formData.supplier_id, formData.category_id]);
+  }, [product, basicData.category_external_id, basicData.supplier_id, basicData.category_id]);
 
   // Track initial hydration to avoid clearing category on first population
   const isHydratingRef = useRef<boolean>(true);
@@ -452,12 +455,12 @@ export function ProductFormTabs({
     console.log('[ProductFormTabs] Supplier changed, isHydrating:', isHydratingRef.current, 'product exists:', !!product, 'isLoadingProduct:', isLoadingProductRef.current);
 
     // Refresh categories from preloaded map when supplier changes
-    const supplierIdNum = Number(formData.supplier_id || 0);
+    const supplierIdNum = Number(basicData.supplier_id || 0);
     if (supplierIdNum) {
       const fromMap = getCategoriesFromMap(supplierIdNum);
       setCategories(fromMap);
     }
-    const currentSupplier = String(formData.supplier_id || '');
+    const currentSupplier = String(basicData.supplier_id || '');
     const initialSupplier = String(initialSupplierIdRef.current || '');
 
     // Skip any clearing while product is loading/hydrating
@@ -473,34 +476,30 @@ export function ProductFormTabs({
     }
 
     // Also skip clearing if we have external_id from product and category not yet selected
-    if (product && formData.category_external_id && !formData.category_id) {
+    if (product && basicData.category_external_id && !basicData.category_id) {
       console.log('[ProductFormTabs] Skipping category clear - waiting for category resolution');
       return;
     }
 
     // Reset selected category only on user-initiated supplier change
     console.log('[ProductFormTabs] Clearing category due to supplier change');
-    setFormData(prev => ({
-      ...prev,
-      category_id: '',
-      category_external_id: ''
-    }));
+    setBasicData(prev => ({ ...prev, category_id: '', category_external_id: '' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.supplier_id]);
+  }, [basicData.supplier_id]);
 
   // Keep selectedCategoryName in sync when category_id or categories change
   useEffect(() => {
-    if (!formData.category_id) {
+    if (!basicData.category_id) {
       return;
     }
-    const selected = categories.find(c => String(c.id) === String(formData.category_id));
+    const selected = categories.find(c => String(c.id) === String(basicData.category_id));
     if (selected) {
       setSelectedCategoryName(selected.name || '');
       // Once label is synced, hydration/loading can end
       isHydratingRef.current = false;
       isLoadingProductRef.current = false;
     }
-  }, [formData.category_id, categories]);
+  }, [basicData.category_id, categories]);
   const loadProductData = async (signal?: AbortSignal) => {
     if (!product) return;
     try {
@@ -522,7 +521,7 @@ export function ProductFormTabs({
         categoryExternalId
       });
       if (signal?.aborted) return;
-      setFormData({
+      setBasicData({
         name: product.name || '',
         name_ua: product.name_ua || '',
         description: product.description || '',
@@ -534,16 +533,19 @@ export function ProductFormTabs({
         external_id: product.external_id || '',
         supplier_id: supplierId ? String(supplierId) : '',
         category_id: categoryId ? String(categoryId) : '',
-        // Use product.category_external_id directly; categories may not be loaded yet
         category_external_id: categoryExternalId ? String(categoryExternalId) : '',
+        state: product.state || 'new',
+        store_id: product.store_id || ''
+      });
+      setPriceData({
         currency_code: selectedCurrency?.code || (product as any).currency_code || 'UAH',
         price: product.price || 0,
         price_old: product.price_old || 0,
         price_promo: product.price_promo || 0,
+      });
+      setStockData({
         stock_quantity: product.stock_quantity || 0,
         available: product.available ?? true,
-        state: product.state || 'new',
-        store_id: product.store_id || ''
       });
       // Do not end hydration here; wait for category resolution/label sync
 
@@ -611,7 +613,7 @@ export function ProductFormTabs({
     }
   };
   const handleSubmit = async () => {
-    if (!formData.name_ua.trim()) {
+    if (!basicData.name_ua.trim()) {
       toast.error(t('product_name_required'));
       return;
     }
@@ -1090,7 +1092,7 @@ export function ProductFormTabs({
 
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
-                  <NamesDescriptionSection t={t} formData={formData} setFormData={setFormData} readOnly={readOnly} />
+          <NamesDescriptionSection t={t} data={basicData} onChange={updateBasicData} readOnly={readOnly} />
 
                   {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
 
@@ -1098,11 +1100,11 @@ export function ProductFormTabs({
 
                 </div>
               </div>
-              <BasicSection t={t} formData={formData} setFormData={setFormData} readOnly={readOnly} editableKeys={editableKeys} categories={categories} selectedCategoryName={selectedCategoryName} onChange={onChange} />
+              <BasicSection t={t} basicData={basicData} setBasicData={setBasicData} stockData={stockData} setStockData={setStockData} readOnly={readOnly} editableKeys={editableKeys} categories={categories} selectedCategoryName={selectedCategoryName} onChange={onChange} />
 
-              <CategoryEditorSection t={t} suppliers={suppliers} categories={categories} setCategories={setCategories} preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap} formData={formData} setFormData={setFormData} />
+              <CategoryEditorSection t={t} suppliers={suppliers} categories={categories} setCategories={setCategories} preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap} basicData={basicData} setBasicData={setBasicData} />
 
-              <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} formData={formData} setFormData={setFormData} onChange={onChange} />
+              <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} priceData={priceData} setPriceData={setPriceData} onChange={onChange} />
             </TabsContent>
 
             {/* Tab 2: Images */}
@@ -1167,7 +1169,7 @@ export function ProductFormTabs({
             </TabsContent>
           </Tabs>
           
-          <FormActions t={t} readOnly={readOnly} loading={loading} product={product} onCancel={onCancel} onSubmit={handleSubmit} disabledSubmit={loading || !formData.name_ua.trim()} />
+          <FormActions t={t} readOnly={readOnly} loading={loading} product={product} onCancel={onCancel} onSubmit={handleSubmit} disabledSubmit={loading || !basicData.name_ua.trim()} />
         </CardContent>
       </Card>
     </div>;

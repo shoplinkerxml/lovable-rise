@@ -13,6 +13,7 @@ import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy,
 import { CSS } from '@dnd-kit/utilities'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DialogDescription } from '@/components/ui/dialog'
+import { FixedSizeList as List } from 'react-window'
 
 export type ProductImage = {
   id?: string
@@ -100,6 +101,25 @@ export function ImageSection(props: Props) {
     const src = isVid ? getImageUrl(original) : getImageUrl(original)
     return (
       <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
+          {src ? (
+            isVid ? (
+              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+            ) : (
+              <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
+            )
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  function Thumb({ image, index }: { image: ProductImage; index: number }) {
+    const original = image.url
+    const isVid = isVideoUrl(original)
+    const src = isVid ? getImageUrl(original) : getImageUrl(original)
+    return (
+      <div>
         <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
           {src ? (
             isVid ? (
@@ -235,23 +255,43 @@ export function ImageSection(props: Props) {
       {props.images.length > 0 && (
           <>
           <div className="relative w-full">
-            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-              <SortableContext items={props.images.map((im) => String(im.object_key || im.url || ''))} strategy={horizontalListSortingStrategy}>
-                <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
-                  <CarouselContent className="-ml-2 mr-2">
-                    {props.images.map((image, index) => (
-                      <CarouselItem key={(image.object_key || image.url || index).toString()} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
-                        <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)} data-testid={`productFormTabs_imageCard_${index}`}>
-                          <CardContent className="p-2">
-                            <SortableThumb image={image} index={index} />
-                          </CardContent>
-                        </Card>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                </Carousel>
-              </SortableContext>
-            </DndContext>
+            {props.images.length > 50 ? (
+              <List
+                height={isLarge ? 100 : 92}
+                itemCount={props.images.length}
+                itemSize={isLarge ? 80 : 64}
+                width={'100%'}
+                layout="horizontal"
+              >
+                {({ index, style }) => (
+                  <div style={{ ...style, paddingLeft: '0.5rem' }}>
+                    <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)} data-testid={`productFormTabs_imageCard_${index}`}>
+                      <CardContent className="p-2">
+                        <Thumb image={props.images[index]} index={index} />
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </List>
+            ) : (
+              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                <SortableContext items={props.images.map((im) => String(im.object_key || im.url || ''))} strategy={horizontalListSortingStrategy}>
+                  <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
+                    <CarouselContent className="-ml-2 mr-2">
+                      {props.images.map((image, index) => (
+                        <CarouselItem key={(image.object_key || image.url || index).toString()} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
+                          <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)} data-testid={`productFormTabs_imageCard_${index}`}>
+                            <CardContent className="p-2">
+                              <SortableThumb image={image} index={index} />
+                            </CardContent>
+                          </Card>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                  </Carousel>
+                </SortableContext>
+              </DndContext>
+            )}
           </div>
 
           <Dialog open={reorderOpen} onOpenChange={(o) => setReorderOpen(!!o)}>
