@@ -1,24 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
-import ImageSection from './ProductFormTabs/ImageSection';
 import NamesDescriptionSection from './ProductFormTabs/NamesDescriptionSection';
 import BasicSection from './ProductFormTabs/BasicSection';
 import CategoryEditorSection from './ProductFormTabs/CategoryEditorSection';
 import PricesSection from './ProductFormTabs/PricesSection';
 import ImagePreviewSection from './ProductFormTabs/ImagePreviewSection';
-import ParamsSection from './ProductFormTabs/ParamsSection';
 import TabsHeader from './ProductFormTabs/TabsHeader';
 import FormActions from './ProductFormTabs/FormActions';
 import { usePhotoPreview } from './ProductFormTabs/hooks/usePhotoPreview';
+import { Spinner } from '@/components/ui/spinner';
+const ImageSection = lazy(() => import('./ProductFormTabs/ImageSection'));
+const ParamsSection = lazy(() => import('./ProductFormTabs/ParamsSection'));
 import { Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProductService, type Product } from '@/lib/product-service';
 import { useI18n } from '@/providers/i18n-provider';
 import { R2Storage } from '@/lib/r2-storage';
 import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData } from './ProductFormTabs/types';
-import { CategoryService } from '@/lib/category-service';
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -123,18 +123,20 @@ export function ProductFormTabs({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const { photoBlockRef, isLargeScreen, getAdaptiveImageStyle, getThumbSizeRem, handlePhotoResizeStart, resetPhotoBlockToDefaultSize, galleryImgRefs } = usePhotoPreview(activeImageIndex);
-  const [imageDimensions, setImageDimensions] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
-  const [galleryImageDimensions, setGalleryImageDimensions] = useState<Map<number, {
-    width: number;
-    height: number;
-  }>>(new Map());
-  const [allImageDimensions, setAllImageDimensions] = useState<Map<number, {
-    width: number;
-    height: number;
-  }>>(new Map());
+  const [imageDimensionsMap, setImageDimensionsMap] = useState<Map<number, { width: number; height: number }>>(new Map());
+  const updateDimensions = useMemo(() => {
+    let timer: number | null = null;
+    return (index: number, dims: { width: number; height: number }) => {
+      if (timer) clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        setImageDimensionsMap(prev => {
+          const next = new Map(prev);
+          next.set(index, dims);
+          return next;
+        });
+      }, 100);
+    };
+  }, []);
   const [maxContainerSize, setMaxContainerSize] = useState<{
     width: number;
     height: number;
@@ -144,6 +146,14 @@ export function ProductFormTabs({
   const cleanedRef = useRef(false);
   const imagesRef = useRef<ProductImage[]>([]);
   const isNewProduct = !product?.id;
+
+  const addImages = useCallback((newImages: ProductImage[]) => {
+    setImages(prev => {
+      const combined = [...prev, ...newImages];
+      imagesRef.current = combined;
+      return combined;
+    });
+  }, []);
 
   // Drag and drop state
   const [isDragOver, setIsDragOver] = useState(false);
@@ -159,9 +169,9 @@ export function ProductFormTabs({
     if (count === 7) return '14.2857%';
     return '12.5%';
   };
-  const notifyImagesLoading = (flag: boolean) => {
+  const notifyImagesLoading = useCallback((flag: boolean) => {
     setTimeout(() => onImagesLoadingChange?.(flag), 0);
-  };
+  }, [onImagesLoadingChange]);
   useEffect(() => {
     setGalleryLoadCount(0);
     setGalleryLoaded(images.length === 0);
@@ -170,47 +180,29 @@ export function ProductFormTabs({
     } else {
       notifyImagesLoading(false);
     }
-  }, [images, activeTab]);
+  }, [images, activeTab, galleryLoaded, notifyImagesLoading]);
 
   // Navigation functions for main image carousel
   const goToPrevious = () => {
     const newIndex = activeImageIndex === 0 ? images.length - 1 : activeImageIndex - 1;
     setActiveImageIndex(newIndex);
-
-    // Update current image dimensions from stored data
-    const storedDimensions = allImageDimensions.get(newIndex);
-    if (storedDimensions) {
-      setImageDimensions(storedDimensions);
-    }
   };
   const goToNext = () => {
     const newIndex = activeImageIndex === images.length - 1 ? 0 : activeImageIndex + 1;
     setActiveImageIndex(newIndex);
-
-    // Update current image dimensions from stored data
-    const storedDimensions = allImageDimensions.get(newIndex);
-    if (storedDimensions) {
-      setImageDimensions(storedDimensions);
-    }
   };
 
   // Handle image load to get dimensions
   const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const img = event.currentTarget;
-    const dimensions = {
-      width: img.naturalWidth,
-      height: img.naturalHeight
-    };
-    setImageDimensions(dimensions);
-
-    // Store dimensions for this image index
-    setAllImageDimensions(prev => {
-      const newMap = new Map(prev);
-      newMap.set(activeImageIndex, dimensions);
-      return newMap;
-    });
+    const dimensions = { width: img.naturalWidth, height: img.naturalHeight };
+    updateDimensions(activeImageIndex, dimensions);
     setMainImageLoaded(true);
   };
+
+  const handleSelectIndex = useCallback((i: number) => {
+    setActiveImageIndex(i);
+  }, []);
   const handleMainImageError = (_event: React.SyntheticEvent<HTMLImageElement>) => {
     setMainImageLoaded(true);
   };
@@ -218,12 +210,7 @@ export function ProductFormTabs({
   const handleMainVideoLoaded = (event: React.SyntheticEvent<HTMLVideoElement>) => {
     const vid = event.currentTarget;
     const dimensions = { width: vid.videoWidth, height: vid.videoHeight };
-    setImageDimensions(dimensions);
-    setAllImageDimensions(prev => {
-      const newMap = new Map(prev);
-      newMap.set(activeImageIndex, dimensions);
-      return newMap;
-    });
+    updateDimensions(activeImageIndex, dimensions);
     setMainImageLoaded(true);
   };
 
@@ -234,14 +221,7 @@ export function ProductFormTabs({
   // Handle gallery image load to get dimensions
   const handleGalleryImageLoad = (event: React.SyntheticEvent<HTMLImageElement>, index: number) => {
     const img = event.currentTarget;
-    setGalleryImageDimensions(prev => {
-      const newMap = new Map(prev);
-      newMap.set(index, {
-        width: img.naturalWidth,
-        height: img.naturalHeight
-      });
-      return newMap;
-    });
+    updateDimensions(index, { width: img.naturalWidth, height: img.naturalHeight });
     setGalleryLoadCount(prev => {
       const next = prev + 1;
       if (next >= images.length) setGalleryLoaded(true);
@@ -260,11 +240,7 @@ export function ProductFormTabs({
 
   const handleGalleryVideoLoaded = (event: React.SyntheticEvent<HTMLVideoElement>, index: number) => {
     const vid = event.currentTarget;
-    setGalleryImageDimensions(prev => {
-      const newMap = new Map(prev);
-      newMap.set(index, { width: vid.videoWidth, height: vid.videoHeight });
-      return newMap;
-    });
+    updateDimensions(index, { width: vid.videoWidth, height: vid.videoHeight });
     setGalleryLoadCount(prev => {
       const next = prev + 1;
       if (next >= images.length) setGalleryLoaded(true);
@@ -279,7 +255,7 @@ export function ProductFormTabs({
 
   // Calculate adaptive container style for gallery images
   const getGalleryAdaptiveImageStyle = (index: number) => {
-    const dimensions = galleryImageDimensions.get(index);
+    const dimensions = imageDimensionsMap.get(index);
     if (!dimensions) {
       return {
         width: '100%',
@@ -338,8 +314,8 @@ export function ProductFormTabs({
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
 
-  // Helper: fetch categories by supplier with minimized type inference to avoid deep instantiation
-  const getCategoriesFromMap = (supplierId: number): CategoryOption[] => {
+  // Helper: fetch categories by supplier
+  const getCategoriesFromMap = useCallback((supplierId: number): CategoryOption[] => {
     const list = preloadedSupplierCategoriesMap?.[String(supplierId)] || [];
     return (list || []).map((c) => ({
       ...c,
@@ -348,16 +324,10 @@ export function ProductFormTabs({
       supplier_id: String(c.supplier_id ?? ''),
       parent_external_id: c.parent_external_id === null || c.parent_external_id === undefined ? null : String(c.parent_external_id)
     }));
-  };
+  }, [preloadedSupplierCategoriesMap]);
 
-  // Load initial data
-  useEffect(() => {
-    loadLookupData();
-    if (product) {
-      loadProductData();
-    }
-  }, [product]);
-  const loadLookupData = async () => {
+  // Load initial data (defined after helper to avoid TS "used before declaration")
+  const loadLookupData = useCallback(async () => {
     try {
       if (preloadedSuppliers) setSuppliers(preloadedSuppliers);
       if (preloadedCurrencies) setCurrencies(preloadedCurrencies);
@@ -379,7 +349,21 @@ export function ProductFormTabs({
       console.error('Error loading lookup data:', error);
       toast.error(t('failed_load_data'));
     }
-  };
+  }, [preloadedSuppliers, preloadedCurrencies, preloadedCategories, formData.supplier_id, getCategoriesFromMap, t]);
+
+  // Load initial data
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      await loadLookupData();
+      if (product) {
+        await loadProductData(controller.signal);
+      }
+    })();
+    return () => {
+      controller.abort();
+    };
+  }, [product, loadLookupData]);
 
   useEffect(() => {
     if (preloadedSuppliers && preloadedSuppliers.length) {
@@ -396,7 +380,7 @@ export function ProductFormTabs({
     if (sid) {
       setCategories(getCategoriesFromMap(sid));
     }
-  }, [preloadedSuppliers, preloadedCurrencies, preloadedSupplierCategoriesMap, formData.supplier_id]);
+  }, [preloadedSuppliers, preloadedCurrencies, formData.supplier_id, getCategoriesFromMap]);
 
   // Auto-select category by external_id when categories list is loaded
   useEffect(() => {
@@ -517,7 +501,7 @@ export function ProductFormTabs({
       isLoadingProductRef.current = false;
     }
   }, [formData.category_id, categories]);
-  const loadProductData = async () => {
+  const loadProductData = async (signal?: AbortSignal) => {
     if (!product) return;
     try {
       // Mark loading to suppress supplier change side-effects during hydration
@@ -537,6 +521,7 @@ export function ProductFormTabs({
         categoryId,
         categoryExternalId
       });
+      if (signal?.aborted) return;
       setFormData({
         name: product.name || '',
         name_ua: product.name_ua || '',
@@ -603,6 +588,7 @@ export function ProductFormTabs({
             object_key: objectKeyFixed || undefined,
           } as ProductImage;
         }));
+        if (signal?.aborted) return;
         setImages(resolved);
       }
 
@@ -662,7 +648,7 @@ export function ProductFormTabs({
   };
 
   // Cleanup function: remove all unsaved images if user leaves without saving
-  const cleanupUnsavedImages = () => {
+  const cleanupUnsavedImages = useCallback(() => {
     // Отправляем удаление только если товар не сохранён и это новый товар
     if (isSavedRef.current || !isNewProduct) return;
     // Одноразовый запуск очистки на уход со страницы
@@ -683,7 +669,7 @@ export function ProductFormTabs({
         }).catch(() => {});
       }
     } catch {}
-  };
+  }, [isNewProduct]);
 
   // Attach leave-page handlers for new product creation
   useEffect(() => {
@@ -714,7 +700,7 @@ export function ProductFormTabs({
       R2Storage.cleanupPendingUploads().catch(() => {});
       cleanupUnsavedImages();
     };
-  }, [isNewProduct]);
+  }, [isNewProduct, cleanupUnsavedImages]);
 
   // Image handling functions
   const addImageFromUrl = () => {
@@ -725,9 +711,7 @@ export function ProductFormTabs({
       try {
         const res = await R2Storage.uploadProductImageFromUrl(String((product as unknown as { id?: string }).id || ''), imageUrl.trim());
         const newImage: ProductImage = { url: res.originalUrl, order_index: images.length, is_main: images.length === 0, object_key: res.r2KeyOriginal };
-        const nextImages = [...images, newImage];
-        setImages(nextImages);
-        imagesRef.current = nextImages;
+        addImages([newImage]);
         setImageUrl('');
         await reloadImagesFromDb();
         toast.success(t('image_uploaded_successfully'));
@@ -801,9 +785,7 @@ export function ProductFormTabs({
       const pid = String((product as unknown as { id?: string }).id || '');
       if (!pid) {
         const newImage: ProductImage = { url: droppedUrl, order_index: images.length, is_main: images.length === 0 };
-        const nextImages = [...images, newImage];
-        setImages(nextImages);
-        imagesRef.current = nextImages;
+        addImages([newImage]);
         toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
         return;
       }
@@ -821,9 +803,7 @@ export function ProductFormTabs({
           await uploadFileDirect(file);
         } catch {
           const newImage: ProductImage = { url: droppedUrl, order_index: images.length, is_main: images.length === 0 };
-          const nextImages = [...images, newImage];
-          setImages(nextImages);
-          imagesRef.current = nextImages;
+          addImages([newImage]);
           toast.success(t('image_added_successfully') || 'Изображение добавлено успешно');
         }
         return;
@@ -832,17 +812,13 @@ export function ProductFormTabs({
       try {
         const res = await R2Storage.uploadProductImageFromUrl(pid, droppedUrl);
         const newImage: ProductImage = { url: res.originalUrl, order_index: images.length, is_main: images.length === 0, object_key: res.r2KeyOriginal };
-        const nextImages = [...images, newImage];
-        setImages(nextImages);
-        imagesRef.current = nextImages;
+        addImages([newImage]);
         await reloadImagesFromDb();
         toast.success(t('image_uploaded_successfully'));
       } catch (e) {
         console.error(e);
         const newImage: ProductImage = { url: droppedUrl, order_index: images.length, is_main: images.length === 0 };
-        const nextImages = [...images, newImage];
-        setImages(nextImages);
-        imagesRef.current = nextImages;
+        addImages([newImage]);
         toast.error(t('failed_upload_image'));
       } finally {
         setUploadingImage(false);
@@ -857,9 +833,7 @@ export function ProductFormTabs({
       if (!product) { toast.error(t('failed_load_product_data')); return; }
       const res = await R2Storage.uploadProductImage(String((product as unknown as { id?: string }).id || ''), file);
       const newImage: ProductImage = { url: res.originalUrl, order_index: images.length, is_main: images.length === 0, object_key: res.r2KeyOriginal };
-      const nextImages = [...images, newImage];
-      setImages(nextImages);
-      imagesRef.current = nextImages;
+      addImages([newImage]);
       toast.success(t('image_uploaded_successfully'));
       await reloadImagesFromDb();
       
@@ -1096,7 +1070,7 @@ export function ProductFormTabs({
                   <ImagePreviewSection
                     images={images}
                     activeIndex={activeImageIndex}
-                    onSelectIndex={(i) => setActiveImageIndex(i)}
+                    onSelectIndex={handleSelectIndex}
                     getMainAdaptiveImageStyle={getAdaptiveImageStyle}
                     isLargeScreen={isLargeScreen}
                     galleryImgRefs={galleryImgRefs}
@@ -1133,41 +1107,44 @@ export function ProductFormTabs({
 
             {/* Tab 2: Images */}
             <TabsContent value="images" className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
+              <Suspense fallback={<Spinner className="mx-auto" />}> 
                 <ImageSection
-                images={images}
-                readOnly={readOnly}
-                isDragOver={isDragOver}
-                uploading={uploadingImage}
-                imageUrl={imageUrl}
-                onSetImageUrl={(v) => setImageUrl(v)}
-                onAddImageFromUrl={addImageFromUrl}
-                onRemoveImage={(index) => removeImage(index)}
-                onSetMainImage={(index) => setMainImage(index)}
-                onReorderImages={handleReorderImages}
-                onFileUpload={handleFileUpload}
-                onDropZoneClick={() => document.getElementById('fileUpload')?.click()}
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                getGalleryAdaptiveImageStyle={getGalleryAdaptiveImageStyle}
-                galleryImgRefs={galleryImgRefs}
-                onGalleryImageLoad={handleGalleryImageLoad}
-                onGalleryImageError={handleGalleryImageError}
-                onGalleryVideoLoaded={handleGalleryVideoLoaded}
-                activeIndex={activeImageIndex}
-                onSelectIndex={(i) => setActiveImageIndex(i)}
-                getMainAdaptiveImageStyle={getAdaptiveImageStyle}
-                onMainImageLoad={handleImageLoad}
-                onMainImageError={handleMainImageError}
-                onMainVideoLoaded={handleMainVideoLoaded}
-                onPrev={goToPrevious}
-                onNext={goToNext}
-              />
+                  images={images}
+                  readOnly={readOnly}
+                  isDragOver={isDragOver}
+                  uploading={uploadingImage}
+                  imageUrl={imageUrl}
+                  onSetImageUrl={(v) => setImageUrl(v)}
+                  onAddImageFromUrl={addImageFromUrl}
+                  onRemoveImage={(index) => removeImage(index)}
+                  onSetMainImage={(index) => setMainImage(index)}
+                  onReorderImages={handleReorderImages}
+                  onFileUpload={handleFileUpload}
+                  onDropZoneClick={() => document.getElementById('fileUpload')?.click()}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  getGalleryAdaptiveImageStyle={getGalleryAdaptiveImageStyle}
+                  galleryImgRefs={galleryImgRefs}
+                  onGalleryImageLoad={handleGalleryImageLoad}
+                  onGalleryImageError={handleGalleryImageError}
+                  onGalleryVideoLoaded={handleGalleryVideoLoaded}
+                  activeIndex={activeImageIndex}
+                  onSelectIndex={handleSelectIndex}
+                  getMainAdaptiveImageStyle={getAdaptiveImageStyle}
+                  onMainImageLoad={handleImageLoad}
+                  onMainImageError={handleMainImageError}
+                  onMainVideoLoaded={handleMainVideoLoaded}
+                  onPrev={goToPrevious}
+                  onNext={goToNext}
+                />
+              </Suspense>
             </TabsContent>
 
             {/* Tab 3: Parameters */}
             <TabsContent value="params" className="space-y-6" data-testid="productFormTabs_paramsContent">
+              <Suspense fallback={<Spinner className="mx-auto" />}> 
               <ParamsSection
                 t={t}
                 readOnly={readOnly}
@@ -1186,6 +1163,7 @@ export function ProductFormTabs({
                 saveParamModal={saveParamModal}
                 editingParamIndex={editingParamIndex}
               />
+              </Suspense>
             </TabsContent>
           </Tabs>
           
