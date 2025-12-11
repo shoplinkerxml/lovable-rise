@@ -98,7 +98,7 @@ export default function ImagePreviewSection(props: Props) {
                           {(() => {
                             const original = image.url || ''
                             const isVid = isVideoUrl(original)
-                            const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+                            const src = isVid ? getImageUrl(original) : getImageUrl(original)
                             if (!src) return null
                             if (isVid) {
                               return (

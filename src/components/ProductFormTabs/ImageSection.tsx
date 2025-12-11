@@ -97,7 +97,7 @@ export function ImageSection(props: Props) {
     }
     const original = image.url
     const isVid = isVideoUrl(original)
-    const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+    const src = isVid ? getImageUrl(original) : getImageUrl(original)
     return (
       <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
         <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
@@ -140,7 +140,7 @@ export function ImageSection(props: Props) {
     const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
     const original = image.url
     const isVid = isVideoUrl(original)
-    const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.THUMB)
+    const src = isVid ? getImageUrl(original) : getImageUrl(original)
     return (
       <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="aspect-square rounded-md overflow-hidden border">
         {src ? (isVid ? (
@@ -165,7 +165,7 @@ export function ImageSection(props: Props) {
                 {(() => {
                   const original = props.images[props.activeIndex]?.url || ''
                   const isVid = isVideoUrl(original)
-                  const src = isVid ? getImageUrl(original) : getImageUrl(original, IMAGE_SIZES.CARD)
+                  const src = isVid ? getImageUrl(original) : getImageUrl(original)
                   if (!src) return null
                   if (isVid) {
                     return (

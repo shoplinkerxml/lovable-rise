@@ -354,24 +354,17 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       setNewImageUrl('');
       try {
         const list = await ProductService.getProductImages(pid);
-        const normalizeImageUrl = (u: string): string => {
-          const s = String(u || '');
-          if (!s) return s;
-          return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
-        };
         const resolved = await Promise.all((list || []).map(async (img, index) => {
           const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-          const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
-          const previewUrl = normalizeImageUrl(img.url || '');
-          const base = R2Storage.getR2PublicBaseUrl();
-          const absolutePreview = base ? `${base}/${(objectKeyFixed || objectKeyRaw || previewUrl).replace(/^\/+/, '')}` : previewUrl;
+          const previewUrl = String(img.url || '');
+          const absolutePreview = objectKeyRaw ? R2Storage.makePublicUrl(objectKeyRaw) : previewUrl;
           return {
             id: img.id,
             url: absolutePreview,
             alt_text: img.alt_text || '',
             order_index: typeof img.order_index === 'number' ? img.order_index : index,
             is_main: !!img.is_main,
-            object_key: objectKeyFixed || undefined,
+            object_key: objectKeyRaw || undefined,
           } as ProductImage;
         }));
         setImages(resolved);
@@ -406,24 +399,17 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           await ProductService.updateProduct(pid, { images: reorderedImages });
           try {
             const list = await ProductService.getProductImages(pid);
-            const normalizeImageUrl = (u: string): string => {
-              const s = String(u || '');
-              if (!s) return s;
-              return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
-            };
             const resolved = await Promise.all((list || []).map(async (img, index2) => {
               const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
-              const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
-              const previewUrl = normalizeImageUrl(img.url || '');
-              const base = R2Storage.getR2PublicBaseUrl();
-              const absolutePreview = base ? `${base}/${(objectKeyFixed || objectKeyRaw || previewUrl).replace(/^\/+/, '')}` : previewUrl;
+              const previewUrl = String(img.url || '');
+              const absolutePreview = objectKeyRaw ? R2Storage.makePublicUrl(objectKeyRaw) : previewUrl;
               return {
                 id: img.id,
                 url: absolutePreview,
                 alt_text: img.alt_text || '',
                 order_index: typeof img.order_index === 'number' ? img.order_index : index2,
                 is_main: !!img.is_main,
-                object_key: objectKeyFixed || undefined,
+                object_key: objectKeyRaw || undefined,
               } as ProductImage;
             }));
             setImages(resolved);
@@ -1006,7 +992,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                         <div className="aspect-square rounded-lg border overflow-hidden bg-muted">
                           {(() => {
                             const original = image.url || '';
-                            const src = getImageUrl(original, IMAGE_SIZES.THUMB);
+                            const src = getImageUrl(original);
                             return src ? (
                               <img
                                 src={src}
