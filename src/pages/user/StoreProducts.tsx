@@ -79,7 +79,7 @@ export const StoreProducts = () => {
 
   return (
     <ProgressiveLoader
-      isLoading={!shopLoaded || !initialReady}
+      isLoading={!shopLoaded}
       delay={200}
       fallback={
         <FullPageLoader

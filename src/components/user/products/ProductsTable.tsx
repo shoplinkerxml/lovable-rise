@@ -575,6 +575,7 @@ export const ProductsTable = ({
         t={t}
         table={table}
         storeId={storeId}
+        loading={loading}
         onCreateNew={onCreateNew}
         onEdit={onEdit}
         canCreate={canCreate}
