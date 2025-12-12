@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import NamesDescriptionSection from './ProductFormTabs/NamesDescriptionSection';
 import BasicSection from './ProductFormTabs/BasicSection';
-import CategoryEditorSection from './ProductFormTabs/CategoryEditorSection';
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import PricesSection from './ProductFormTabs/PricesSection';
 import ImagePreviewSection from './ProductFormTabs/ImagePreviewSection';
 import TabsHeader from './ProductFormTabs/TabsHeader';
@@ -321,6 +322,12 @@ export function ProductFormTabs({
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [selectedCategoryName, setSelectedCategoryName] = useState<string>('');
+  const selectedSupplierName = useMemo(() => {
+    const sid = String(basicData.supplier_id || '');
+    if (!sid) return '';
+    const s = suppliers.find((x) => String(x.id) === sid);
+    return s?.supplier_name || '';
+  }, [suppliers, basicData.supplier_id]);
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
 
@@ -1090,6 +1097,10 @@ export function ProductFormTabs({
                 {/* Правая часть — гибкая колонка с данными */}
                 <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
           <NamesDescriptionSection t={t} data={basicData} onChange={updateBasicData} readOnly={readOnly} />
+                  <div className="space-y-2" data-testid="productFormTabs_supplierNameReadonly">
+                    <Label htmlFor="supplier_name_readonly">{t('supplier_name')}</Label>
+                    <Input id="supplier_name_readonly" value={selectedSupplierName} readOnly disabled />
+                  </div>
 
                   {/* Перемещено: блок назви та опис будет ниже фото и на всю ширину */}
 
@@ -1099,7 +1110,6 @@ export function ProductFormTabs({
               </div>
               <BasicSection t={t} basicData={basicData} setBasicData={setBasicData} stockData={stockData} setStockData={setStockData} readOnly={readOnly} editableKeys={editableKeys} categories={categories} selectedCategoryName={selectedCategoryName} onChange={onChange} />
 
-              <CategoryEditorSection t={t} suppliers={suppliers} categories={categories} setCategories={setCategories} preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap} basicData={basicData} setBasicData={setBasicData} />
 
               <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} priceData={priceData} setPriceData={setPriceData} onChange={onChange} />
             </TabsContent>

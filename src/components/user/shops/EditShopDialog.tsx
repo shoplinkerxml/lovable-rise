@@ -370,7 +370,7 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button type="button" variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} data-testid={`shop_currency_del_${cur.code}`} aria-label={t('delete')} className="h-8 w-8">
+                              <Button type="button" variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} disabled={cur.is_base} data-testid={`shop_currency_del_${cur.code}`} aria-label={t('delete')} className="h-8 w-8" aria-disabled={cur.is_base}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>

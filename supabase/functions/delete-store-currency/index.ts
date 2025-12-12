@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "npm:@supabase/supabase-js"
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -6,12 +6,14 @@ const corsHeaders: Record<string, string> = {
   "Content-Type": "application/json",
 }
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   try {
     const authHeader = req.headers.get("Authorization") || ""
-    const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey)
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
     function decodeJwtSub(h: string): string | null {
       try {
         const t = h.replace(/^Bearer\s+/i, "").trim()
@@ -29,6 +31,15 @@ Deno.serve(async (req) => {
     if (!store_id || !code) return new Response(JSON.stringify({ error: "validation_failed" }), { status: 422, headers: corsHeaders })
     const { data: store } = await supabase.from("user_stores").select("id,user_id").eq("id", store_id).maybeSingle()
     if (!store || String((store as any).user_id) !== userId) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: corsHeaders })
+    const { data: row } = await supabase
+      .from("store_currencies")
+      .select("is_base")
+      .eq("store_id", store_id)
+      .eq("code", code)
+      .maybeSingle()
+    if (row && (row as any).is_base) {
+      return new Response(JSON.stringify({ error: "cannot_delete_base_currency" }), { status: 422, headers: corsHeaders })
+    }
     const { error } = await supabase.from("store_currencies").delete().eq("store_id", store_id).eq("code", code)
     if (error) return new Response(JSON.stringify({ error: "db_error" }), { status: 500, headers: corsHeaders })
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders })

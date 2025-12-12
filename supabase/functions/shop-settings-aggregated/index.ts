@@ -1,8 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from 'npm:@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json',
 }
@@ -30,8 +30,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const authHeader = req.headers.get('Authorization') || ''
     if (!authHeader || !authHeader.startsWith('Bearer ')) return json({ error: 'unauthorized' }, { status: 401 })
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
+    const apiKey = req.headers.get('apikey') || SUPABASE_ANON_KEY
+    const supabase = (createClient as any)(SUPABASE_URL, apiKey, {
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
     })
 
     const { data: userRes, error: userErr } = await supabase.auth.getUser()
@@ -126,13 +127,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     })
 
-    const marketplaces = Array.from(
-      new Set(
-        (marketplacesRes.data || [])
-          .map((r: any) => (r?.marketplace ? String(r.marketplace) : null))
-          .filter((v: string | null): v is string => !!v)
-      )
-    ).sort((a, b) => a.localeCompare(b))
+    const rawMarketplaces = (marketplacesRes.data || [])
+      .map((r: any) => (r?.marketplace ? String(r.marketplace) : null))
+      .filter((v: string | null): v is string => !!v)
+    const marketplaces: string[] = Array.from(new Set(rawMarketplaces))
+      .map((v) => String(v))
+      .sort((a, b) => a.localeCompare(b))
 
     return json({
       shop: { ...(storeRow as any), marketplace: shopMarketplace },

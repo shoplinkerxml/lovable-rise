@@ -270,7 +270,9 @@ export default function ShopSettings() {
                       <div className="flex items-center gap-2 ml-auto">
                         <span className="text-sm text-muted-foreground">{t('base_currency')}</span>
                         <Switch checked={cur.is_base} onCheckedChange={checked => checked ? handleSetBase(cur.code) : null} />
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} className="h-8 w-8"><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} disabled={cur.is_base} className="h-8 w-8" aria-disabled={cur.is_base}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>)}
                 </div>}

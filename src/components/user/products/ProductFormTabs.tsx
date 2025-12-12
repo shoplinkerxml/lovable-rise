@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,6 +97,13 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
+
+  const selectedSupplierName = useMemo(() => {
+    const sid = String(formData.supplier_id || '');
+    if (!sid) return '';
+    const s = suppliers.find((x) => String(x.id) === sid);
+    return s?.supplier_name || '';
+  }, [suppliers, formData.supplier_id]);
 
   
 
@@ -735,6 +742,11 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                       rows={4}
                       data-testid="productForm_descriptionUa"
                     />
+                  </div>
+
+                  <div className="space-y-2" data-testid="productFormTabs_supplierNameReadonly">
+                    <Label htmlFor="supplier_name_readonly">{t('supplier_name')}</Label>
+                    <Input id="supplier_name_readonly" value={selectedSupplierName} readOnly disabled />
                   </div>
 
                   <div className="space-y-2">
