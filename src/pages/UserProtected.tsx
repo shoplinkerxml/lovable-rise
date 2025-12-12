@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigationRefetch } from "@/hooks/useNavigationRefetch";
 import { ProductService } from "@/lib/product-service";
@@ -20,185 +20,272 @@ type SubscriptionEntity = {
   };
 };
 
+type AuthState = {
+  ready: boolean;
+  authenticated: boolean;
+  user: UserProfile | null;
+  error: string | null;
+};
+
+type SubscriptionState = {
+  hasValidSubscription: boolean;
+  subscription: SubscriptionEntity | null;
+  isDemo: boolean;
+};
+
 const UserProtected = () => {
-  const [ready, setReady] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [hasAccess, setHasAccess] = useState(true);
-  const [uiUserProfile, setUiUserProfile] = useState<UIUserProfile | null>(null);
-  const [subscription, setSubscription] = useState<{ hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null>(null);
+  // Объединенные состояния для лучшей производительности
+  const [authState, setAuthState] = useState<AuthState>({
+    ready: false,
+    authenticated: false,
+    user: null,
+    error: null,
+  });
+
+  const [subscriptionState, setSubscriptionState] = useState<SubscriptionState>({
+    hasValidSubscription: true,
+    subscription: null,
+    isDemo: false,
+  });
+
   const [tariffLimits, setTariffLimits] = useState<TariffLimit[]>([]);
-  const [prefetchOpen, setPrefetchOpen] = useState(false);
-  const [prefetchProgress, setPrefetchProgress] = useState(0);
-  const ttlMs = 900_000;
+  const [prefetchState, setPrefetchState] = useState({
+    open: false,
+    progress: 0,
+  });
+
   const queryClient = useQueryClient();
   const location = useLocation();
-  const navReadyRef = useRef(false);
-  const lastRefreshAtRef = useRef(0);
 
+  // Мемоизация UI профиля
+  const uiUserProfile = useMemo<UIUserProfile | null>(() => {
+    if (!authState.user) return null;
+    return {
+      email: authState.user.email,
+      name: authState.user.name,
+      role: authState.user.role,
+      avatarUrl: authState.user.avatar_url || "",
+    };
+  }, [authState.user]);
+
+  // Проверка валидности подписки
+  const checkSubscriptionValidity = useCallback((sub: SubscriptionEntity | null): boolean => {
+    if (!sub) return false;
+    if (!sub.end_date) return true; // Бессрочная подписка
+    return new Date(sub.end_date) > new Date();
+  }, []);
+
+  // Обновление данных подписки
+  const updateSubscriptionData = useCallback((authMe: any) => {
+    const sub = authMe.subscription as SubscriptionEntity | null;
+    const valid = checkSubscriptionValidity(sub);
+    
+    setSubscriptionState({
+      hasValidSubscription: valid,
+      subscription: sub,
+      isDemo: false,
+    });
+    
+    setTariffLimits(Array.isArray(authMe.tariffLimits) ? authMe.tariffLimits : []);
+  }, [checkSubscriptionValidity]);
+
+  // Функция обновления данных
   const refresh = useCallback(async () => {
+    if (!authState.user?.id) return;
+    
     try {
-      if (!user?.id) return;
       const authMe = await UserAuthService.fetchAuthMe();
-      const sub = authMe.subscription as SubscriptionEntity | null;
-      const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
-      setHasAccess(valid);
-      setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
-      setTariffLimits(Array.isArray(authMe.tariffLimits) ? (authMe.tariffLimits as unknown as TariffLimit[]) : []);
-    } catch (_e) { void 0; }
-  }, [user?.id]);
+      updateSubscriptionData(authMe);
+    } catch (error) {
+      console.error('[UserProtected] Refresh failed:', error);
+    }
+  }, [authState.user?.id, updateSubscriptionData]);
 
-  useEffect(() => { navReadyRef.current = true; }, []);
+  // Hook для обновления при навигации
   useNavigationRefetch(refresh);
 
+  // Prefetch магазинов при необходимости
   useEffect(() => {
-    if (!authenticated) return;
-    const p = location.pathname.toLowerCase();
-    const isProductEdit = p.includes('/user/products/edit');
-    const needsShops = p.includes('/user/shops') || (p.includes('/user/products') && !isProductEdit);
-    if (!needsShops) return;
-    ProductService.getUserStores().catch(() => void 0);
-  }, [authenticated, location.pathname]);
+    if (!authState.authenticated) return;
 
+    const path = location.pathname.toLowerCase();
+    const isProductEdit = path.includes('/user/products/edit');
+    const isShopsListPage = path === '/user/shops' || path === '/user/shops/';
+    const isProductsListPage = path === '/user/products' || path === '/user/products/';
+    
+    const needsShops = isShopsListPage || (isProductsListPage && !isProductEdit);
+    
+    if (needsShops) {
+      ProductService.getUserStores().catch(() => void 0);
+    }
+  }, [authState.authenticated, location.pathname]);
+
+  // Основная логика аутентификации
   useEffect(() => {
+    let isMounted = true;
+
     const checkAuthentication = async () => {
       try {
-        const now = Date.now();
-        const readCache = (key: string) => {
-          try {
-            const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-            if (!raw) return null;
-            const parsed = JSON.parse(raw) as { items: unknown[]; expiresAt: number };
-            if (parsed && Array.isArray(parsed.items) && parsed.expiresAt > now) return parsed.items;
-            return null;
-          } catch { return null; }
-        };
-        const shopsCached = readCache('rq:shopsList');
-        const productsCached = readCache('rq:products:first:all');
-        const tariffsCached = readCache('rq:tariffs:list');
-        const suppliersCached = readCache('rq:suppliers:list');
-        const flagRaw = typeof window !== 'undefined' ? window.localStorage.getItem('rq:prefetch_done') : null;
-        const prefetchDone = flagRaw === '1';
-        const needsPrefetch = !shopsCached || !productsCached || !tariffsCached || !suppliersCached;
-        const showOverlay = !prefetchDone && needsPrefetch;
-        if (showOverlay) {
-          setPrefetchOpen(true);
-          setPrefetchProgress(5);
-        } else {
-          setPrefetchOpen(false);
-        }
-        // First validate session with enhanced validation
+        // Валидация сессии
         const sessionValidation = await SessionValidator.ensureValidSession();
         
         if (!sessionValidation.isValid) {
           console.warn('[UserProtected] Session validation failed:', sessionValidation.error);
-          setAuthenticated(false);
-          setSessionError(sessionValidation.error || 'Invalid session');
-          setPrefetchOpen(false);
-          setReady(true);
+          if (isMounted) {
+            setAuthState({
+              ready: true,
+              authenticated: false,
+              user: null,
+              error: sessionValidation.error || 'Invalid session',
+            });
+          }
           return;
         }
-        
-        // debug logging disabled to avoid extra requests during navigation
-        
-        const authMe = await UserAuthService.fetchAuthMe();
-        if (showOverlay) setPrefetchProgress(12);
-        const currentUser = authMe.user;
-        const session = sessionValidation.isValid ? sessionValidation.session || null : null;
 
-        if (session && currentUser) {
-          // Check if user has 'user' role
-          if (currentUser.role === 'user') {
-            const sub = authMe.subscription as SubscriptionEntity | null;
-            const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
-            setHasAccess(valid);
-            setSubscription({ hasValidSubscription: valid, subscription: sub, isDemo: false });
-            setTariffLimits(Array.isArray(authMe.tariffLimits) ? (authMe.tariffLimits as unknown as TariffLimit[]) : []);
-            
-            setAuthenticated(true);
-            setUser(currentUser);
-            setUiUserProfile({
-              email: currentUser.email,
-              name: currentUser.name,
-              role: currentUser.role,
-              avatarUrl: currentUser.avatar_url || ""
+        // Получение данных пользователя
+        const authMe = await UserAuthService.fetchAuthMe();
+        const currentUser = authMe.user;
+
+        if (!currentUser || !sessionValidation.session) {
+          if (isMounted) {
+            setAuthState({
+              ready: true,
+              authenticated: false,
+              user: null,
+              error: 'No session or user data',
             });
-            setSessionError(null);
-            setReady(true);
-            setPrefetchOpen(false);
-            // Prefetch TTL caches so subsequent pages avoid network
-            try {
-              if (needsPrefetch) {
-                if (showOverlay) setPrefetchProgress(18);
-                const tasks: Array<Promise<void>> = [];
-                // Do not prefetch shops to avoid duplicate requests when navigating to /user/Shops
-                
-                if (!tariffsCached) {
-                  tasks.push((async () => {
-                    const { TariffService } = await import('@/lib/tariff-service');
-                    const tariffs = await TariffService.getTariffsAggregated(false);
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:tariffs:list', JSON.stringify({ items: tariffs, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
-                    if (showOverlay) setPrefetchProgress((p) => Math.max(p, 95));
-                  })());
-                }
-                if (!suppliersCached) {
-                  tasks.push((async () => {
-                    const { SupplierService } = await import('@/lib/supplier-service');
-                    const suppliers = await SupplierService.getSuppliers();
-                    try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:suppliers:list', JSON.stringify({ items: suppliers, expiresAt: Date.now() + ttlMs })); } catch (_e) { void 0; }
-                    if (showOverlay) setPrefetchProgress((p) => Math.max(p, 98));
-                  })());
-                }
-                await Promise.allSettled(tasks);
-                try { if (typeof window !== 'undefined') window.localStorage.setItem('rq:prefetch_done', '1'); } catch { void 0; }
-              }
-            } catch { void 0; }
-          } else {
-            // If admin or manager, redirect to admin interface
-            console.log('[UserProtected] Non-user role detected, redirecting to admin:', currentUser.role);
-            setAuthenticated(false);
-            setPrefetchOpen(false);
-            setReady(true);
-            return;
           }
-        } else {
-          setAuthenticated(false);
-          setSessionError('No session or user data');
+          return;
         }
-        
-        if (showOverlay) setPrefetchProgress(100);
-        setReady(true);
+
+        // Проверка роли пользователя
+        if (currentUser.role !== 'user') {
+          console.log('[UserProtected] Non-user role detected:', currentUser.role);
+          if (isMounted) {
+            setAuthState({
+              ready: true,
+              authenticated: false,
+              user: currentUser,
+              error: null,
+            });
+          }
+          return;
+        }
+
+        // Установка данных пользователя
+        if (isMounted) {
+          setAuthState({
+            ready: true,
+            authenticated: true,
+            user: currentUser,
+            error: null,
+          });
+          
+          updateSubscriptionData(authMe);
+        }
+
+        // Prefetch данных (используем React Query вместо localStorage)
+        await prefetchData();
+
       } catch (error) {
-        console.error('[UserProtected] Error checking authentication:', error);
-        setAuthenticated(false);
-        setSessionError(error instanceof Error ? error.message : 'Authentication failed');
-        setReady(true);
+        console.error('[UserProtected] Authentication error:', error);
+        if (isMounted) {
+          setAuthState({
+            ready: true,
+            authenticated: false,
+            user: null,
+            error: error instanceof Error ? error.message : 'Authentication failed',
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setTimeout(() => {
+            setPrefetchState({ open: false, progress: 0 });
+          }, 200);
+        }
       }
-      finally {
-        setTimeout(() => setPrefetchOpen(false), 200);
+    };
+
+    // Prefetch данных через React Query
+    const prefetchData = async () => {
+      try {
+        setPrefetchState({ open: true, progress: 10 });
+
+        // Используем React Query для prefetch вместо localStorage
+        await Promise.allSettled([
+          queryClient.prefetchQuery({
+            queryKey: ['tariffs', 'list'],
+            queryFn: async () => {
+              const { TariffService } = await import('@/lib/tariff-service');
+              const tariffs = await TariffService.getTariffsAggregated(false);
+              setPrefetchState(prev => ({ ...prev, progress: 50 }));
+              return tariffs;
+            },
+            staleTime: 900_000, // 15 минут
+          }),
+          queryClient.prefetchQuery({
+            queryKey: ['suppliers', 'list'],
+            queryFn: async () => {
+              const { SupplierService } = await import('@/lib/supplier-service');
+              const suppliers = await SupplierService.getSuppliers();
+              setPrefetchState(prev => ({ ...prev, progress: 80 }));
+              return suppliers;
+            },
+            staleTime: 900_000,
+          }),
+        ]);
+
+        setPrefetchState(prev => ({ ...prev, progress: 100 }));
+      } catch (error) {
+        console.error('[UserProtected] Prefetch error:', error);
       }
     };
 
     checkAuthentication();
-  }, []);
 
-  
+    return () => {
+      isMounted = false;
+    };
+  }, [queryClient, updateSubscriptionData]);
 
-  // No background subscription checks on focus/visibility to avoid extra network requests
+  // Мемоизация context значения
+  const contextValue = useMemo(() => ({
+    hasAccess: subscriptionState.hasValidSubscription,
+    user: authState.user,
+    uiUserProfile,
+    subscription: subscriptionState,
+    tariffLimits,
+    refresh,
+  }), [
+    subscriptionState,
+    authState.user,
+    uiUserProfile,
+    tariffLimits,
+    refresh,
+  ]);
 
-  if (prefetchOpen || !ready) {
+  // Loading state
+  if (prefetchState.open || !authState.ready) {
     return (
       <div className="min-h-screen">
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="w-[420px] rounded-lg border-0 bg-background p-6 shadow-lg">
-            <div className="space-y-3">
-              <div className="font-medium">Завантажуємо кабінет</div>
-              <div className="text-sm text-muted-foreground">Будь ласка, зачекайте. Йде підготовка даних.</div>
-              <div className="mt-2 h-2 w-full rounded bg-muted">
-                <div className="h-2 rounded bg-primary transition-all" style={{ width: `${prefetchProgress}%` }} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="w-[420px] rounded-lg border bg-card p-6 shadow-lg">
+            <div className="space-y-4">
+              <div className="text-lg font-semibold">Завантажуємо кабінет</div>
+              <div className="text-sm text-muted-foreground">
+                Будь ласка, зачекайте. Йде підготовка даних.
               </div>
-              <div className="text-xs text-muted-foreground">{prefetchProgress}%</div>
+              <div className="space-y-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div 
+                    className="h-full rounded-full bg-primary transition-all duration-300 ease-in-out" 
+                    style={{ width: `${prefetchState.progress}%` }} 
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground text-right">
+                  {prefetchState.progress}%
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -206,22 +293,21 @@ const UserProtected = () => {
     );
   }
 
-  if (!authenticated) {
-    console.log('[UserProtected] Redirecting to login due to authentication failure:', sessionError);
+  // Redirect to login if not authenticated
+  if (!authState.authenticated) {
+    console.log('[UserProtected] Redirecting to login:', authState.error);
     return <Navigate to="/user-auth" replace />;
   }
 
-  // Check if user is admin/manager and redirect them
-  if (user && (user.role === 'admin' || user.role === 'manager')) {
-    console.log('[UserProtected] Redirecting admin/manager to admin interface:', user.role);
+  // Redirect admin/manager to admin interface
+  if (authState.user && (authState.user.role === 'admin' || authState.user.role === 'manager')) {
+    console.log('[UserProtected] Redirecting to admin interface:', authState.user.role);
     return <Navigate to="/admin" replace />;
   }
 
-  
-
   return (
     <div className="min-h-screen">
-      <Outlet context={{ hasAccess, user, uiUserProfile, subscription, tariffLimits, refresh }} />
+      <Outlet context={contextValue} />
     </div>
   );
 };

@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FullPageLoader } from '@/components/LoadingSkeletons';
+import { ProductService } from '@/lib/product-service';
 
 type ShopWithMarketplace = ShopAggregated;
 
@@ -46,6 +47,7 @@ export const ShopsList = ({
     open: false,
     shop: null
   });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const { data: shopsData, isLoading, isFetching } = useQuery<ShopWithMarketplace[]>({
     queryKey: ['shopsList'],
@@ -64,6 +66,46 @@ export const ShopsList = ({
   useEffect(() => { onShopsLoadedRef.current = onShopsLoaded; }, [onShopsLoaded]);
   useEffect(() => { onShopsLoadedRef.current?.(shops.length); }, [shops.length]);
   useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const uid = String(data?.user?.id || "");
+        setCurrentUserId(uid || null);
+      } catch { setCurrentUserId(null); }
+    })();
+  }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        const arr = Array.isArray(shopsData) ? shopsData : [];
+        const suspicious = arr
+          .filter((s) => (Number(s.productsCount) || 0) > 0 && (Number(s.categoriesCount) || 0) === 0)
+          .map((s) => String(s.id))
+          .filter(Boolean);
+        if (suspicious.length === 0) return;
+        const toFetch = suspicious.filter((sid) => {
+          try {
+            const raw = typeof window !== 'undefined' ? window.localStorage.getItem(`rq:filters:categories:${sid}`) : null;
+            if (!raw) return true;
+            const parsed = JSON.parse(raw);
+            const items = Array.isArray((parsed as any)?.items) ? (parsed as any).items : (Array.isArray(parsed) ? parsed : []);
+            return !(Array.isArray(items) && items.length > 0);
+          } catch { return true; }
+        });
+        if (toFetch.length === 0) return;
+        const results = await ProductService.refreshStoreCategoryFilterOptions(toFetch);
+        queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+          const arrPrev = Array.isArray(prev) ? prev : [];
+          return arrPrev.map((x) => {
+            const names = Array.isArray(results[String(x.id)]) ? results[String(x.id)] : undefined;
+            if (!names) return x as ShopWithMarketplace;
+            return { ...x, categoriesCount: names.length } as ShopWithMarketplace;
+          });
+        });
+      } catch { /* ignore */ }
+    })();
+  }, [shopsData, queryClient]);
+  useEffect(() => {
     if ((refreshTrigger ?? 0) > 0) {
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
     }
@@ -81,6 +123,26 @@ export const ShopsList = ({
             return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopWithMarketplace;
           });
         });
+        (async () => {
+          try {
+            const arr = queryClient.getQueryData<ShopWithMarketplace[]>(['shopsList']) || [];
+            const exists = arr.some((s) => String(s.id) === String(storeId));
+            if (!exists) return;
+            const raw = typeof window !== 'undefined' ? window.localStorage.getItem(`rq:filters:categories:${storeId}`) : null;
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                const items = Array.isArray((parsed as any)?.items) ? (parsed as any).items : (Array.isArray(parsed) ? parsed : []);
+                const cnt = Array.isArray(items) ? items.length : 0;
+                queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+                  const arrPrev = Array.isArray(prev) ? prev : [];
+                  return arrPrev.map((s) => String(s.id) === String(storeId) ? { ...s, categoriesCount: cnt } : s);
+                });
+                return;
+              } catch { /* ignore */ }
+            }
+          } catch { /* ignore */ }
+        })();
         if (refetchDebounceRef.current != null) window.clearTimeout(refetchDebounceRef.current);
         refetchDebounceRef.current = window.setTimeout(() => {
           queryClient.refetchQueries({ queryKey: ['shopsList'], exact: false });
@@ -181,14 +243,16 @@ export const ShopsList = ({
               <div className="flex items-start justify-between">
                 <Store className="h-8 w-8 text-emerald-600" />
                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    onClick={() => setDeleteDialog({ open: true, shop })}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {currentUserId && String(shop.user_id) === String(currentUserId) ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteDialog({ open: true, shop })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
               </div>
               <CardTitle className="mt-2">{shop.store_name}</CardTitle>

@@ -77,6 +77,7 @@ export const StoreProducts = () => {
           return arr.map((s: any) => String(s.id) === String(storeId) ? { ...s, categoriesCount: names.length } : s);
         });
       } catch { /* ignore */ }
+      try { setTotalCount((prev) => Math.max(0, (prev || 0) - 1)); } catch { /* ignore */ }
       setRefreshTrigger((p) => p + 1);
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
       try { ShopService.bumpProductsCountInCache(storeId, -1); } catch (e) { void e; }

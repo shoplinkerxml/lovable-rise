@@ -55,7 +55,6 @@ export const Shops = () => {
       toast.success(t('shop_deleted'));
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {
-      console.error('Delete error:', error);
       const message = (error as Error)?.message || t('failed_delete_shop');
       toast.error(message);
     }

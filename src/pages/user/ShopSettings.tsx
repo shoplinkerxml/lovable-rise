@@ -437,8 +437,8 @@ export default function ShopSettings() {
                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground"> 
                       <div className="flex items-center justify-center">
                         <Checkbox checked={selectedRowIds.length === pageRows.length && pageRows.length > 0 ? true : selectedRowIds.length > 0 ? "indeterminate" : false} onCheckedChange={value => {
-                              if (value) setSelectedRowIds(pageRows.map(r => r.store_category_id));else setSelectedRowIds([]);
-                            }} aria-label={t('select_all') || 'Вибрати все'} />
+                          if (value) setSelectedRowIds(pageRows.map(r => r.store_category_id));else setSelectedRowIds([]);
+                        }} aria-label={t('select_all') || 'Вибрати все'} />
                       </div>
                     </th>
                     {showNameCol && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground">{t('category_name')}</th>}
@@ -496,6 +496,15 @@ export default function ShopSettings() {
                               <DropdownMenuItem onClick={async () => {
                                 await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
                                 queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+                                try {
+                                  const { productsCount, categoriesCount } = await ShopService.recomputeStoreCounts(String(id!));
+                                  try {
+                                    queryClient.setQueryData(['shopsList'], (prev: any) => {
+                                      const arr = Array.isArray(prev) ? prev : [];
+                                      return arr.map((s: any) => String(s.id) === String(id!) ? { ...s, productsCount, categoriesCount } : s);
+                                    });
+                                  } catch { /* ignore */ }
+                                } catch { /* ignore */ }
                                 setSelectedRowIds(prev => prev.filter(pid => pid !== cat.store_category_id));
                               }}>
                                 <Trash2 className="mr-2 h-4 w-4" />{t('delete') || 'Видалити'}

@@ -33,12 +33,15 @@ export const Suppliers = () => {
   }, [tariffLimits]);
 
   const handleSuppliersLoaded = useCallback((count: number) => {
-    setSuppliersCount(count);
-    setLimitInfo(prev => ({
-      ...prev,
-      current: count,
-      canCreate: count < prev.max,
-    }));
+    (async () => {
+      const cachedCount = await SupplierService.getSuppliersCountCached();
+      setSuppliersCount(cachedCount);
+      setLimitInfo(prev => ({
+        ...prev,
+        current: cachedCount,
+        canCreate: cachedCount < prev.max,
+      }));
+    })();
   }, []);
 
   const handleEdit = (supplier: Supplier) => {

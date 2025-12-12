@@ -176,6 +176,7 @@ export class ShopService {
 
     // Пытаемся извлечь понятное сообщение
     let message = `${functionName} failed`;
+    let status: number | undefined = undefined;
     
     if (error && typeof error === "object") {
       const err = error as Record<string, any>;
@@ -189,6 +190,7 @@ export class ShopService {
       try {
         const context = err.context;
         if (context) {
+          status = typeof context.status === "number" ? context.status : undefined;
           const body = context.body || context.error;
           if (body) {
             const parsed = typeof body === "string" ? JSON.parse(body) : body;
@@ -202,6 +204,14 @@ export class ShopService {
         // Если парсинг не удался, используем базовое сообщение
         console.warn("Could not parse error details:", parseError);
       }
+    }
+
+    if (status && !message.includes(String(status))) {
+      if (status === 401) message = `${message} (401 Unauthorized)`;
+      else if (status === 403) message = `${message} (403 Forbidden)`;
+      else if (status === 404) message = `${message} (404 Not Found)`;
+      else if (status === 409) message = `${message} (409 Conflict)`;
+      else message = `${message} (${status})`;
     }
 
     throw new Error(message);
@@ -379,6 +389,13 @@ export class ShopService {
     
     const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
     return Array.isArray(response.shops) ? response.shops.length : 0;
+  }
+
+  static async getShopsCountCached(): Promise<number> {
+    const cached = this.readShopsCache(true);
+    if (cached) return cached.length;
+    const count = await this.getShopsCount();
+    return count;
   }
 
   /**
@@ -610,7 +627,48 @@ export class ShopService {
 
     await this.ensureSession();
 
-    await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
+    // 1) Пробуем прямое удаление для владельца (для пустого магазина это самый быстрый путь)
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = String(auth?.user?.id || "");
+      if (uid) {
+        const { error: delErr } = await supabase
+          .from("user_stores")
+          .delete()
+          .eq("id", id)
+          .eq("user_id", uid);
+        if (!delErr) {
+          removeCache(this.SHOPS_CACHE_KEY);
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
+    // 2) Основной путь через Edge
+    try {
+      await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
+    } catch (e) {
+      const msg = String((e as { message?: string } | null)?.message || "");
+      // Ошибки прав/аутентификации — возвращаем сразу
+      if (/401|Unauthorized|403|Forbidden|forbidden/i.test(msg)) throw e;
+      // Конфликт из-за зависимостей → чистим и повторяем
+      try {
+        const { ProductService } = await import("@/lib/product-service");
+        const products = await ProductService.getProductsAggregated(id);
+        const productIds = Array.from(new Set((products || []).map((p) => String(p.id)).filter(Boolean)));
+        if (productIds.length > 0) {
+          await ProductService.bulkRemoveStoreProductLinks(productIds, [String(id)]);
+        }
+      } catch { /* ignore */ }
+      try {
+        const categories = await ShopService.getStoreCategories(String(id));
+        const categoryIds = Array.from(new Set((categories || []).map((c) => Number(c.store_category_id)).filter((n) => Number.isFinite(n))));
+        if (categoryIds.length > 0) {
+          await ShopService.deleteStoreCategoriesWithProducts(String(id), categoryIds);
+        }
+      } catch { /* ignore */ }
+      await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
+    }
 
     // Инвалидируем кэш после удаления
     removeCache(this.SHOPS_CACHE_KEY);
@@ -668,6 +726,24 @@ export class ShopService {
         return {
           ...shop,
           categoriesCount: finalCount,
+        };
+      })
+    );
+  }
+ 
+  /**
+   * Установка точного количества товаров в кэше.
+   * Если товаров 0, категории тоже обнуляются.
+   */
+  static setProductsCountInCache(storeId: string, count: number): void {
+    const final = Math.max(0, Number(count) || 0);
+    this.updateShopsCache(shops =>
+      shops.map(shop => {
+        if (shop.id !== storeId) return shop;
+        return {
+          ...shop,
+          productsCount: final,
+          categoriesCount: final === 0 ? 0 : (shop.categoriesCount || 0),
         };
       })
     );
@@ -968,17 +1044,33 @@ export class ShopService {
       }
     } catch { /* ignore */ }
 
-    // 2) Fallback без Edge: прямой запрос к таблице store_products (быстрее и надежнее)
+    // 2) Edge Function: точный подсчет количества товаров
     try {
       await this.ensureSession();
-      const { count } = await supabase
-        .from("store_products")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId);
-      return Math.max(0, Number(count || 0));
+      const resp = await this.invokeEdge<{ count: number }>("get-store-products-count", { store_id: storeId });
+      return Math.max(0, Number(resp?.count || 0));
     } catch (error) {
-      console.warn("getStoreProductsCount fallback failed, returning 0:", error);
+      console.warn("getStoreProductsCount edge failed, returning 0:", error);
       return 0;
     }
+  }
+ 
+  /**
+   * Пересчет счетчиков магазина и синхронизация с кэшем.
+   */
+  static async recomputeStoreCounts(storeId: string): Promise<{ productsCount: number; categoriesCount: number }> {
+    if (!storeId) return { productsCount: 0, categoriesCount: 0 };
+    await this.ensureSession();
+    // Получаем количество товаров и список названий категорий через Edge Functions
+    const [{ count: pCountRaw }, catResp] = await Promise.all([
+      this.invokeEdge<{ count: number }>("get-store-products-count", { store_id: storeId }),
+      this.invokeEdge<{ names?: string[] }>("store-category-filter-options", { store_id: storeId }),
+    ]);
+    const pCount = Math.max(0, Number(pCountRaw || 0));
+    const cCount = pCount === 0 ? 0 : Math.max(0, Array.isArray(catResp?.names) ? catResp.names!.length : 0);
+    this.updateShopsCache(shops =>
+      shops.map(s => String(s.id) === String(storeId) ? { ...s, productsCount: pCount, categoriesCount: cCount } : s)
+    );
+    return { productsCount: pCount, categoriesCount: cCount };
   }
 }

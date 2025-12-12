@@ -95,6 +95,21 @@ export class SupplierService {
     return Array.isArray(list) ? list.length : 0;
   }
 
+  static async getSuppliersCountCached(): Promise<number> {
+    try {
+      const cacheKey = 'rq:suppliers:list';
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { items: Supplier[]; expiresAt: number };
+        if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+          return parsed.items.length;
+        }
+      }
+    } catch { /* ignore */ }
+    const count = await this.getSuppliersCount();
+    return count;
+  }
+
   /** Отримання списку постачальників поточного користувача */
   static async getSuppliers(): Promise<Supplier[]> {
     const sessionValidation = await SessionValidator.ensureValidSession();

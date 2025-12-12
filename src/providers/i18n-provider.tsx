@@ -172,6 +172,10 @@ const dictionary: Dictionary = {
   export_section: { uk: "Експорт", en: "Export" },
   export_updated: { uk: "Експорт оновлено", en: "Export updated" },
   export_update_failed: { uk: "Не вдалося оновити експорт", en: "Failed to update export" },
+  managing_shop: { uk: "Управління магазином", en: "Managing shop" },
+  loading_shop: { uk: "Завантаження магазину…", en: "Loading shop…" },
+  loading_shop_subtitle: { uk: "Готуємо панель керування та список товарів", en: "Preparing dashboard and product list" },
+  
   link_copied: { uk: "Посилання скопійовано", en: "Link copied" },
   copy_link: { uk: "Копіювати", en: "Copy" },
   refresh_export: { uk: "Оновити", en: "Refresh" },
@@ -213,6 +217,7 @@ const dictionary: Dictionary = {
   shop_not_found_description: { uk: "Перевірте посилання або поверніться до списку магазинів.", en: "Check the link or return to the shops list." },
   go_to_shops: { uk: "До магазинів", en: "Back to shops" },
   
+  
   // Products → Товари
   products_title: { uk: "Товари", en: "Products" },
   products_description: { uk: "Керування вашими товарами", en: "Manage your products" },
@@ -228,6 +233,7 @@ const dictionary: Dictionary = {
   product_created: { uk: "Товар створено", en: "Product created" },
   product_updated: { uk: "Товар оновлено", en: "Product updated" },
   product_deleted: { uk: "Товар видалено", en: "Product deleted" },
+  product_removed_successfully: { uk: "Товар видалено", en: "Product removed" },
   products_deleted_successfully: { uk: "Товари успішно видалено", en: "Products deleted successfully" },
   // Products duplication flow
   product_copying: { uk: "Триває копіювання товару…", en: "Copying product…" },
@@ -324,7 +330,7 @@ const dictionary: Dictionary = {
   // Common actions
   save: { uk: "Зберегти", en: "Save" },
   update: { uk: "Оновити", en: "Update" },
-  "delete": { uk: "Видалити", en: "Delete" },
+  delete: { uk: "Видалити", en: "Delete" },
   edit: { uk: "Редагувати", en: "Edit" },
   back: { uk: "Назад", en: "Back" },
   cancel: { uk: "Скасувати", en: "Cancel" },

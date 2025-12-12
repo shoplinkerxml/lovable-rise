@@ -329,20 +329,14 @@ export class ProductService {
       throw new Error("Store access denied");
     }
     if (!storeIds.length) return { products: [], page: { limit, offset, hasMore: false, nextOffset: null, total: 0 } };
-    const [countRes, rowsRes] = await Promise.all([
-      supabase
-        .from('store_products')
-        .select('id', { count: 'exact', head: true })
-        .in('store_id', storeIds),
-      supabase
-        .from('store_products')
-        .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at')
-        .in('store_id', storeIds)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1),
-    ]);
-    const total = Number((countRes as { count?: number } | null)?.count || 0);
-    const rows = (rowsRes as { data?: any[] } | null)?.data || [];
+    const resp = await supabase
+      .from('store_products')
+      .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at', { count: 'exact' })
+      .in('store_id', storeIds)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    const total = Number((resp as { count?: number } | null)?.count || 0);
+    const rows = (resp as { data?: any[] } | null)?.data || [];
     const ids = ((rows || []) as any[]).map((r) => String((r as any).id));
     let images: Array<{ product_id: string; url: string; is_main: boolean; order_index: number }> = [];
     if (ids.length) {

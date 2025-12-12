@@ -63,21 +63,16 @@ async function updateStoreCounts(
   itemsForAccurateCount?: ProductRow[]
 ) {
   try {
-    // Обновляем счетчики продуктов
     Object.entries(productDelta).forEach(([sid, delta]) => {
       if (delta !== 0) {
         ShopService.bumpProductsCountInCache(sid, delta);
       }
     });
-
     const categoryResults = categoryResultsOverride || {};
-    
     storeIds.forEach(sid => {
       const categories = categoryResults?.[sid] || [];
       ShopService.setCategoriesCountInCache(sid, categories.length);
     });
-
-    // Обновляем query cache
     queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
       const stores = prev || currentStores;
       return stores.map(store => {
@@ -92,7 +87,6 @@ async function updateStoreCounts(
         };
       });
     });
-
     const updated = queryClient.getQueryData<StoreAgg[]>(['shopsList']) || [];
     setStores(updated);
   } catch (error) {

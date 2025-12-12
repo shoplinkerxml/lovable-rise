@@ -149,14 +149,25 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                               return (arr || []).map((s) => s.id === idStr ? { ...s, categoriesCount: Math.max(0, Number(cnt) || 0) } : s);
                                             });
                                           } catch { /* ignore */ }
-                                            try {
-                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                                const arr = Array.isArray(prev) ? prev : (stores || []);
-                                                return (arr || []).map((s) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) + 1)) } : s);
-                                              });
-                                              const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                              setStores(updated);
-                                            } catch { void 0; }
+                                          try {
+                                            queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                              const arr = Array.isArray(prev) ? prev : (stores || []);
+                                              return (arr || []).map((s) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) + 1)) } : s);
+                                            });
+                                            const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                            setStores(updated);
+                                          } catch { void 0; }
+                                          try {
+                                            const idStr = String(id);
+                                            const arrNow = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                            const target = arrNow.find((s) => s.id === idStr);
+                                            const nextProducts = Math.max(0, ((target?.productsCount ?? 0) + 0));
+                                            const nextCategories = Math.max(0, ((target?.categoriesCount ?? 0)));
+                                            queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                              const arr = Array.isArray(prev) ? prev : (stores || []);
+                                              return (arr || []).map((s) => s.id === idStr ? { ...s, productsCount: nextProducts, categoriesCount: nextCategories } : s);
+                                            });
+                                          } catch { /* ignore */ }
                                           }
                                         } else {
                                           const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
@@ -186,11 +197,22 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                               const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                               setStores(updated);
                                             } catch { void 0; }
+                                            try {
+                                              const idStr = String(id);
+                                              const arrNow = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                              const target = arrNow.find((s) => s.id === idStr);
+                                              const nextProducts = Math.max(0, ((target?.productsCount ?? 0) + 0));
+                                              const nextCategories = Math.max(0, ((target?.categoriesCount ?? 0)));
+                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                                const arr = Array.isArray(prev) ? prev : (stores || []);
+                                                return (arr || []).map((s) => s.id === idStr ? { ...s, productsCount: nextProducts, categoriesCount: nextCategories } : s);
+                                              });
+                                            } catch { /* ignore */ }
                                           }
                                         }
                                       } catch {
                                         toast.error(t("operation_failed"));
-                                  } finally {
+                                      } finally {
                                     setTogglingStoreIds((prev) => prev.filter((sid) => sid !== id));
                                     try { setActionsOpen(true); } catch { void 0; }
                                   }
