@@ -15,13 +15,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from "@/components/ui/dialog-no-overlay";
 import { Loader2, Settings as SettingsIcon } from "lucide-react";
-import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Pencil } from "lucide-react";
+import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Pencil, Tag, Hash, Link, CheckCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ShopSettingsAggregated } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
+import { toast } from "sonner";
 type StoreCategoryRow = {
   store_category_id: number;
   store_id: string;
@@ -148,11 +149,17 @@ export default function ShopSettings() {
     rz_id_value: string | null;
     is_active: boolean;
   }>) => {
-    await ShopService.updateStoreCategory({
-      id: rowId,
-      ...patch
-    });
-    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    try {
+      await ShopService.updateStoreCategory({
+        id: rowId,
+        ...patch
+      });
+      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+      toast.success(t('category_updated_success'));
+    } catch (e) {
+      console.error('Failed to update category field', e);
+      toast.error(t('unknown_error'));
+    }
   };
   const [availableCurrencies, setAvailableCurrencies] = useState<Array<{
     code: string;
@@ -163,14 +170,24 @@ export default function ShopSettings() {
     rate: number;
     is_base: boolean;
   }>>([]);
+  const [savingShop, setSavingShop] = useState(false);
   const [addCurrencyCode, setAddCurrencyCode] = useState<string>('');
+  const [isAddingCurrency, setIsAddingCurrency] = useState(false);
   const handleAddCurrency = async () => {
-    if (!addCurrencyCode) return;
-    const sys = availableCurrencies.find(c => c.code === addCurrencyCode);
-    const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
-    await ShopService.addStoreCurrency(id!, addCurrencyCode, defaultRate);
-    setAddCurrencyCode('');
-    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    if (!addCurrencyCode) {
+      toast.info(t('select_currency'));
+      return;
+    }
+    setIsAddingCurrency(true);
+    try {
+      const sys = availableCurrencies.find(c => c.code === addCurrencyCode);
+      const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
+      await ShopService.addStoreCurrency(id!, addCurrencyCode, defaultRate);
+      setAddCurrencyCode('');
+      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    } finally {
+      setIsAddingCurrency(false);
+    }
   };
   const handleUpdateRate = async (code: string, rate: number) => {
     await ShopService.updateStoreCurrencyRate(id!, code, rate);
@@ -250,47 +267,111 @@ export default function ShopSettings() {
                 <p className="text-sm text-muted-foreground">{productsCount > 0 ? 'Формат можна змінити тільки якщо не додано жодного товару' : 'Зміна формату скопіює новий шаблон'}</p>
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => navigate(`/user/shops/${id}`)}>{t('btn_cancel')}</Button>
+                <Button variant="outline" onClick={() => navigate(`/user/shops/${id}`)} disabled={savingShop}>{t('btn_cancel')}</Button>
                 <Button onClick={async () => {
-                await ShopService.updateShop(id!, {
-                  store_name: shopName.trim(),
-                  store_company: storeCompany,
-                  store_url: storeUrl
-                });
-              }}>{t('save_changes') || 'Зберегти зміни'}</Button>
+                setSavingShop(true);
+                try {
+                  await ShopService.updateShop(id!, {
+                    store_name: shopName.trim(),
+                    store_company: storeCompany,
+                    store_url: storeUrl
+                  });
+                  setTimeout(() => navigate(`/user/shops/${id}/products`), 500);
+                } catch (_) {
+                  toast.error(t('unknown_error'));
+                } finally {
+                  setSavingShop(false);
+                }
+              }} aria-busy={savingShop} className="active:scale-[0.98]">{t('save_changes') || 'Зберегти зміни'}</Button>
               </div>
             </TabsContent>
 
             <TabsContent value="currencies" className="space-y-4">
-              <div className="text-sm font-medium">{t('shop_currencies')}</div>
-              <div className="flex items-center justify-between gap-2">
-                <Select value={addCurrencyCode} onValueChange={setAddCurrencyCode}>
-                  <SelectTrigger className="w-[clamp(10rem,30vw,12rem)]" data-testid="shop_settings_addCurrency_select">
-                    <SelectValue placeholder={t('select_currency')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCurrencies.filter(c => !storeCurrencies.some(sc => sc.code === c.code)).map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm">
-                  <Button type="button" onClick={handleAddCurrency} disabled={!addCurrencyCode} variant="ghost" size="icon" className="h-8 w-8" aria-label={t('add_currency')} data-testid="shop_settings_addCurrency_btn">
-                    <Plus className="h-4 w-4" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">{t('shop_currencies')}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(() => {
+                      const base = storeCurrencies.find(c => c.is_base)?.code || '—';
+                      const total = storeCurrencies.length;
+                      return `Базова валюта: ${base} • Доступно: ${total}`;
+                    })()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={addCurrencyCode} onValueChange={setAddCurrencyCode}>
+                    <SelectTrigger className="h-9 w-[clamp(10rem,30vw,12rem)]" data-testid="shop_settings_addCurrency_select">
+                      <SelectValue placeholder={t('select_currency')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableCurrencies.filter(c => !storeCurrencies.some(sc => sc.code === c.code)).map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={handleAddCurrency}
+                    disabled={!addCurrencyCode || isAddingCurrency}
+                    aria-busy={isAddingCurrency}
+                    className="h-9 bg-transparent text-foreground cursor-pointer hover:bg-primary/10 active:bg-primary/15 hover:shadow-sm active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200"
+                    aria-label={t('add_currency')}
+                    data-testid="shop_settings_addCurrency_btn"
+                  >
+                    {isAddingCurrency ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} {t('add_currency')}
                   </Button>
                 </div>
               </div>
-              {storeCurrencies.length === 0 ? <div className="text-xs text-muted-foreground">{t('no_currencies_found')}</div> : <div className="space-y-2">
-                  {storeCurrencies.map(cur => <div key={cur.code} className="flex items-center gap-3 h-9">
-                      <Badge variant="outline" className="px-2 py-0.5 text-sm">{cur.code}</Badge>
-                      <Input type="number" step="0.0001" defaultValue={cur.rate} onBlur={e => handleUpdateRate(cur.code, parseFloat(e.target.value) || 0)} className="h-8 w-[clamp(5rem,10vw,6rem)] text-sm" />
-                      <div className="flex items-center gap-2 ml-auto">
-                        <span className="text-sm text-muted-foreground">{t('base_currency')}</span>
-                        <Switch checked={cur.is_base} onCheckedChange={checked => checked ? handleSetBase(cur.code) : null} />
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} disabled={cur.is_base} className="h-8 w-8" aria-disabled={cur.is_base}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>)}
-                </div>}
+              {storeCurrencies.length === 0 ? (
+                <div className="rounded-lg border bg-card/50 p-6 text-center">
+                  <div className="text-sm font-medium mb-1">{t('no_currencies_found')}</div>
+                  <div className="text-xs text-muted-foreground">Додайте валюту та задайте курс відносно базової</div>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-lg border">
+                  <div className="relative w-full overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr className="border-b">
+                          <th className="h-10 px-3 text-left font-medium text-muted-foreground">Валюта</th>
+                          <th className="h-10 px-3 text-left font-medium text-muted-foreground">Курс</th>
+                          <th className="h-10 px-3 text-left font-medium text-muted-foreground">Основна</th>
+                          <th className="h-10 px-3 text-right font-medium text-muted-foreground">Дії</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {storeCurrencies.map(cur => (
+                          <tr key={cur.code} className="border-b hover:bg-muted/50">
+                            <td className="px-3 py-2">
+                              <Badge variant="outline" className="px-2 py-0.5 text-sm border-0">{cur.code}</Badge>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  step="0.0001"
+                                  defaultValue={cur.rate}
+                                  onBlur={e => handleUpdateRate(cur.code, parseFloat(e.target.value) || 0)}
+                                  className="h-8 w-[clamp(6rem,12vw,8rem)] text-sm border-0 shadow-none focus-visible:ring-0"
+                                />
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <Switch checked={cur.is_base} onCheckedChange={checked => checked ? handleSetBase(cur.code) : null} className="transition-all duration-200 data-[state=checked]:ring-2 data-[state=checked]:ring-emerald-400" />
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteCurrency(cur.code)} disabled={cur.is_base} className="h-8 w-8 transition-all duration-200 hover:bg-muted active:scale-[0.98]" aria-disabled={cur.is_base}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="categories" className="space-y-4">
@@ -381,9 +462,14 @@ export default function ShopSettings() {
                         {showNameCol && <td className="p-2 align-middle"><span className="text-sm font-medium truncate block max-w-[30rem]">{cat.name}</span></td>}
                         {showCodeCol && <td className="p-2 align-middle"><Badge variant="outline" className="px-1.5 py-0 text-xs border-0">{(cat.store_external_id ?? cat.base_external_id) || '-'}</Badge></td>}
                         {showRozetkaCol && <td className="p-2 align-middle">
-                          <Input id={`rzv_${cat.store_category_id}`} defaultValue={cat.store_rz_id_value || ''} className="h-8 w-[10rem] border-0 focus-visible:ring-0 focus-visible:outline-none shadow-none" onBlur={e => updateCategoryField(cat.store_category_id, {
-                            rz_id_value: e.target.value || null
-                          })} data-testid={`shop_settings_rzid_${cat.store_category_id}`} />
+                          <Input
+                            id={`rzv_${cat.store_category_id}`}
+                            value={cat.store_rz_id_value || ''}
+                            readOnly
+                            aria-readonly="true"
+                            className="h-8 w-[10rem] text-sm border-0 focus-visible:ring-0 focus-visible:outline-none shadow-none cursor-not-allowed bg-muted/40"
+                            data-testid={`shop_settings_rzid_${cat.store_category_id}`}
+                          />
                         </td>}
                         {showActiveCol && <td className="p-2 align-middle">
                           <Switch checked={cat.is_active} onCheckedChange={checked => updateCategoryField(cat.store_category_id, {
@@ -436,38 +522,57 @@ export default function ShopSettings() {
                 <DialogTitle>{t('edit') || 'Редагувати'}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-category-name">{t('category_name')}</Label>
-                  
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <Tag className="h-4 w-4" />
+                    <Label htmlFor="edit-category-name">{t('category_name')}</Label>
+                  </div>
+                  <div id="edit-category-name" className="text-sm font-medium text-foreground break-words">{editRow?.name || '-'}</div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-category-code">Код категорії</Label>
-                  <div className="text-sm text-muted-foreground">{editExternalId || '-'}</div>
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <Hash className="h-4 w-4" />
+                    <Label htmlFor="edit-category-code">{t('code')}</Label>
+                  </div>
+                  <div className="text-sm font-medium text-foreground break-all">{editExternalId || '-'}</div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-rozetka-category">Категорія Rozetka</Label>
-                  <Input id="edit-rozetka-category" value={editRzIdValue} onChange={e => setEditRzIdValue(e.target.value)} placeholder="Введіть ID категорії Rozetka" className="border-0 focus-visible:ring-0 focus-visible:outline-none shadow-none" />
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <Link className="h-4 w-4" />
+                    <Label htmlFor="edit-rozetka-category">{t('rozetka_category')}</Label>
+                  </div>
+                  <Input id="edit-rozetka-category" value={editRzIdValue} onChange={e => setEditRzIdValue(e.target.value)} placeholder="ID Rozetka" inputMode="numeric" className="h-9 w-full text-sm font-medium border-0 bg-muted/30 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none shadow-none transition-colors" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="edit-active">{t('active')}</Label>
-                  <Switch id="edit-active" checked={editActive} onCheckedChange={setEditActive} />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                      <CheckCircle className="h-4 w-4" />
+                      <Label htmlFor="edit-active" className="truncate">{t('active')}</Label>
+                    </div>
+                    <Switch id="edit-active" checked={editActive} onCheckedChange={setEditActive} className="flex-shrink-0 data-[state=checked]:ring-2 data-[state=checked]:ring-emerald-400" />
+                  </div>
                 </div>
               </div>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => { setEditOpen(false); setEditRow(null); cleanupDialogArtifacts(); }}>{t('btn_cancel') || 'Скасувати'}</Button>
+              <DialogFooter className="gap-2 justify-center">
                 <Button onClick={async () => {
                       if (editRow) {
-                        await ShopService.updateStoreCategory({
-                          id: editRow.store_category_id,
-                          rz_id_value: editRzIdValue || null,
-                          is_active: editActive
-                        });
-                        queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
-                        setEditOpen(false);
-                        setEditRow(null);
-                        cleanupDialogArtifacts();
+                        try {
+                          await ShopService.updateStoreCategory({
+                            id: editRow.store_category_id,
+                            rz_id_value: editRzIdValue || null,
+                            is_active: editActive
+                          });
+                          queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+                          toast.success(t('category_updated_success'));
+                          setEditOpen(false);
+                          setEditRow(null);
+                          cleanupDialogArtifacts();
+                        } catch (e) {
+                          console.error('Failed to update category in modal', e);
+                          toast.error(t('unknown_error'));
+                        }
                       }
-                    }}>{t('save_changes') || 'Зберегти зміни'}</Button>
+                    }} className="active:scale-[0.98] px-6">{t('save_changes') || 'Зберегти зміни'}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -510,6 +615,17 @@ export default function ShopSettings() {
             </TabsContent>
           </CardContent>
         </Tabs>
+        <Dialog open={savingShop} onOpenChange={() => void 0}>
+          <DialogContent className="max-w-[clamp(16rem,40vw,20rem)]">
+            <DialogHeader>
+              <DialogTitle className="text-sm">{t('save_changes') || 'Зберегти зміни'}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center justify-center py-2">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <div className="mt-2 text-sm text-muted-foreground">Збереження налаштувань…</div>
+            </div>
+          </DialogContent>
+        </Dialog>
         <DialogNoOverlay open={deletingCurrency} onOpenChange={() => void 0} modal={false}>
           <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(24rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             <DialogNoOverlayHeader>

@@ -65,7 +65,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const [productsRes, storeCurrenciesRes, availCurRes, storeCatsRes, marketplacesRes] = await Promise.all([
       supabase.from('store_products').select('*', { count: 'exact', head: true }).eq('store_id', storeId),
-      supabase.from('store_currencies').select('code, rate, is_base').eq('store_id', storeId),
+      supabase.from('store_currencies').select('code, rate, is_base, created_at').eq('store_id', storeId).order('created_at', { ascending: true }),
       supabase.from('currencies').select('code, rate'),
       supabase.from('store_store_categories').select('id, store_id, category_id, custom_name, external_id, rz_id_value, is_active').eq('store_id', storeId),
       supabase.from('store_templates').select('marketplace').eq('is_active', true),

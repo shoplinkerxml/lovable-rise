@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Edit, Settings, Share2 } from 'lucide-react';
+import { Edit, Settings, Share2, Package, List } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
@@ -29,6 +29,7 @@ export const ShopDetail = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showStructureEditor, setShowStructureEditor] = useState(false);
   const [productsCount, setProductsCount] = useState(0);
+  const [categoriesCount, setCategoriesCount] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
   const [initialTableReady, setInitialTableReady] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -76,6 +77,42 @@ export const ShopDetail = () => {
     return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
   }, [id, queryClient]);
 
+  const computeCategoriesCount = useCallback(async () => {
+    try {
+      if (!id) return;
+      const { data } = await supabase
+        .from('store_products')
+        .select('category_id, category_external_id')
+        .eq('store_id', String(id!));
+      const keys = new Set<string>();
+      for (const row of (data || [])) {
+        const key = (row as any).category_id != null
+          ? `cat:${String((row as any).category_id)}`
+          : (row as any).category_external_id
+            ? `ext:${String((row as any).category_external_id)}`
+            : null;
+        if (key) keys.add(key);
+      }
+      setCategoriesCount(keys.size);
+    } catch { /* ignore */ }
+  }, [id]);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!id) return;
+        const pCount = await ShopService.getStoreProductsCount(id!);
+        setProductsCount(Number(pCount) || 0);
+        await computeCategoriesCount();
+      } catch { /* ignore */ }
+    })();
+  }, [id, computeCategoriesCount]);
+  useEffect(() => {
+    if (!tableLoading) computeCategoriesCount();
+  }, [tableLoading, refreshTrigger, computeCategoriesCount]);
+  useEffect(() => {
+    if (productsCount === 0) setCategoriesCount(0);
+  }, [productsCount]);
+
   // Add marketplace type to breadcrumbs
   const shopBreadcrumbs = [
     ...breadcrumbs,
@@ -106,6 +143,16 @@ export const ShopDetail = () => {
         breadcrumbItems={shopBreadcrumbs}
         actions={
           <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-2 mr-1">
+              <span className="inline-flex items-center gap-1 text-xs border rounded-md px-3 py-1">
+                <Package className="h-3 w-3" />
+                <span>{productsCount}</span>
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs border rounded-md px-3 py-1">
+                <List className="h-3 w-3" />
+                <span>{categoriesCount}</span>
+              </span>
+            </div>
             <Button
               variant="outline"
               size="icon"
@@ -142,7 +189,16 @@ export const ShopDetail = () => {
           onEdit={(product: Product) => navigate(`/user/shops/${id}/products/edit/${product.id}`)}
           onDelete={async (product: Product) => {
             try {
-              await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id!)]);
+              const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id!)]);
+              try {
+                const names = Array.isArray(categoryNamesByStore?.[String(id!)]) ? categoryNamesByStore![String(id!)] : [];
+                setCategoriesCount(names.length);
+                ShopService.setCategoriesCountInCache(String(id!), names.length);
+                queryClient.setQueryData(['shopsList'], (prev: any) => {
+                  const arr = Array.isArray(prev) ? prev : [];
+                  return arr.map((s: any) => String(s.id) === String(id!) ? { ...s, categoriesCount: names.length } : s);
+                });
+              } catch { /* ignore */ }
               setRefreshTrigger((p) => p + 1);
             } catch (e) {
               toast.error(t('failed_remove_from_store'));

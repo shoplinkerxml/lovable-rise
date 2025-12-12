@@ -67,8 +67,16 @@ export const StoreProducts = () => {
 
   const handleDelete = async (product: Product) => {
     try {
-      await ProductService.updateStoreProductLink(product.id, storeId, { is_active: false });
-      await ProductService.removeStoreProductLink(product.id, storeId);
+      const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(storeId)]);
+      try {
+        const names = Array.isArray(categoryNamesByStore?.[String(storeId)]) ? categoryNamesByStore![String(storeId)] : [];
+        setCategoriesCount(names.length);
+        ShopService.setCategoriesCountInCache(String(storeId), names.length);
+        queryClient.setQueryData(['shopsList'], (prev: any) => {
+          const arr = Array.isArray(prev) ? prev : [];
+          return arr.map((s: any) => String(s.id) === String(storeId) ? { ...s, categoriesCount: names.length } : s);
+        });
+      } catch { /* ignore */ }
       setRefreshTrigger((p) => p + 1);
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
       try { ShopService.bumpProductsCountInCache(storeId, -1); } catch (e) { void e; }

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, accept",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 }
 
@@ -10,8 +11,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
   try {
     const authHeader = req.headers.get("Authorization") || ""
-    const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey)
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || ""
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
+    const supabase = (createClient as any)(SUPABASE_URL, SERVICE_KEY, {
+      global: authHeader ? { headers: { Authorization: authHeader } } : undefined,
+    })
     function decodeJwtSub(h: string): string | null {
       try {
         const t = h.replace(/^Bearer\s+/i, "").trim()

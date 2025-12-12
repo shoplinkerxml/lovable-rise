@@ -68,3 +68,6 @@ verify_jwt = true
 
 [functions.shop-settings-aggregated]
 verify_jwt = true
+
+[functions.update-store-category]
+verify_jwt = true

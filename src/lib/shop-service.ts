@@ -957,11 +957,28 @@ export class ShopService {
    * Получение количества товаров в магазине.
    */
   static async getStoreProductsCount(storeId: string): Promise<number> {
-    const response = await this.invokeEdge<{ count?: number }>(
-      "get-store-products-count",
-      { store_id: storeId }
-    );
+    if (!storeId) return 0;
 
-    return Number(response.count) || 0;
+    // 1) Пытаемся получить из кэша магазинов (у нас уже есть counts на странице магазинов)
+    try {
+      const cached = this.readShopsCache(true);
+      const found = (cached || []).find((s) => String(s.id) === String(storeId));
+      if (found && typeof found.productsCount === "number") {
+        return Math.max(0, Number(found.productsCount) || 0);
+      }
+    } catch { /* ignore */ }
+
+    // 2) Fallback без Edge: прямой запрос к таблице store_products (быстрее и надежнее)
+    try {
+      await this.ensureSession();
+      const { count } = await supabase
+        .from("store_products")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", storeId);
+      return Math.max(0, Number(count || 0));
+    } catch (error) {
+      console.warn("getStoreProductsCount fallback failed, returning 0:", error);
+      return 0;
+    }
   }
 }

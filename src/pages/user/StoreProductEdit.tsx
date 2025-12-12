@@ -228,7 +228,7 @@ export const StoreProductEdit = () => {
         } catch { /* ignore */ }
       }
       toast.success(t("product_updated"));
-      navigate(`/user/shops/${storeId}/products`);
+      navigate(`/user/shops/${storeId}`);
     } catch (e) {
       toast.error(t("failed_save_product"));
     } finally {

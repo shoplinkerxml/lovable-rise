@@ -992,6 +992,7 @@ const toastDictionary = {
   please_log_in: { uk: "Будь ласка, увійдіть, щоб продовжити", en: "Please log in to continue" },
   failed_load_user_data: { uk: "Не вдалося завантажити дані користувача", en: "Failed to load user data" },
   failed_load_menu_items: { uk: "Не вдалося завантажити пункти меню", en: "Failed to load menu items" },
+  category_updated_success: { uk: "Категорію успішно оновлено", en: "Category updated successfully" },
   
   // User Header notifications
   failed_logout: { uk: "Не вдалося вийти", en: "Failed to logout" },
