@@ -30,6 +30,20 @@ function countProductsInStore(products: ProductRow[], storeId: string): number {
   }, 0);
 }
 
+function countCategoriesInStore(products: ProductRow[], storeId: string): number {
+  const keys = new Set<string>();
+  for (const p of products) {
+    if (!Array.isArray(p.linkedStoreIds) || !p.linkedStoreIds.includes(storeId)) continue;
+    const key = p.category_id != null
+      ? `cat:${String(p.category_id)}`
+      : p.category_external_id
+        ? `ext:${String(p.category_external_id)}`
+        : null;
+    if (key) keys.add(key);
+  }
+  return keys.size;
+}
+
 function hasLinkedProducts(products: ProductRow[], storeIds: string[]): boolean {
   if (storeIds.length === 0 || products.length === 0) return false;
   
@@ -45,7 +59,8 @@ async function updateStoreCounts(
   productDelta: Record<string, number>,
   setStores: (stores: StoreAgg[]) => void,
   currentStores: StoreAgg[],
-  categoryResultsOverride?: Record<string, string[]>
+  categoryResultsOverride?: Record<string, string[]>,
+  itemsForAccurateCount?: ProductRow[]
 ) {
   try {
     // Обновляем счетчики продуктов
@@ -68,11 +83,12 @@ async function updateStoreCounts(
       return stores.map(store => {
         const delta = productDelta[store.id] || 0;
         const categories = categoryResults?.[store.id] || [];
-        
+        const accurateCount = itemsForAccurateCount ? countProductsInStore(itemsForAccurateCount, String(store.id)) : null;
+        const accurateCategories = itemsForAccurateCount ? countCategoriesInStore(itemsForAccurateCount, String(store.id)) : null;
         return {
           ...store,
-          productsCount: Math.max(0, (store.productsCount || 0) + delta),
-          categoriesCount: Math.max(0, categories.length)
+          productsCount: accurateCount != null ? Math.max(0, accurateCount) : Math.max(0, (store.productsCount || 0) + delta),
+          categoriesCount: accurateCategories != null ? Math.max(0, accurateCategories) : Math.max(0, categories.length)
         };
       });
     });
@@ -195,7 +211,7 @@ export function AddToStoresMenu({
       }));
 
       // Обновляем счетчики магазинов
-      await updateStoreCounts(q, selectedStoreIds, addedByStore, setStores, stores, categoryNamesByStore);
+      await updateStoreCounts(q, selectedStoreIds, addedByStore, setStores, stores, categoryNamesByStore, items);
 
     } catch (error) {
       console.error('Failed to add products to stores:', error);
@@ -243,7 +259,7 @@ export function AddToStoresMenu({
         Object.entries(countsByStore).map(([sid, count]) => [sid, -count])
       );
 
-      await updateStoreCounts(q, storeIds, negativeDeltas, setStores, stores, categoryNamesByStore);
+      await updateStoreCounts(q, storeIds, negativeDeltas, setStores, stores, categoryNamesByStore, items);
 
     } catch (error) {
       console.error('Failed to remove products from stores:', error);
@@ -277,7 +293,7 @@ export function AddToStoresMenu({
       }));
 
       const delta = deletedByStore?.[storeId] || productsInStore.length;
-      await updateStoreCounts(q, [storeId], { [storeId]: -delta }, setStores, stores, categoryNamesByStore);
+      await updateStoreCounts(q, [storeId], { [storeId]: -delta }, setStores, stores, categoryNamesByStore, items);
 
       const remainingCount = countProductsInStore(items, storeId) - delta;
       if (remainingCount === 0) {
@@ -345,6 +361,7 @@ export function AddToStoresMenu({
                 const storeId = String(store.id);
                 const isChecked = selectedStoreIds.includes(storeId);
                 const productCount = countProductsInStore(items, storeId);
+                const categoryCount = productCount === 0 ? 0 : countCategoriesInStore(items, storeId);
                 const isRemoving = removingStores || removingStoreId === storeId;
 
                 return (
@@ -388,12 +405,12 @@ export function AddToStoresMenu({
                     <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <Package className="h-3 w-3" />
-                        <span className="tabular-nums">{store.productsCount || 0}</span>
+                        <span className="tabular-nums">{productCount}</span>
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <List className="h-3 w-3" />
                         <span className="tabular-nums">
-                          {store.productsCount === 0 ? 0 : (store.categoriesCount || 0)}
+                          {categoryCount}
                         </span>
                       </span>
 

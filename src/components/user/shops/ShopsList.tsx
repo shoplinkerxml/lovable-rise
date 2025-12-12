@@ -21,6 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FullPageLoader } from '@/components/LoadingSkeletons';
 
 type ShopWithMarketplace = ShopAggregated;
 
@@ -69,15 +70,14 @@ export const ShopsList = ({
   }, [refreshTrigger, queryClient]);
   const refetchDebounceRef = useRef<number | null>(null);
   useEffect(() => {
-    const mutateCounts = (storeId: string, deltaProducts: number, deltaCategories?: number) => {
+    const mutateCounts = (storeId: string, deltaProducts: number) => {
       try {
         queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
           const arr = Array.isArray(prev) ? prev : [];
           return arr.map((s) => {
             if (String(s.id) !== String(storeId)) return s;
             const nextProducts = Math.max(0, (s.productsCount ?? 0) + (deltaProducts || 0));
-            const nextCategoriesRaw = Math.max(0, (s.categoriesCount ?? 0) + (deltaCategories || 0));
-            const nextCategories = nextProducts === 0 ? 0 : nextCategoriesRaw;
+            const nextCategories = nextProducts === 0 ? 0 : (s.categoriesCount ?? 0);
             return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopWithMarketplace;
           });
         });
@@ -100,13 +100,13 @@ export const ShopsList = ({
         const row = payload?.new || {};
         const active = row?.is_active !== false;
         const sid = row?.store_id ? String(row.store_id) : '';
-        if (sid && active) mutateCounts(sid, +1, 0);
+        if (sid && active) mutateCounts(sid, +1);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'store_product_links' }, (payload: any) => {
         const row = payload?.old || {};
         const active = row?.is_active !== false;
         const sid = row?.store_id ? String(row.store_id) : '';
-        if (sid && active) mutateCounts(sid, -1, 0);
+        if (sid && active) mutateCounts(sid, -1);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'store_product_links' }, (payload: any) => {
         const oldRow = payload?.old || {};
@@ -116,39 +116,11 @@ export const ShopsList = ({
         const wasActive = oldRow?.is_active !== false;
         const isActive = newRow?.is_active !== false;
         if (sidOld && sidNew && sidOld !== sidNew) {
-          if (wasActive) mutateCounts(sidOld, -1, 0);
-          if (isActive) mutateCounts(sidNew, +1, 0);
+          if (wasActive) mutateCounts(sidOld, -1);
+          if (isActive) mutateCounts(sidNew, +1);
         } else if (sidNew) {
-          if (wasActive && !isActive) mutateCounts(sidNew, -1, 0);
-          if (!wasActive && isActive) mutateCounts(sidNew, +1, 0);
-        }
-      })
-      // Store categories → adjust categoriesCount fast
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'store_store_categories' }, (payload: any) => {
-        const row = payload?.new || {};
-        const active = row?.is_active !== false;
-        const sid = row?.store_id ? String(row.store_id) : '';
-        if (sid && active) mutateCounts(sid, 0, +1);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'store_store_categories' }, (payload: any) => {
-        const row = payload?.old || {};
-        const active = row?.is_active !== false;
-        const sid = row?.store_id ? String(row.store_id) : '';
-        if (sid && active) mutateCounts(sid, 0, -1);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'store_store_categories' }, (payload: any) => {
-        const oldRow = payload?.old || {};
-        const newRow = payload?.new || {};
-        const sidOld = oldRow?.store_id ? String(oldRow.store_id) : '';
-        const sidNew = newRow?.store_id ? String(newRow.store_id) : '';
-        const wasActive = oldRow?.is_active !== false;
-        const isActive = newRow?.is_active !== false;
-        if (sidOld && sidNew && sidOld !== sidNew) {
-          if (wasActive) mutateCounts(sidOld, 0, -1);
-          if (isActive) mutateCounts(sidNew, 0, +1);
-        } else if (sidNew) {
-          if (wasActive && !isActive) mutateCounts(sidNew, 0, -1);
-          if (!wasActive && isActive) mutateCounts(sidNew, 0, +1);
+          if (wasActive && !isActive) mutateCounts(sidNew, -1);
+          if (!wasActive && isActive) mutateCounts(sidNew, +1);
         }
       })
       .subscribe();
@@ -172,36 +144,14 @@ export const ShopsList = ({
 
   return (
     <>
+      {showSkeletons && (
+        <FullPageLoader
+          title={t('shops_title')}
+          subtitle={t('shops_description')}
+          icon={Store}
+        />
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {showSkeletons && Array.from({ length: 6 }).map((_, idx) => (
-          <Card key={`skeleton_${idx}`} className="hover:shadow-none">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <Skeleton className="h-8 w-8 rounded-md" />
-                <div className="flex gap-1">
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                </div>
-              </div>
-              <Skeleton className="h-5 w-40 mt-2" />
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Skeleton className="h-4 w-16" />
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1">
-                  <Skeleton className="h-4 w-4 rounded" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <Skeleton className="h-4 w-4 rounded" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
         {!showSkeletons && shops.length === 0 && (
           <div className="flex justify-center col-span-full">
             <Empty className="border max-w-md">

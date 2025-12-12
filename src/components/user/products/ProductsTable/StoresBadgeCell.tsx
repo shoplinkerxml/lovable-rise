@@ -133,48 +133,14 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               ProductService.invalidateStoreLinksCache(String(product.id));
                               toast.success(t("product_added_to_store"));
                               ShopService.bumpProductsCountInCache(String(id), 1);
-                              try {
-                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
-                                ShopService.setCategoriesCountInCache(String(id), names.length);
-                              } catch { void 0; }
-                              try {
-                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
-                                queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                  const arr = Array.isArray(prev) ? prev : (stores || []);
-                                  return (arr || []).map((s) => {
-                                    if (s.id !== String(id)) return s;
-                                    const nextProducts = Math.max(0, ((s.productsCount ?? 0) + 1));
-                                    const nextCategories = nextProducts === 0 ? 0 : names.length;
-                                    return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
-                                  });
-                                });
-                                const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                setStores(updated);
-                              } catch { void 0; }
+                              try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                               try { /* keep menu open */ setOpen(true); } catch { void 0; }
                             } else {
                               const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
                               ProductService.invalidateStoreLinksCache(String(product.id));
                               toast.success(t("product_removed_from_store"));
                               ShopService.bumpProductsCountInCache(String(id), -1);
-                              try {
-                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
-                                ShopService.setCategoriesCountInCache(String(id), names.length);
-                              } catch { void 0; }
-                              try {
-                                const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
-                                queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                  const arr = Array.isArray(prev) ? prev : (stores || []);
-                                  return (arr || []).map((s) => {
-                                    if (s.id !== String(id)) return s;
-                                    const nextProducts = Math.max(0, ((s.productsCount ?? 0) - 1));
-                                    const nextCategories = nextProducts === 0 ? 0 : names.length;
-                                    return { ...s, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
-                                  });
-                                });
-                                const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                setStores(updated);
-                              } catch { void 0; }
+                              try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                               try { setOpen(true); } catch { void 0; }
                             }
                           } catch {
@@ -276,48 +242,14 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       ProductService.invalidateStoreLinksCache(String(product.id));
                                       toast.success(t("product_added_to_store"));
                                       ShopService.bumpProductsCountInCache(String(sid), 1);
-                                      try {
-                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
-                                        ShopService.setCategoriesCountInCache(String(sid), names.length);
-                                      } catch { void 0; }
-                                      try {
-                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
-                                        queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                          const arr = Array.isArray(prev) ? prev : (stores || []);
-                                          return (arr || []).map((x) => {
-                                            if (x.id !== String(sid)) return x;
-                                            const nextProducts = Math.max(0, ((x.productsCount ?? 0) + 1));
-                                            const nextCategories = nextProducts === 0 ? 0 : names.length;
-                                            return { ...x, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
-                                          });
-                                        });
-                                        const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                        setStores(updated);
-                                      } catch { void 0; }
+                                      try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
                                     } else {
                                       const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(sid)]);
                                       ProductService.invalidateStoreLinksCache(String(product.id));
                                       toast.success(t("product_removed_from_store"));
                                       ShopService.bumpProductsCountInCache(String(sid), -1);
-                                      try {
-                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
-                                        ShopService.setCategoriesCountInCache(String(sid), names.length);
-                                      } catch { void 0; }
-                                      try {
-                                        const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
-                                        queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                          const arr = Array.isArray(prev) ? prev : (stores || []);
-                                          return (arr || []).map((x) => {
-                                            if (x.id !== String(sid)) return x;
-                                            const nextProducts = Math.max(0, ((x.productsCount ?? 0) - 1));
-                                            const nextCategories = nextProducts === 0 ? 0 : names.length;
-                                            return { ...x, productsCount: nextProducts, categoriesCount: nextCategories } as ShopAggregated;
-                                          });
-                                        });
-                                        const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                        setStores(updated);
-                                      } catch { void 0; }
+                                      try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
                                     }
                                   } catch {

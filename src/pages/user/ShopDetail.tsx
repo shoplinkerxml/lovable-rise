@@ -14,6 +14,8 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/
 import { ProductsTable } from '@/components/user/products/ProductsTable';
  
 import { ProductService, type Product } from '@/lib/product-service';
+import { ProgressiveLoader, FullPageLoader } from '@/components/LoadingSkeletons';
+import { Store as StoreIcon } from 'lucide-react';
 
 export const ShopDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -28,11 +30,12 @@ export const ShopDetail = () => {
   const [showStructureEditor, setShowStructureEditor] = useState(false);
   const [productsCount, setProductsCount] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
+  const [initialTableReady, setInitialTableReady] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showExportDialog, setShowExportDialog] = useState(false);
   
 
-  const { data: shopData, isLoading } = useQuery<Shop | null>({
+  const { data: shopData, isLoading, isError } = useQuery<Shop | null>({
     queryKey: ['shopDetail', id!],
     queryFn: async () => {
       if (!id) return null;
@@ -55,8 +58,10 @@ export const ShopDetail = () => {
     setLoading(isLoading);
     if (shopData) {
       setShop(shopData);
+    } else if (!isLoading && isError) {
+      setShop(null);
     }
-  }, [id, isLoading, shopData, navigate]);
+  }, [id, isLoading, isError, shopData, navigate]);
   useEffect(() => {
     if (shopData?.marketplace) {
       setMarketplace(String(shopData.marketplace));
@@ -80,18 +85,20 @@ export const ShopDetail = () => {
     }
   ];
 
-  if (loading || !shop) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-        </div>
-      </div>
-    );
-  }
-
+  const pageLoading = isLoading;
   return (
+    <ProgressiveLoader
+      isLoading={pageLoading}
+      delay={250}
+      fallback={
+        <FullPageLoader
+          title="Завантаження магазину…"
+          subtitle="Готуємо панель керування та список товарів"
+          icon={StoreIcon}
+        />
+      }
+    >
+    {shop ? (
     <div className="p-6 space-y-6">
       <PageHeader
         title={shop.store_name}
@@ -142,7 +149,10 @@ export const ShopDetail = () => {
             }
           }}
           onProductsLoaded={(count: number) => setProductsCount(count)}
-          onLoadingChange={(loading: boolean) => setTableLoading(loading)}
+          onLoadingChange={(loading: boolean) => {
+            setTableLoading(loading);
+            if (!loading && !initialTableReady) setInitialTableReady(true);
+          }}
           refreshTrigger={refreshTrigger}
           canCreate={true}
           hideDuplicate={true}
@@ -180,6 +190,23 @@ export const ShopDetail = () => {
         />
       )}
     </div>
+    ) : (
+      <div className="p-6">
+        <Empty className="border max-w-lg mx-auto">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <StoreIcon className="h-[1.5rem] w-[1.5rem]" />
+            </EmptyMedia>
+            <EmptyTitle>{t('shop_not_found') || 'Магазин не знайдено'}</EmptyTitle>
+            <EmptyDescription>{t('shop_not_found_description') || 'Перевірте посилання або поверніться до списку магазинів.'}</EmptyDescription>
+          </EmptyHeader>
+          <div className="mt-4 flex justify-center">
+            <Button variant="default" onClick={() => navigate('/user/shops')}>{t('go_to_shops') || 'До магазинів'}</Button>
+          </div>
+        </Empty>
+      </div>
+    )}
+    </ProgressiveLoader>
   );
 };
 import { useQuery, useQueryClient } from '@tanstack/react-query';

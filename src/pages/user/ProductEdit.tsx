@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { ContentSkeleton, ProgressiveLoader } from "@/components/LoadingSkeletons";
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ContentSkeleton, ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
+import { ArrowLeft, Loader2, Package } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
@@ -221,7 +221,17 @@ export const ProductEdit = () => {
         }
       />
 
-      <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="product-edit" />} delay={100}>
+      <ProgressiveLoader
+        isLoading={loading}
+        delay={150}
+        fallback={
+          <FullPageLoader
+            title="Завантаження товару…"
+            subtitle="Готуємо форму редагування, дані та зображення"
+            icon={Package}
+          />
+        }
+      >
         <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
           <ProductFormTabs
             product={product || undefined}

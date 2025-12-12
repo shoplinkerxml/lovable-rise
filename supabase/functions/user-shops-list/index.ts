@@ -126,8 +126,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Параллельное получение связанных данных
     const [
       { data: templates },
-      { data: links },
-      { data: categories }
+      { data: links }
     ] = await Promise.all([
       templateIds.length > 0
         ? supabaseClient
@@ -138,21 +137,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       storeId
         ? supabaseClient
             .from('store_product_links')
-            .select('store_id, is_active')
+            .select('store_id, is_active, product_id, custom_category_id, store_products!inner(category_id,category_external_id)')
             .eq('store_id', storeId)
         : supabaseClient
             .from('store_product_links')
-            .select('store_id, is_active')
+            .select('store_id, is_active, product_id, custom_category_id, store_products!inner(category_id,category_external_id)')
             .in('store_id', storeIds),
-      storeId
-        ? supabaseClient
-            .from('store_store_categories')
-            .select('store_id, is_active')
-            .eq('store_id', storeId)
-        : supabaseClient
-            .from('store_store_categories')
-            .select('store_id, is_active')
-            .in('store_id', storeIds)
     ])
 
     // Построение map для templates
@@ -175,15 +165,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // Подсчет активных категорий по магазинам
+    // Подсчет уникальных категорий по активным связям продуктов в магазинах
     const categoriesCountByStore: Record<string, number> = {}
-    for (const category of categories || []) {
-      const storeId = (category as any)?.store_id
-      const isActive = (category as any)?.is_active !== false
-      if (storeId && isActive) {
-        const key = String(storeId)
-        categoriesCountByStore[key] = (categoriesCountByStore[key] || 0) + 1
-      }
+    const categoriesSets: Record<string, Set<string>> = {}
+    for (const link of links || []) {
+      const sid = (link as any)?.store_id
+      const isActive = (link as any)?.is_active !== false
+      if (!sid || !isActive) continue
+      const keyStore = String(sid)
+      const base = (link as any)?.store_products || {}
+      const customCat = (link as any)?.custom_category_id
+      const catKey = customCat != null
+        ? `ext:${String(customCat)}`
+        : (base?.category_id != null)
+          ? `cat:${String(base.category_id)}`
+          : (base?.category_external_id != null)
+            ? `ext:${String(base.category_external_id)}`
+            : null
+      if (!catKey) continue
+      if (!categoriesSets[keyStore]) categoriesSets[keyStore] = new Set<string>()
+      categoriesSets[keyStore].add(catKey)
+    }
+    for (const [sid, set] of Object.entries(categoriesSets)) {
+      categoriesCountByStore[sid] = set.size
     }
 
     // Агрегация данных

@@ -209,6 +209,9 @@ const dictionary: Dictionary = {
   shops_limit_reached: { uk: "Досягнуто ліміту магазинів", en: "Shop limit reached" },
   upgrade_plan: { uk: "Оновіть тарифний план для створення додаткових магазинів", en: "Upgrade plan to create more shops" },
   create: { uk: "Створити", en: "Create" },
+  shop_not_found: { uk: "Магазин не знайдено", en: "Shop not found" },
+  shop_not_found_description: { uk: "Перевірте посилання або поверніться до списку магазинів.", en: "Check the link or return to the shops list." },
+  go_to_shops: { uk: "До магазинів", en: "Back to shops" },
   
   // Products → Товари
   products_title: { uk: "Товари", en: "Products" },
@@ -229,6 +232,8 @@ const dictionary: Dictionary = {
   // Products duplication flow
   product_copying: { uk: "Триває копіювання товару…", en: "Copying product…" },
   products_deleting: { uk: "Йде видалення товарів…", en: "Deleting products…" },
+  shop_deleting_currency: { uk: "Йде видалення валюти…", en: "Deleting currency…" },
+  shop_deleting_categories: { uk: "Йде видалення категорій…", en: "Deleting categories…" },
   failed_duplicate_product: { uk: "Не вдалося скопіювати товар", en: "Failed to duplicate product" },
   failed_save_product: { uk: "Помилка збереження товару", en: "Failed to save product" },
   failed_load_products: { uk: "Помилка завантаження товарів", en: "Failed to load products" },

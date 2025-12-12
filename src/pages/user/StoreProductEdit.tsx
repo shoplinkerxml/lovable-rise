@@ -17,7 +17,7 @@ import { CategoryService } from "@/lib/category-service";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ContentSkeleton, ProgressiveLoader } from "@/components/LoadingSkeletons";
+import { ContentSkeleton, ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 
 type StoreProductLinkForm = {
   is_active: boolean;
@@ -263,7 +263,17 @@ export const StoreProductEdit = () => {
         }
       />
       <Card className="p-6 space-y-6">
-        <ProgressiveLoader isLoading={loading} fallback={<ContentSkeleton type="product-edit" />} delay={100}>
+        <ProgressiveLoader
+          isLoading={loading}
+          delay={150}
+          fallback={
+            <FullPageLoader
+              title="Завантаження товару магазина…"
+              subtitle="Готуємо форму редагування та дані лінка"
+              icon={Loader2}
+            />
+          }
+        >
           <div className="space-y-6">
             {baseProduct ? (
               <ProductFormTabs

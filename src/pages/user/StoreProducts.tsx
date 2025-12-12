@@ -6,9 +6,10 @@ import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";
-import { Loader2, Package, List } from "lucide-react";
+import { Loader2, Package, List, Store as StoreIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
  
 
 export const StoreProducts = () => {
@@ -19,6 +20,8 @@ export const StoreProducts = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [shopName, setShopName] = useState("");
   const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const [initialReady, setInitialReady] = useState<boolean>(false);
+  const [shopLoaded, setShopLoaded] = useState<boolean>(false);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [limitInfo] = useState<{ current: number; max: number; canCreate: boolean }>({ current: 0, max: 0, canCreate: true });
   const queryClient = useQueryClient();
@@ -32,9 +35,8 @@ export const StoreProducts = () => {
       try {
         const shop = await ShopService.getShop(storeId);
         setShopName(shop?.store_name || "");
-      } catch (_) {
-        setShopName("");
-      }
+      } catch (_) { setShopName(""); }
+      finally { setShopLoaded(true); }
     })();
   }, [storeId, t]);
 
@@ -76,6 +78,17 @@ export const StoreProducts = () => {
   };
 
   return (
+    <ProgressiveLoader
+      isLoading={!shopLoaded || !initialReady}
+      delay={200}
+      fallback={
+        <FullPageLoader
+          title="Завантаження товарів…"
+          subtitle="Готуємо таблицю та фільтри магазину"
+          icon={Package}
+        />
+      }
+    >
     <div className="p-6 space-y-6">
       <PageHeader
         title={t("products_title")}
@@ -99,17 +112,15 @@ export const StoreProducts = () => {
           </div>
         }
       />
-      <div className="relative" aria-busy={tableLoading}>
-        {tableLoading && (
-          <div className="absolute inset-0 z-10 grid place-items-center bg-background/60 backdrop-blur-sm">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
+      <div className="relative">
         <ProductsTable
           onEdit={handleEdit}
           onDelete={handleDelete}
           onProductsLoaded={(cnt) => setTotalCount(cnt ?? 0)}
-          onLoadingChange={setTableLoading}
+          onLoadingChange={(loading) => {
+            setTableLoading(loading);
+            if (!loading && !initialReady) setInitialReady(true);
+          }}
           refreshTrigger={refreshTrigger}
           canCreate={true}
           storeId={storeId}
@@ -117,6 +128,7 @@ export const StoreProducts = () => {
         />
       </div>
     </div>
+    </ProgressiveLoader>
   );
 };
 

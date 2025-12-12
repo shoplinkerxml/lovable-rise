@@ -11,7 +11,13 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") || ""
     const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey)
+    const supabase = (createClient as any)(
+      Deno.env.get("SUPABASE_URL") || "",
+      apiKey,
+      {
+        global: { headers: authHeader ? { Authorization: authHeader } : {} },
+      },
+    )
 
     function decodeJwtSub(h: string): string | null {
       try {

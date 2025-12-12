@@ -125,6 +125,8 @@ const UserProtected = () => {
               avatarUrl: currentUser.avatar_url || ""
             });
             setSessionError(null);
+            setReady(true);
+            setPrefetchOpen(false);
             // Prefetch TTL caches so subsequent pages avoid network
             try {
               if (needsPrefetch) {
@@ -181,9 +183,11 @@ const UserProtected = () => {
     checkAuthentication();
   }, []);
 
+  
+
   // No background subscription checks on focus/visibility to avoid extra network requests
 
-  if (!ready) {
+  if (prefetchOpen || !ready) {
     return (
       <div className="min-h-screen">
         <div className="fixed inset-0 z-50 flex items-center justify-center">

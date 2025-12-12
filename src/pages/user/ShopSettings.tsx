@@ -13,12 +13,15 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from "@/components/ui/dialog-no-overlay";
+import { Loader2, Settings as SettingsIcon } from "lucide-react";
 import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ShopSettingsAggregated } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 type StoreCategoryRow = {
   store_category_id: number;
   store_id: string;
@@ -178,10 +181,22 @@ export default function ShopSettings() {
     queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
   };
   const handleDeleteCurrency = async (code: string) => {
-    await ShopService.deleteStoreCurrency(id!, code);
-    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    setDeletingCurrency(true);
+    try {
+      await ShopService.deleteStoreCurrency(id!, code);
+      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    } finally {
+      setDeletingCurrency(false);
+    }
   };
-  return <div className="p-6 space-y-6" data-testid="shop_settings_page">
+  const [deletingCurrency, setDeletingCurrency] = useState(false);
+  const [deletingCategories, setDeletingCategories] = useState(false);
+  return <ProgressiveLoader
+    isLoading={aggLoading || !aggData}
+    delay={200}
+    fallback={<FullPageLoader title="Завантаження налаштувань…" subtitle="Готуємо категорії, валюту та конфігурацію магазину" icon={SettingsIcon} />}
+  >
+    <div className="p-6 space-y-6" data-testid="shop_settings_page">
       <PageHeader title={shopName} description={t('breadcrumb_settings')} breadcrumbItems={shopBreadcrumbs} />
 
       <Card>
@@ -300,14 +315,19 @@ export default function ShopSettings() {
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" disabled={selectedRowIds.length === 0} onClick={async () => {
-                    for (const catId of selectedRowIds) {
-                      const cat = rows.find(r => r.store_category_id === catId);
-                      if (cat) {
-                        await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
+                    setDeletingCategories(true);
+                    try {
+                      for (const catId of selectedRowIds) {
+                        const cat = rows.find(r => r.store_category_id === catId);
+                        if (cat) {
+                          await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
+                        }
                       }
+                      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+                      setSelectedRowIds([]);
+                    } finally {
+                      setDeletingCategories(false);
                     }
-                    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
-                    setSelectedRowIds([]);
                   }} data-testid="shop_settings_delete_btn">
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -490,6 +510,27 @@ export default function ShopSettings() {
             </TabsContent>
           </CardContent>
         </Tabs>
+        <DialogNoOverlay open={deletingCurrency} onOpenChange={() => void 0} modal={false}>
+          <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(24rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <DialogNoOverlayHeader>
+              <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
+                <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />
+                {t('shop_deleting_currency')}
+              </DialogNoOverlayTitle>
+            </DialogNoOverlayHeader>
+          </DialogNoOverlayContent>
+        </DialogNoOverlay>
+        <DialogNoOverlay open={deletingCategories} onOpenChange={() => void 0} modal={false}>
+          <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(24rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+            <DialogNoOverlayHeader>
+              <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
+                <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />
+                {t('shop_deleting_categories')}
+              </DialogNoOverlayTitle>
+            </DialogNoOverlayHeader>
+          </DialogNoOverlayContent>
+        </DialogNoOverlay>
       </Card>
-    </div>;
+    </div>
+  </ProgressiveLoader>;
 }

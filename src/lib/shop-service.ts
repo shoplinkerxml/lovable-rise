@@ -400,7 +400,14 @@ export class ShopService {
   static async getShopsAggregated(): Promise<ShopAggregated[]> {
     // Проверяем валидный кэш
     const cached = this.readShopsCache(false);
-    if (cached) return cached;
+    if (cached) {
+      const hasSuspiciousCounts = cached.some(
+        (s) => (s.productsCount ?? 0) > 0 && (s.categoriesCount ?? 0) === 0
+      );
+      if (!hasSuspiciousCounts) {
+        return cached;
+      }
+    }
 
     // В offline режиме используем устаревший кэш
     if (this.isOffline()) {
