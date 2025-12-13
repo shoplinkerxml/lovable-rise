@@ -19,6 +19,7 @@ import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Penc
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ShopSettingsAggregated } from "@/lib/shop-service";
+import { useMarketplaces } from "@/hooks/useMarketplaces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
@@ -50,6 +51,7 @@ export default function ShopSettings() {
   const [activeTab, setActiveTab] = useState<'info' | 'currencies' | 'categories'>('categories');
   const [productsCount, setProductsCount] = useState(0);
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
+  const { templatesMap } = useMarketplaces(true);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState<string>("");
   const [pageSize, setPageSize] = useState<number>(10);
@@ -244,17 +246,28 @@ export default function ShopSettings() {
                 <Select value={selectedMarketplace} onValueChange={async marketplace => {
                 setSelectedMarketplace(marketplace);
                 if (productsCount > 0) return;
-                const {
-                  data: template
-                } = await supabase.from('store_templates').select('id, xml_structure, mapping_rules').eq('marketplace', marketplace).eq('is_active', true).order('created_at', {
-                  ascending: false
-                }).limit(1).single();
-                if (template) {
-                  await ShopService.updateShop(id!, {
-                    template_id: template.id,
-                    xml_config: template.xml_structure,
-                    custom_mapping: template.mapping_rules
-                  });
+                try {
+                  const key = marketplace.toLowerCase().trim();
+                  let template = templatesMap?.[key];
+                  if (!template) {
+                    const { data, error: fnError } = await (supabase as unknown as { functions: { invoke: <T = unknown>(name: string, args: { body?: unknown }) => Promise<{ data: T; error?: { message?: string } }> } }).functions.invoke('store-templates-marketplaces', {
+                      body: { marketplace }
+                    });
+                    if (!fnError) {
+                      const payload = typeof data === 'string' ? JSON.parse(data) as { template?: any } : (data as { template?: any });
+                      template = payload?.template;
+                    }
+                  }
+                  if (template) {
+                    await ShopService.updateShop(id!, {
+                      template_id: template.id,
+                      xml_config: (template as any).xml_structure,
+                      custom_mapping: (template as any).mapping_rules
+                    });
+                  }
+                } catch (e) {
+                  console.error('Error loading template:', e);
+                  toast.error('Не вдалося отримати шаблон для формату');
                 }
               }} disabled={productsCount > 0}>
                   <SelectTrigger id="marketplace">

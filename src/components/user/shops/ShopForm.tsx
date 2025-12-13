@@ -23,66 +23,43 @@ export const ShopForm = ({ shop, onSuccess, onCancel }: ShopFormProps) => {
   const [formData, setFormData] = useState<CreateShopData>({
     store_name: shop?.store_name || '',
     template_id: shop?.template_id || null,
-    custom_mapping: shop?.custom_mapping || null
+    custom_mapping: shop?.custom_mapping || null,
+    marketplace: shop?.marketplace || null
   });
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('');
-  const { marketplaces, isLoading: marketplacesLoading } = useMarketplaces();
+  const { marketplaces, templatesMap, isLoading: marketplacesLoading } = useMarketplaces();
 
-  // Load marketplace from template_id when editing
+  // Load marketplace when editing: prefer provided field, avoid direct DB
   useEffect(() => {
-    if (shop?.template_id) {
-      const loadTemplateMarketplace = async () => {
-        try {
-         
-          const { data, error } = await (supabase as any)
-            .from('store_templates')
-            .select('marketplace')
-            .eq('id', shop.template_id)
-            .single();
-
-          if (!error && data?.marketplace) {
-            setSelectedMarketplace(data.marketplace);
-          }
-        } catch (err) {
-          console.error('Error loading template marketplace:', err);
-        }
-      };
-      loadTemplateMarketplace();
+    if (shop?.marketplace) {
+      setSelectedMarketplace(shop.marketplace);
     }
-  }, [shop?.template_id]);
+  }, [shop?.marketplace]);
 
   const handleMarketplaceChange = async (marketplace: string) => {
     setSelectedMarketplace(marketplace);
     
     try {
-      // Get template by marketplace
-    
-      const { data: template, error } = await (supabase as any)
-        .from('store_templates')
-        .select('id, xml_structure, mapping_rules')
-        .eq('marketplace', marketplace)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.error('Error fetching template:', error);
-        return;
+      const key = marketplace.toLowerCase().trim();
+      let template = templatesMap?.[key];
+      if (!template) {
+        const { data, error: fnError } = await (supabase as unknown as { functions: { invoke: <T = unknown>(name: string, args: { body?: unknown }) => Promise<{ data: T; error?: { message?: string } }> } }).functions.invoke('store-templates-marketplaces', {
+          body: { marketplace }
+        });
+        if (fnError) throw new Error((fnError as { message?: string })?.message || 'template_fetch_failed');
+        const payload = typeof data === 'string' ? JSON.parse(data) as { template?: any } : (data as { template?: any });
+        template = payload?.template;
       }
-
-      if (template) {
-        // Copy template data: id→template_id, xml_structure→xml_config, mapping_rules→custom_mapping
-        setFormData(prev => ({
-          ...prev,
-          template_id: template.id,
-          xml_config: template.xml_structure || null,
-          custom_mapping: template.mapping_rules || null
-        }));
-      }
+      setFormData(prev => ({
+        ...prev,
+        marketplace,
+        template_id: template ? template.id : null,
+        xml_config: template ? ((template as any).xml_structure || null) : null,
+        custom_mapping: template ? ((template as any).mapping_rules || null) : null
+      }));
     } catch (err) {
       console.error('Error loading template:', err);
-      toast.error('Failed to load template');
+      toast.error('Не вдалося отримати шаблон для формату');
     }
   };
 
@@ -114,7 +91,6 @@ export const ShopForm = ({ shop, onSuccess, onCancel }: ShopFormProps) => {
       
       onSuccess?.();
     } catch (error: any) {
-      console.error('Shop save error:', error);
       toast.error(error?.message || t('failed_save_shop'));
     } finally {
       setLoading(false);

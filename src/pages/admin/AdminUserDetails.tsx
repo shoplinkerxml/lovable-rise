@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { TariffService, type TariffWithDetails } from "@/lib/tariff-service";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 interface UserProfile {
   id: string;
@@ -68,6 +69,7 @@ const AdminUserDetails = () => {
   const [subscriptionHistory, setSubscriptionHistory] = useState<Subscription[]>([]);
   const [availableTariffs, setAvailableTariffs] = useState<Tariff[]>([]);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const breadcrumbs: BreadcrumbItem[] = [{
     label: t('menu_main') || 'Головна',
     href: '/admin/dashboard'
@@ -274,6 +276,7 @@ const AdminUserDetails = () => {
       }
       
       toast.success(t('tariff_updated_successfully') || 'Тариф успішно оновлено');
+      try { queryClient.invalidateQueries({ queryKey: ['shopLimit'] }); } catch { void 0; }
       
       // 5. Обновляем только состояние подписок без полной перезагрузки
       // Обновляем активную подписку
@@ -338,6 +341,7 @@ const AdminUserDetails = () => {
           sub.id === subscriptionId ? { ...sub, is_active: false } : sub
         )
       );
+      try { queryClient.invalidateQueries({ queryKey: ['shopLimit'] }); } catch { void 0; }
       
     } catch (error) {
       console.error('Deactivate tariff error:', error);
@@ -367,6 +371,7 @@ const AdminUserDetails = () => {
       }
       
       toast.success(t('subscription_deleted_successfully') || 'Підписку успішно видалено');
+      try { queryClient.invalidateQueries({ queryKey: ['shopLimit'] }); } catch { void 0; }
       
       // Обновляем только историю без полной перезагрузки
       setSubscriptionHistory(prev => 

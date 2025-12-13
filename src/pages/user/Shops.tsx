@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, Store, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +6,11 @@ import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopsList, ShopForm } from '@/components/user/shops';
-import { ShopService, type Shop, type ShopLimitInfo } from '@/lib/shop-service';
+import { ShopService, type ShopLimitInfo } from '@/lib/shop-service';
 import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { SessionValidator } from '@/lib/session-validation';
 
 type ViewMode = 'list' | 'create';
 
@@ -19,12 +21,24 @@ export const Shops = () => {
   const [shopsCount, setShopsCount] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
+  const queryClient = useQueryClient();
 
-  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
+  const { data: limitMax } = useQuery<number>({
+    queryKey: ['shopLimit'],
+    queryFn: async () => ShopService.getShopLimitOnly(),
+    staleTime: 3_600_000,
+    gcTime: 86_400_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
   useEffect(() => {
-    const shopLimit = (tariffLimits || []).find((l) => String(l.limit_name || '').toLowerCase().includes('магаз'))?.value ?? 0;
-    setLimitInfo((prev) => ({ ...prev, max: shopLimit, canCreate: prev.current < shopLimit }));
-  }, [tariffLimits]);
+    const max = Number(limitMax || 0);
+    if (max > 0) {
+      setLimitInfo(prev => ({ ...prev, max, canCreate: prev.current < max }));
+    }
+  }, [limitMax]);
 
   const handleShopsLoaded = (count: number) => {
     setShopsCount(count);
@@ -34,6 +48,23 @@ export const Shops = () => {
       canCreate: count < prev.max
     }));
   };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await SessionValidator.validateSession();
+        const userId = String(v?.user?.id || '');
+        if (!userId) return;
+        const channel = supabase
+          .channel(`shop_limit_${userId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'user_subscriptions', filter: `user_id=eq.${userId}` }, () => {
+            queryClient.invalidateQueries({ queryKey: ['shopLimit'] });
+          })
+          .subscribe();
+        return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
+      } catch { /* noop */ }
+    })();
+  }, [queryClient]);
 
   // No forced refresh on mount; React Query in ShopsList handles initial fetch
   const handleCreateNew = () => {
@@ -87,7 +118,6 @@ export const Shops = () => {
                   size="icon"
                   title={t('refresh') || 'Оновити'}
                   onClick={() => {
-                    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:shopsList'); } catch { void 0; }
                     setRefreshTrigger(prev => prev + 1);
                   }}
                 >

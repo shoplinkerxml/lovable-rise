@@ -33,8 +33,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey)
+    const apiKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
   const userId = decodeJwtSub(authHeader)
   if (!userId) {
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders })
@@ -48,15 +50,48 @@ Deno.serve(async (req) => {
     })
   }
 
+  // Template data: expected to be provided by client
+  let template_id = (body as any)?.template_id ?? null
+  let xml_config = (body as any)?.xml_config ?? null
+  let custom_mapping = (body as any)?.custom_mapping ?? null
+  const marketplace = typeof (body as any)?.marketplace === "string" ? String((body as any)?.marketplace).trim() : null
+
+  // Legacy fallback: if client only provided marketplace, do ONE exact query
+  if (!template_id && !xml_config && !custom_mapping) {
+    if (!marketplace) {
+      return new Response(JSON.stringify({ error: "validation_failed", message: "template data required" }), {
+        status: 422,
+        headers: corsHeaders,
+      })
+    }
+    const { data: template, error: tplErr } = await (supabase as any)
+      .from("store_templates")
+      .select("id, xml_structure, mapping_rules")
+      .eq("marketplace", marketplace)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (tplErr) {
+      return new Response(JSON.stringify({ error: "db_error" }), { status: 500, headers: corsHeaders })
+    }
+    if (!template) {
+      return new Response(JSON.stringify({ error: "template_not_found" }), { status: 422, headers: corsHeaders })
+    }
+    template_id = String(template.id)
+    xml_config = (template as any)?.xml_structure ?? null
+    custom_mapping = (template as any)?.mapping_rules ?? null
+  }
+
   const payload = {
     id: crypto.randomUUID(),
     user_id: userId,
     store_name,
     store_company: (body as any)?.store_company ?? null,
     store_url: (body as any)?.store_url ?? null,
-    template_id: (body as any)?.template_id ?? null,
-    xml_config: (body as any)?.xml_config ?? null,
-    custom_mapping: (body as any)?.custom_mapping ?? null,
+    template_id,
+    xml_config,
+    custom_mapping,
     is_active: true,
   }
 

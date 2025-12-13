@@ -1,6 +1,6 @@
 export const CACHE_TTL = {
   productsPage: 900_000,
-  shopsList: 2_592_000_000,
+  shopsList: 900_000,
   categoryFilters: 300_000,
   productLinks: 120_000,
   uiPrefs: 2_592_000_000,

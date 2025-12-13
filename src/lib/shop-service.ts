@@ -29,6 +29,7 @@ export interface CreateShopData {
   template_id?: string | null;
   xml_config?: Json | null;
   custom_mapping?: Json | null;
+  marketplace?: string | null;
 }
 
 export interface UpdateShopData {
@@ -273,30 +274,6 @@ export class ShopService {
    * Миграция старого формата в новый происходит автоматически.
    */
   private static readShopsCache(allowStale: boolean): ShopAggregated[] | null {
-    // Сначала пытаемся прочитать из нового кэша
-    const cached = readCache<ShopAggregated[]>(this.SHOPS_CACHE_KEY, allowStale);
-    if (cached?.data && Array.isArray(cached.data)) {
-      return cached.data;
-    }
-
-    // Fallback на legacy localStorage (только в браузере)
-    if (typeof window === "undefined") return null;
-
-    try {
-      const raw = window.localStorage.getItem(this.SHOPS_CACHE_KEY);
-      if (!raw) return null;
-
-      const legacy = JSON.parse(raw) as { items?: ShopAggregated[]; expiresAt?: number };
-      
-      if (Array.isArray(legacy.items) && typeof legacy.expiresAt === "number") {
-        // Мигрируем в новый формат
-        writeCache(this.SHOPS_CACHE_KEY, legacy.items, CACHE_TTL.shopsList);
-        return legacy.items;
-      }
-    } catch (error) {
-      console.warn("Failed to read legacy cache:", error);
-    }
-
     return null;
   }
 
@@ -304,7 +281,7 @@ export class ShopService {
    * Запись в кэш с типобезопасностью
    */
   private static writeShopsCache(items: ShopAggregated[]): void {
-    writeCache(this.SHOPS_CACHE_KEY, items, CACHE_TTL.shopsList);
+    return;
   }
 
   /**
@@ -314,15 +291,7 @@ export class ShopService {
   private static updateShopsCache(
     mutator: (items: ShopAggregated[]) => ShopAggregated[]
   ): void {
-    const current = this.readShopsCache(true);
-    if (!current) return;
-
-    try {
-      const updated = mutator(current);
-      this.writeShopsCache(updated);
-    } catch (error) {
-      console.error("Failed to update shops cache:", error);
-    }
+    return;
   }
 
   /**
@@ -370,13 +339,16 @@ export class ShopService {
    */
   static async getShopLimitOnly(): Promise<number> {
     await this.ensureSession();
-    
-    const response = await this.invokeEdge<ShopLimitResponse>(
-      "get-shop-limit-only",
-      {}
-    );
-    
-    return Number(response.value) || 0;
+    let v = 0;
+    try {
+      const response = await this.invokeEdge<ShopLimitResponse>("get-shop-limit-only", {});
+      v = Number(response.value) || 0;
+    } catch {
+      v = 0;
+    }
+    if (v > 0) return v;
+    if (v <= 0) v = 3;
+    return v;
   }
 
   /**
@@ -386,16 +358,16 @@ export class ShopService {
     if (this.isOffline()) return 0;
 
     await this.ensureSession();
-    
-    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
-    return Array.isArray(response.shops) ? response.shops.length : 0;
+    try {
+      const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+      return Array.isArray(response.shops) ? response.shops.length : 0;
+    } catch {
+      return 0;
+    }
   }
 
   static async getShopsCountCached(): Promise<number> {
-    const cached = this.readShopsCache(true);
-    if (cached) return cached.length;
-    const count = await this.getShopsCount();
-    return count;
+    return await this.getShopsCount();
   }
 
   /**
@@ -415,21 +387,8 @@ export class ShopService {
    * Это основной метод для получения списка магазинов в UI.
    */
   static async getShopsAggregated(): Promise<ShopAggregated[]> {
-    // Проверяем валидный кэш
-    const cached = this.readShopsCache(false);
-    if (cached) {
-      const hasSuspiciousCounts = cached.some(
-        (s) => (s.productsCount ?? 0) > 0 && (s.categoriesCount ?? 0) === 0
-      );
-      if (!hasSuspiciousCounts) {
-        return cached;
-      }
-    }
-
-    // В offline режиме используем устаревший кэш
     if (this.isOffline()) {
-      const stale = this.readShopsCache(true);
-      return stale || [];
+      return [];
     }
 
     await this.ensureSession();
@@ -443,18 +402,10 @@ export class ShopService {
         );
         
         const shops = response.shops || [];
-        this.writeShopsCache(shops);
         return shops;
       } catch (error) {
         console.error("Failed to fetch aggregated shops, using fallback:", error);
-        
-        // Пытаемся использовать устаревший кэш
-        const stale = this.readShopsCache(true);
-        if (stale) return stale;
-        
-        // Последний вариант — fallback запрос
         const fallback = await this.getShopsFallback();
-        this.writeShopsCache(fallback);
         return fallback;
       }
     });
@@ -538,27 +489,25 @@ export class ShopService {
 
     await this.ensureSession();
 
-    // Проверяем лимит перед созданием
-    const limitInfo = await this.getShopLimit();
-    if (!limitInfo.canCreate) {
-      throw new Error(
-        `Досягнуто ліміту магазинів (${limitInfo.max}). Оновіть тарифний план.`
-      );
+    try {
+      const response = await this.invokeEdge<ShopResponse>("create-shop", {
+        store_name: storeName,
+        template_id: shopData.template_id ?? null,
+        xml_config: shopData.xml_config ?? null,
+        custom_mapping: shopData.custom_mapping ?? null,
+        store_company: shopData.store_company ?? null,
+        store_url: shopData.store_url ?? null,
+        marketplace: shopData.marketplace ?? null,
+      });
+      return response.shop;
+    } catch (e) {
+      const msg = String((e as { message?: string } | null)?.message || "");
+      if (/limit/i.test(msg) || /\(400\)/.test(msg) || /LIMIT_REACHED/i.test(msg)) {
+        const max = await this.getShopLimitOnly();
+        throw new Error(`Досягнуто ліміту магазинів (${max}). Оновіть тарифний план.`);
+      }
+      throw e;
     }
-
-    const response = await this.invokeEdge<ShopResponse>("create-shop", {
-      store_name: storeName,
-      template_id: shopData.template_id ?? null,
-      xml_config: shopData.xml_config ?? null,
-      custom_mapping: shopData.custom_mapping ?? null,
-      store_company: shopData.store_company ?? null,
-      store_url: shopData.store_url ?? null,
-    });
-
-    // Инвалидируем кэш после создания
-    removeCache(this.SHOPS_CACHE_KEY);
-
-    return response.shop;
   }
 
   /**
@@ -613,9 +562,6 @@ export class ShopService {
       patch,
     });
 
-    // Инвалидируем кэш после обновления
-    removeCache(this.SHOPS_CACHE_KEY);
-
     return response.shop;
   }
 
@@ -637,10 +583,7 @@ export class ShopService {
           .delete()
           .eq("id", id)
           .eq("user_id", uid);
-        if (!delErr) {
-          removeCache(this.SHOPS_CACHE_KEY);
-          return;
-        }
+        if (!delErr) { return; }
       }
     } catch { /* ignore */ }
 
@@ -670,8 +613,7 @@ export class ShopService {
       await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
     }
 
-    // Инвалидируем кэш после удаления
-    removeCache(this.SHOPS_CACHE_KEY);
+    return;
   }
 
   // ============================================================================
@@ -1035,16 +977,7 @@ export class ShopService {
   static async getStoreProductsCount(storeId: string): Promise<number> {
     if (!storeId) return 0;
 
-    // 1) Пытаемся получить из кэша магазинов (у нас уже есть counts на странице магазинов)
-    try {
-      const cached = this.readShopsCache(true);
-      const found = (cached || []).find((s) => String(s.id) === String(storeId));
-      if (found && typeof found.productsCount === "number") {
-        return Math.max(0, Number(found.productsCount) || 0);
-      }
-    } catch { /* ignore */ }
-
-    // 2) Edge Function: точный подсчет количества товаров
+    // Edge Function: точный подсчет количества товаров
     try {
       await this.ensureSession();
       const resp = await this.invokeEdge<{ count: number }>("get-store-products-count", { store_id: storeId });

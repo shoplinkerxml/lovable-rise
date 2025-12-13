@@ -6,10 +6,13 @@ export interface MarketplaceOption {
   label: string;
 }
 
+export type TemplatesMap = Record<string, { id: string; xml_structure: unknown; mapping_rules: unknown }>;
+
 export const useMarketplaces = (enabled: boolean = true) => {
   const [marketplaces, setMarketplaces] = useState<MarketplaceOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [templatesMap, setTemplatesMap] = useState<TemplatesMap>({});
 
   useEffect(() => {
     const fetchMarketplaces = async () => {
@@ -20,12 +23,18 @@ export const useMarketplaces = (enabled: boolean = true) => {
         try {
           const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
           if (raw) {
-            const parsed = JSON.parse(raw) as { items: string[]; expiresAt: number };
-            if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
+            const parsed = JSON.parse(raw) as { items: string[]; templatesByMarketplace?: TemplatesMap; expiresAt: number };
+            const hasValidItems = parsed && Array.isArray(parsed.items) && parsed.items.length > 0;
+            const notExpired = parsed && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now();
+            const tm = parsed?.templatesByMarketplace || {};
+            const hasTemplates = tm && Object.keys(tm).length > 0;
+            if (hasValidItems && notExpired && hasTemplates) {
               setMarketplaces(parsed.items.map((m) => ({ value: m, label: m })));
+              setTemplatesMap(tm);
               setIsLoading(false);
               return;
             }
+            // If cache exists but without templates, fall through to fetch and upgrade cache
           }
         } catch (e) { void 0; }
 
@@ -35,13 +44,20 @@ export const useMarketplaces = (enabled: boolean = true) => {
           body: {},
         });
         if (fnError) throw new Error((fnError as { message?: string })?.message || 'fetch_failed');
-        const payload = typeof data === 'string' ? JSON.parse(data) as { marketplaces?: string[] } : (data as { marketplaces?: string[] });
+        const payload = typeof data === 'string' 
+          ? JSON.parse(data) as { marketplaces?: string[]; templatesByMarketplace?: TemplatesMap } 
+          : (data as { marketplaces?: string[]; templatesByMarketplace?: TemplatesMap });
         const items = Array.isArray(payload?.marketplaces) ? (payload.marketplaces as string[]) : [];
         const options: MarketplaceOption[] = items.map((m) => ({ value: String(m), label: String(m) }));
+        const tmRaw = payload?.templatesByMarketplace || {};
+        const tm: TemplatesMap = Object.fromEntries(
+          Object.entries(tmRaw).map(([k, v]) => [String(k).toLowerCase().trim(), v])
+        );
         
         setMarketplaces(options);
+        setTemplatesMap(tm);
         try {
-          const payloadStore = JSON.stringify({ items: items, expiresAt: Date.now() + 900_000 });
+          const payloadStore = JSON.stringify({ items: items, templatesByMarketplace: tm, expiresAt: Date.now() + 900_000 });
           if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payloadStore);
         } catch (e) { void 0; }
       } catch (err) {
@@ -54,5 +70,5 @@ export const useMarketplaces = (enabled: boolean = true) => {
     if (enabled) fetchMarketplaces(); else { setIsLoading(false); }
   }, [enabled]);
 
-  return { marketplaces, isLoading, error };
+  return { marketplaces, templatesMap, isLoading, error };
 };

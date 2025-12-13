@@ -173,13 +173,7 @@ export class ProductService {
   private static readonly FIRST_PAGE_INDEX_KEY = "rq:index:products:first";
 
   private static addFirstPageKeyToIndex(key: string) {
-    try {
-      if (typeof window === "undefined") return;
-      const raw = window.localStorage.getItem(ProductService.FIRST_PAGE_INDEX_KEY);
-      const arr = raw ? (JSON.parse(raw) as string[]) : [];
-      const next = Array.from(new Set([...(Array.isArray(arr) ? arr : []), key]));
-      window.localStorage.setItem(ProductService.FIRST_PAGE_INDEX_KEY, JSON.stringify(next));
-    } catch { /* ignore */ }
+    return;
   }
 
   private static castNullableNumber(value: unknown): number | null {
@@ -284,13 +278,6 @@ export class ProductService {
       total: number;
     };
   }> {
-    const sizedKey = `rq:products:first:${storeId ?? "all"}:${limit}`;
-    if (!options?.bypassCache) {
-      const cached = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(sizedKey, false);
-      if (cached?.data && Array.isArray(cached.data.items)) {
-        return { products: cached.data.items, page: cached.data.page };
-      }
-    }
     try {
       const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
         store_id: storeId ?? null,
@@ -305,13 +292,9 @@ export class ProductService {
         nextOffset: fresh?.page?.nextOffset ?? null,
         total: fresh?.page?.total ?? products.length,
       };
-      writeCache(sizedKey, { items: products, page }, CACHE_TTL.productsPage);
-      ProductService.addFirstPageKeyToIndex(sizedKey);
       return { products, page };
     } catch {
       const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
-      writeCache(sizedKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
-      ProductService.addFirstPageKeyToIndex(sizedKey);
       return fb;
     }
   }
@@ -437,19 +420,7 @@ export class ProductService {
     storeId: string | null,
     mutate: (items: unknown[]) => unknown[],
   ) {
-    try {
-      if (typeof window === "undefined") return;
-      const prefix = `rq:products:first:${storeId ?? "all"}`;
-      const raw = window.localStorage.getItem(ProductService.FIRST_PAGE_INDEX_KEY);
-      const indexKeys = raw ? (JSON.parse(raw) as string[]) : [];
-      const keysToUpdate = (Array.isArray(indexKeys) ? indexKeys : []).filter((k) => k === prefix || k.startsWith(`${prefix}:`));
-      for (const key of keysToUpdate) {
-        const cached = readCache<{ items: unknown[]; page?: unknown }>(key, true);
-        if (!cached || !Array.isArray(cached.data.items)) continue;
-        const nextItems = mutate(cached.data.items);
-        writeCache(key, { items: nextItems, page: cached.data.page }, CACHE_TTL.productsPage);
-      }
-    } catch { void 0; }
+    return;
   }
 
   static patchProductCaches(
@@ -457,27 +428,7 @@ export class ProductService {
     patch: Partial<ProductAggregated>,
     storeId?: string | null,
   ) {
-    try {
-      ProductService.updateFirstPageCaches(storeId ?? null, (arr) => {
-        const items = arr as ProductAggregated[];
-        return items.map((p) =>
-          String(p.id) === String(productId) ? { ...p, ...patch } : p,
-        );
-      });
-      ProductService.updateFirstPageCaches(null, (arr) => {
-        const items = arr as ProductAggregated[];
-        return items.map((p) =>
-          String(p.id) === String(productId) ? { ...p, ...patch } : p,
-        );
-      });
-      const env = readCache<ProductAggregated[]>("rq:products:all", true);
-      if (env?.data && Array.isArray(env.data)) {
-        const next = env.data.map((p) =>
-          String(p.id) === String(productId) ? { ...p, ...patch } : p,
-        );
-        writeCache("rq:products:all", next, CACHE_TTL.productsPage);
-      }
-    } catch { void 0; }
+    return;
   }
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
@@ -780,10 +731,6 @@ export class ProductService {
   }
 
   static async getStoreLinksForProduct(productId: string): Promise<string[]> {
-    const cacheKey = `rq:links:product:${productId}`;
-    const cached = readCache<string[]>(cacheKey, false);
-    if (cached?.data && Array.isArray(cached.data)) return cached.data.map(String);
-
     const existing = ProductService.inFlightLinksByProduct.get(productId);
     if (existing) return existing;
 
@@ -795,7 +742,6 @@ export class ProductService {
       const ids = Array.isArray(payload.store_ids)
         ? payload.store_ids.map(String)
         : [];
-      writeCache(cacheKey, ids, CACHE_TTL.productLinks);
       return ids;
     })();
 
@@ -808,15 +754,11 @@ export class ProductService {
   }
 
   static invalidateStoreLinksCache(productId: string) {
-    removeCache(`rq:links:product:${productId}`);
     try { ProductService.inFlightLinksByProduct.delete(productId); } catch { void 0; }
   }
 
   /** Максимальный лимит продуктов: через отдельную функцию get-product-limit-only */
   static async getProductLimitOnly(): Promise<number> {
-    const cacheKey = "rq:product-limit";
-    const cached = readCache<number>(cacheKey, false);
-    if (cached && cached.data !== undefined && cached.data !== null) return Number(cached.data) || 0;
     const sessionValidation = await SessionValidator.ensureValidSession();
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
@@ -824,7 +766,6 @@ export class ProductService {
     try {
       const resp = await ProductService.invokeEdge<{ value?: number }>("get-product-limit-only", {});
       const v = Number(resp?.value ?? 0) || 0;
-      writeCache(cacheKey, v, CACHE_TTL.limits);
       return v;
     } catch (e) {
       return 0;
@@ -844,7 +785,7 @@ export class ProductService {
   }
 
   static invalidateProductLimitCache() {
-    try { removeCache("rq:product-limit"); } catch { void 0; }
+    return;
   }
 
   /** Количество продуктов текущего пользователя: только функция user-products-list */
@@ -875,20 +816,7 @@ export class ProductService {
   }
 
   static async getProductsCountCached(): Promise<number> {
-    try {
-      if (typeof window === "undefined") return 0;
-      const prefix = `rq:products:first:all`;
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const k = window.localStorage.key(i);
-        if (!k) continue;
-        if (k === prefix || k.startsWith(`${prefix}:`)) {
-          const env = readCache<{ items: unknown[]; page?: { total?: number } }>(k, false);
-          const total = typeof env?.data?.page?.total === "number" ? Number(env.data.page.total) || 0 : 0;
-          if (total > 0) return total;
-        }
-      }
-    } catch { /* ignore */ }
-    return 0;
+    return await ProductService.getProductsCount();
   }
 
   /** Полный список продуктов текущего пользователя (по функциям с пагинацией + кэш) */
@@ -897,10 +825,6 @@ export class ProductService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-
-    const cacheKey = "rq:products:all";
-    const cached = readCache<ProductAggregated[]>(cacheKey, false);
-    if (cached?.data && Array.isArray(cached.data)) return cached.data as unknown as Product[];
 
     const limit = 50;
     let offset = 0;
@@ -937,7 +861,6 @@ export class ProductService {
       if (all.length >= 1000) break;
     }
 
-    writeCache(cacheKey, all, CACHE_TTL.productsPage);
     return all as unknown as Product[];
   }
 
@@ -1438,19 +1361,7 @@ export class ProductService {
   }
 
   static clearAllFirstPageCaches() {
-    try {
-      if (typeof window === "undefined") return;
-      const prefix = "rq:products:first:";
-      const keysToDelete: string[] = [];
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const k = window.localStorage.key(i);
-        if (!k) continue;
-        if (k.startsWith(prefix)) keysToDelete.push(k);
-      }
-      for (const key of keysToDelete) {
-        removeCache(key);
-      }
-    } catch { void 0; }
+    return;
   }
 
   /** Проверка только валидности сессии (без дополнительных запросов) */
