@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { ProductPlaceholder } from '@/components/ProductPlaceholder'
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
 import { R2Storage } from '@/lib/r2-storage'
+import { ImageHelpers } from '@/utils/imageHelpers'
 import type { ProductImage } from './types'
 
 type Props = {
@@ -63,7 +64,7 @@ export default function ImagePreviewSection(props: Props) {
                         onError={(e) => {
                           const el = e.target as HTMLImageElement
                           if (original) el.src = original
-                          const key = original ? R2Storage.extractObjectKeyFromUrl(original) : null
+                          const key = original ? ImageHelpers.extractObjectKeyFromUrl(original) : null
                           if (key) {
                             R2Storage.getViewUrl(key).then((view) => { if (view) el.src = view }).catch(() => void 0)
                           }

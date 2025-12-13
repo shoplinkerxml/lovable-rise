@@ -137,7 +137,7 @@ export const R2Storage = {
         || (import.meta as any).env?.R2_PUBLIC_HOST
         || (window as any).__R2_PUBLIC_BASE_URL__
         || (window as any).__R2_PUBLIC_HOST__
-        || '';
+        || 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev';
       if (!base) return '';
       const b = String(base).startsWith('http') ? String(base) : `https://${String(base)}`;
       try {
@@ -149,7 +149,7 @@ export const R2Storage = {
         return b;
       }
     } catch {
-      return '';
+      return 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev';
     }
   },
   makePublicUrl(objectKey: string): string {
@@ -184,7 +184,10 @@ export const R2Storage = {
     if (!productId && userId && resp?.objectKey && (resp.objectKey.includes(`uploads/tmp/${userId}/`) || resp.objectKey.includes(`/uploads/tmp/${userId}/`))) {
       addPendingUpload(userId, resp.objectKey);
     }
-    return resp;
+    const publicBase = R2Storage.getR2PublicBaseUrl();
+    const parsedKey = resp.objectKey || R2Storage.extractObjectKeyFromUrl(resp.publicUrl || '') || '';
+    const normalizedPublicUrl = parsedKey ? `${publicBase}/${parsedKey}` : (resp.publicUrl || '');
+    return { success: !!resp.success, objectKey: parsedKey || resp.objectKey, publicUrl: normalizedPublicUrl, viewUrl: resp.viewUrl };
   },
 
   /**

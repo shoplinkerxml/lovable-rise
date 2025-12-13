@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { useI18n } from "@/providers/i18n-provider";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
+import { ImageHelpers } from "@/utils/imageHelpers";
 
 interface ProductFormProps {
   product?: any | null;
@@ -31,6 +32,7 @@ interface ProductImage {
   order_index: number;
   alt_text?: string;
   is_main?: boolean;
+  object_key?: string;
 }
 
 export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) => {
@@ -240,6 +242,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
           url: result.originalUrl,
           order_index: result.orderIndex,
           is_main: result.isMain,
+          object_key: result.r2KeyOriginal,
         }]);
         setNewImageUrl('');
         toast.success('Зображення завантажено');
@@ -250,8 +253,16 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         setLoading(false);
       }
     } else {
-      toast.error('Спочатку збережіть товар, щоб додати фото за URL');
-      return;
+      const u = newImageUrl.trim();
+      const key = ImageHelpers.extractObjectKeyFromUrl(u);
+      setImages([...images, { 
+        url: u,
+        order_index: images.length,
+        is_main: images.length === 0,
+        object_key: key || undefined,
+      }]);
+      setNewImageUrl('');
+      toast.success('Зображення додано');
     }
   };
 
@@ -291,12 +302,19 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
           url: result.originalUrl,
           order_index: result.orderIndex,
           is_main: result.isMain,
+          object_key: result.r2KeyOriginal,
         }]);
         
         toast.success('Зображення завантажено');
       } else {
-        toast.error('Спочатку збережіть товар, щоб додати фото');
-        return;
+        const resp = await R2Storage.uploadFile(file);
+        setImages([...images, {
+          url: resp.publicUrl,
+          order_index: images.length,
+          is_main: images.length === 0,
+          object_key: resp.objectKey,
+        }]);
+        toast.success('Зображення завантажено');
       }
     } catch (error) {
       console.error('Upload error:', error);

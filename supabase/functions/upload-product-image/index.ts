@@ -72,24 +72,26 @@ function resolvePublicBase(): string {
     const h = host.startsWith("http") ? host : `https://${host}`
     try {
       const u = new URL(h)
-      return `${u.protocol}//${u.host}`
+      // Убираем trailing slash
+      return `${u.protocol}//${u.host}`.replace(/\/+$/, "")
     } catch {
-      return h
+      return h.replace(/\/+$/, "")
     }
   }
-  const raw = Deno.env.get("R2_PUBLIC_BASE_URL") || Deno.env.get("IMAGE_BASE_URL") || "https://image-resize-worker.shoplinkerxml.workers.dev"
+  const raw = Deno.env.get("R2_PUBLIC_BASE_URL") || Deno.env.get("IMAGE_BASE_URL") || "https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev"
   try {
     const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`)
     const origin = `${u.protocol}//${u.host}`
     const path = (u.pathname || "/").replace(/^\/+/, "").replace(/\/+$/, "")
-    return path ? `${origin}/${path}` : origin
+    // Убираем trailing slash из финального URL
+    return path ? `${origin}/${path}`.replace(/\/+$/, "") : origin
   } catch {
-    return raw
+    return raw.replace(/\/+$/, "")
   }
 }
 
 const IMAGE_BASE_URL = resolvePublicBase()
-console.log("[upload-product-image] version v10-cloudflare-worker")
+console.log("[upload-product-image] version v11-url-fix")
 console.log(`[upload-product-image] Using IMAGE_BASE_URL: ${IMAGE_BASE_URL}`)
 
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
@@ -282,18 +284,20 @@ Deno.serve(async (req) => {
     const imageId = (inserted as any).id
     console.log(`[upload-product-image] Created image row: ${imageId}`)
 
-    // Определяем расширение файла
-    const contentType = inputMime || 'image/jpeg'
-    const ext = contentType.includes('png') ? 'png' : 
-                contentType.includes('webp') ? 'webp' : 
-                contentType.includes('gif') ? 'gif' : 'jpg'
+    // Формируем ключ для R2 без начального слеша
+    const originalKey = `products/${productId}/${imageId}/original.webp`
+    
+    // Формируем правильный URL (без двойных слешей)
+    const originalUrl = `${IMAGE_BASE_URL}/${originalKey}`
+    
+    console.log(`[upload-product-image] R2 Key: ${originalKey}`)
+    console.log(`[upload-product-image] Final URL will be: ${originalUrl}`)
 
-    // Создаём ключ только для оригинала
-    const originalKey = `products/${productId}/${imageId}/original.${ext}`
+    const contentType = body.fileData ? 'image/webp' : (inputMime || 'image/webp')
 
     try {
       // Загружаем только оригинал
-      console.log(`[upload-product-image] Uploading to R2: ${originalKey}`)
+      console.log(`[upload-product-image] Uploading to R2...`)
       
       // Добавляем таймаут для загрузки в R2
       const uploadPromise = s3.send(new PutObjectCommand({ 
@@ -309,10 +313,8 @@ Deno.serve(async (req) => {
       
       await Promise.race([uploadPromise, timeoutPromise])
 
-      console.log(`[upload-product-image] Upload complete`)
-
-      // Формируем URL оригинала
-      const originalUrl = `${IMAGE_BASE_URL}/${originalKey}`
+      console.log(`[upload-product-image] Upload complete to R2`)
+      console.log(`[upload-product-image] Image accessible at: ${originalUrl}`)
 
       // Обновляем БД
       const { error: updateErr } = await supabase

@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 import { R2Storage } from "@/lib/r2-storage";
+import { ImageHelpers } from "@/utils/imageHelpers";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { SortToggle } from "./SortToggle";
@@ -63,7 +64,7 @@ const ProductThumbnail = React.memo(({
       return;
     }
 
-    const key = baseUrl ? (R2Storage.extractObjectKeyFromUrl(baseUrl) || baseUrl) : '';
+    const key = baseUrl ? (ImageHelpers.extractObjectKeyFromUrl(baseUrl) || baseUrl) : '';
     if (!key) {
       setSrc('');
       return;

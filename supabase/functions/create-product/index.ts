@@ -99,6 +99,28 @@ serve(async (req) => {
     const bucket = Deno.env.get("R2_BUCKET_NAME") ?? "";
     const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") ?? "";
     const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? "";
+    function resolvePublicBase(): string {
+      const host = Deno.env.get("R2_PUBLIC_HOST") || "";
+      if (host) {
+        const h = host.startsWith("http") ? host : `https://${host}`;
+        try {
+          const u = new URL(h);
+          return `${u.protocol}//${u.host}`;
+        } catch {
+          return h;
+        }
+      }
+      const raw = Deno.env.get("R2_PUBLIC_BASE_URL") || Deno.env.get("IMAGE_BASE_URL") || "https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev";
+      try {
+        const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+        const origin = `${u.protocol}//${u.host}`;
+        const path = (u.pathname || "/").replace(/^\/+/, "").replace(/\/+$/, "");
+        return path ? `${origin}/${path}` : origin;
+      } catch {
+        return raw;
+      }
+    }
+    const IMAGE_BASE_URL = resolvePublicBase();
     if (!SUPABASE_URL || !SERVICE_KEY) {
       return new Response(JSON.stringify({ error: "server_misconfig" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -200,61 +222,54 @@ serve(async (req) => {
     const s3 = accountId && bucket && accessKeyId && secretAccessKey
       ? new S3Client({ region: "auto", endpoint: `https://${accountId}.r2.cloudflarestorage.com`, credentials: { accessKeyId, secretAccessKey } })
       : null;
-    const now = new Date();
-    const yyyy = now.getUTCFullYear();
-    const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(now.getUTCDate()).padStart(2, "0");
-    const datePath = `${yyyy}/${mm}/${dd}`;
 
     try {
       const images = Array.isArray(body.images) ? body.images : [];
       if (images.length) {
         const hasMain = images.some((i) => i.is_main === true);
         let assigned = false;
-        const normalized = [] as Array<{ product_id: string; url: string; order_index: number; is_main: boolean }>;
         for (let index = 0; index < images.length; index++) {
           const img = images[index];
-          let finalUrl = String(img.url || "");
-          if (s3) {
-            const srcKey = (img.key && String(img.key)) || (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url) : null);
-            if (srcKey) {
-              const parts = srcKey.split("/").filter(Boolean);
-              const baseName = parts[parts.length - 1] || "file";
-              const cleanName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_");
-              const suffix = crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-              const destKey = `uploads/products/${String(created.id)}/${datePath}/${suffix}-${cleanName}`;
-              try {
-                await s3.send(new CopyObjectCommand({ Bucket: bucket, Key: destKey, CopySource: `${bucket}/${srcKey}` }));
-                finalUrl = `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${destKey}`;
-                const getCmd = new GetObjectCommand({ Bucket: bucket, Key: destKey });
-                try { finalUrl = await getSignedUrl(s3, getCmd, { expiresIn: 3600 }); } catch { /* noop */ }
-              } catch (_) {
-                // Fallback: keep original URL when copy fails (external image or missing key)
-                finalUrl = String(img.url || "");
-              }
-            }
-          }
           let m = img.is_main === true && !assigned;
           if (hasMain) {
             if (img.is_main === true && !assigned) assigned = true; else m = false;
           } else {
             m = index === 0;
           }
-          if (finalUrl && finalUrl.trim() !== "") {
-            normalized.push({ product_id: String(created.id), url: finalUrl, order_index: typeof img.order_index === "number" ? img.order_index : index, is_main: m });
+          let insertedId: number | null = null;
+          const { data: insertedRow } = await supabase
+            .from("store_product_images")
+            .insert({
+              product_id: String(created.id),
+              url: "#processing",
+              order_index: typeof img.order_index === "number" ? img.order_index : index,
+              is_main: m,
+            })
+            .select("id")
+            .single();
+          insertedId = (insertedRow as any)?.id ?? null;
+          const srcKey = s3 ? ((img.key && String(img.key)) || (typeof img.url === "string" ? extractObjectKeyFromUrl(img.url) : null)) : null;
+          if (s3 && insertedId && srcKey) {
+            const originalKey = `products/${String(created.id)}/${String(insertedId)}/original.webp`;
+            try {
+              await s3.send(new CopyObjectCommand({ Bucket: bucket, Key: originalKey, CopySource: `${bucket}/${srcKey}` }));
+              const finalUrl = IMAGE_BASE_URL ? `${IMAGE_BASE_URL}/${originalKey}` : `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${originalKey}`;
+              await supabase
+                .from("store_product_images")
+                .update({ url: finalUrl, r2_key_original: originalKey })
+                .eq("id", insertedId);
+            } catch {
+              await supabase
+                .from("store_product_images")
+                .update({ url: String(img.url || "") })
+                .eq("id", insertedId);
+            }
+          } else if (insertedId) {
+            await supabase
+              .from("store_product_images")
+              .update({ url: String(img.url || "") })
+              .eq("id", insertedId);
           }
-        }
-        const mainIdx = normalized.findIndex((i) => i.is_main === true);
-        const ordered = (() => {
-          const arr = normalized.slice();
-          if (mainIdx > 0) {
-            const [main] = arr.splice(mainIdx, 1);
-            arr.unshift(main);
-          }
-          return arr.map((i, idx) => ({ ...i, order_index: idx }));
-        })();
-        if (ordered.length) {
-          await supabase.from("store_product_images").insert(ordered);
         }
       }
 

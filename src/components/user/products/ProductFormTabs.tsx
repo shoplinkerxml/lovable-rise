@@ -16,6 +16,7 @@ import { ShopService } from "@/lib/shop-service";
 import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "@/lib/session-validation";
 import { R2Storage } from "@/lib/r2-storage";
+import { ImageHelpers } from "@/utils/imageHelpers";
 import { useI18n } from "@/providers/i18n-provider";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 
@@ -126,7 +127,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     try {
       const currentImages = imagesRef.current || [];
       for (const img of currentImages) {
-        const objectKey = img?.object_key || (img?.url ? R2Storage.extractObjectKeyFromUrl(img.url) : null);
+        const objectKey = img?.object_key || (img?.url ? ImageHelpers.extractObjectKeyFromUrl(img.url) : null);
         if (!objectKey) continue;
         // Отправляем keepalive-удаление без await, щоб не блокувати перехід
         R2Storage.deleteFileKeepalive(objectKey)
@@ -229,7 +230,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
                   : (img.url
                       ? R2Storage.makePublicUrl(String(img.url))
                       : ''));
-            const objectKey = originalFull ? (R2Storage.extractObjectKeyFromUrl(originalFull) || undefined) : undefined;
+            const objectKey = originalFull ? (ImageHelpers.extractObjectKeyFromUrl(originalFull) || undefined) : undefined;
             const objectKeyFixed = objectKey ? String(objectKey).replace(/\.web$/, '.webp') : undefined;
             return {
               url: originalFull || '',
@@ -362,7 +363,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
       try {
         const list = await ProductService.getProductImages(pid);
         const resolved = await Promise.all((list || []).map(async (img, index) => {
-          const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          const objectKeyRaw = ImageHelpers.extractObjectKeyFromUrl(img.url);
           const previewUrl = String(img.url || '');
           const absolutePreview = objectKeyRaw ? R2Storage.makePublicUrl(objectKeyRaw) : previewUrl;
           return {
@@ -388,7 +389,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
   const removeImage = async (index: number) => {
     const target = images[index];
     try {
-      const objectKey = target?.object_key || (target?.url ? R2Storage.extractObjectKeyFromUrl(target.url) : null);
+      const objectKey = target?.object_key || (target?.url ? ImageHelpers.extractObjectKeyFromUrl(target.url) : null);
       if (objectKey) {
         await R2Storage.deleteFile(objectKey);
         await R2Storage.removePendingUpload(objectKey);
@@ -407,7 +408,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           try {
             const list = await ProductService.getProductImages(pid);
             const resolved = await Promise.all((list || []).map(async (img, index2) => {
-              const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+              const objectKeyRaw = ImageHelpers.extractObjectKeyFromUrl(img.url);
               const previewUrl = String(img.url || '');
               const absolutePreview = objectKeyRaw ? R2Storage.makePublicUrl(objectKeyRaw) : previewUrl;
               return {
@@ -476,7 +477,7 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           return s.replace(/\.(web|wep)(\?|#|$)/, '.webp$2');
         };
         const resolved = await Promise.all((list || []).map(async (img, index) => {
-          const objectKeyRaw = typeof img.url === 'string' ? R2Storage.extractObjectKeyFromUrl(img.url) : null;
+          const objectKeyRaw = ImageHelpers.extractObjectKeyFromUrl(img.url);
           const objectKeyFixed = objectKeyRaw ? String(objectKeyRaw).replace(/\.web$/, '.webp') : undefined;
           const previewUrl = normalizeImageUrl(img.url || '');
           const base = R2Storage.getR2PublicBaseUrl();

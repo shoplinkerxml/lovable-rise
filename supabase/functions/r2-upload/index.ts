@@ -34,8 +34,13 @@ function decodeJwtSub(authHeader?: string | null): string | null {
   }
 }
 
+// ИСПРАВЛЕНО: теперь обрабатывает data URI
 function decodeBase64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
+  // Убираем data URI префикс если есть (data:image/png;base64,xxxxx)
+  const commaIdx = b64.indexOf(',');
+  const pureBase64 = commaIdx >= 0 ? b64.slice(commaIdx + 1) : b64;
+  
+  const binary = atob(pureBase64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
@@ -51,27 +56,63 @@ function randomId(): string {
   return crypto.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// НОВАЯ ФУНКЦИЯ: получаем правильный публичный base URL
+function getPublicBaseUrl(): string {
+  const customDomain = Deno.env.get('R2_PUBLIC_HOST') || '';
+  if (customDomain) {
+    const url = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
+    return url.replace(/\/+$/, ''); // убираем trailing slash
+  }
+  
+  // Fallback на стандартный R2.dev URL
+  const defaultUrl = Deno.env.get('R2_PUBLIC_BASE_URL') || 
+                     Deno.env.get('IMAGE_BASE_URL') || 
+                     'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev';
+  
+  return defaultUrl.replace(/\/+$/, ''); // убираем trailing slash
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  console.log('[r2-upload] New request:', req.method);
+  
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+  
   try {
     const auth = req.headers.get('authorization');
     if (!auth) {
-      return new Response(JSON.stringify({ error: 'unauthorized', message: 'Missing authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      console.log('[r2-upload] Missing authorization');
+      return new Response(
+        JSON.stringify({ error: 'unauthorized', message: 'Missing authorization header' }), 
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const userId = decodeJwtSub(auth);
+    console.log('[r2-upload] User ID:', userId);
+    
     // Разбор тела запроса
     const body = await req.json() as UploadBody;
     if (!body?.fileName || !body?.fileType || !body?.fileSize || !body?.fileData) {
-      return new Response(JSON.stringify({ error: 'invalid_body', message: 'Required fields: fileName, fileType, fileSize, fileData' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      console.log('[r2-upload] Missing required fields');
+      return new Response(
+        JSON.stringify({ error: 'invalid_body', message: 'Required fields: fileName, fileType, fileSize, fileData' }), 
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const accountId = Deno.env.get('CLOUDFLARE_ACCOUNT_ID') ?? '';
     const bucket = Deno.env.get('R2_BUCKET_NAME') ?? '';
     const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID') ?? '';
     const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY') ?? '';
+    
     if (!accountId || !bucket || !accessKeyId || !secretAccessKey) {
-      return new Response(JSON.stringify({ error: 'server_misconfig', message: 'Missing R2 environment configuration' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      console.error('[r2-upload] Missing R2 configuration');
+      return new Response(
+        JSON.stringify({ error: 'server_misconfig', message: 'Missing R2 environment configuration' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const s3 = new S3Client({
@@ -81,6 +122,8 @@ serve(async (req) => {
     });
 
     const fileBytes = decodeBase64ToBytes(body.fileData);
+    console.log(`[r2-upload] File size: ${fileBytes.length} bytes`);
+    
     const now = new Date();
     const yyyy = now.getUTCFullYear();
     const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
@@ -98,27 +141,48 @@ serve(async (req) => {
       objectKey = `uploads/tmp/unknown/${datePath}/${suffix}-${cleanName}`;
     }
 
+    console.log(`[r2-upload] Uploading to R2: ${objectKey}`);
+
     await s3.send(new PutObjectCommand({
       Bucket: bucket,
       Key: objectKey,
       Body: fileBytes,
       ContentType: body.fileType,
-      ACL: undefined,
+      ACL: undefined, // R2 не поддерживает ACL
     }));
 
-    const publicUrl = `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${objectKey}`;
-    // Сразу формируем подписанный URL для предпросмотра (GET)
+    console.log('[r2-upload] Upload successful');
+
+    // ИСПРАВЛЕНО: формируем правильный публичный URL
+    const publicBaseUrl = getPublicBaseUrl();
+    const publicUrl = `${publicBaseUrl}/${objectKey}`;
+    
+    console.log(`[r2-upload] Public URL: ${publicUrl}`);
+
+    // Presigned URL для приватного доступа (если нужен)
     const getCmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
     const viewUrl = await getSignedUrl(s3, getCmd, { expiresIn: 3600 });
 
-    return new Response(JSON.stringify({ success: true, objectKey, publicUrl, viewUrl }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        objectKey, 
+        publicUrl,   // Правильный публичный URL
+        viewUrl,     // Подписанный URL (истекает через 1 час)
+      }), 
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'upload_failed', message: e?.message ?? 'Upload failed' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('[r2-upload] Error:', e);
+    return new Response(
+      JSON.stringify({ error: 'upload_failed', message: e?.message ?? 'Upload failed' }), 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });
