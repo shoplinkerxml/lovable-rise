@@ -764,6 +764,14 @@ export function ProductFormTabs({
       const img = doc.querySelector('img');
       if (img && img.src) {
         droppedUrl = img.src;
+      } else {
+        const a = doc.querySelector('a[href]');
+        const href = a?.getAttribute('href') || '';
+        if (href && (href.startsWith('http') || href.startsWith('data:'))) {
+          if (href.match(/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?|$)/i) || href.startsWith('data:image/')) {
+            droppedUrl = href;
+          }
+        }
       }
     }
 
@@ -776,6 +784,46 @@ export function ProductFormTabs({
           droppedUrl = textData;
         }
       }
+    }
+    // Check for URI list (common for dragging links/images)
+    if (!droppedUrl) {
+      const uriList = e.dataTransfer.getData('text/uri-list');
+      if (uriList) {
+        const first = uriList.split('\n').find(line => line.trim() && !line.startsWith('#')) || '';
+        if (first && (first.startsWith('http') || first.startsWith('data:'))) {
+          if (first.match(/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?|$)/i) || first.startsWith('data:image/')) {
+            droppedUrl = first.trim();
+          }
+        }
+      }
+    }
+    // As a last resort, inspect items asynchronously
+    if (!droppedUrl && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      const str = await new Promise<string | null>((resolve) => {
+        let resolved = false;
+        try {
+          for (const item of Array.from(e.dataTransfer.items)) {
+            if (item.kind === 'string') {
+              // Try text/uri-list style
+              item.getAsString((s) => {
+                if (resolved) return;
+                const val = String(s || '');
+                if (val && (val.startsWith('http') || val.startsWith('data:'))) {
+                  if (val.match(/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?|$)/i) || val.startsWith('data:image/')) {
+                    resolved = true;
+                    resolve(val);
+                  }
+                }
+              });
+            }
+          }
+          // Fallback timeout
+          setTimeout(() => { if (!resolved) resolve(null); }, 25);
+        } catch {
+          resolve(null);
+        }
+      });
+      if (str) droppedUrl = str;
     }
 
     // Check for files
