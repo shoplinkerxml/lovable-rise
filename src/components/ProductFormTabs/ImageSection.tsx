@@ -106,7 +106,18 @@ export function ImageSection(props: Props) {
             isVid ? (
               <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
             ) : (
-              <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
+              <img
+                ref={(el) => {
+                  if (props.galleryImgRefs.current[index] !== el) {
+                    props.galleryImgRefs.current[index] = el
+                  }
+                }}
+                src={src}
+                alt={image.alt_text || `Изображение ${index + 1}`}
+                className="w-full h-full object-contain"
+                onLoad={(e) => props.onGalleryImageLoad(e, index)}
+                onError={(e) => props.onGalleryImageError(e, index)}
+              />
             )
           ) : null}
         </div>
@@ -136,7 +147,7 @@ export function ImageSection(props: Props) {
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e
     if (!over || active.id === over.id) return
-    const ids = props.images.map((im) => String(im.object_key || im.url))
+    const ids = props.images.map((im, idx) => String(im.object_key || im.url || idx))
     const oldIndex = ids.indexOf(String(active.id))
     const newIndex = ids.indexOf(String(over.id))
     if (oldIndex === -1 || newIndex === -1) return
@@ -147,7 +158,7 @@ export function ImageSection(props: Props) {
   function handleModalDragEnd(e: DragEndEvent) {
     const { active, over } = e
     if (!over || active.id === over.id) return
-    const ids = reorderList.map((im) => String(im.object_key || im.url))
+    const ids = reorderList.map((im, idx) => String(im.object_key || im.url || idx))
     const oldIndex = ids.indexOf(String(active.id))
     const newIndex = ids.indexOf(String(over.id))
     if (oldIndex === -1 || newIndex === -1) return
@@ -213,28 +224,37 @@ export function ImageSection(props: Props) {
                 })()}
               </div>
               {!props.readOnly && (
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+                  {/* Белая (outline) - первая */}
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label={t('reorder') || 'Змінити порядок'}
+                    onClick={() => { setReorderList(props.images.slice()); setReorderOpen(true) }}
+                    className="h-7 w-7 rounded-md"
+                  >
+                    <ListOrdered className="h-3 w-3" />
+                  </Button>
+                  {/* Зеленая (set main) - вторая */}
                   {props.images[props.activeIndex]?.is_main ? null : (
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={() => props.onSetMainImage(props.activeIndex)}
                       aria-label={t('set_as_main_photo')}
-                      className="rounded-md bg-success text-primary-foreground hover:bg-success/90"
+                      className="h-7 w-7 rounded-md bg-success text-primary-foreground hover:bg-success/90"
                     >
-                      <Check className="h-4 w-4" />
+                      <Check className="h-3 w-3" />
                     </Button>
                   )}
+                  {/* Красная (delete) - третья */}
                   <Button
                     size="icon"
-                    variant="outline"
-                    aria-label={t('reorder') || 'Змінити порядок'}
-                    onClick={() => { setReorderList(props.images.slice()); setReorderOpen(true) }}
+                    variant="destructive"
+                    onClick={() => props.onRemoveImage(props.activeIndex)}
+                    className="h-7 w-7 rounded-md"
                   >
-                    <ListOrdered className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="destructive" onClick={() => props.onRemoveImage(props.activeIndex)}>
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               )}
@@ -275,13 +295,13 @@ export function ImageSection(props: Props) {
               </List>
             ) : (
               <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                <SortableContext items={props.images.map((im) => String(im.object_key || im.url || ''))} strategy={horizontalListSortingStrategy}>
+                <SortableContext items={props.images.map((im, idx) => String(im.object_key || im.url || idx))} strategy={horizontalListSortingStrategy}>
                   <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
                     <CarouselContent className="-ml-2 mr-2">
                       {props.images.map((image, index) => (
                         <CarouselItem key={(image.object_key || image.url || index).toString()} className="pl-2" style={{ flex: `0 0 ${isLarge ? 5 : 4}rem` }}>
                           <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)} data-testid={`productFormTabs_imageCard_${index}`}>
-                            <CardContent className="p-2">
+                          <CardContent className="p-2">
                               <SortableThumb image={image} index={index} />
                             </CardContent>
                           </Card>
@@ -301,7 +321,7 @@ export function ImageSection(props: Props) {
                 <DialogDescription>{t('drag_to_reorder') || 'Перетягніть зображення, щоб змінити порядок. Максимум 15 фото.'}</DialogDescription>
               </DialogHeader>
               <DndContext sensors={sensors} onDragEnd={handleModalDragEnd}>
-                <SortableContext items={reorderList.map((im) => String(im.object_key || im.url || ''))} strategy={rectSortingStrategy}>
+                <SortableContext items={reorderList.map((im, idx) => String(im.object_key || im.url || idx))} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
                     {reorderList.slice(0, 15).map((image, index) => (
                       <ModalSortableThumb key={(image.object_key || image.url || index).toString()} image={image} index={index} />

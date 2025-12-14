@@ -1,42 +1,67 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 
-export function useImageGallery(imagesLength: number, activeTab: string, onImagesLoadingChange?: (flag: boolean) => void) {
-  const [galleryLoaded, setGalleryLoaded] = useState(imagesLength === 0);
-  const [galleryLoadCount, setGalleryLoadCount] = useState(0);
+export function useImageGallery(
+  imagesLength: number, 
+  activeTab: string, 
+  onImagesLoadingChange?: (flag: boolean) => void
+) {
+  const [loadedCount, setLoadedCount] = useState(0);
+  const imagesLengthRef = useRef(imagesLength);
+  
+  // Мemoized вычисление состояний
+  const isLoading = useMemo(
+    () => imagesLength > 0 && loadedCount < imagesLength,
+    [imagesLength, loadedCount]
+  );
+  
+  const isLoaded = useMemo(
+    () => imagesLength === 0 || loadedCount >= imagesLength,
+    [imagesLength, loadedCount]
+  );
 
-  const notify = useCallback((flag: boolean) => {
-    if (!onImagesLoadingChange) return;
-    setTimeout(() => onImagesLoadingChange(flag), 0);
-  }, [onImagesLoadingChange]);
-
+  // Сброс при изменении количества изображений
   useEffect(() => {
-    setGalleryLoadCount(0);
-    setGalleryLoaded(imagesLength === 0);
-    if (activeTab === 'images') {
-      notify(imagesLength > 0 && !galleryLoaded);
-    } else {
-      notify(false);
-    }
-  }, [imagesLength, activeTab, galleryLoaded, notify]);
-
-  const incrementLoadCount = useCallback(() => {
-    setGalleryLoadCount(prev => {
-      const next = prev + 1;
-      if (next >= imagesLength) {
-        setGalleryLoaded(true);
-        notify(false);
-      }
-      return next;
-    });
-  }, [imagesLength, notify]);
-
-  const resetLoadCount = useCallback(() => {
-    setGalleryLoadCount(0);
-    setGalleryLoaded(imagesLength === 0);
+    imagesLengthRef.current = imagesLength;
+    setLoadedCount(0);
   }, [imagesLength]);
 
-  const isLoading = useMemo(() => imagesLength > 0 && !galleryLoaded, [imagesLength, galleryLoaded]);
+  // Стабильная ссылка на коллбек
+  const onLoadingChangeRef = useRef(onImagesLoadingChange);
+  useEffect(() => {
+    onLoadingChangeRef.current = onImagesLoadingChange;
+  }, [onImagesLoadingChange]);
 
-  return { galleryLoaded, incrementLoadCount, resetLoadCount, isLoading };
+  // Уведомление о загрузке (с защитой от лишних вызовов)
+  const prevLoadingStateRef = useRef<boolean>();
+  useEffect(() => {
+    if (!onLoadingChangeRef.current) return;
+
+    const shouldShowLoading = activeTab === 'images' && isLoading;
+    
+    if (prevLoadingStateRef.current !== shouldShowLoading) {
+      prevLoadingStateRef.current = shouldShowLoading;
+      onLoadingChangeRef.current?.(shouldShowLoading);
+    }
+  }, [activeTab, isLoading]);
+
+  // Инкремент с защитой от race conditions
+  const incrementLoadCount = useCallback(() => {
+    setLoadedCount(prev => {
+      const currentLength = imagesLengthRef.current;
+      // Не увеличиваем счётчик, если уже достигли лимита
+      return prev < currentLength ? prev + 1 : prev;
+    });
+  }, []);
+
+  const resetLoadCount = useCallback(() => {
+    setLoadedCount(0);
+  }, []);
+
+  return { 
+    galleryLoaded: isLoaded,
+    isLoading,
+    loadedCount,
+    incrementLoadCount, 
+    resetLoadCount 
+  };
 }
-
