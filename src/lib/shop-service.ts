@@ -299,15 +299,36 @@ export class ShopService {
    * Используется когда основной endpoint недоступен.
    */
   private static async getShopsFallback(): Promise<ShopAggregated[]> {
-    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
-    const shops = response.shops || [];
-    
-    return shops.map(shop => ({
-      ...shop,
-      marketplace: shop.marketplace || "Не вказано",
-      productsCount: shop.productsCount || 0,
-      categoriesCount: shop.categoriesCount || 0,
-    }));
+    try {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userRes?.user) return [];
+      const userId = String(userRes.user.id);
+      if (!userId) return [];
+      const { data: rows, error } = await supabase
+        .from("user_stores")
+        .select("id, user_id, store_name, store_company, store_url, template_id, xml_config, custom_mapping, is_active, created_at, updated_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error || !Array.isArray(rows)) return [];
+      return (rows as any[]).map((shop) => ({
+        id: String(shop.id),
+        user_id: String(shop.user_id),
+        store_name: String(shop.store_name || ""),
+        store_company: shop.store_company ?? null,
+        store_url: shop.store_url ?? null,
+        template_id: shop.template_id ?? null,
+        xml_config: shop.xml_config ?? null,
+        custom_mapping: shop.custom_mapping ?? null,
+        marketplace: "Не вказано",
+        is_active: Boolean(shop.is_active),
+        created_at: String(shop.created_at || ""),
+        updated_at: String(shop.updated_at || ""),
+        productsCount: 0,
+        categoriesCount: 0,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   // ============================================================================
@@ -988,22 +1009,27 @@ export class ShopService {
     }
   }
  
+  
   /**
-   * Пересчет счетчиков магазина и синхронизация с кэшем.
-   */
-  static async recomputeStoreCounts(storeId: string): Promise<{ productsCount: number; categoriesCount: number }> {
-    if (!storeId) return { productsCount: 0, categoriesCount: 0 };
-    await this.ensureSession();
-    // Получаем количество товаров и список названий категорий через Edge Functions
-    const [{ count: pCountRaw }, catResp] = await Promise.all([
-      this.invokeEdge<{ count: number }>("get-store-products-count", { store_id: storeId }),
-      this.invokeEdge<{ names?: string[] }>("store-category-filter-options", { store_id: storeId }),
-    ]);
-    const pCount = Math.max(0, Number(pCountRaw || 0));
-    const cCount = pCount === 0 ? 0 : Math.max(0, Array.isArray(catResp?.names) ? catResp.names!.length : 0);
-    this.updateShopsCache(shops =>
-      shops.map(s => String(s.id) === String(storeId) ? { ...s, productsCount: pCount, categoriesCount: cCount } : s)
-    );
-    return { productsCount: pCount, categoriesCount: cCount };
-  }
+ * Пересчет счетчиков магазина и синхронизация с кэшем.
+ */
+/**
+ * Пересчет счетчиков магазина и синхронизация с кэшем.
+ */
+static async recomputeStoreCounts(storeId: string): Promise<{ productsCount: number; categoriesCount: number }> {
+  if (!storeId) return { productsCount: 0, categoriesCount: 0 };
+  await this.ensureSession();
+  
+  const { ProductService } = await import("@/lib/product-service");
+  
+  const [productsCount, categoryNames] = await Promise.all([
+    this.getStoreProductsCount(storeId),
+    ProductService.getStoreCategoryFilterOptions(storeId),
+  ]);
+  
+  const pCount = Math.max(0, productsCount);
+  const cCount = pCount === 0 ? 0 : (Array.isArray(categoryNames) ? categoryNames.length : 0);
+  
+  return { productsCount: pCount, categoriesCount: cCount };
+}
 }

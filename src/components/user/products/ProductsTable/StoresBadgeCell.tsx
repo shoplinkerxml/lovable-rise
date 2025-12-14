@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ShopService, type ShopAggregated } from "@/lib/shop-service";
+import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
 
 type ProductRow = Product & { linkedStoreIds?: string[] };
@@ -132,14 +133,30 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               ]);
                               ProductService.invalidateStoreLinksCache(String(product.id));
                               toast.success(t("product_added_to_store"));
-                              ShopService.bumpProductsCountInCache(String(id), 1);
+                              {
+                                const idStr = String(id);
+                                const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+                                const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
+                                const nextProducts = baseProducts + 1;
+                                const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
+                                const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
+                                ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                              }
                               try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                               try { /* keep menu open */ setOpen(true); } catch { void 0; }
                             } else {
                               const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
                               ProductService.invalidateStoreLinksCache(String(product.id));
                               toast.success(t("product_removed_from_store"));
-                              ShopService.bumpProductsCountInCache(String(id), -1);
+                              {
+                                const idStr = String(id);
+                                const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+                                const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
+                                const nextProducts = Math.max(0, baseProducts - 1);
+                                const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
+                                const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
+                                ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                              }
                               try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                               try { setOpen(true); } catch { void 0; }
                             }
@@ -241,14 +258,30 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       ]);
                                       ProductService.invalidateStoreLinksCache(String(product.id));
                                       toast.success(t("product_added_to_store"));
-                                      ShopService.bumpProductsCountInCache(String(sid), 1);
+                                      {
+                                        const sidStr = String(sid);
+                                        const existing = queryClient.getQueryData<any>(ShopCountsService.key(sidStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+                                        const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
+                                        const nextProducts = baseProducts + 1;
+                                        const names = Array.isArray(categoryNamesByStore?.[sidStr]) ? categoryNamesByStore![sidStr] : [];
+                                        const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
+                                        ShopCountsService.set(queryClient, sidStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                      }
                                       try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
                                     } else {
                                       const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(sid)]);
                                       ProductService.invalidateStoreLinksCache(String(product.id));
                                       toast.success(t("product_removed_from_store"));
-                                      ShopService.bumpProductsCountInCache(String(sid), -1);
+                                      {
+                                        const sidStr = String(sid);
+                                        const existing = queryClient.getQueryData<any>(ShopCountsService.key(sidStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+                                        const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
+                                        const nextProducts = Math.max(0, baseProducts - 1);
+                                        const names = Array.isArray(categoryNamesByStore?.[sidStr]) ? categoryNamesByStore![sidStr] : [];
+                                        const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
+                                        ShopCountsService.set(queryClient, sidStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                      }
                                       try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
                                     }

@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ShopService } from "@/lib/shop-service";
 import { ProductService } from "@/lib/product-service";
+import { ShopCountsService } from "@/lib/shop-counts";
 import type { ShopAggregated } from "@/lib/shop-service";
 import type {
   PostgresInsertPayload,
@@ -38,16 +39,7 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
           ]);
           if (!isMountedRef.current) return;
           const categoriesCount = Array.isArray(categoryNames) ? categoryNames.length : 0;
-          queryClient.setQueryData<ShopCounts>(["shopCounts", shopId], {
-            productsCount,
-            categoriesCount,
-          });
-          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-            if (!Array.isArray(prev)) return prev;
-            return prev.map((s) =>
-              String(s.id) === shopId ? { ...s, productsCount, categoriesCount } : s
-            );
-          });
+          ShopCountsService.set(queryClient, shopId, { productsCount, categoriesCount });
         } catch (error) {
           if (isMountedRef.current) {
             queryClient.invalidateQueries({ queryKey: ["shopCounts", shopId] });
@@ -57,21 +49,7 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
     };
 
     const updateProductCount = (delta: number) => {
-      queryClient.setQueryData<ShopCounts>(["shopCounts", shopId], (old) => {
-        if (!old) return { productsCount: Math.max(0, delta), categoriesCount: 0 };
-        return {
-          productsCount: Math.max(0, old.productsCount + delta),
-          categoriesCount: old.categoriesCount,
-        };
-      });
-      queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-        if (!Array.isArray(prev)) return prev;
-        return prev.map((s) =>
-          String(s.id) === shopId
-            ? { ...s, productsCount: Math.max(0, (s.productsCount ?? 0) + delta) }
-            : s
-        );
-      });
+      ShopCountsService.bumpProducts(queryClient, shopId, delta);
       scheduleCountsRefetch();
     };
 
@@ -127,4 +105,3 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
     };
   }, [shopId, enabled, queryClient]);
 };
-

@@ -9,6 +9,7 @@ import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';
 import { ShopService } from '@/lib/shop-service';
+import { ShopCountsService } from '@/lib/shop-counts';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -171,17 +172,13 @@ export const ProductEdit = () => {
             const linked = await ProductService.getStoreLinksForProduct(String(id));
             const namesByStore = await ProductService.refreshStoreCategoryFilterOptions(linked);
             for (const sid of linked) {
-              const names = Array.isArray(namesByStore?.[String(sid)]) ? namesByStore![String(sid)] : [];
-              ShopService.setCategoriesCountInCache(String(sid), names.length);
+              const idStr = String(sid);
+              const names = Array.isArray(namesByStore?.[idStr]) ? namesByStore![idStr] : [];
+              const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+              const productsCount = Math.max(0, (existing?.productsCount ?? 0));
+              const categoriesCount = productsCount === 0 ? 0 : Math.max(0, names.length);
+              ShopCountsService.set(queryClient, idStr, { productsCount, categoriesCount });
             }
-            queryClient.setQueryData(['shopsList'], (prev: any) => {
-              const arr = Array.isArray(prev) ? prev : [];
-              return arr.map((s: any) => {
-                const names = Array.isArray(namesByStore?.[String(s.id)]) ? namesByStore![String(s.id)] : undefined;
-                if (!names) return s;
-                return { ...s, categoriesCount: names.length };
-              });
-            });
           } catch { /* ignore */ }
         }
       } catch { void 0; }

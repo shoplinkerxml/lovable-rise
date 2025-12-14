@@ -16,6 +16,7 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/
 import { Store, Trash2, Package, List } from 'lucide-react';
 import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type ShopAggregated } from '@/lib/shop-service';
+import { ShopCountsService } from '@/lib/shop-counts';
 import { supabase } from '@/integrations/supabase/client';
 import { SessionValidator } from '@/lib/session-validation';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -88,6 +89,20 @@ export const ShopsList = ({
       }
     })();
   }, []);
+  
+  // Нормализация счетчиков: если товаров 0 — категории 0
+  useEffect(() => {
+    try {
+      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+        const arr = Array.isArray(prev) ? prev : shops;
+        return (arr || []).map((s) => {
+          const products = Math.max(0, Number(s.productsCount ?? 0));
+          const categories = products === 0 ? 0 : Math.max(0, Number(s.categoriesCount ?? 0));
+          return { ...s, productsCount: products, categoriesCount: categories };
+        });
+      });
+    } catch { void 0; }
+  }, [shops, queryClient]);
 
   // Інвалідація при зміні refreshTrigger
   useEffect(() => {
@@ -104,22 +119,7 @@ export const ShopsList = ({
   useEffect(() => {
     // Оптимістичне оновлення лічильників товарів
     const updateProductsCount = (storeId: string, delta: number) => {
-      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
-        const arr = Array.isArray(prev) ? prev : [];
-        return arr.map((s) => {
-          if (String(s.id) !== String(storeId)) return s;
-          
-          const nextProducts = Math.max(0, (s.productsCount ?? 0) + delta);
-          // Якщо товарів 0 → категорій теж 0
-          const nextCategories = nextProducts === 0 ? 0 : (s.categoriesCount ?? 0);
-          
-          return { 
-            ...s, 
-            productsCount: nextProducts, 
-            categoriesCount: nextCategories 
-          } as ShopWithMarketplace;
-        });
-      });
+      ShopCountsService.bumpProducts(queryClient, storeId, delta);
 
       // Через 750мс робимо повний refetch для синхронізації
       if (refetchDebounceRef.current != null) {

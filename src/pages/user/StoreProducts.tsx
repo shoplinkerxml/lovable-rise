@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ProductsTable } from "@/components/user/products/ProductsTable";
 import { ProductService, type Product } from "@/lib/product-service";
@@ -6,139 +6,100 @@ import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";
-import { Loader2, Package, List, Store as StoreIcon } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { Package, List } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
-import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
- 
+import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { useShopRealtimeSync } from "@/hooks/useShopRealtimeSync";
+import { ShopCountsService } from "@/lib/shop-counts";
 
 export const StoreProducts = () => {
   const { id } = useParams();
-  const storeId = String(id || "");
+  const storeId = id ? String(id) : "";
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [shopName, setShopName] = useState("");
-  const [tableLoading, setTableLoading] = useState<boolean>(true);
-  const [initialReady, setInitialReady] = useState<boolean>(false);
-  const [shopLoaded, setShopLoaded] = useState<boolean>(false);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const [limitInfo] = useState<{ current: number; max: number; canCreate: boolean }>({ current: 0, max: 0, canCreate: true });
   const queryClient = useQueryClient();
-  const [categoriesCount, setCategoriesCount] = useState<number>(0);
+  useEffect(() => {
+    if (storeId) {
+      navigate(`/user/shops/${storeId}`, { replace: true });
+    }
+  }, [storeId, navigate]);
+
+  console.log('=== StoreProducts RENDER ===');
+  console.log('storeId:', storeId);
+
+  const { data: counts, refetch: refetchCounts } = useQuery({
+    queryKey: ShopCountsService.key(storeId),
+    queryFn: async () => {
+      console.log('🔵 queryFn START, storeId:', storeId);
+      const result = await ShopService.recomputeStoreCounts(storeId);
+      console.log('🔵 queryFn RESULT:', result);
+      return result;
+    },
+    enabled: !!storeId,
+    staleTime: 60000,
+  });
+
+  console.log('counts from useQuery:', counts);
+  console.log('totalCount will be:', counts?.productsCount ?? 0);
+  console.log('categoriesCount will be:', counts?.categoriesCount ?? 0);
+
+  const { data: shop, isLoading: shopLoading } = useQuery({
+    queryKey: ['shop', storeId],
+    queryFn: () => ShopService.getShop(storeId),
+    enabled: !!storeId,
+    staleTime: 300000,
+  });
+
+  useShopRealtimeSync({ shopId: storeId, enabled: !!storeId });
 
   useEffect(() => {
     if (!storeId) {
       toast.error(t("no_active_stores"));
     }
-    (async () => {
-      try {
-        const shop = await ShopService.getShop(storeId);
-        setShopName(shop?.store_name || "");
-      } catch (_) { setShopName(""); }
-      finally { setShopLoaded(true); }
-    })();
   }, [storeId, t]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const names = await ProductService.getStoreCategoryFilterOptions(storeId);
-        setCategoriesCount(Array.isArray(names) ? names.length : 0);
-      } catch {
-        try {
-          const key = `rq:filters:categories:${storeId}`;
-          const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
-          if (raw) {
-            const parsed = JSON.parse(raw) as { items?: string[] } | string[];
-            const cnt = Array.isArray((parsed as { items?: string[] }).items)
-              ? ((parsed as { items?: string[] }).items as string[]).length
-              : (Array.isArray(parsed) ? (parsed as string[]).length : 0);
-            setCategoriesCount(cnt);
-          }
-        } catch { void 0; }
-      }
-    })();
-  }, [storeId]);
-
-  const handleEdit = (product: Product) => {
+  const handleEdit = useCallback((product: Product) => {
     navigate(`/user/shops/${storeId}/products/edit/${product.id}`);
-  };
+  }, [navigate, storeId]);
 
-  const handleDelete = async (product: Product) => {
+  const handleDelete = useCallback(async (product: Product) => {
     try {
-      const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(storeId)]);
-      try {
-        const names = Array.isArray(categoryNamesByStore?.[String(storeId)]) ? categoryNamesByStore![String(storeId)] : [];
-        setCategoriesCount(names.length);
-        ShopService.setCategoriesCountInCache(String(storeId), names.length);
-        queryClient.setQueryData(['shopsList'], (prev: any) => {
-          const arr = Array.isArray(prev) ? prev : [];
-          return arr.map((s: any) => String(s.id) === String(storeId) ? { ...s, categoriesCount: names.length } : s);
-        });
-      } catch { /* ignore */ }
-      try { setTotalCount((prev) => Math.max(0, (prev || 0) - 1)); } catch { /* ignore */ }
-      setRefreshTrigger((p) => p + 1);
+      const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(
+        [String(product.id)], 
+        [storeId]
+      );
+
+      const names = categoryNamesByStore?.[storeId] || [];
+      const current = counts || { productsCount: 0, categoriesCount: 0 };
+      
+      ShopCountsService.set(queryClient, storeId, {
+        productsCount: Math.max(0, current.productsCount - 1),
+        categoriesCount: names.length,
+      });
+
+      await refetchCounts();
       queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-      try { ShopService.bumpProductsCountInCache(storeId, -1); } catch (e) { void e; }
-    } catch (_) {
+      queryClient.invalidateQueries({ queryKey: ['shopsAggregated'] });
+      
+      toast.success(t("product_removed_successfully"));
+    } catch {
       toast.error(t("failed_remove_from_store"));
     }
-  };
+  }, [storeId, counts, queryClient, refetchCounts, t]);
 
-  return (
-    <ProgressiveLoader
-      isLoading={!shopLoaded}
-      delay={200}
-      fallback={
-        <FullPageLoader
-          title="Завантаження товарів…"
-          subtitle="Готуємо таблицю та фільтри магазину"
-          icon={Package}
-        />
-      }
-    >
-    <div className="p-6 space-y-6">
-      <PageHeader
-        title={t("products_title")}
-        description={t("products_description")}
-        breadcrumbItems={[
-          { label: t("breadcrumb_home"), href: "/user/dashboard" },
-          { label: t("shops_title"), href: "/user/shops" },
-          { label: shopName || storeId, href: `/user/shops/${storeId}` },
-          { label: t("products_title"), current: true },
-        ]}
-        actions={
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
-              <Package className="h-3 w-3" />
-              <span>{totalCount}</span>
-            </Badge>
-            <Badge variant="outline" className="px-3 py-1 font-mono inline-flex items-center gap-1">
-              <List className="h-3 w-3" />
-              <span>{categoriesCount}</span>
-            </Badge>
-          </div>
-        }
-      />
-      <div className="relative">
-        <ProductsTable
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onProductsLoaded={(cnt) => setTotalCount(cnt ?? 0)}
-          onLoadingChange={(loading) => {
-            setTableLoading(loading);
-            if (!loading && !initialReady) setInitialReady(true);
-          }}
-          refreshTrigger={refreshTrigger}
-          canCreate={true}
-          storeId={storeId}
-          hideDuplicate={true}
-        />
-      </div>
-    </div>
-    </ProgressiveLoader>
+  const handleProductsLoaded = useCallback(
+    (count: number) => {
+      refetchCounts();
+    },
+    [refetchCounts]
   );
+
+  const totalCount = counts?.productsCount ?? 0;
+  const categoriesCount = counts?.categoriesCount ?? 0;
+  const shopName = shop?.store_name || "";
+
+  return null;
 };
 
 export default StoreProducts;

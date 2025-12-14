@@ -1,23 +1,21 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ProductService, type Product } from "@/lib/product-service";
+import { ProductService, type Product, type ProductParam } from "@/lib/product-service";
 import { useI18n } from "@/providers/i18n-provider";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ProductFormTabs } from "@/components/ProductFormTabs";
-import { type ProductParam } from "@/lib/product-service";
 import { PageHeader } from "@/components/PageHeader";
 import { Loader2, ArrowLeft } from "lucide-react";
-import { ShopService, type Shop } from "@/lib/shop-service";
-import { CategoryService } from "@/lib/category-service";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ContentSkeleton, ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
+import { ShopService } from "@/lib/shop-service";
+import { ShopCountsService } from "@/lib/shop-counts";
+import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 type StoreProductLinkForm = {
   is_active: boolean;
@@ -38,17 +36,106 @@ type StoreProductLinkPatch = {
   custom_category_id: string | null;
 };
 
+type FormImage = {
+  id?: string;
+  url: string;
+  order_index: number;
+  is_main: boolean;
+  alt_text?: string;
+};
+
+type StoreCategory = {
+  store_category_id: number;
+  category_id: number;
+  name: string;
+  store_external_id: string | null;
+  is_active: boolean;
+};
+
+type ProductEditData = {
+  product: Product | null;
+  images: FormImage[];
+  params: ProductParam[];
+  shopName: string;
+  categoryName: string;
+  storeCategories: StoreCategory[];
+  suppliers?: Array<{ id: string; supplier_name: string }>;
+  currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+  categories?: Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>;
+  supplierCategoriesMap?: Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>>;
+};
+
+// Extended type for form changes that includes category_name
+type ProductFormChange = Partial<Product> & {
+  category_name?: string;
+};
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+const parseNumericValue = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const num = Number(trimmed);
+  return Number.isFinite(num) ? num : null;
+};
+
+const sanitizeParams = (params: ProductParam[]): ProductParam[] => {
+  return params.map((p, idx) => ({
+    name: p.name,
+    value: p.value,
+    order_index: typeof p.order_index === "number" ? p.order_index : idx,
+    paramid: p.paramid?.trim() || null,
+    valueid: p.valueid?.trim() || null,
+  })) as ProductParam[];
+};
+
+const normalizeImages = (images: any[]): FormImage[] => {
+  return images.map((img, index) => ({
+    id: img.id ? String(img.id) : undefined,
+    url: String(img.images?.original || img.url || ''),
+    order_index: typeof img.order_index === 'number' ? img.order_index : index,
+    is_main: !!img.is_main,
+    alt_text: img.alt_text ?? undefined,
+  }));
+};
+
+const getInitialFormState = (link: any, product: Product | null): StoreProductLinkForm => {
+  if (!link) {
+    return {
+      is_active: true,
+      custom_price: "",
+      custom_price_old: "",
+      custom_price_promo: "",
+      custom_stock_quantity: "",
+      custom_available: true,
+    };
+  }
+
+  return {
+    is_active: !!link.is_active,
+    custom_price: link.custom_price == null ? "" : String(link.custom_price),
+    custom_price_old: link.custom_price_old == null ? "" : String(link.custom_price_old),
+    custom_price_promo: link.custom_price_promo == null ? "" : String(link.custom_price_promo),
+    custom_stock_quantity: link.custom_stock_quantity == null ? "" : String(link.custom_stock_quantity),
+    custom_available: link.custom_available == null ? (product ? !!product.available : true) : !!link.custom_available,
+  };
+};
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export const StoreProductEdit = () => {
   const { id, productId } = useParams();
   const storeId = String(id || "");
   const pid = String(productId || "");
   const { t } = useI18n();
-  const showFailToast = useCallback(() => toast.error(t('failed_load_products')), [t]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [shopName, setShopName] = useState("");
-  const [categoryName, setCategoryName] = useState("");
 
+  // Consolidated state
   const [form, setForm] = useState<StoreProductLinkForm>({
     is_active: true,
     custom_price: "",
@@ -57,155 +144,183 @@ export const StoreProductEdit = () => {
     custom_stock_quantity: "",
     custom_available: true,
   });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [baseProduct, setBaseProduct] = useState<Product | null>(null);
-  type FormImage = { id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string };
-  const [images, setImages] = useState<FormImage[]>([]);
-  const [params, setParams] = useState<ProductParam[]>([]);
-  const [imagesLoading, setImagesLoading] = useState<boolean>(false);
+
+  const [productData, setProductData] = useState<ProductEditData>({
+    product: null,
+    images: [],
+    params: [],
+    shopName: "",
+    categoryName: "",
+    storeCategories: [],
+  });
+
+  const [uiState, setUiState] = useState({
+    loading: true,
+    saving: false,
+    imagesLoading: false,
+  });
+
   const [lastCategoryId, setLastCategoryId] = useState<string | null>(null);
-  const [storeCategories, setStoreCategories] = useState<Array<{ store_category_id: number; category_id: number; name: string; store_external_id: string | null; is_active: boolean }>>([]);
-  const [selectedStoreCategoryId, setSelectedStoreCategoryId] = useState<number | null>(null);
-  const aggSuppliersRef = useRef<Array<{ id: string; supplier_name: string }> | undefined>(undefined);
-  const aggCurrenciesRef = useRef<Array<{ id: number; name: string; code: string; status: boolean | null }> | undefined>(undefined);
-  const aggCategoriesRef = useRef<Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }> | undefined>(undefined);
-  const aggSupplierCategoriesMapRef = useRef<Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>> | undefined>(undefined);
 
-  const firstLoadRef = useRef<string | null>(null);
+  // ============================================================================
+  // Data Loading
+  // ============================================================================
+
+  const loadProductData = useCallback(async () => {
+    setUiState(prev => ({ ...prev, loading: true }));
+    
+    try {
+      const agg = await ProductService.getProductEditData(pid, storeId);
+      
+      setProductData({
+        product: agg.product,
+        images: normalizeImages(agg.images || []),
+        params: agg.params || [],
+        shopName: agg.shop?.store_name || "",
+        categoryName: agg.categoryName || "",
+        storeCategories: (agg.storeCategories || []).map(r => ({
+          store_category_id: r.store_category_id,
+          category_id: r.category_id,
+          name: r.name,
+          store_external_id: r.store_external_id,
+          is_active: r.is_active,
+        })),
+        suppliers: agg.suppliers,
+        currencies: agg.currencies,
+        categories: agg.categories,
+        supplierCategoriesMap: agg.supplierCategoriesMap,
+      });
+
+      setForm(getInitialFormState(agg.link, agg.product));
+    } catch (error) {
+      console.error("Failed to load product data:", error);
+      toast.error(t('failed_load_products'));
+    } finally {
+      setUiState(prev => ({ ...prev, loading: false }));
+    }
+  }, [pid, storeId, t]);
+
   useEffect(() => {
-    const key = `${pid}:${storeId}`;
-    if (firstLoadRef.current === key) return;
-    firstLoadRef.current = key;
-    (async () => {
-      setLoading(true);
-      try {
-        const agg = await ProductService.getProductEditData(pid, storeId);
-        setBaseProduct(agg.product);
-        if (agg.link) {
-          const link = agg.link as {
-            is_active?: boolean;
-            custom_price?: string | number | null;
-            custom_price_old?: string | number | null;
-            custom_price_promo?: string | number | null;
-            custom_stock_quantity?: string | number | null;
-            custom_available?: boolean | null;
-          };
-          setForm({
-            is_active: !!link.is_active,
-            custom_price: link.custom_price == null ? "" : String(link.custom_price),
-            custom_price_old: link.custom_price_old == null ? "" : String(link.custom_price_old),
-            custom_price_promo: link.custom_price_promo == null ? "" : String(link.custom_price_promo),
-            custom_stock_quantity: link.custom_stock_quantity == null ? "" : String(link.custom_stock_quantity),
-            custom_available: link.custom_available == null ? (agg.product ? !!agg.product.available : true) : !!link.custom_available,
-          });
+    loadProductData();
+  }, [loadProductData]);
+
+  // ============================================================================
+  // Form Handlers
+  // ============================================================================
+
+  const updateField = useCallback(<K extends keyof StoreProductLinkForm>(
+    key: K,
+    value: StoreProductLinkForm[K]
+  ) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleFormChange = useCallback((partial: ProductFormChange) => {
+    if (typeof partial.price === "number") {
+      updateField("custom_price", String(partial.price));
+    }
+    if (typeof partial.price_old === "number") {
+      updateField("custom_price_old", String(partial.price_old));
+    }
+    if (typeof partial.price_promo === "number") {
+      updateField("custom_price_promo", String(partial.price_promo));
+    }
+    if (typeof partial.stock_quantity === "number") {
+      updateField("custom_stock_quantity", String(partial.stock_quantity));
+    }
+    if (typeof partial.available === "boolean") {
+      updateField("custom_available", partial.available);
+    }
+    
+    // Handle category_id as either string or number
+    const categoryIdStr = typeof partial.category_id === "string" 
+      ? partial.category_id 
+      : typeof partial.category_id === "number" 
+        ? String(partial.category_id) 
+        : null;
+    
+    if (categoryIdStr && categoryIdStr.trim()) {
+      const cid = categoryIdStr.trim();
+      if (cid !== lastCategoryId) {
+        setLastCategoryId(cid);
+        if (partial.category_name) {
+          setProductData(prev => ({ ...prev, categoryName: partial.category_name! }));
         }
-        const srcImages = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main?: boolean; alt_text?: string | null; images?: { original: string | null; card: string | null; thumb: string | null } }>;
-        setImages(srcImages.map((img, index) => ({
-          id: img.id ? String(img.id) : undefined,
-          url: String((img.images?.original || img.url || '')),
-          order_index: typeof img.order_index === 'number' ? img.order_index : index,
-          is_main: !!img.is_main,
-          alt_text: img.alt_text ?? undefined,
-        })));
-        setParams(agg.params || []);
-        setShopName(agg.shop?.store_name || "");
-        if (agg.categoryName) setCategoryName(agg.categoryName);
-        aggSuppliersRef.current = agg.suppliers;
-        aggCurrenciesRef.current = agg.currencies;
-        aggCategoriesRef.current = agg.categories;
-        aggSupplierCategoriesMapRef.current = agg.supplierCategoriesMap;
-        if (Array.isArray(agg.storeCategories)) {
-          setStoreCategories(agg.storeCategories.map(r => ({
-            store_category_id: r.store_category_id,
-            category_id: r.category_id,
-            name: r.name,
-            store_external_id: r.store_external_id,
-            is_active: r.is_active,
-          })));
-        }
-      } catch (_) {
-        showFailToast();
-      } finally {
-        setLoading(false);
       }
-    })();
-  }, [pid, storeId, showFailToast]);
+    }
+  }, [updateField, lastCategoryId]);
 
-  // storeCategories получаем из функции product-edit-data; не выполняем прямые запросы
+  // ============================================================================
+  // Save Logic
+  // ============================================================================
 
-  // categoryName приходит из product-edit-data; дублирующие запросы убраны
+  const buildPatchData = useCallback((): StoreProductLinkPatch => {
+    return {
+      is_active: !!form.is_active,
+      custom_price: parseNumericValue(form.custom_price),
+      custom_price_old: parseNumericValue(form.custom_price_old),
+      custom_price_promo: parseNumericValue(form.custom_price_promo),
+      custom_stock_quantity: parseNumericValue(form.custom_stock_quantity),
+      custom_available: form.custom_available,
+      custom_category_id: null,
+    };
+  }, [form]);
 
-  const updateField = <K extends keyof StoreProductLinkForm>(key: K, value: StoreProductLinkForm[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const updateCategoryCache = useCallback(async (
+    categoryId: number,
+    categoryExtId: string | null,
+    categoryName: string
+  ) => {
+    try {
+      const namesByStore = await ProductService.refreshStoreCategoryFilterOptions([storeId]);
+      const names = Array.isArray(namesByStore?.[storeId]) ? namesByStore[storeId] : [];
+      
+      const existing = queryClient.getQueryData<any>(ShopCountsService.key(storeId)) as { productsCount?: number; categoriesCount?: number } | undefined;
+      const productsCount = Math.max(0, (existing?.productsCount ?? 0));
+      const categoriesCount = productsCount === 0 ? 0 : Math.max(0, names.length);
+      ShopCountsService.set(queryClient, storeId, { productsCount, categoriesCount });
+    } catch (error) {
+      console.error("Failed to update category cache:", error);
+    }
+  }, [storeId, queryClient]);
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSave = useCallback(async () => {
+    setUiState(prev => ({ ...prev, saving: true }));
+
     try {
       const productPayload: { params?: ProductParam[]; category_id?: number } = {};
-      if (params && params.length >= 0) {
-        const sanitized: Array<
-          Omit<ProductParam, "paramid" | "valueid"> & {
-            paramid?: string | null;
-            valueid?: string | null;
-          }
-        > = (params || []).map((p, idx) => ({
-          name: p.name,
-          value: p.value,
-          order_index: typeof p.order_index === "number" ? p.order_index : idx,
-          paramid: p.paramid && p.paramid.trim() ? p.paramid.trim() : null,
-          valueid: p.valueid && p.valueid.trim() ? p.valueid.trim() : null,
-        }))
-        productPayload.params = sanitized as unknown as ProductParam[];
+      
+      if (productData.params && productData.params.length > 0) {
+        productPayload.params = sanitizeParams(productData.params);
       }
-      const patch: StoreProductLinkPatch = {
-        is_active: !!form.is_active,
-        custom_price: null,
-        custom_price_old: null,
-        custom_price_promo: null,
-        custom_stock_quantity: null,
-        custom_available: form.custom_available ? true : false,
-        custom_category_id: null,
-      };
 
-      const priceStr = form.custom_price.trim();
-      const priceNum = Number(priceStr);
-      patch.custom_price = priceStr ? (Number.isFinite(priceNum) ? priceNum : null) : null;
+      const patch = buildPatchData();
 
-      const priceOldStr = form.custom_price_old.trim();
-      const priceOldNum = Number(priceOldStr);
-      patch.custom_price_old = priceOldStr ? (Number.isFinite(priceOldNum) ? priceOldNum : null) : null;
-
-      const promoStr = form.custom_price_promo.trim();
-      const promoNum = Number(promoStr);
-      patch.custom_price_promo = promoStr ? (Number.isFinite(promoNum) ? promoNum : null) : null;
-
-      const stockStr = form.custom_stock_quantity.trim();
-      const stockNum = Number(stockStr);
-      patch.custom_stock_quantity = stockStr ? (Number.isFinite(stockNum) ? stockNum : null) : null;
-
+      // Handle category
       let freshName: string | undefined = undefined;
       if (lastCategoryId) {
-        const num = Number(lastCategoryId);
-        if (Number.isFinite(num)) {
-          productPayload.category_id = num;
-          const storeExtId = (() => {
-            const row = storeCategories.find((r) => r.category_id === num);
-            return row?.store_external_id ?? null;
-          })();
-          patch.custom_category_id = storeExtId ?? null;
-          freshName = (() => {
-            const fromStore = storeCategories.find((r) => r.category_id === num)?.name || '';
-            if (fromStore) return fromStore;
-            const cats = (aggCategoriesRef.current || []) as Array<{ id: string | number; name: string }>;
-            const found = cats.find((c) => String(c.id) === String(num));
-            return found?.name || '';
-          })();
+        const categoryId = Number(lastCategoryId);
+        if (Number.isFinite(categoryId)) {
+          productPayload.category_id = categoryId;
+          
+          const storeCategory = productData.storeCategories.find(
+            r => r.category_id === categoryId
+          );
+          patch.custom_category_id = storeCategory?.store_external_id ?? null;
+          
+          freshName = storeCategory?.name || 
+            productData.categories?.find(c => String(c.id) === String(categoryId))?.name || 
+            '';
         }
       }
 
-      await ProductService.saveStoreProductEdit(pid, storeId, { ...productPayload, linkPatch: patch });
-      // Обновим значения на клиенте для списка товаров магазина
+      // Save to backend
+      await ProductService.saveStoreProductEdit(pid, storeId, {
+        ...productPayload,
+        linkPatch: patch,
+      });
+
+      // Update cache
       ProductService.patchProductCaches(pid, {
         price: patch.custom_price,
         price_old: patch.custom_price_old,
@@ -213,28 +328,73 @@ export const StoreProductEdit = () => {
         stock_quantity: patch.custom_stock_quantity ?? undefined,
         available: patch.custom_available,
       }, storeId);
+
       if (productPayload.category_id != null) {
-        const num = Number(productPayload.category_id);
-        const storeExtId = String(patch.custom_category_id || "") || null;
-        ProductService.patchProductCaches(pid, { category_id: num, category_external_id: storeExtId || null, categoryName: freshName || undefined }, storeId);
-        try {
-          const namesByStore = await ProductService.refreshStoreCategoryFilterOptions([String(storeId)]);
-          const names = Array.isArray(namesByStore?.[String(storeId)]) ? namesByStore![String(storeId)] : [];
-          ShopService.setCategoriesCountInCache(String(storeId), names.length);
-          queryClient.setQueryData(['shopsList'], (prev: any) => {
-            const arr = Array.isArray(prev) ? prev : [];
-            return arr.map((s: any) => String(s.id) === String(storeId) ? { ...s, categoriesCount: names.length } : s);
-          });
-        } catch { /* ignore */ }
+        ProductService.patchProductCaches(pid, {
+          category_id: productPayload.category_id,
+          category_external_id: patch.custom_category_id,
+          categoryName: freshName,
+        }, storeId);
+        
+        await updateCategoryCache(
+          productPayload.category_id,
+          patch.custom_category_id,
+          freshName || ''
+        );
       }
+
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}`);
-    } catch (e) {
+    } catch (error) {
+      console.error("Failed to save product:", error);
       toast.error(t("failed_save_product"));
     } finally {
-      setSaving(false);
+      setUiState(prev => ({ ...prev, saving: false }));
     }
-  };
+  }, [
+    productData.params,
+    productData.storeCategories,
+    productData.categories,
+    buildPatchData,
+    lastCategoryId,
+    pid,
+    storeId,
+    updateCategoryCache,
+    t,
+    navigate,
+  ]);
+
+  // ============================================================================
+  // Computed Values
+  // ============================================================================
+
+  const formOverrides = useMemo(() => ({
+    price: form.custom_price ? parseFloat(form.custom_price) || 0 : productData.product?.price || 0,
+    price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : productData.product?.price_old || 0,
+    price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : productData.product?.price_promo || 0,
+    stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : productData.product?.stock_quantity || 0,
+  }), [form, productData.product]);
+
+  const supplierCategoriesMapNormalized = useMemo(() => {
+    if (!productData.supplierCategoriesMap) return {};
+    
+    return Object.fromEntries(
+      Object.entries(productData.supplierCategoriesMap).map(([key, arr]) => [
+        key,
+        (arr || []).map(c => ({
+          id: String(c.id),
+          name: String(c.name || ''),
+          external_id: String(c.external_id || ''),
+          supplier_id: String(c.supplier_id || ''),
+          parent_external_id: c.parent_external_id == null ? null : String(c.parent_external_id),
+        }))
+      ])
+    );
+  }, [productData.supplierCategoriesMap]);
+
+  // ============================================================================
+  // Render
+  // ============================================================================
 
   return (
     <div className="p-6 space-y-6">
@@ -244,17 +404,16 @@ export const StoreProductEdit = () => {
         breadcrumbItems={[
           { label: t("breadcrumb_home"), href: "/user/dashboard" },
           { label: t("shops_title"), href: "/user/shops" },
-          { label: shopName || storeId, href: `/user/shops/${storeId}` },
-          { label: t("products_title"), href: `/user/shops/${storeId}/products` },
-          { label: categoryName || "—", current: true },
+          { label: productData.shopName || storeId, href: `/user/shops/${storeId}` },
+          { label: productData.categoryName || "—", current: true },
         ]}
         actions={
           <Link
-            to={`/user/shops/${storeId}/products`}
+            to={`/user/shops/${storeId}`}
             className="text-muted-foreground inline-flex items-center p-0 group hover:bg-transparent active:bg-transparent"
             data-testid="store_product_edit_back"
-            aria-label={t("back_to_products")}
-            title={t("back_to_products")}
+            aria-label={t("back_to_shops")}
+            title={t("back_to_shops")}
           >
             <span className="inline-flex items-center justify-center rounded-full bg-transparent border border-border text-foreground w-7 h-7 transition-colors group-hover:border-emerald-500 group-hover:text-emerald-600 group-active:scale-95 group-active:shadow-inner">
               <ArrowLeft className="h-4 w-4" />
@@ -262,9 +421,10 @@ export const StoreProductEdit = () => {
           </Link>
         }
       />
+
       <Card className="p-6 space-y-6">
         <ProgressiveLoader
-          isLoading={loading}
+          isLoading={uiState.loading}
           delay={150}
           fallback={
             <FullPageLoader
@@ -275,49 +435,41 @@ export const StoreProductEdit = () => {
           }
         >
           <div className="space-y-6">
-            {baseProduct ? (
+            {productData.product && (
               <ProductFormTabs
-                product={baseProduct}
+                product={productData.product}
                 readOnly
                 editableKeys={["price", "price_old", "price_promo", "stock_quantity", "available"]}
-                overrides={{
-                  price: form.custom_price ? parseFloat(form.custom_price) || 0 : baseProduct.price || 0,
-                  price_old: form.custom_price_old ? parseFloat(form.custom_price_old) || 0 : baseProduct.price_old || 0,
-                  price_promo: form.custom_price_promo ? parseFloat(form.custom_price_promo) || 0 : baseProduct.price_promo || 0,
-                  stock_quantity: form.custom_stock_quantity ? parseInt(form.custom_stock_quantity) || 0 : baseProduct.stock_quantity || 0,
-                }}
-                preloadedImages={images}
-                preloadedParams={params}
-                preloadedSuppliers={aggSuppliersRef.current}
-                preloadedCurrencies={aggCurrenciesRef.current}
-                preloadedCategories={aggCategoriesRef.current}
-                preloadedSupplierCategoriesMap={Object.fromEntries(Object.entries(aggSupplierCategoriesMapRef.current || {}).map(([key, arr]) => [key, (arr || []).map((c) => ({ id: String(c.id), name: String(c.name || ''), external_id: String(c.external_id || ''), supplier_id: String(c.supplier_id || ''), parent_external_id: c.parent_external_id == null ? null : String(c.parent_external_id) }))]))}
-                onChange={async (partial) => {
-                  if (typeof partial.price === "number") updateField("custom_price", String(partial.price));
-                  if (typeof partial.price_old === "number") updateField("custom_price_old", String(partial.price_old));
-                  if (typeof partial.price_promo === "number") updateField("custom_price_promo", String(partial.price_promo));
-                  if (typeof partial.stock_quantity === "number") updateField("custom_stock_quantity", String(partial.stock_quantity));
-                  if (typeof partial.available === "boolean") {
-                    updateField("custom_available", partial.available);
-                  }
-                  if (typeof partial.category_id === "string" && partial.category_id.trim()) {
-                    const cid = partial.category_id.trim();
-                    if (cid !== lastCategoryId) {
-                      setLastCategoryId(cid);
-                      if (partial.category_name) setCategoryName(partial.category_name);
-                    }
-                  }
-                }}
+                overrides={formOverrides}
+                preloadedImages={productData.images}
+                preloadedParams={productData.params}
+                preloadedSuppliers={productData.suppliers}
+                preloadedCurrencies={productData.currencies}
+                preloadedCategories={productData.categories}
+                preloadedSupplierCategoriesMap={supplierCategoriesMapNormalized}
+                onChange={handleFormChange as any}
                 forceParamsEditable
-                onParamsChange={(p) => setParams(p)}
-                onImagesLoadingChange={setImagesLoading}
+                onParamsChange={(p) => setProductData(prev => ({ ...prev, params: p }))}
+                onImagesLoadingChange={(loading) => setUiState(prev => ({ ...prev, imagesLoading: loading }))}
               />
-            ) : null}
+            )}
 
             <div className="space-y-3">
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => navigate(-1)}>{t("cancel")}</Button>
-                <Button onClick={handleSave} disabled={saving} aria-disabled={saving}>{t("save_changes")}</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/user/shops/${storeId}`)}
+                  disabled={uiState.saving}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={uiState.saving}
+                  aria-disabled={uiState.saving}
+                >
+                  {uiState.saving ? t("saving") : t("save_changes")}
+                </Button>
               </div>
             </div>
           </div>

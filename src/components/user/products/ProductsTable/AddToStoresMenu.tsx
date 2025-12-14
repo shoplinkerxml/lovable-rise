@@ -10,6 +10,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import { ShopService } from "@/lib/shop-service";
+import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
 
 type ProductRow = Product & { linkedStoreIds?: string[] };
@@ -63,32 +64,23 @@ async function updateStoreCounts(
   itemsForAccurateCount?: ProductRow[]
 ) {
   try {
-    Object.entries(productDelta).forEach(([sid, delta]) => {
-      if (delta !== 0) {
-        ShopService.bumpProductsCountInCache(sid, delta);
-      }
-    });
     const categoryResults = categoryResultsOverride || {};
-    storeIds.forEach(sid => {
-      const categories = categoryResults?.[sid] || [];
-      ShopService.setCategoriesCountInCache(sid, categories.length);
+    // Update each store via centralized ShopCountsService
+    storeIds.forEach((sid) => {
+      const delta = productDelta[sid] || 0;
+      const categoriesArr = categoryResults?.[sid] || [];
+      const accurateProducts = itemsForAccurateCount ? countProductsInStore(itemsForAccurateCount, String(sid)) : null;
+      const accurateCategories = itemsForAccurateCount ? countCategoriesInStore(itemsForAccurateCount, String(sid)) : null;
+      const existing = queryClient.getQueryData<any>(ShopCountsService.key(String(sid))) as { productsCount?: number; categoriesCount?: number } | undefined;
+      const baseProducts = accurateProducts != null ? Math.max(0, accurateProducts) : Math.max(0, (existing?.productsCount ?? 0));
+      const nextProducts = Math.max(0, baseProducts + delta);
+      const nextCategories = nextProducts === 0 ? 0 : (accurateCategories != null ? Math.max(0, accurateCategories) : Math.max(0, categoriesArr.length));
+      ShopCountsService.set(queryClient, String(sid), { productsCount: nextProducts, categoriesCount: nextCategories });
     });
-    queryClient.setQueryData<StoreAgg[]>(['shopsList'], (prev) => {
-      const stores = prev || currentStores;
-      return stores.map(store => {
-        const delta = productDelta[store.id] || 0;
-        const categories = categoryResults?.[store.id] || [];
-        const accurateCount = itemsForAccurateCount ? countProductsInStore(itemsForAccurateCount, String(store.id)) : null;
-        const accurateCategories = itemsForAccurateCount ? countCategoriesInStore(itemsForAccurateCount, String(store.id)) : null;
-        return {
-          ...store,
-          productsCount: accurateCount != null ? Math.max(0, accurateCount) : Math.max(0, (store.productsCount || 0) + delta),
-          categoriesCount: accurateCategories != null ? Math.max(0, accurateCategories) : Math.max(0, categories.length)
-        };
-      });
-    });
-    const updated = queryClient.getQueryData<StoreAgg[]>(['shopsList']) || [];
-    setStores(updated);
+    try {
+      const updated = queryClient.getQueryData<StoreAgg[]>(['shopsList']) || [];
+      setStores(updated as StoreAgg[]);
+    } catch { /* ignore */ }
   } catch (error) {
     console.error('Failed to update store counts:', error);
   }

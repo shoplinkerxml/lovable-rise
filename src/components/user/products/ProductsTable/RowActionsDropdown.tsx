@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
 import { ShopService } from "@/lib/shop-service";
+import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
 import type { ShopAggregated } from "@/lib/shop-service";
 
@@ -138,36 +139,20 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                             const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
                                             onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: true, categoryKey });
                                             toast.success(t("product_added_to_store"));
-                                          ShopService.bumpProductsCountInCache(String(id), 1);
-                                          const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
-                                          const cnt = names.length;
-                                          ShopService.setCategoriesCountInCache(String(id), cnt);
-                                          try {
-                                            queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                              const arr = Array.isArray(prev) ? prev : (stores || []);
-                                              const idStr = String(id);
-                                              return (arr || []).map((s) => s.id === idStr ? { ...s, categoriesCount: Math.max(0, Number(cnt) || 0) } : s);
-                                            });
-                                          } catch { /* ignore */ }
-                                          try {
-                                            queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                              const arr = Array.isArray(prev) ? prev : (stores || []);
-                                              return (arr || []).map((s) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) + 1)) } : s);
-                                            });
-                                            const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                            setStores(updated);
-                                          } catch { void 0; }
-                                          try {
+                                          {
                                             const idStr = String(id);
-                                            const arrNow = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                            const target = arrNow.find((s) => s.id === idStr);
-                                            const nextProducts = Math.max(0, ((target?.productsCount ?? 0) + 0));
-                                            const nextCategories = Math.max(0, ((target?.categoriesCount ?? 0)));
-                                            queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                              const arr = Array.isArray(prev) ? prev : (stores || []);
-                                              return (arr || []).map((s) => s.id === idStr ? { ...s, productsCount: nextProducts, categoriesCount: nextCategories } : s);
-                                            });
-                                          } catch { /* ignore */ }
+                                            const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
+                                            const cnt = Math.max(0, names.length);
+                                            const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+                                            const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
+                                            const nextProducts = baseProducts + 1;
+                                            const nextCategories = nextProducts === 0 ? 0 : cnt;
+                                            ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                            try {
+                                              const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                              setStores(updated || []);
+                                            } catch { /* ignore */ }
+                                          }
                                           }
                                         } else {
                                           const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
@@ -178,36 +163,20 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                             const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
                                             onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: false, categoryKey });
                                             toast.success(t("product_removed_from_store"));
-                                            ShopService.bumpProductsCountInCache(String(id), -1);
-                                            const names = Array.isArray(categoryNamesByStore?.[String(id)]) ? categoryNamesByStore![String(id)] : [];
-                                            const cnt = names.length;
-                                            ShopService.setCategoriesCountInCache(String(id), cnt);
-                                            try {
-                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                                const arr = Array.isArray(prev) ? prev : (stores || []);
-                                                const idStr = String(id);
-                                                return (arr || []).map((s) => s.id === idStr ? { ...s, categoriesCount: Math.max(0, Number(cnt) || 0) } : s);
-                                              });
-                                            } catch { /* ignore */ }
-                                            try {
-                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                                const arr = Array.isArray(prev) ? prev : (stores || []);
-                                                return (arr || []).map((s) => s.id === String(id) ? { ...s, productsCount: Math.max(0, ((s.productsCount ?? 0) - 1)) } : s);
-                                              });
-                                              const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                              setStores(updated);
-                                            } catch { void 0; }
-                                            try {
+                                            {
                                               const idStr = String(id);
-                                              const arrNow = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                              const target = arrNow.find((s) => s.id === idStr);
-                                              const nextProducts = Math.max(0, ((target?.productsCount ?? 0) + 0));
-                                              const nextCategories = Math.max(0, ((target?.categoriesCount ?? 0)));
-                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                                const arr = Array.isArray(prev) ? prev : (stores || []);
-                                                return (arr || []).map((s) => s.id === idStr ? { ...s, productsCount: nextProducts, categoriesCount: nextCategories } : s);
-                                              });
-                                            } catch { /* ignore */ }
+                                              const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
+                                              const cnt = Math.max(0, names.length);
+                                              const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
+                                              const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
+                                              const nextProducts = Math.max(0, baseProducts - 1);
+                                              const nextCategories = nextProducts === 0 ? 0 : cnt;
+                                              ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                              try {
+                                                const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                                setStores(updated || []);
+                                              } catch { /* ignore */ }
+                                            }
                                           }
                                         }
                                       } catch {
