@@ -174,10 +174,10 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
     
     try {
       setFormData({
-        name: product.name || '',
-        name_ua: product.name_ua || '',
-        description: product.description || '',
-        description_ua: product.description_ua || '',
+        name: product.name || product.name_ua || '',
+        name_ua: product.name_ua || product.name || '',
+        description: product.description || product.description_ua || '',
+        description_ua: product.description_ua || product.description || '',
         external_id: product.external_id || '',
         store_id: product.store_id || '',
         supplier_id: product.supplier_id || '',
@@ -191,8 +191,8 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
         stock_quantity: product.stock_quantity?.toString() || '',
         available: product.available !== false,
         state: product.state || 'new',
-        docket: product.docket || '',
-        docket_ua: product.docket_ua || ''
+        docket: product.docket || product.docket_ua || '',
+        docket_ua: product.docket_ua || product.docket || ''
       });
 
       // Загружаем параметры товара

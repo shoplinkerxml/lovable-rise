@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { BasicData } from '@/components/ProductFormTabs/types';
 import type { SupplierOption, CategoryOption, CurrencyOption } from '@/components/ProductFormTabs/types';
 
 export function useProductLookups(
   productStoreId?: string,
   initialBasic?: BasicData,
-  setBasic?: (p: BasicData) => void,
+  setBasic?: Dispatch<SetStateAction<BasicData>>,
   preloadedSuppliers?: SupplierOption[],
   preloadedCurrencies?: CurrencyOption[],
   preloadedCategories?: CategoryOption[],
@@ -36,8 +37,7 @@ export function useProductLookups(
         const sid = String(initialBasic?.supplier_id || '');
         if (!sid) {
           const firstId = String(preloadedSuppliers[0].id);
-          const next = { ...(initialBasic as BasicData), supplier_id: firstId };
-          setBasic(next);
+          setBasic((prev: BasicData) => ({ ...prev, supplier_id: firstId }));
         }
       }
     }
@@ -70,8 +70,11 @@ export function useProductLookups(
     if (categories.length === 0) return;
     const found = categories.find(c => String(c.external_id || '') === extId);
     if (found && setBasic) {
-      const next = { ...initialBasic, category_id: String(found.id || ''), category_name: found.name || '' };
-      setBasic(next);
+      setBasic((prev: BasicData) => ({
+        ...prev,
+        category_id: String(found.id || ''),
+        category_name: found.name || ''
+      }));
       setSelectedCategoryName(found.name || '');
     }
   }, [categories, initialBasic, setBasic]);

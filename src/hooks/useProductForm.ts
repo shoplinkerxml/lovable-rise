@@ -47,12 +47,12 @@ export function useProductForm(product?: Product | null, overrides?: Partial<For
     const categoryId = product.category_id ?? null;
     const categoryExternalId = (product as any).category_external_id ?? null;
     setBasicData({
-      name: product.name || '',
-      name_ua: product.name_ua || '',
-      description: product.description || '',
-      description_ua: product.description_ua || '',
-      docket: (product as any).docket || '',
-      docket_ua: (product as any).docket_ua || '',
+      name: product.name || product.name_ua || '',
+      name_ua: product.name_ua || product.name || '',
+      description: product.description || product.description_ua || '',
+      description_ua: product.description_ua || product.description || '',
+      docket: (product as any).docket || (product as any).docket_ua || '',
+      docket_ua: (product as any).docket_ua || (product as any).docket || '',
       vendor: product.vendor || '',
       article: product.article || '',
       external_id: product.external_id || '',

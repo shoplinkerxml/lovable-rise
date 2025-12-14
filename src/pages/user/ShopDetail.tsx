@@ -17,6 +17,7 @@ import { useI18n } from '@/providers/i18n-provider';
 import { ShopService, type Shop, type ShopAggregated } from '@/lib/shop-service';
 import { ProductService, type Product } from '@/lib/product-service';
 import { supabase } from '@/integrations/supabase/client';
+import { useShopRealtimeSync } from "@/hooks/useShopRealtimeSync";
 
 export const ShopDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -81,9 +82,13 @@ export const ShopDetail = () => {
   });
 
   // Используем локальные или серверные счетчики (нормализуем формат)
-  const displayCounts = localCounts
-    ? { productsCount: localCounts.products, categoriesCount: localCounts.categories }
-    : (counts || { productsCount: 0, categoriesCount: 0 });
+  const displayCounts = useMemo(() => {
+    return localCounts
+      ? { productsCount: localCounts.products, categoriesCount: localCounts.categories }
+      : (counts || { productsCount: 0, categoriesCount: 0 });
+  }, [localCounts, counts]);
+
+  useShopRealtimeSync({ shopId: String(id), enabled: !!id });
 
   // Realtime subscription для обновления магазина
   useEffect(() => {
@@ -109,6 +114,8 @@ export const ShopDetail = () => {
       supabase.removeChannel(channel).catch(() => void 0);
     };
   }, [id, queryClient]);
+
+  
 
   // Refresh counts when refreshTrigger changes
   useEffect(() => {

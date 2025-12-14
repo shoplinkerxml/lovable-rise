@@ -53,29 +53,29 @@ const NamesDescriptionSection = React.memo(function NamesDescriptionSection({ t,
             <TabsContent value="ukrainian" className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label htmlFor="name_ua">{t('product_name')} *</Label>
-                <Textarea id="name_ua" name="name_ua" autoComplete="off" value={data.name_ua} onChange={e => onChange({ name_ua: e.target.value })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameUaInput" disabled={!!readOnly} />
+                <Textarea id="name_ua" name="name_ua" autoComplete="off" value={data.name_ua || data.name} onChange={e => onChange({ name_ua: e.target.value })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameUaInput" disabled={!!readOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="docket_ua">{t('short_name')}</Label>
-                <Textarea id="docket_ua" name="docket_ua" autoComplete="off" value={data.docket_ua} onChange={e => onChange({ docket_ua: e.target.value })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketUaInput" disabled={!!readOnly} />
+                <Textarea id="docket_ua" name="docket_ua" autoComplete="off" value={data.docket_ua || data.docket} onChange={e => onChange({ docket_ua: e.target.value })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketUaInput" disabled={!!readOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description_ua">{t('product_description')}</Label>
-                <Textarea id="description_ua" name="description_ua" autoComplete="off" value={data.description_ua} onChange={e => onChange({ description_ua: e.target.value })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" disabled={!!readOnly} />
+                <Textarea id="description_ua" name="description_ua" autoComplete="off" value={data.description_ua || data.description} onChange={e => onChange({ description_ua: e.target.value })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionUaInput" disabled={!!readOnly} />
               </div>
             </TabsContent>
             <TabsContent value="russian" className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label htmlFor="name">{t('product_name')}</Label>
-                <Textarea id="name" name="name" autoComplete="off" value={data.name} onChange={e => onChange({ name: e.target.value })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameInput" disabled={!!readOnly} />
+                <Textarea id="name" name="name" autoComplete="off" value={data.name || data.name_ua} onChange={e => onChange({ name: e.target.value })} placeholder={t('product_name_placeholder')} rows={3} data-testid="productFormTabs_nameInput" disabled={!!readOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="docket">{t('short_name')}</Label>
-                <Textarea id="docket" name="docket" autoComplete="off" value={data.docket} onChange={e => onChange({ docket: e.target.value })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketInput" disabled={!!readOnly} />
+                <Textarea id="docket" name="docket" autoComplete="off" value={data.docket || data.docket_ua} onChange={e => onChange({ docket: e.target.value })} placeholder={t('short_name_placeholder')} rows={2} data-testid="productFormTabs_docketInput" disabled={!!readOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">{t('product_description')}</Label>
-                <Textarea id="description" name="description" autoComplete="off" value={data.description} onChange={e => onChange({ description: e.target.value })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" disabled={!!readOnly} />
+                <Textarea id="description" name="description" autoComplete="off" value={data.description || data.description_ua} onChange={e => onChange({ description: e.target.value })} placeholder={t('product_description_placeholder')} rows={3} data-testid="productFormTabs_descriptionInput" disabled={!!readOnly} />
               </div>
             </TabsContent>
           </Tabs>

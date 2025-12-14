@@ -83,6 +83,25 @@ export function ProductFormTabs({
     updateBasicData,
   } = useProductForm(product, overrides);
 
+  useEffect(() => {
+    if (!product) return;
+    setBasicData(prev => {
+      const next = { ...prev };
+      if (!next.name) next.name = product.name || product.name_ua || '';
+      if (!next.name_ua) next.name_ua = product.name_ua || product.name || '';
+      if (!next.description) next.description = product.description || product.description_ua || '';
+      if (!next.description_ua) next.description_ua = product.description_ua || product.description || '';
+      const docketRu = (product as any).docket || '';
+      const docketUa = (product as any).docket_ua || '';
+      if (!next.docket) next.docket = docketRu || docketUa || '';
+      if (!next.docket_ua) next.docket_ua = docketUa || docketRu || '';
+      if (!next.external_id) next.external_id = product.external_id || '';
+      if (!next.vendor) next.vendor = product.vendor || '';
+      if (!next.article) next.article = product.article || '';
+      return next;
+    });
+  }, [product, setBasicData]);
+
   // Images state
   const pid = product?.id ? String(product.id) : '';
   const { images, activeIndex, setActiveIndex, goPrevious, goNext, goToIndex, addImages: addImagesHook, removeImage: removeImageHook, setMainImage: setMainImageHook, reorderImages, reload } = useProductImages(pid, preloadedImages);
@@ -139,17 +158,12 @@ export function ProductFormTabs({
     setParameters,
   } = useProductParams(preloadedParams, onParamsChange);
 
-  const lookups = useProductLookups(product?.store_id || '', basicData, setBasicData as any, preloadedSuppliers, preloadedCurrencies, preloadedCategories, preloadedSupplierCategoriesMap);
+  const lookups = useProductLookups(product?.store_id || '', basicData, setBasicData, preloadedSuppliers, preloadedCurrencies, preloadedCategories, preloadedSupplierCategoriesMap);
   const categories = lookups.categories;
   const currencies = lookups.currencies;
   const selectedCategoryName = lookups.selectedCategoryName;
   const selectedSupplierName = lookups.selectedSupplierName;
   // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
-
-  
-
-
-  
 
   
   const { markSaved } = useImageCleanup(isNewProduct, images);
