@@ -41,13 +41,8 @@ export const ShopCountsService = {
     });
   },
   async recompute(queryClient: QueryClient, storeId: string) {
-    const [productsCount, categoryNames] = await Promise.all([
-      ShopService.getStoreProductsCount(storeId),
-      ProductService.getStoreCategoryFilterOptions(storeId),
-    ]);
-    const categoriesCount = Array.isArray(categoryNames) ? categoryNames.length : 0;
+    const { productsCount, categoriesCount } = await ShopService.recomputeStoreCounts(storeId);
     this.set(queryClient, storeId, { productsCount, categoriesCount });
     return { productsCount, categoriesCount };
   },
 };
-

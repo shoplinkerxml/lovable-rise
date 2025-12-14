@@ -28,6 +28,45 @@ type UploadProductImageResponse = {
 type EdgeErrorContext = { status?: number; body?: unknown };
 type EdgeErrorLike = { message?: string; context?: EdgeErrorContext };
 
+async function invokeWithRetry<T>(fnName: string, init: { body?: unknown; headers?: Record<string, string> }, opts?: { maxRetries?: number; timeoutMs?: number; retryDelayMs?: number }): Promise<{ data: T; error: any | null }> {
+  const maxRetries = Math.max(0, opts?.maxRetries ?? 2);
+  const timeoutMs = Math.max(2500, opts?.timeoutMs ?? 5000);
+  const baseDelay = Math.max(250, opts?.retryDelayMs ?? 500);
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const { data, error } = await supabase.functions.invoke<T>(fnName, {
+        body: init.body,
+        headers: init.headers,
+        signal: controller.signal as AbortSignal,
+      } as any);
+      clearTimeout(timer);
+      if (error) {
+        const status = (error as EdgeErrorLike)?.context?.status ?? 0;
+        const isTransient = status >= 500 || status === 0;
+        if (isTransient && attempt < maxRetries) {
+          attempt += 1;
+          await new Promise((r) => setTimeout(r, baseDelay * attempt));
+          continue;
+        }
+        return { data: data as T, error };
+      }
+      return { data: data as T, error: null };
+    } catch (e) {
+      clearTimeout(timer);
+      if (attempt < maxRetries) {
+        attempt += 1;
+        await new Promise((r) => setTimeout(r, baseDelay * attempt));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 function parseEdgeError(err: unknown, fallbackMessage: string): Error {
   const anyErr = err as EdgeErrorLike | undefined;
   const status = anyErr?.context?.status;
@@ -173,7 +212,7 @@ export const R2Storage = {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    const { data, error } = await supabase.functions.invoke("r2-upload", {
+    const { data, error } = await invokeWithRetry<UploadResponse>("r2-upload", {
       body: { fileName: file.name, fileType: file.type, fileSize: file.size, fileData: base64File, productId },
       headers,
     });
@@ -232,7 +271,7 @@ export const R2Storage = {
       reader.readAsDataURL(normalizedFile);
     });
 
-    const { data, error } = await supabase.functions.invoke('upload-product-image', {
+    const { data, error } = await invokeWithRetry<UploadProductImageResponse>('upload-product-image', {
       body: { productId, fileData: base64File, fileName: normalizedFile.name, fileType: normalizedFile.type },
       headers,
     });
@@ -257,7 +296,7 @@ export const R2Storage = {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
 
-    const { data, error } = await supabase.functions.invoke('upload-product-image', {
+    const { data, error } = await invokeWithRetry<UploadProductImageResponse>('upload-product-image', {
       body: { productId, url },
       headers,
     });
@@ -302,7 +341,7 @@ export const R2Storage = {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
 
-    const { data, error } = await supabase.functions.invoke("r2-view", {
+    const { data, error } = await invokeWithRetry<{ viewUrl: string }>("r2-view", {
       body: { objectKey, expiresIn: expiresInSeconds },
       headers,
     });
@@ -348,7 +387,7 @@ export const R2Storage = {
       console.debug('[R2Storage] deleteFile invoke', { objectKey });
     }
 
-    const { data, error } = await supabase.functions.invoke("r2-delete", {
+    const { data, error } = await invokeWithRetry<{ success: boolean }>("r2-delete", {
       body: { objectKey, authorization: authorizationInBody },
       headers,
     });

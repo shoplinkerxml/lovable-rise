@@ -364,27 +364,7 @@ export const ProductsTable = ({
   const [removingStores, setRemovingStores] = useState(false);
   const [removingStoreId, setRemovingStoreId] = useState<string | null>(null);
 
-  const handleStoresUpdate = useCallback((productId: string, ids: string[], opts?: { storeIdChanged?: string | number; categoryKey?: string; added?: boolean }) => {
-    try {
-      const storeChanged = opts?.storeIdChanged ? String(opts.storeIdChanged) : null;
-      const categoryKey = opts?.categoryKey || null;
-      const added = !!opts?.added;
-      if (storeChanged && categoryKey) {
-        const arr = itemsRef.current || [];
-        const keys = new Set<string>();
-        for (const p of arr) {
-          const key = p.category_id != null ? `cat:${p.category_id}` : p.category_external_id ? `ext:${p.category_external_id}` : null;
-          if (!key) continue;
-          const idsForP = String(p.id) === String(productId) ? ids.map(String) : (p.linkedStoreIds || []).map(String);
-          if (idsForP.includes(storeChanged)) keys.add(key);
-        }
-        const accurateCategories = keys.size;
-        const existing = queryClient.getQueryData<any>(ShopCountsService.key(storeChanged)) as { productsCount?: number; categoriesCount?: number } | undefined;
-        const productsCount = Math.max(0, (existing?.productsCount ?? 0));
-        const categoriesCount = productsCount === 0 ? 0 : Math.max(0, accurateCategories);
-        ShopCountsService.set(queryClient, storeChanged, { productsCount, categoriesCount });
-      }
-    } catch { void 0; }
+  const handleStoresUpdate = useCallback((productId: string, ids: string[], _opts?: { storeIdChanged?: string | number; categoryKey?: string; added?: boolean }) => {
     setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
     try { setSelectedStoreIds(ids.map(String)); } catch { void 0; }
     try {
@@ -399,13 +379,8 @@ export const ProductsTable = ({
     let reverted = false;
     setProductsCached((prev) => prev.map((p) => p.id === pid ? { ...p, linkedStoreIds: (p.linkedStoreIds || []).filter((id) => String(id) !== sid) } : p));
     try {
-      const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([pid], [sid]);
-      const names = Array.isArray(categoryNamesByStore?.[String(sid)]) ? categoryNamesByStore![String(sid)] : [];
-      const existing = queryClient.getQueryData<any>(ShopCountsService.key(String(sid))) as { productsCount?: number; categoriesCount?: number } | undefined;
-      const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-      const nextProducts = Math.max(0, baseProducts - 1);
-      const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
-      ShopCountsService.set(queryClient, String(sid), { productsCount: nextProducts, categoriesCount: nextCategories });
+      await ProductService.bulkRemoveStoreProductLinks([pid], [sid]);
+      await ShopCountsService.recompute(queryClient, String(sid));
       try {
         const updated = queryClient.getQueryData<ShopAggregated[]>(['shopsList']) || [];
         setStores(updated);
@@ -695,15 +670,6 @@ export const ProductsTable = ({
               await onDelete?.(productToDelete);
               setProductsCached((prev) => prev.filter((p) => String(p.id) !== String(productToDelete.id)));
               setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - 1) } : prev);
-              try {
-                if (storeId) {
-                  const existing = queryClient.getQueryData<any>(ShopCountsService.key(String(storeId))) as { productsCount?: number; categoriesCount?: number } | undefined;
-                  const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                  const nextProducts = Math.max(0, baseProducts - 1);
-                  const nextCategories = nextProducts === 0 ? 0 : Math.max(0, existing?.categoriesCount ?? 0);
-                  ShopCountsService.set(queryClient, String(storeId), { productsCount: nextProducts, categoriesCount: nextCategories });
-                }
-              } catch { void 0; }
               try { await loadFirstPage(); } catch { void 0; }
             } else {
               const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
@@ -712,18 +678,12 @@ export const ProductsTable = ({
                 try {
                   const ids = selected.map((p) => String(p.id)).filter(Boolean);
                   setDeleteProgress({ open: true });
-                  const { deleted, deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(ids, [String(storeId)]);
+                  const { deleted } = await ProductService.bulkRemoveStoreProductLinks(ids, [String(storeId)]);
                   setProductsCached((prev) => prev.filter((p) => !ids.includes(String(p.id))));
                   const removedCount = Number(deleted ?? ids.length) || ids.length;
                   setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - removedCount) } : prev);
                   try {
-                    const delta = Math.max(0, (deletedByStore?.[String(storeId)] ?? removedCount));
-                    const names = Array.isArray(categoryNamesByStore?.[String(storeId)]) ? categoryNamesByStore![String(storeId)] : [];
-                    const existing = queryClient.getQueryData<any>(ShopCountsService.key(String(storeId))) as { productsCount?: number; categoriesCount?: number } | undefined;
-                    const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                    const nextProducts = Math.max(0, baseProducts - delta);
-                    const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
-                    ShopCountsService.set(queryClient, String(storeId), { productsCount: nextProducts, categoriesCount: nextCategories });
+                    await ShopCountsService.recompute(queryClient, String(storeId));
                   } catch { void 0; }
                   toast.success(t('product_removed_from_store'));
                   try { await loadFirstPage(); } catch { void 0; }

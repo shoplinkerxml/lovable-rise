@@ -64,19 +64,8 @@ async function updateStoreCounts(
   itemsForAccurateCount?: ProductRow[]
 ) {
   try {
-    const categoryResults = categoryResultsOverride || {};
-    // Update each store via centralized ShopCountsService
-    storeIds.forEach((sid) => {
-      const delta = productDelta[sid] || 0;
-      const categoriesArr = categoryResults?.[sid] || [];
-      const accurateProducts = itemsForAccurateCount ? countProductsInStore(itemsForAccurateCount, String(sid)) : null;
-      const accurateCategories = itemsForAccurateCount ? countCategoriesInStore(itemsForAccurateCount, String(sid)) : null;
-      const existing = queryClient.getQueryData<any>(ShopCountsService.key(String(sid))) as { productsCount?: number; categoriesCount?: number } | undefined;
-      const baseProducts = accurateProducts != null ? Math.max(0, accurateProducts) : Math.max(0, (existing?.productsCount ?? 0));
-      const nextProducts = Math.max(0, baseProducts + delta);
-      const nextCategories = nextProducts === 0 ? 0 : (accurateCategories != null ? Math.max(0, accurateCategories) : Math.max(0, categoriesArr.length));
-      ShopCountsService.set(queryClient, String(sid), { productsCount: nextProducts, categoriesCount: nextCategories });
-    });
+    const uniqueIds = Array.from(new Set(storeIds.map(String).filter(Boolean)));
+    await Promise.all(uniqueIds.map((sid) => ShopCountsService.recompute(queryClient, String(sid))));
     try {
       const updated = queryClient.getQueryData<StoreAgg[]>(['shopsList']) || [];
       setStores(updated as StoreAgg[]);

@@ -12,17 +12,45 @@ async function ensureAccessToken(): Promise<string> {
   return v.accessToken;
 }
 
+function mapAdminError(e: unknown): { code: AdminErrorCode; message?: string } {
+  const err = e as { status?: number; statusCode?: number; message?: string };
+  const s = err?.status ?? err?.statusCode;
+  if (s === 401) return { code: 'unauthorized', message: err?.message };
+  if (s === 404) return { code: 'not_found', message: err?.message };
+  if (s === 422) return { code: 'validation_failed', message: err?.message };
+  return { code: 'db_error', message: err?.message };
+}
+
+function createTraceId(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function logAdminError(context: string, e: unknown, traceId: string): void {
+  try {
+    const mapped = mapAdminError(e);
+    console.error(JSON.stringify({ type: 'admin_error', context, traceId, code: mapped.code, message: mapped.message }));
+  } catch {
+    console.error({ type: 'admin_error', context, traceId, error: e });
+  }
+}
+
 async function invokeAdminEdge<T>(fn: string, body: unknown): Promise<AdminResult<T>> {
   try {
     const token = await ensureAccessToken();
     const { data, error } = await supabase.functions.invoke(fn, { body, headers: { Authorization: `Bearer ${token}` } });
-    if (error) return { success: false, errorCode: 'rpc_error', message: (error as { message?: string })?.message || 'rpc_failed' };
+    if (error) {
+      const tid = createTraceId();
+      logAdminError(`edge:${fn}`, error, tid);
+      return { success: false, errorCode: 'rpc_error', message: (error as { message?: string })?.message || 'rpc_failed' };
+    }
     const payload = typeof data === 'string' ? (JSON.parse(data as string) as T) : (data as T);
     return { success: true, data: payload };
   } catch (e) {
-    const status = (e as { status?: number })?.status;
-    const code: AdminErrorCode = status === 401 ? 'unauthorized' : 'rpc_error';
-    return { success: false, errorCode: code, message: (e as { message?: string })?.message };
+    const tid = createTraceId();
+    logAdminError(`edge:${fn}`, e, tid);
+    const mapped = mapAdminError(e);
+    const code: AdminErrorCode = mapped.code === 'unauthorized' ? 'unauthorized' : 'rpc_error';
+    return { success: false, errorCode: code, message: mapped.message };
   }
 }
 
@@ -32,18 +60,27 @@ async function runDb<T>(op: () => Promise<T>): Promise<AdminResult<T>> {
     const res = await op();
     return { success: true, data: res };
   } catch (e) {
-    const status = (e as { status?: number })?.status;
-    const msg = (e as { message?: string })?.message;
-    let code: AdminErrorCode = 'db_error';
-    if (status === 401) code = 'unauthorized';
-    else if (status === 404) code = 'not_found';
-    else if (status === 422) code = 'validation_failed';
-    return { success: false, errorCode: code, message: msg };
+    const tid = createTraceId();
+    logAdminError('db', e, tid);
+    const mapped = mapAdminError(e);
+    return { success: false, errorCode: mapped.code, message: mapped.message };
   }
 }
 
 export class AdminService {
   // ==================== TARIFF OPERATIONS ====================
+  private static inflight = new Map<string, { promise: Promise<unknown>; expiresAt: number }>();
+  private static INFLIGHT_TTL_MS = 30_000;
+  private static dedupe<T>(key: string, fn: () => Promise<AdminResult<T>>): Promise<AdminResult<T>> {
+    const existing = this.inflight.get(key);
+    if (existing && existing.expiresAt > Date.now()) return existing.promise as Promise<AdminResult<T>>;
+    const p = fn().finally(() => {
+      const cur = this.inflight.get(key);
+      if (cur && cur.promise === p) this.inflight.delete(key);
+    });
+    this.inflight.set(key, { promise: p, expiresAt: Date.now() + this.INFLIGHT_TTL_MS });
+    return p;
+  }
   
   static async createTariff(data: TariffInsert): Promise<AdminResult<unknown>> {
     return runDb(async () => {
@@ -160,43 +197,45 @@ export class AdminService {
   // ==================== SUBSCRIPTION OPERATIONS ====================
   
   static async activateUserTariff(userId: string, tariffId: number): Promise<AdminResult<unknown>> {
-    const edge = await invokeAdminEdge<unknown>('admin-activate-tariff', { userId, tariffId });
-    if (edge.success) return edge;
-    return runDb(async () => {
-      const { error: deactivateError } = await supabase
-        .from('user_subscriptions')
-        .update({ is_active: false })
-        .eq('user_id', userId)
-        .eq('is_active', true);
-      if (deactivateError) throw deactivateError;
-      const { data: tariff, error: tariffError } = await supabase
-        .from('tariffs')
-        .select('duration_days, is_lifetime')
-        .eq('id', tariffId)
-        .single();
-      if (tariffError) throw tariffError;
-      const startDate = new Date();
-      let endDate: Date | null = null;
-      if (!tariff.is_lifetime && tariff.duration_days) {
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + tariff.duration_days);
-      }
-      const { data: newSubscription, error: insertError } = await supabase
-        .from('user_subscriptions')
-        .insert({
-          user_id: userId,
-          tariff_id: tariffId,
-          start_date: startDate.toISOString(),
-          end_date: endDate ? endDate.toISOString() : null,
-          is_active: true
-        })
-        .select(`
-          *,
-          tariffs (id,name,description,new_price,currency_id,duration_days,is_lifetime)
-        `)
-        .single();
-      if (insertError) throw insertError;
-      return newSubscription;
+    return this.dedupe<unknown>(`activate:${userId}`, async () => {
+      const edge = await invokeAdminEdge<unknown>('admin-activate-tariff', { userId, tariffId });
+      if (edge.success) return edge;
+      return runDb(async () => {
+        const { error: deactivateError } = await supabase
+          .from('user_subscriptions')
+          .update({ is_active: false })
+          .eq('user_id', userId)
+          .eq('is_active', true);
+        if (deactivateError) throw deactivateError;
+        const { data: tariff, error: tariffError } = await supabase
+          .from('tariffs')
+          .select('duration_days, is_lifetime')
+          .eq('id', tariffId)
+          .single();
+        if (tariffError) throw tariffError;
+        const startDate = new Date();
+        let endDate: Date | null = null;
+        if (!tariff.is_lifetime && tariff.duration_days) {
+          endDate = new Date(startDate);
+          endDate.setDate(endDate.getDate() + tariff.duration_days);
+        }
+        const { data: newSubscription, error: insertError } = await supabase
+          .from('user_subscriptions')
+          .insert({
+            user_id: userId,
+            tariff_id: tariffId,
+            start_date: startDate.toISOString(),
+            end_date: endDate ? endDate.toISOString() : null,
+            is_active: true
+          })
+          .select(`
+            *,
+            tariffs (id,name,description,new_price,currency_id,duration_days,is_lifetime)
+          `)
+          .single();
+        if (insertError) throw insertError;
+        return newSubscription;
+      });
     });
   }
 

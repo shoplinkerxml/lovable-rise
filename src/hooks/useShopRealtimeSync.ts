@@ -1,16 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ShopService } from "@/lib/shop-service";
-import { ProductService } from "@/lib/product-service";
 import { ShopCountsService } from "@/lib/shop-counts";
-import type { ShopAggregated } from "@/lib/shop-service";
-import type {
-  PostgresInsertPayload,
-  PostgresUpdatePayload,
-  PostgresDeletePayload,
-  ShopCounts,
-} from "@/types/shop";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface UseShopRealtimeSyncOptions {
   shopId: string;
@@ -33,13 +25,7 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
       debounceRef.current = window.setTimeout(async () => {
         if (!isMountedRef.current) return;
         try {
-          const [productsCount, categoryNames] = await Promise.all([
-            ShopService.getStoreProductsCount(shopId),
-            ProductService.getStoreCategoryFilterOptions(shopId),
-          ]);
-          if (!isMountedRef.current) return;
-          const categoriesCount = Array.isArray(categoryNames) ? categoryNames.length : 0;
-          ShopCountsService.set(queryClient, shopId, { productsCount, categoriesCount });
+          await ShopCountsService.recompute(queryClient, shopId);
         } catch (error) {
           if (isMountedRef.current) {
             queryClient.invalidateQueries({ queryKey: ["shopCounts", shopId] });
@@ -53,21 +39,21 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
       scheduleCountsRefetch();
     };
 
-    const handleInsert = (payload: PostgresInsertPayload) => {
+    const handleInsert = (payload: any) => {
       const { store_id, is_active } = payload.new;
       if (String(store_id) === shopId && is_active !== false) {
         updateProductCount(+1);
       }
     };
 
-    const handleDelete = (payload: PostgresDeletePayload) => {
+    const handleDelete = (payload: any) => {
       const { store_id, is_active } = payload.old;
       if (String(store_id) === shopId && is_active !== false) {
         updateProductCount(-1);
       }
     };
 
-    const handleUpdate = (payload: PostgresUpdatePayload) => {
+    const handleUpdate = (payload: any) => {
       const { store_id: oldStoreId, is_active: wasActive } = payload.old;
       const { store_id: newStoreId, is_active: isActive } = payload.new;
       if (oldStoreId !== newStoreId) {
@@ -88,7 +74,9 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
       }
     };
 
-    const channel = supabase
+    const client = supabase as SupabaseClient;
+
+    const channel = client
       .channel(`shop_realtime_${shopId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "store_product_links" }, handleInsert)
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "store_product_links" }, handleDelete)
@@ -101,7 +89,7 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
         window.clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      supabase.removeChannel(channel).catch(() => void 0);
+      client.removeChannel(channel).catch(() => void 0);
     };
   }, [shopId, enabled, queryClient]);
 };

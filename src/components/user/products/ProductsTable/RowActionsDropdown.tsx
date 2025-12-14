@@ -141,13 +141,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                             toast.success(t("product_added_to_store"));
                                           {
                                             const idStr = String(id);
-                                            const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
-                                            const cnt = Math.max(0, names.length);
-                                            const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-                                            const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                                            const nextProducts = baseProducts + 1;
-                                            const nextCategories = nextProducts === 0 ? 0 : cnt;
-                                            ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                            await ShopCountsService.recompute(queryClient, idStr);
                                             try {
                                               const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                               setStores(updated || []);
@@ -165,13 +159,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                             toast.success(t("product_removed_from_store"));
                                             {
                                               const idStr = String(id);
-                                              const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
-                                              const cnt = Math.max(0, names.length);
-                                              const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-                                              const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                                              const nextProducts = Math.max(0, baseProducts - 1);
-                                              const nextCategories = nextProducts === 0 ? 0 : cnt;
-                                              ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                              await ShopCountsService.recompute(queryClient, idStr);
                                               try {
                                                 const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                                 setStores(updated || []);

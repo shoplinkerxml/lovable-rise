@@ -57,6 +57,16 @@ function toBase(row: StoreCategoryBase): StoreCategory {
   };
 }
 
+function invalidateCategoriesCache(): void {
+  try { removeCache("rq:supplierCategoriesMap"); } catch {}
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const res: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) res.push(arr.slice(i, i + size));
+  return res;
+}
+
 export const CategoryService = {
   
   // 0. Read specific category by internal id
@@ -68,7 +78,7 @@ export const CategoryService = {
       id: idNum,
     });
     if (!resp.item) return null;
-    return toFull(resp.item as StoreCategoryFullRow);
+    return toFull(resp.item);
   },
 
   // 0a. Read category name by internal id (safe)
@@ -76,7 +86,7 @@ export const CategoryService = {
     const idNum = castNullableNumber(id);
     if (idNum === undefined) return null;
     const resp = await invokeEdge<{ name?: string | null }>("categories", { action: "get_name_by_id", id: idNum });
-    return (resp.name ?? null) as string | null;
+    return resp.name ?? null;
   },
   // 4. Get all categories of supplier
   async listCategories(supplierId?: string | number): Promise<StoreCategory[]> {
@@ -98,8 +108,8 @@ export const CategoryService = {
       parent_external_id: input.parent_external_id ?? null,
     };
     const resp = await invokeEdge<{ item: StoreCategoryBase }>("categories", { action: "create", data: payload });
-    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
-    return toBase(resp.item as StoreCategoryBase);
+    invalidateCategoriesCache();
+    return toBase(resp.item);
   },
 
   // 3. Bulk create
@@ -113,7 +123,7 @@ export const CategoryService = {
     }));
     const resp = await invokeEdge<{ rows?: StoreCategoryBase[] }>("categories", { action: "bulk_create", items: payload });
     const rows = resp.rows ?? [];
-    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
+    invalidateCategoriesCache();
     return rows.map(toBase);
   },
 
@@ -137,14 +147,20 @@ export const CategoryService = {
       return env.data;
     }
 
-    // Single query for all categories of the given suppliers
-    const { data, error } = await supabase
-      .from('store_categories')
-      .select('id,external_id,name,parent_external_id,supplier_id')
-      .in('supplier_id', ids.map((v) => Number(v)))
-      .order('supplier_id', { ascending: true });
-    if (error) throw error;
-    const rows = (data || []) as Array<{ id: number; external_id: string; name: string; parent_external_id: string | null; supplier_id: number }>;
+    const numericIds = ids.map((v) => Number(v)).filter((n) => Number.isFinite(n));
+    const batches = chunk(numericIds, 200);
+    const results = await Promise.all(
+      batches.map(async (batch) => {
+        const { data, error } = await supabase
+          .from('store_categories')
+          .select('id,external_id,name,parent_external_id,supplier_id')
+          .in('supplier_id', batch)
+          .order('supplier_id', { ascending: true });
+        if (error) throw error;
+        return (data || []) as Array<{ id: number; external_id: string; name: string; parent_external_id: string | null; supplier_id: number }>;
+      })
+    );
+    const rows = results.flat();
     const map: Record<string, StoreCategoryFull[]> = {};
     for (const r of rows) {
       const sid = String(r.supplier_id);
@@ -183,7 +199,7 @@ export const CategoryService = {
       external_id: externalId,
     });
     if (!resp.item) return null;
-    return toFull(resp.item as StoreCategoryFullRow);
+    return toFull(resp.item);
   },
 
   // 7. Update category name by external_id and supplier_id
@@ -198,8 +214,8 @@ export const CategoryService = {
       external_id: externalId,
       name,
     });
-    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
-    return toBase(resp.item as StoreCategoryBase);
+    invalidateCategoriesCache();
+    return toBase(resp.item);
   },
 
   // 8. Delete category by external_id and supplier_id
@@ -213,7 +229,7 @@ export const CategoryService = {
       supplier_id: normalized,
       external_id: externalId,
     });
-    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
+    invalidateCategoriesCache();
     return true;
   },
 
@@ -228,7 +244,7 @@ export const CategoryService = {
       supplier_id: normalized,
       external_id: externalId,
     });
-    try { removeCache("rq:supplierCategoriesMap"); } catch { /* ignore */ }
+    invalidateCategoriesCache();
     return true;
   },
 };

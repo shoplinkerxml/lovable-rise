@@ -377,7 +377,7 @@ export const StoreProductEdit = () => {
 
   const supplierCategoriesMapNormalized = useMemo(() => {
     if (!productData.supplierCategoriesMap) return {};
-    
+
     return Object.fromEntries(
       Object.entries(productData.supplierCategoriesMap).map(([key, arr]) => [
         key,
@@ -391,6 +391,30 @@ export const StoreProductEdit = () => {
       ])
     );
   }, [productData.supplierCategoriesMap]);
+
+  const storeCategoryIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const sc of productData.storeCategories || []) {
+      ids.add(String(sc.category_id));
+    }
+    return ids;
+  }, [productData.storeCategories]);
+
+  const categoriesForStore = useMemo(() => {
+    const base = productData.categories || [];
+    if (storeCategoryIds.size === 0) return base;
+    return base.filter(c => storeCategoryIds.has(String(c.id)));
+  }, [productData.categories, storeCategoryIds]);
+
+  const supplierCategoriesMapForStore = useMemo(() => {
+    if (storeCategoryIds.size === 0) return supplierCategoriesMapNormalized;
+    return Object.fromEntries(
+      Object.entries(supplierCategoriesMapNormalized).map(([sid, list]) => [
+        sid,
+        (list || []).filter(c => storeCategoryIds.has(String(c.id))),
+      ])
+    );
+  }, [supplierCategoriesMapNormalized, storeCategoryIds]);
 
   // ============================================================================
   // Render
@@ -445,8 +469,8 @@ export const StoreProductEdit = () => {
                 preloadedParams={productData.params}
                 preloadedSuppliers={productData.suppliers}
                 preloadedCurrencies={productData.currencies}
-                preloadedCategories={productData.categories}
-                preloadedSupplierCategoriesMap={supplierCategoriesMapNormalized}
+                preloadedCategories={categoriesForStore}
+                preloadedSupplierCategoriesMap={supplierCategoriesMapForStore}
                 onChange={handleFormChange as any}
                 forceParamsEditable
                 onParamsChange={(p) => setProductData(prev => ({ ...prev, params: p }))}

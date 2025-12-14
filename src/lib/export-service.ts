@@ -1,9 +1,8 @@
-import { supabase } from '@/integrations/supabase/client';
-import { ProductService, type Product } from '@/lib/product-service';
-import { R2Storage } from '@/lib/r2-storage';
-import { SessionValidator } from './session-validation';
-import { readCache, writeCache, removeCache, CACHE_TTL } from './cache-utils';
- 
+import { supabase } from "@/integrations/supabase/client";
+import { ProductService, type Product } from "@/lib/product-service";
+import { R2Storage } from "@/lib/r2-storage";
+import { SessionValidator, type SessionValidationResult } from "./session-validation";
+import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
 
 export type ExportLink = {
   id: string;
@@ -19,57 +18,60 @@ export type ExportLink = {
 };
 
 export const ExportService = {
-  LINKS_CACHE_PREFIX: 'rq:exportLinks:',
+  LINKS_CACHE_PREFIX: "rq:exportLinks:",
   inFlightList: new Map<string, Promise<ExportLink[]>>(),
   inFlightGenerate: new Map<string, Promise<boolean>>(),
   inFlightLocalGenerate: new Map<string, Promise<boolean>>(),
 
-  async ensureSession(): Promise<void> {
+  async ensureSession(): Promise<SessionValidationResult> {
     const v = await SessionValidator.ensureValidSession();
-    if (!v.isValid) throw new Error('Invalid session');
+    if (!v.isValid || !v.user?.id) throw new Error("Invalid session");
+    return v;
   },
 
-  makeLinksCacheKey(storeId: string): string {
-    return `${ExportService.LINKS_CACHE_PREFIX}${storeId}`;
+  makeLinksCacheKey(storeId: string, userId?: string | null): string {
+    const suffix = userId ? `:${userId}` : "";
+    return `${ExportService.LINKS_CACHE_PREFIX}${storeId}${suffix}`;
   },
 
-  invalidateLinksCache(storeId: string): void {
-    removeCache(ExportService.makeLinksCacheKey(storeId));
+  invalidateLinksCache(storeId: string, userId?: string | null): void {
+    removeCache(ExportService.makeLinksCacheKey(storeId, userId));
   },
 
   async listForStore(storeId: string): Promise<ExportLink[]> {
-    await ExportService.ensureSession();
-    const key = ExportService.makeLinksCacheKey(storeId);
+    const session = await ExportService.ensureSession();
+    const key = ExportService.makeLinksCacheKey(storeId, session.user?.id || null);
     const cached = readCache<ExportLink[]>(key, false);
     if (cached?.data && Array.isArray(cached.data)) return cached.data;
-    const pending = ExportService.inFlightList.get(storeId);
+    const inflightKey = `${storeId}:${session.user?.id || "current"}`;
+    const pending = ExportService.inFlightList.get(inflightKey);
     if (pending) return await pending;
     const task = (async () => {
       const { data, error } = await supabase
-        .from('store_export_links')
-        .select('id,store_id,format,token,object_key,is_active,auto_generate,last_generated_at,created_at,updated_at')
-        .eq('store_id', storeId)
-        .order('format')
+        .from("store_export_links")
+        .select("id,store_id,format,token,object_key,is_active,auto_generate,last_generated_at,created_at,updated_at")
+        .eq("store_id", storeId)
+        .order("format")
         .returns<ExportLink[]>();
       if (error) return [];
       const rows = data ?? [];
       writeCache(key, rows, CACHE_TTL.productLinks);
       return rows;
     })();
-    ExportService.inFlightList.set(storeId, task);
+    ExportService.inFlightList.set(inflightKey, task);
     try {
       return await task;
     } finally {
-      ExportService.inFlightList.delete(storeId);
+      ExportService.inFlightList.delete(inflightKey);
     }
   },
 
   async createLink(storeId: string, format: 'xml' | 'csv'): Promise<ExportLink | null> {
-    await ExportService.ensureSession();
+    const session = await ExportService.ensureSession();
     const token = crypto.randomUUID();
     const objectKey = `exports/stores/${storeId}/${format}/${token}.${format}`;
     const { data, error } = await supabase
-      .from('store_export_links')
+      .from("store_export_links")
       .insert({
         id: crypto.randomUUID(),
         store_id: storeId,
@@ -78,26 +80,26 @@ export const ExportService = {
         object_key: objectKey,
         is_active: true,
       })
-      .select('id,store_id,format,token,object_key,is_active,last_generated_at,created_at,updated_at')
+      .select("id,store_id,format,token,object_key,is_active,last_generated_at,created_at,updated_at")
       .returns<ExportLink>()
       .single();
     if (error) return null;
-    ExportService.invalidateLinksCache(storeId);
+    ExportService.invalidateLinksCache(storeId, session.user?.id);
     return data as ExportLink;
   },
 
   async regenerate(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
-    await ExportService.ensureSession();
+    const session = await ExportService.ensureSession();
     const key = `${storeId}:${format}`;
     const pending = ExportService.inFlightGenerate.get(key);
     if (pending) return await pending;
     const task = (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('export-generate', {
+        const { data, error } = await supabase.functions.invoke("export-generate", {
           body: { store_id: storeId, format },
         });
         if (error) return false;
-        ExportService.invalidateLinksCache(storeId);
+        ExportService.invalidateLinksCache(storeId, session.user?.id);
         return !!(data?.success);
       } catch {
         return false;
@@ -112,20 +114,23 @@ export const ExportService = {
   },
 
   async updateAutoGenerate(linkId: string, auto: boolean): Promise<boolean> {
-    await ExportService.ensureSession();
+    const session = await ExportService.ensureSession();
     const { data, error } = await supabase
-      .from('store_export_links')
+      .from("store_export_links")
       .update({ auto_generate: auto })
-      .eq('id', linkId)
-      .select('id')
-      .returns<Pick<ExportLink,'id'>>()
+      .eq("id", linkId)
+      .select("id,store_id")
+      .returns<Pick<ExportLink, "id" | "store_id">>()
       .maybeSingle();
     if (error) return false;
+    if (data?.store_id) {
+      ExportService.invalidateLinksCache(data.store_id, session.user?.id);
+    }
     return !!data;
   },
 
   async generateAndUpload(storeId: string, format: 'xml' | 'csv', options?: { local?: boolean }): Promise<boolean> {
-    await ExportService.ensureSession();
+    const session = await ExportService.ensureSession();
     if (options?.local) {
       return await ExportService.generateLocalAndUpload(storeId, format);
     }
@@ -133,11 +138,11 @@ export const ExportService = {
     const pending = ExportService.inFlightGenerate.get(key);
     if (pending) return await pending;
     const task = (async () => {
-      const { data, error } = await supabase.functions.invoke('export-generate', {
+      const { data, error } = await supabase.functions.invoke("export-generate", {
         body: { store_id: storeId, format },
       });
       if (error) return false;
-      ExportService.invalidateLinksCache(storeId);
+      ExportService.invalidateLinksCache(storeId, session.user?.id);
       return !!(data?.success);
     })();
     ExportService.inFlightGenerate.set(key, task);
@@ -203,7 +208,8 @@ export const ExportService = {
   },
 
   async generateLocalAndUpload(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
-    const key = `${storeId}:${format}:local`;
+    const session = await ExportService.ensureSession();
+    const key = `${storeId}:${format}:local:${session.user?.id || "current"}`;
     const pending = ExportService.inFlightLocalGenerate.get(key);
     if (pending) return await pending;
     const task = (async () => {
@@ -214,7 +220,7 @@ export const ExportService = {
       const file = new File([blob], `export-${storeId}-${Date.now()}.${format}`, { type: blob.type });
       const res = await R2Storage.uploadFile(file);
       const ok = !!res?.success;
-      if (ok) ExportService.invalidateLinksCache(storeId);
+      if (ok) ExportService.invalidateLinksCache(storeId, session.user?.id);
       return ok;
     })();
     ExportService.inFlightLocalGenerate.set(key, task);

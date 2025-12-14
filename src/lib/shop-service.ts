@@ -417,13 +417,27 @@ export class ShopService {
     // Дедуплицируем запросы
     return this.deduplicateRequest("shops-aggregated", async () => {
       try {
-        const response = await this.invokeEdge<ShopsListResponse>(
-          "user-shops-list",
-          {}
-        );
-        
+        const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
         const shops = response.shops || [];
-        return shops;
+
+        const enriched = await Promise.all(
+          shops.map(async (shop) => {
+            try {
+              const { productsCount, categoriesCount } = await this.recomputeStoreCounts(
+                String(shop.id),
+              );
+              return {
+                ...shop,
+                productsCount,
+                categoriesCount,
+              };
+            } catch {
+              return shop;
+            }
+          }),
+        );
+
+        return enriched;
       } catch (error) {
         console.error("Failed to fetch aggregated shops, using fallback:", error);
         const fallback = await this.getShopsFallback();
@@ -994,17 +1008,19 @@ export class ShopService {
 
   /**
    * Получение количества товаров в магазине.
+   * Источником правды является user-products-list / fallback запросы,
+   * чтобы счетчики всегда совпадали с реальным списком товаров магазина.
    */
   static async getStoreProductsCount(storeId: string): Promise<number> {
     if (!storeId) return 0;
-
-    // Edge Function: точный подсчет количества товаров
     try {
       await this.ensureSession();
-      const resp = await this.invokeEdge<{ count: number }>("get-store-products-count", { store_id: storeId });
-      return Math.max(0, Number(resp?.count || 0));
+      const { ProductService } = await import("@/lib/product-service");
+      const { page } = await ProductService.getProductsFirstPage(storeId, 1, { bypassCache: true });
+      const total = page?.total ?? 0;
+      return Math.max(0, Number(total) || 0);
     } catch (error) {
-      console.warn("getStoreProductsCount edge failed, returning 0:", error);
+      console.warn("getStoreProductsCount failed, returning 0:", error);
       return 0;
     }
   }
@@ -1013,23 +1029,29 @@ export class ShopService {
   /**
  * Пересчет счетчиков магазина и синхронизация с кэшем.
  */
-/**
- * Пересчет счетчиков магазина и синхронизация с кэшем.
- */
-static async recomputeStoreCounts(storeId: string): Promise<{ productsCount: number; categoriesCount: number }> {
-  if (!storeId) return { productsCount: 0, categoriesCount: 0 };
-  await this.ensureSession();
-  
-  const { ProductService } = await import("@/lib/product-service");
-  
-  const [productsCount, categoryNames] = await Promise.all([
-    this.getStoreProductsCount(storeId),
-    ProductService.getStoreCategoryFilterOptions(storeId),
-  ]);
-  
-  const pCount = Math.max(0, productsCount);
-  const cCount = pCount === 0 ? 0 : (Array.isArray(categoryNames) ? categoryNames.length : 0);
-  
-  return { productsCount: pCount, categoriesCount: cCount };
-}
+  /**
+   * Пересчет счетчиков магазина на основе реально доступных товаров.
+   * Использует те же источники данных, что и список товаров магазина.
+   */
+  static async recomputeStoreCounts(
+    storeId: string,
+  ): Promise<{ productsCount: number; categoriesCount: number }> {
+    if (!storeId) return { productsCount: 0, categoriesCount: 0 };
+    await this.ensureSession();
+
+    const { ProductService } = await import("@/lib/product-service");
+
+    const [{ page }, categoryNamesByStore] = await Promise.all([
+      ProductService.getProductsFirstPage(storeId, 1, { bypassCache: true }),
+      ProductService.refreshStoreCategoryFilterOptions([storeId]),
+    ]);
+
+    const pCount = Math.max(0, Number(page?.total ?? 0) || 0);
+    const names = Array.isArray(categoryNamesByStore?.[storeId])
+      ? categoryNamesByStore[storeId]
+      : [];
+    const cCount = pCount === 0 ? 0 : names.length;
+
+    return { productsCount: pCount, categoriesCount: cCount };
+  }
 }

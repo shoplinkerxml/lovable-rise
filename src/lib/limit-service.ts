@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
 
 export interface LimitTemplate {
   id: number;
@@ -26,6 +27,7 @@ export interface UpdateLimitData {
 
 export class LimitService {
   private static codeRegex = /^[a-z][a-z0-9_]*$/;
+  private static CACHE_KEY = "rq:limitTemplates:list";
   private static ensureName(name?: string): string {
     const v = (name ?? '').trim();
     if (!v) throw new Error("Назва обмеження обов'язкова");
@@ -40,8 +42,13 @@ export class LimitService {
     return v;
   }
   private static trimOrNull(v?: string): string | null { return (v?.trim() || '') || null; }
-  /** Отримання списку всіх лімітів */
+  private static invalidateCache() {
+    removeCache(LimitService.CACHE_KEY);
+  }
+
   static async getLimits(): Promise<LimitTemplate[]> {
+    const cached = readCache<LimitTemplate[]>(LimitService.CACHE_KEY);
+    if (cached?.data && Array.isArray(cached.data)) return cached.data;
     const { data, error } = await supabase
       .from('limit_templates')
       .select('id,code,name,path,description,order_index')
@@ -52,7 +59,9 @@ export class LimitService {
       throw new Error(error.message);
     }
 
-    return (data || []) as LimitTemplate[];
+    const rows = (data || []) as LimitTemplate[];
+    writeCache(LimitService.CACHE_KEY, rows, CACHE_TTL.limits);
+    return rows;
   }
 
   /** Отримання одного ліміту за ID */
@@ -100,7 +109,9 @@ export class LimitService {
       throw new Error(error.message);
     }
 
-    return data as LimitTemplate;
+    const row = data as LimitTemplate;
+    LimitService.invalidateCache();
+    return row;
   }
 
   /** Оновлення ліміту */
@@ -144,7 +155,9 @@ export class LimitService {
       throw new Error(error.message);
     }
 
-    return data as LimitTemplate;
+    const row = data as LimitTemplate;
+    LimitService.invalidateCache();
+    return row;
   }
 
   /** Видалення ліміту */
@@ -159,20 +172,22 @@ export class LimitService {
     if (error) {
       throw new Error(error.message);
     }
+    LimitService.invalidateCache();
   }
 
   /** Оновлення порядку лімітів */
   static async updateLimitsOrder(limits: { id: number; order_index: number }[]): Promise<void> {
     if (!Array.isArray(limits) || limits.length === 0) return;
-    // Update each limit individually to avoid type issues
     for (const l of limits) {
+      const idx = l.order_index < 0 ? 0 : l.order_index;
       const { error } = await supabase
         .from('limit_templates')
-        .update({ order_index: l.order_index })
+        .update({ order_index: idx })
         .eq('id', l.id);
       if (error) {
         throw new Error('Failed to update limits order');
       }
     }
+    LimitService.invalidateCache();
   }
 }

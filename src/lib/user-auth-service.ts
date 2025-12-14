@@ -173,8 +173,10 @@ const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptions = {
 };
 
 export class UserAuthService {
-  private static authMeCache: { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] } } | null = null;
-  private static authMeInFlight: Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> | null = null;
+  private static authMeCacheBySession: Map<string, { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] } }> =
+    new Map();
+  private static authMeInFlightBySession: Map<string, Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }>> =
+    new Map();
   private static readonly AUTH_ME_TTL_MS = 900000;
   /**
    * Register a new user with email confirmation flow
@@ -604,36 +606,30 @@ export class UserAuthService {
   }
 
   static async fetchAuthMe(): Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> {
+    const validation = await SessionValidator.ensureValidSession();
+    if (!validation.isValid || !validation.session || !validation.user) {
+      this.authMeCacheBySession.clear();
+      this.authMeInFlightBySession.clear();
+      return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
+    }
+    const sessionKey = `${validation.user.id}:${validation.expiresAt ?? 0}`;
     const now = Date.now();
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('rq:authMe') : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as { data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }; expiresAt: number };
-        if (parsed && typeof parsed.expiresAt === 'number' && parsed.expiresAt > now && parsed.data) {
-          this.authMeCache = { timestamp: now, data: parsed.data };
-          return parsed.data;
-        }
-      }
-    } catch {}
-    if (this.authMeCache && now - this.authMeCache.timestamp < this.AUTH_ME_TTL_MS) {
-      return this.authMeCache.data;
+    const cached = this.authMeCacheBySession.get(sessionKey);
+    if (cached && now - cached.timestamp < this.AUTH_ME_TTL_MS) {
+      return cached.data;
     }
-    if (this.authMeInFlight) {
-      return this.authMeInFlight;
+    const inFlight = this.authMeInFlightBySession.get(sessionKey);
+    if (inFlight) {
+      return inFlight;
     }
-    this.authMeInFlight = (async () => {
-      const validation = await SessionValidator.ensureValidSession();
-      if (!validation.isValid) {
-        this.authMeInFlight = null;
-        return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
-      }
+    const promise = (async () => {
       const accessToken = validation.accessToken || await this.getCurrentAccessToken();
       const { data, error } = await supabase.functions.invoke('auth-me', {
         body: {},
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
       if (error) {
-        this.authMeInFlight = null;
+        this.authMeInFlightBySession.delete(sessionKey);
         return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
       }
       const resp: { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] } =
@@ -646,22 +642,22 @@ export class UserAuthService {
         tariffLimits: Array.isArray(resp?.tariffLimits) ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>) : [],
         menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
       };
-      this.authMeCache = { timestamp: Date.now(), data: result };
-      try {
-        if (typeof window !== 'undefined') {
-          const payload = JSON.stringify({ data: result, expiresAt: Date.now() + this.AUTH_ME_TTL_MS });
-          window.localStorage.setItem('rq:authMe', payload);
-        }
-      } catch {}
-      this.authMeInFlight = null;
+      this.authMeCacheBySession.set(sessionKey, { timestamp: Date.now(), data: result });
+      this.authMeInFlightBySession.delete(sessionKey);
       return result;
     })();
-    return this.authMeInFlight;
+    this.authMeInFlightBySession.set(sessionKey, promise);
+    return promise;
   }
 
   static clearAuthMeCache(): void {
-    this.authMeCache = null;
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:authMe'); } catch {}
+    this.authMeCacheBySession.clear();
+    this.authMeInFlightBySession.clear();
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('rq:authMe');
+      }
+    } catch {}
   }
 
   /**

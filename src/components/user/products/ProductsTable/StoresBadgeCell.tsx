@@ -135,12 +135,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               toast.success(t("product_added_to_store"));
                               {
                                 const idStr = String(id);
-                                const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-                                const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                                const nextProducts = baseProducts + 1;
-                                const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
-                                const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
-                                ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                await ShopCountsService.recompute(queryClient, idStr);
                               }
                               try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                               try { /* keep menu open */ setOpen(true); } catch { void 0; }
@@ -150,12 +145,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               toast.success(t("product_removed_from_store"));
                               {
                                 const idStr = String(id);
-                                const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-                                const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                                const nextProducts = Math.max(0, baseProducts - 1);
-                                const names = Array.isArray(categoryNamesByStore?.[idStr]) ? categoryNamesByStore![idStr] : [];
-                                const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
-                                ShopCountsService.set(queryClient, idStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                await ShopCountsService.recompute(queryClient, idStr);
                               }
                               try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                               try { setOpen(true); } catch { void 0; }
@@ -260,12 +250,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       toast.success(t("product_added_to_store"));
                                       {
                                         const sidStr = String(sid);
-                                        const existing = queryClient.getQueryData<any>(ShopCountsService.key(sidStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-                                        const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                                        const nextProducts = baseProducts + 1;
-                                        const names = Array.isArray(categoryNamesByStore?.[sidStr]) ? categoryNamesByStore![sidStr] : [];
-                                        const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
-                                        ShopCountsService.set(queryClient, sidStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                        await ShopCountsService.recompute(queryClient, sidStr);
                                       }
                                       try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }
@@ -275,12 +260,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       toast.success(t("product_removed_from_store"));
                                       {
                                         const sidStr = String(sid);
-                                        const existing = queryClient.getQueryData<any>(ShopCountsService.key(sidStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-                                        const baseProducts = Math.max(0, (existing?.productsCount ?? 0));
-                                        const nextProducts = Math.max(0, baseProducts - 1);
-                                        const names = Array.isArray(categoryNamesByStore?.[sidStr]) ? categoryNamesByStore![sidStr] : [];
-                                        const nextCategories = nextProducts === 0 ? 0 : Math.max(0, names.length);
-                                        ShopCountsService.set(queryClient, sidStr, { productsCount: nextProducts, categoriesCount: nextCategories });
+                                        await ShopCountsService.recompute(queryClient, sidStr);
                                       }
                                       try { queryClient.invalidateQueries({ queryKey: ["shopsList"] }); } catch { void 0; }
                                       try { setBadgeOpenId(String(id)); } catch { void 0; }

@@ -61,18 +61,12 @@ export const ShopDetail = () => {
       if (!shopId) return;
 
       try {
-        const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(
+        await ProductService.bulkRemoveStoreProductLinks(
           [String(product.id)],
           [shopId]
         );
 
-        const categoryNames = categoryNamesByStore?.[shopId] || [];
-        const current = counts || { productsCount: 0, categoriesCount: 0 };
-        
-        ShopCountsService.set(queryClient, shopId, {
-          productsCount: Math.max(0, current.productsCount - 1),
-          categoriesCount: categoryNames.length,
-        });
+        await ShopCountsService.recompute(queryClient, shopId);
 
         await refetchCounts();
         queryClient.invalidateQueries({ queryKey: ['shopsList'] });
@@ -88,11 +82,14 @@ export const ShopDetail = () => {
   );
 
   const handleProductsLoaded = useCallback(
-    (count: number) => {
-      const categories = counts?.categoriesCount ?? 0;
-      ShopCountsService.set(queryClient, shopId, { productsCount: Math.max(0, count ?? 0), categoriesCount: categories });
+    async (count: number) => {
+      if (!shopId) return;
+      try {
+        await ShopCountsService.recompute(queryClient, shopId);
+      } catch {
+      }
     },
-    [counts?.categoriesCount, queryClient, shopId]
+    [queryClient, shopId]
   );
 
   if (isLoading) {
