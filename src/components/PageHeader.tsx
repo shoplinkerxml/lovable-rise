@@ -25,7 +25,7 @@ export function PageHeader({
       {/* Title row with inline actions, description below */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl xs:text-3xl sm:text-3xl md:text-4xl font-bold tracking-tight truncate">{title}</h1>
+          <h1 className="text-xl xs:text-2xl sm:text-2xl md:text-3xl font-bold tracking-tight truncate">{title}</h1>
           {actions && (
             <div className="flex items-center gap-2 shrink-0">
               {actions}
@@ -33,7 +33,7 @@ export function PageHeader({
           )}
         </div>
         {description && (
-          <p className="text-sm xs:text-base sm:text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
         )}
       </div>
     </div>

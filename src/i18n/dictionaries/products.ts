@@ -23,8 +23,8 @@ export const productsDictionary: Dictionary = {
   },
   no_products: { uk: "Немає товарів", en: "No Products" },
   no_products_description: {
-    uk: "Перейдіть у розділ «Товари» і додайте товар до магазину",
-    en: "Go to the products section and add a product to the store",
+    uk: "Додайте товар до магазину",
+    en: "Add a product to the store",
   },
   description_placeholder: {
     uk: "Введіть опис товару",
