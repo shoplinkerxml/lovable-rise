@@ -158,11 +158,23 @@ export function ProductFormTabs({
     setParameters,
   } = useProductParams(preloadedParams, onParamsChange);
 
-  const lookups = useProductLookups(product?.store_id || '', basicData, setBasicData, preloadedSuppliers, preloadedCurrencies, preloadedCategories, preloadedSupplierCategoriesMap);
-  const categories = lookups.categories;
-  const currencies = lookups.currencies;
-  const selectedCategoryName = lookups.selectedCategoryName;
-  const selectedSupplierName = lookups.selectedSupplierName;
+  const lookups = useProductLookups(
+    product?.store_id || '',
+    basicData,
+    setBasicData,
+    preloadedSuppliers,
+    preloadedCurrencies,
+    preloadedCategories,
+    preloadedSupplierCategoriesMap
+  );
+  const {
+    suppliers,
+    categories,
+    currencies,
+    selectedCategoryName,
+    selectedSupplierName,
+    setCategories,
+  } = lookups;
   // Removed redundant selectedSupplierId; formData.supplier_id is the single source of truth
 
   
@@ -241,12 +253,20 @@ export function ProductFormTabs({
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsHeader t={t} tabsOverflow={tabsOverflow} tabsScrollRef={tabsScrollRef} />
 
-            <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
-              <InfoTab
-                formState={{ basicData, priceData, stockData }}
-                formActions={{ updateBasicData, setPriceData, setStockData, setBasicData }}
-                lookups={{ currencies, categories, selectedCategoryName, selectedSupplierName }}
-                imageState={{ images, activeIndex, galleryImgRefs }}
+          <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
+            <InfoTab
+              formState={{ basicData, priceData, stockData }}
+              formActions={{ updateBasicData, setPriceData, setStockData, setBasicData }}
+              lookups={{
+                currencies,
+                categories,
+                selectedCategoryName,
+                selectedSupplierName,
+                suppliers,
+                setCategories,
+                preloadedSupplierCategoriesMap,
+              }}
+              imageState={{ images, activeIndex, galleryImgRefs }}
                 imageHandlers={{
                   onSelectIndex: handleSelectIndex,
                   getMainAdaptiveImageStyle: getAdaptiveImageStyle,

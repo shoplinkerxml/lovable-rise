@@ -3,14 +3,36 @@ import NamesDescriptionSection from '../NamesDescriptionSection';
 import BasicSection from '../BasicSection';
 import PricesSection from '../PricesSection';
 import ImagePreviewSection from '../ImagePreviewSection';
+import CategoryEditorSection from '../CategoryEditorSection';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import type { BasicData, PriceData, StockData, CategoryOption, CurrencyOption, ProductImage } from '../types';
+import type {
+  BasicData,
+  PriceData,
+  StockData,
+  CategoryOption,
+  CurrencyOption,
+  ProductImage,
+  SupplierOption,
+} from '../types';
 
 export function InfoTab(props: {
   formState: { basicData: BasicData; priceData: PriceData; stockData: StockData };
-  formActions: { updateBasicData: (partial: Partial<BasicData>) => void; setPriceData: (p: PriceData) => void; setStockData: (s: StockData) => void; setBasicData: (next: BasicData) => void };
-  lookups: { currencies: CurrencyOption[]; categories: CategoryOption[]; selectedCategoryName: string; selectedSupplierName: string };
+  formActions: {
+    updateBasicData: (partial: Partial<BasicData>) => void;
+    setPriceData: (p: PriceData) => void;
+    setStockData: (s: StockData) => void;
+    setBasicData: (next: BasicData) => void;
+  };
+  lookups: {
+    currencies: CurrencyOption[];
+    categories: CategoryOption[];
+    selectedCategoryName: string;
+    selectedSupplierName: string;
+    suppliers: SupplierOption[];
+    setCategories: React.Dispatch<React.SetStateAction<CategoryOption[]>>;
+    preloadedSupplierCategoriesMap?: Record<string, CategoryOption[]>;
+  };
   imageState: { images: ProductImage[]; activeIndex: number; galleryImgRefs: React.MutableRefObject<Array<HTMLImageElement | null>> };
   imageHandlers: {
     onSelectIndex: (i: number) => void;
@@ -41,7 +63,15 @@ export function InfoTab(props: {
   const { t, readOnly, editableKeys, isLargeScreen } = config;
   const { basicData, priceData, stockData } = formState;
   const { updateBasicData, setPriceData, setStockData, setBasicData } = formActions;
-  const { currencies, categories, selectedCategoryName, selectedSupplierName } = lookups;
+  const {
+    currencies,
+    categories,
+    selectedCategoryName,
+    selectedSupplierName,
+    suppliers,
+    setCategories,
+    preloadedSupplierCategoriesMap,
+  } = lookups;
   const { images, activeIndex, galleryImgRefs } = imageState;
   const {
     onSelectIndex,
@@ -89,10 +119,12 @@ export function InfoTab(props: {
         </div>
         <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
           <NamesDescriptionSection t={t} data={basicData} onChange={updateBasicData} readOnly={readOnly} />
-          <div className="space-y-2" data-testid="productFormTabs_supplierNameReadonly">
-            <Label htmlFor="supplier_name_readonly">{t('supplier_name')}</Label>
-            <Input id="supplier_name_readonly" value={selectedSupplierName} readOnly disabled />
-          </div>
+          {readOnly && (
+            <div className="space-y-2" data-testid="productFormTabs_supplierNameReadonly">
+              <Label htmlFor="supplier_name_readonly">{t('supplier_name')}</Label>
+              <Input id="supplier_name_readonly" value={selectedSupplierName} readOnly disabled />
+            </div>
+          )}
         </div>
       </div>
       <BasicSection
@@ -107,6 +139,17 @@ export function InfoTab(props: {
         selectedCategoryName={selectedCategoryName}
         onChange={onChange}
       />
+      {!readOnly && (
+        <CategoryEditorSection
+          t={t}
+          suppliers={suppliers}
+          categories={categories}
+          setCategories={setCategories}
+          preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap}
+          basicData={basicData}
+          setBasicData={setBasicData}
+        />
+      )}
       <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} priceData={priceData} setPriceData={setPriceData} onChange={onChange} />
     </div>
   );
