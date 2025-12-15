@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import { ProfileTrigger } from "@/components/ui/profile-trigger";
 import { ProfileSheetContent } from "@/components/ui/profile-sheet-content";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
 import { UserProfile } from "@/lib/user-auth-schemas";

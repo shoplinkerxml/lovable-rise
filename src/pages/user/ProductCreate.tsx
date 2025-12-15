@@ -4,7 +4,7 @@ import { ArrowLeft, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type ProductLimitInfo, type ProductImage, type ProductParam } from '@/lib/product-service';
 import { useNavigate, useOutletContext } from 'react-router-dom';

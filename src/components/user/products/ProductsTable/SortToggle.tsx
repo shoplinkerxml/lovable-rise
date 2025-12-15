@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 export function SortToggle<TData>({ column, table }: { column: import("@tanstack/react-table").Column<TData, unknown>; table: import("@tanstack/react-table").Table<TData> }) {
   const { t } = useI18n();

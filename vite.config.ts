@@ -19,4 +19,13 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          i18n: ["./src/i18n/dictionaries/index.ts"],
+        },
+      },
+    },
+  },
 }));

@@ -11,7 +11,7 @@ import { ProductsTable } from '@/components/user/products/ProductsTable';
 import { FullPageLoader } from '@/components/LoadingSkeletons';
 
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { ShopService, type Shop } from '@/lib/shop-service';
 import { ProductService, type Product } from '@/lib/product-service';
 import { useShopRealtimeSync } from "@/hooks/useShopRealtimeSync";

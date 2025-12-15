@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { List, ChevronDown, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 type PageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
 

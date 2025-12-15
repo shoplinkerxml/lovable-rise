@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Plug, FileSpreadsheet, Tags, Sparkles, UploadCloud, BarChart3, Shield } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 
 const AdminAuth = () => {
@@ -169,5 +169,4 @@ const AdminAuth = () => {
 };
 
 export default AdminAuth;
-
 

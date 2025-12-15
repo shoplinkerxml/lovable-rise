@@ -1,0 +1,383 @@
+import type { Dictionary } from "../types";
+
+export const productsDictionary: Dictionary = {
+  products_title: { uk: "Товари", en: "Products" },
+  products_description: {
+    uk: "Керування вашими товарами",
+    en: "Manage your products",
+  },
+  create_product: { uk: "Створити товар", en: "Create Product" },
+  create_product_description: {
+    uk: "Створення нового товару",
+    en: "Create new product",
+  },
+  edit_product: { uk: "Редагувати товар", en: "Edit Product" },
+  edit_product_description: {
+    uk: "Редагування інформації про товар",
+    en: "Edit product information",
+  },
+  add_product: { uk: "Створити товар", en: "Create Product" },
+  back_to_products: {
+    uk: "Назад до товарів",
+    en: "Back to Products",
+  },
+  no_products: { uk: "Немає товарів", en: "No Products" },
+  no_products_description: {
+    uk: "Перейдіть у розділ «Товари» і додайте товар до магазину",
+    en: "Go to the products section and add a product to the store",
+  },
+  description_placeholder: {
+    uk: "Введіть опис товару",
+    en: "Enter product description",
+  },
+  product_created: { uk: "Товар створено", en: "Product created" },
+  product_updated: { uk: "Товар оновлено", en: "Product updated" },
+  product_deleted: { uk: "Товар видалено", en: "Product deleted" },
+  product_removed_successfully: {
+    uk: "Товар видалено",
+    en: "Product removed",
+  },
+  products_deleted_successfully: {
+    uk: "Товари успішно видалено",
+    en: "Products deleted successfully",
+  },
+  product_copying: {
+    uk: "Триває копіювання товару…",
+    en: "Copying product…",
+  },
+  products_deleting: {
+    uk: "Йде видалення товарів…",
+    en: "Deleting products…",
+  },
+  product_tab_main: { uk: "Основні дані", en: "Main Data" },
+  product_tab_description: { uk: "Опис", en: "Description" },
+  product_tab_images: { uk: "Зображення", en: "Images" },
+  product_tab_parameters: {
+    uk: "Характеристики",
+    en: "Characteristics",
+  },
+  product_tab_seo: { uk: "SEO", en: "SEO" },
+  product_main_data: { uk: "Основні дані", en: "Main Data" },
+  product_names_description: {
+    uk: "Назви та опис",
+    en: "Names and Description",
+  },
+  product_category_prices: {
+    uk: "Категорія та ціни",
+    en: "Category and Prices",
+  },
+  product_additional_info: {
+    uk: "Додаткова інформація",
+    en: "Additional Information",
+  },
+  product_photos: { uk: "Фото товару", en: "Product Photos" },
+  add_product_photo: {
+    uk: "Додати фото товару",
+    en: "Add product photo",
+  },
+  click_to_upload: {
+    uk: "Натисніть для завантаження",
+    en: "Click to upload",
+  },
+  main_image: { uk: "Головне", en: "Main" },
+  set_as_main: { uk: "Зробити головним", en: "Set as main" },
+  product_main_info: {
+    uk: "Основна інформація про товар",
+    en: "Main Product Information",
+  },
+  product_name_ru: {
+    uk: "Назва товару (рос.)",
+    en: "Product Name (Russian)",
+  },
+  product_name_ru_placeholder: {
+    uk: "Введіть назву товару російською",
+    en: "Enter product name in Russian",
+  },
+  product_description_ru: {
+    uk: "Опис товару (рос.)",
+    en: "Product Description (Russian)",
+  },
+  product_description_ru_placeholder: {
+    uk: "Введіть опис товару російською",
+    en: "Enter product description in Russian",
+  },
+  product_description_uk: {
+    uk: "Опис товару (укр.)",
+    en: "Product Description (Ukrainian)",
+  },
+  product_description_uk_placeholder: {
+    uk: "Введіть опис товару українською",
+    en: "Enter product description in Ukrainian",
+  },
+  product_url: { uk: "URL товару", en: "Product URL" },
+  product_url_placeholder: {
+    uk: "Введіть URL товару",
+    en: "Enter product URL",
+  },
+  product_images: {
+    uk: "Зображення товару",
+    en: "Product Images",
+  },
+  add_image_url: {
+    uk: "Додати зображення по URL",
+    en: "Add Image by URL",
+  },
+  image_url_placeholder: {
+    uk: "Введіть URL зображення",
+    en: "Enter image URL",
+  },
+  add: { uk: "Додати", en: "Add" },
+  upload_file: { uk: "Завантажити файл", en: "Upload File" },
+  upload: { uk: "Завантажити", en: "Upload" },
+  file_upload_later: {
+    uk: "Завантаження файлів буде реалізовано пізніше",
+    en: "File upload will be implemented later",
+  },
+  no_images_added: {
+    uk: "Зображення не додані",
+    en: "No Images Added",
+  },
+  add_images_instruction: {
+    uk: "Додайте зображення по URL або натисніть/перетягніть у зону",
+    en: "Add images by URL or click/drag into the drop zone",
+  },
+  drop_image_here: {
+    uk: "Перетягніть зображення сюди",
+    en: "Drop image here",
+  },
+  image_types_and_limit: {
+    uk: "Формати: JPEG, PNG, WebP, AVIF, GIF, SVG • Макс. 5 МБ",
+    en: "Formats: JPEG, PNG, WebP, AVIF, GIF, SVG • Max 5MB",
+  },
+  added_images: { uk: "Додані зображення", en: "Added Images" },
+  main_photo: { uk: "Головне", en: "Main" },
+  set_as_main_photo: {
+    uk: "Зробити головним",
+    en: "Set as main",
+  },
+  uploading_image: {
+    uk: "Завантаження зображення...",
+    en: "Uploading image...",
+  },
+  reorder: { uk: "Змінити порядок", en: "Reorder" },
+  drag_to_reorder: {
+    uk: "Перетягніть, щоб змінити порядок",
+    en: "Drag to reorder",
+  },
+  product_characteristics: {
+    uk: "Характеристики товару",
+    en: "Product Characteristics",
+  },
+  add_characteristic: {
+    uk: "Додати характеристику",
+    en: "Add Characteristic",
+  },
+  no_characteristics_added: {
+    uk: "Характеристики не додані",
+    en: "No Characteristics Added",
+  },
+  add_characteristics_instruction: {
+    uk: "Додайте характеристики для детального опису товару",
+    en: "Add characteristics for detailed product description",
+  },
+  characteristic_name: {
+    uk: "Назва характеристики",
+    en: "Characteristic Name",
+  },
+  value: { uk: "Значення", en: "Value" },
+  characteristic_name_placeholder: {
+    uk: "Назва характеристики",
+    en: "Characteristic name",
+  },
+  characteristic_value_placeholder: {
+    uk: "Значення характеристики",
+    en: "Characteristic value",
+  },
+  param_id_placeholder: {
+    uk: "ID параметра",
+    en: "Parameter ID",
+  },
+  value_id_placeholder: {
+    uk: "ID значення",
+    en: "Value ID",
+  },
+  edit_characteristic: {
+    uk: "Редагувати характеристику",
+    en: "Edit Characteristic",
+  },
+  delete_characteristic: {
+    uk: "Видалити характеристику",
+    en: "Delete Characteristic",
+  },
+  param_id_optional: {
+    uk: "Param ID (необов'язково)",
+    en: "Param ID (optional)",
+  },
+  value_id_optional: {
+    uk: "Value ID (необов'язково)",
+    en: "Value ID (optional)",
+  },
+  param_id: { uk: "Param ID", en: "Param ID" },
+  value_id: { uk: "Value ID", en: "Value ID" },
+  order: { uk: "Порядок", en: "Order" },
+  actions: { uk: "Дії", en: "Actions" },
+  select_all: { uk: "Вибрати все", en: "Select all" },
+  select_row: { uk: "Вибрати рядок", en: "Select row" },
+  filter: { uk: "Фільтр", en: "Filter" },
+  filter_values: {
+    uk: "Значення фільтра",
+    en: "Filter values",
+  },
+  search_placeholder: {
+    uk: "Пошук за назвою",
+    en: "Search by name",
+  },
+  delete_selected: {
+    uk: "Видалити вибране",
+    en: "Delete selected",
+  },
+  customize_columns: {
+    uk: "Налаштувати колонки",
+    en: "Customize Columns",
+  },
+  columns_short: { uk: "Колонки", en: "Columns" },
+  no_results: { uk: "Немає результатів", en: "No results" },
+  clear: { uk: "Очистити", en: "Clear" },
+  sort_asc: {
+    uk: "Сортувати за зростанням",
+    en: "Sort ascending",
+  },
+  sort_desc: {
+    uk: "Сортувати за спаданням",
+    en: "Sort descending",
+  },
+  rows_selected: { uk: "Вибрано", en: "Selected" },
+  page_size: { uk: "Кількість рядків", en: "Rows per page" },
+  page_of: { uk: "Сторінка", en: "Page" },
+  page_of_connector: { uk: "з", en: "of" },
+  first_page: { uk: "Перша сторінка", en: "First page" },
+  previous_page: { uk: "Попередня сторінка", en: "Previous page" },
+  next_page: { uk: "Наступна сторінка", en: "Next page" },
+  last_page: { uk: "Остання сторінка", en: "Last page" },
+  btn_delete_selected: {
+    uk: "Видалити вибране",
+    en: "Delete selected",
+  },
+  view_options: { uk: "Опції перегляду", en: "View options" },
+  toggle_columns: {
+    uk: "Перемикання колонок",
+    en: "Toggle columns",
+  },
+  currency_uah: { uk: "UAH - Гривня", en: "UAH - Hryvnia" },
+  currency_usd: { uk: "USD - Долар", en: "USD - Dollar" },
+  currency_eur: { uk: "EUR - Євро", en: "EUR - Euro" },
+  failed_load_data: {
+    uk: "Помилка завантаження даних",
+    en: "Failed to load data",
+  },
+  failed_load_product_data: {
+    uk: "Помилка завантаження даних товару",
+    en: "Failed to load product data",
+  },
+  product_name_required: {
+    uk: "Назва товару обов'язкова",
+    en: "Product name is required",
+  },
+  product_saved_successfully: {
+    uk: "Товар успішно збережено",
+    en: "Product saved successfully",
+  },
+  image_uploaded_successfully: {
+    uk: "Зображення завантажено",
+    en: "Image uploaded successfully",
+  },
+  failed_upload_image: {
+    uk: "Помилка завантаження зображення",
+    en: "Failed to upload image",
+  },
+  image_deleted_successfully: {
+    uk: "Зображення видалено",
+    en: "Image deleted successfully",
+  },
+  failed_delete_image: {
+    uk: "Не вдалося видалити зображення",
+    en: "Failed to delete image",
+  },
+  create_new_product: {
+    uk: "Створити новий товар",
+    en: "Create New Product",
+  },
+  product_status: { uk: "Статус", en: "Status" },
+  select_status: {
+    uk: "Оберіть статус",
+    en: "Select Status",
+  },
+  status_new: { uk: "Новий", en: "New" },
+  status_stock: { uk: "Уцінений", en: "Stock" },
+  status_used: { uk: "Вживаний", en: "Used" },
+  status_refurbished: { uk: "Відновлений", en: "Refurbished" },
+  status_active: { uk: "Активний", en: "Active" },
+  status_inactive: { uk: "Неактивний", en: "Inactive" },
+  status_archived: { uk: "Архівний", en: "Archived" },
+  add_image_by_url: {
+    uk: "Додати зображення по URL",
+    en: "Add Image by URL",
+  },
+  name: { uk: "Назва", en: "Name" },
+  value_example: {
+    uk: "Наприклад: Червоний, XL, Бавовна",
+    en: "Example: Red, XL, Cotton",
+  },
+  product_name_ua: { uk: "Назва товару", en: "Product Name" },
+  product_name_ua_placeholder: {
+    uk: "Введіть назву товару українською",
+    en: "Enter product name in Ukrainian",
+  },
+  product_description_ua: {
+    uk: "Опис товару",
+    en: "Product Description",
+  },
+  product_description_ua_placeholder: {
+    uk: "Введіть опис товару українською",
+    en: "Enter product description in Ukrainian",
+  },
+  product_description_en: {
+    uk: "Опис товару (англійською)",
+    en: "Product Description (English)",
+  },
+  product_description_en_placeholder: {
+    uk: "Введіть опис товару англійською",
+    en: "Enter product description in English",
+  },
+  category_prices: {
+    uk: "Ціна товару",
+    en: "Product Price",
+  },
+  product_name_ukrainian_tab: {
+    uk: "Назва товару",
+    en: "Product Name",
+  },
+  product_name_russian_tab: {
+    uk: "Назва товару (російською)",
+    en: "Product Name (Russian)",
+  },
+  short_name: { uk: "Коротка назва", en: "Short Name" },
+  short_name_ua: { uk: "Коротка назва", en: "Short Name UA" },
+  short_name_placeholder: {
+    uk: "Введіть коротку назву",
+    en: "Enter short name",
+  },
+  product_name: { uk: "Назва товару", en: "Product Name" },
+  product_name_placeholder: {
+    uk: "Введіть назву товару",
+    en: "Enter product name",
+  },
+  product_description: {
+    uk: "Опис товару",
+    en: "Product Description",
+  },
+  product_description_placeholder: {
+    uk: "Введіть опис товару",
+    en: "Enter product description",
+  },
+};

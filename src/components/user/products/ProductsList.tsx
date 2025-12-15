@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { Package, Edit, Trash2, Loader2 } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { ProductService, type Product } from '@/lib/product-service';
 import { toast } from 'sonner';
 

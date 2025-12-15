@@ -3,7 +3,7 @@ import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOve
 import { ProfileTrigger, CollapsedLogoutButton } from './profile-trigger';
 import { ProfileSheetContent } from './profile-sheet-content';
 import { UserProfile } from './profile-types';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { useNavigate } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './dropdown-menu';
 import { MoreHorizontal, User, LogOut } from 'lucide-react';

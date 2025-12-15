@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { TrendingUp, User, CheckCircle2, Chrome, Facebook } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { ProfileService } from "@/lib/profile-service";
 import { 

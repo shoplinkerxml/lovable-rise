@@ -3,7 +3,7 @@
 import { Zap, BarChart3, TrendingUp, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 export function SolutionsSection() {
   const {
     t

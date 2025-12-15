@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Plus, Edit3, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";

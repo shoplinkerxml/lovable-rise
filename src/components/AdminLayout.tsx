@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAdmin, AdminProvider } from '@/providers/admin-provider';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

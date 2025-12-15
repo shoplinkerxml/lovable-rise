@@ -29,7 +29,7 @@ import {
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Package } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
 import { readCache, writeCache, CACHE_TTL } from "@/lib/cache-utils";

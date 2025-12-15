@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Store, Package, List, Loader2, Trash2, Plus } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";

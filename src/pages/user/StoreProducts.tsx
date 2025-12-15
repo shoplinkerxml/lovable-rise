@@ -2,7 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ProductsTable } from "@/components/user/products/ProductsTable";
 import { ProductService, type Product } from "@/lib/product-service";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { ShopService } from "@/lib/shop-service";

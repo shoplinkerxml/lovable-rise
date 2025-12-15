@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Copy, MoreHorizontal, CreditCard, Star, Crown, Package, AlertTriangle, DollarSign, PoundSterling, JapaneseYen, Rocket, Banknote, TrendingUp, Zap } from 'lucide-react';
 import { TariffService, type Tariff, type TariffInsert, type Currency } from '@/lib/tariff-service';
 import TariffCache from '@/lib/tariff-cache';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
 import { Spinner } from '@/components/ui/spinner';

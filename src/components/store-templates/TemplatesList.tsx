@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { FileText, Edit, Trash2, Loader2 } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { TemplateService } from '@/lib/template-service';

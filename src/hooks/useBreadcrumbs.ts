@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { BreadcrumbItem } from "@/components/ui/breadcrumb";
 
 // Route mapping for breadcrumb labels

@@ -11,7 +11,7 @@ import { ProductService } from "@/lib/product-service";
 import { SupplierService } from "@/lib/supplier-service";
 import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 import { ImageHelpers } from "@/utils/imageHelpers";
 

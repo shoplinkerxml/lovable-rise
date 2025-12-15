@@ -34,7 +34,7 @@ import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil, Pl
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 // Keep local type consistent with ProductFormTabs
 export interface ProductParam {

@@ -9,7 +9,7 @@ import { Logo } from "@/components/ui/logo";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserProfile } from "@/components/ui/profile-types";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 function buildTree(items: MenuItemData[]): Record<number | "root", MenuItemData[]> {
   const map: Record<number | "root", MenuItemData[]> = { root: [] };
@@ -176,4 +176,3 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed = false, u
 };
 
 export default AdminSidebar;
-

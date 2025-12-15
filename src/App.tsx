@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, Suspense, lazy } from "react";
 import { R2Storage } from "@/lib/r2-storage";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
-import { I18nProvider } from "@/providers/i18n-provider";
+import { I18nProvider } from "@/i18n";
 // Dev diagnostics removed per request
 
 const Index = lazy(() => import("./pages/Index"));

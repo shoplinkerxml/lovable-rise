@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UserService } from "@/lib/user-service";
 import { toast } from "sonner";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 interface UserProfile {
   id: string;

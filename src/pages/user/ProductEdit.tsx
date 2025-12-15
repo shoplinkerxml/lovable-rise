@@ -4,7 +4,7 @@ import { ContentSkeleton, ProgressiveLoader, FullPageLoader } from "@/components
 import { ArrowLeft, Loader2, Package } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';

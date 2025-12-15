@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { UserAuthService } from "@/lib/user-auth-service";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 
 interface UserHeaderProps {

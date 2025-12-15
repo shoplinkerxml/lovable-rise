@@ -1,6 +1,6 @@
 import React from "react";
 import { Switch } from "@/components/ui/switch";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { Badge } from "@/components/ui/badge";
 
 interface StatusToggleProps {

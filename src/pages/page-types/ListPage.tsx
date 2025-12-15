@@ -12,7 +12,7 @@ import {
 import { Plus, MoreHorizontal, CreditCard, Star, Crown, Package, Edit, Trash2, Copy } from "lucide-react";
 import { TariffService } from "@/lib/tariff-service";
 import { toast } from "sonner";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { PageHeader as PageHeaderComponent, ActionButton, PageCardHeader } from "@/components/page-header";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
 import { Breadcrumb } from "@/components/ui/breadcrumb";

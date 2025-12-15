@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { ExportService, type ExportLink } from '@/lib/export-service';
 import { Copy, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';

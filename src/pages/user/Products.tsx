@@ -5,7 +5,7 @@ import { Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { ProductsTable } from '@/components/user/products';
 import { ProductService, type Product, type ProductLimitInfo } from '@/lib/product-service';
 import { useNavigate } from 'react-router-dom';

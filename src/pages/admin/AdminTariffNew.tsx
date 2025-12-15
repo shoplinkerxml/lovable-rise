@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { TariffService, type TariffInsert, type Currency, type TariffFeature, type TariffLimit } from '@/lib/tariff-service';
 import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';

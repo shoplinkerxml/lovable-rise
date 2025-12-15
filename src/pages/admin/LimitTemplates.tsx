@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { LimitsList, LimitForm } from '@/components/admin/limits';
 import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';

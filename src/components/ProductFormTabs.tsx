@@ -16,7 +16,7 @@ import { Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { type Product } from '@/lib/product-service';
 import { ProductService } from '@/lib/product-service';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useProductImages } from '@/hooks/useProductImages';
 import { useProductForm } from '@/hooks/useProductForm';

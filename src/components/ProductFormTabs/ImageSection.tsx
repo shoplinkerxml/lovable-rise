@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2, ChevronLeft, ChevronRight, ListOrdered } from 'lucide-react'
-import { useI18n } from '@/providers/i18n-provider'
+import { useI18n } from "@/i18n";
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'

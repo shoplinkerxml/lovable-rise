@@ -4,7 +4,7 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 const AuthCallback = () => {
   const navigate = useNavigate();

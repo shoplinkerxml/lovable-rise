@@ -4,7 +4,7 @@ import { DynamicIcon } from '@/components/ui/dynamic-icon';
 import { getAutoIcon } from '@/components/ui/dynamic-icon-utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 
 export interface MenuItemWithIconProps {
   item: UserMenuItem;

@@ -2,7 +2,7 @@ import { FixedSizeList } from 'react-window';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { XMLField } from '@/lib/xml-template-service';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 
 interface VirtualizedXMLTreeProps {
   items: XMLField[];

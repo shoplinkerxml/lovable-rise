@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Check, Crown, Zap, Rocket } from "lucide-react"
-import { useI18n } from "@/providers/i18n-provider"
+import { useI18n } from "@/i18n";
 
 export function PricingSection() {
   const { t } = useI18n();

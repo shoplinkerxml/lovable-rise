@@ -5,7 +5,7 @@ import { InputGroup, InputGroupAddon, InputGroupText, InputGroupInput } from '@/
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, X, Store, Tag } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { ShopService, type Shop, type CreateShopData, type UpdateShopData } from '@/lib/shop-service';
 import { useMarketplaces } from '@/hooks/useMarketplaces';
 import { supabase } from '@/integrations/supabase/client';

@@ -12,7 +12,7 @@ import {
 } from '@/components/store-templates';
 import { StructureTable } from '@/components/store-templates/StructureTable';
 import { SimpleMappingView } from '@/components/store-templates/SimpleMappingView';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { XMLStructure, MappingRule } from '@/lib/xml-template-service';
 import { XMLTemplateService } from '@/lib/xml-template-service';
 import { supabase } from '@/integrations/supabase/client';

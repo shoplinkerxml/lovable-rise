@@ -33,7 +33,7 @@ import {
   XCircle,
   FileText
 } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { StatusToggle } from "./StatusToggle";
 
 interface UserProfile {

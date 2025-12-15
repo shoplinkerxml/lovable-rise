@@ -4,7 +4,7 @@ type Lang = "uk" | "en";
 
 type Dictionary = Record<string, Record<Lang, string>>;
 
-const dictionary: Dictionary = {
+export const dictionary: Dictionary = {
   login_title: { uk: "Вхід до MarketGrow", en: "Sign in to MarketGrow" },
   login_desc: { uk: "Доступ до адмін‑панелі керування даними", en: "Access the data admin panel" },
   email: { uk: "Ел. пошта", en: "Email" },

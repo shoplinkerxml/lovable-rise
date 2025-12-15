@@ -17,7 +17,7 @@ import {
   Plus,
   Settings
 } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { UserMenuItem } from "@/lib/user-menu-service";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Copy, Edit2, Eye, EyeOff, GripVertical } from 'lucide-react';
 import type { XMLStructure } from '@/lib/xml-template-service';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { toast } from 'sonner';
 import { useState } from 'react';
 

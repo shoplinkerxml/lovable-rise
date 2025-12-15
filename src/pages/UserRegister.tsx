@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TrendingUp, User, CheckCircle2, Chrome, Facebook, Mail } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { 
   registrationSchema, 

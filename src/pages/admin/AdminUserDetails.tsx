@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Crown, CreditCard, AlertCircle, MoreHorizontal, Plus, Trash2, XCircle, CheckCircle2, TrendingUp } from "lucide-react";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { TariffService, type TariffWithDetails } from "@/lib/tariff-service";
 import { format } from "date-fns";

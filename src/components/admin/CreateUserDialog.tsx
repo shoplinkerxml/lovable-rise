@@ -22,7 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useCreateUser } from "@/hooks/useUsers";
 import { useToast } from "@/hooks/use-toast";

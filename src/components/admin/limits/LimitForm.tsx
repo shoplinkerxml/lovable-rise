@@ -7,7 +7,7 @@ import {
   InputGroupInput,
   InputGroupTextarea,
 } from '@/components/ui/input-group';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { type LimitTemplate } from '@/lib/limit-service';
 import { FileText, Code, Globe, FileCode } from 'lucide-react';
 

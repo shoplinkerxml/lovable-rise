@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { Store, Trash2, Package, List } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { ShopService, type ShopAggregated } from '@/lib/shop-service';
 import { ShopCountsService } from '@/lib/shop-counts';
 import { supabase } from '@/integrations/supabase/client';

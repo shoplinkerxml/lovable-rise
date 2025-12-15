@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { TariffService, type TariffWithDetails } from '@/lib/tariff-service';
-import { toast } from 'sonner';
-import { 
-  CheckCircle, 
-  XCircle, 
-  CreditCard, 
-  Info, 
-  Zap, 
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { TariffService, type TariffWithDetails } from "@/lib/tariff-service";
+import { toast } from "sonner";
+import {
+  CheckCircle,
+  XCircle,
+  CreditCard,
+  Info,
+  Zap,
   Shield,
   Database,
   Users,
@@ -37,15 +37,15 @@ import {
   Package,
   User,
   Rocket,
-  Banknote
-} from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
-import { PageHeader } from '@/components/PageHeader';
-import { useOutletContext } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { AdminService } from '@/lib/admin-service';
-import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useQuery } from '@tanstack/react-query';
+  Banknote,
+} from "lucide-react";
+import { useI18n } from "@/i18n";
+import { PageHeader } from "@/components/PageHeader";
+import { useOutletContext } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { AdminService } from "@/lib/admin-service";
+import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
+import { useQuery } from "@tanstack/react-query";
 
 const TariffPage = () => {
   const { t } = useI18n();

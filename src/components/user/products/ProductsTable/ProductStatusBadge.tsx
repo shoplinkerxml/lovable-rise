@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 export function ProductStatusBadge({ state }: { state?: string }) {
   const { t } = useI18n();
@@ -12,4 +12,3 @@ export function ProductStatusBadge({ state }: { state?: string }) {
     </Badge>
   );
 }
-

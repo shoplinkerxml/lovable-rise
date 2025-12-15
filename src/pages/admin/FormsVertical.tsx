@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 
 const FormsVertical = () => {
   const { t } = useI18n();

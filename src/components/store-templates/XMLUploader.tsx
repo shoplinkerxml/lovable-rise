@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { XMLTemplateService } from '@/lib/xml-template-service';
 import { toast } from 'sonner';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { XMLStructureDialog, type XMLStructureMapping } from './XMLStructureDialog';
 import type { XMLParseResult } from '@/lib/xml-template-service';
 

@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";

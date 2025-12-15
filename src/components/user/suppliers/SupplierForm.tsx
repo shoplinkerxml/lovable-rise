@@ -8,7 +8,7 @@ import {
   InputGroupInput 
 } from '@/components/ui/input-group';
 import { Building2, Globe, Link, Phone, Loader2 } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { SupplierService, type Supplier, type CreateSupplierData, type UpdateSupplierData } from '@/lib/supplier-service';
 import { toast } from 'sonner';
 

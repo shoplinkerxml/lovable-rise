@@ -2,7 +2,7 @@ import React from 'react';
 import { Mail, User2 } from 'lucide-react';
 import { Button } from './button';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { ProfileSheetContentProps } from './profile-types';
 
 /**

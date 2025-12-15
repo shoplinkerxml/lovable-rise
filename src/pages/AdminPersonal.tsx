@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -179,4 +179,3 @@ const AdminPersonal = () => {
 };
 
 export default AdminPersonal;
-

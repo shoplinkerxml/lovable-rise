@@ -4,7 +4,7 @@ import { useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";
 import { Button } from "@/components/ui/button";
 import { Edit3, Copy, Trash2 } from "lucide-react";

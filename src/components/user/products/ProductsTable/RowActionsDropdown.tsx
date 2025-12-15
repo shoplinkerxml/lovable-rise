@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Edit, MoreHorizontal, Copy, Loader2, Store, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { ShopService } from "@/lib/shop-service";
 import { ShopCountsService } from "@/lib/shop-counts";

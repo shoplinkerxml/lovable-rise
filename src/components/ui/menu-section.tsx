@@ -6,7 +6,7 @@ import { DynamicIcon } from './dynamic-icon';
 import { getAutoIcon } from './dynamic-icon-utils';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 
 export interface MenuSectionProps {
   title?: string;

@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { Settings, Edit, Trash2, Loader2, MoreVertical, Shield, GripVertical } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';
 import {

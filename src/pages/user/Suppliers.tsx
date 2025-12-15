@@ -4,7 +4,7 @@ import { Plus, ArrowLeft, Truck, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { SuppliersList } from '@/components/user/suppliers';
 import { SupplierForm } from '@/components/user/suppliers';
 import { SupplierService, type Supplier, type SupplierLimitInfo } from '@/lib/supplier-service';

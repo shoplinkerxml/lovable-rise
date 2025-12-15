@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { ShopService } from "@/lib/shop-service";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { TrendingUp, Menu, X, Globe } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const {

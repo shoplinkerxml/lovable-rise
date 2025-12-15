@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { TariffService, type Tariff, type TariffFeature, type TariffLimit, type TariffFeatureInsert, type TariffLimitInsert } from '@/lib/tariff-service';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from '@/i18n';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
 

@@ -1,4 +1,4 @@
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import UserStatisticsCard from "@/components/admin/UserStatisticsCard";
 import TariffStatisticsCard from "@/components/admin/TariffStatisticsCard";
 import AddMissingMenuItems from "@/components/admin/AddMissingMenuItems";

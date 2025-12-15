@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { ProfileService } from "@/lib/profile-service";
 import { UserProfile as UserProfileType } from "@/lib/user-auth-schemas";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { ArrowLeft, User, Save, Upload, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";

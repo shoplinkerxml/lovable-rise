@@ -20,7 +20,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { Loader2 } from "lucide-react";
 import { useUpdateUser } from "@/hooks/useUsers";
 

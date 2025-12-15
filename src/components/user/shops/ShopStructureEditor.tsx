@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Save, X } from 'lucide-react';
-import { useI18n } from '@/providers/i18n-provider';
+import { useI18n } from "@/i18n";
 import { ShopService, type Shop } from '@/lib/shop-service';
 import { toast } from 'sonner';
 import { InteractiveXmlTree } from '@/components/store-templates/InteractiveXmlTree';

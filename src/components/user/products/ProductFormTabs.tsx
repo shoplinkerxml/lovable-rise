@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "@/lib/session-validation";
 import { R2Storage } from "@/lib/r2-storage";
 import { ImageHelpers } from "@/utils/imageHelpers";
-import { useI18n } from "@/providers/i18n-provider";
+import { useI18n } from "@/i18n";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 
 interface ProductFormTabsProps {
