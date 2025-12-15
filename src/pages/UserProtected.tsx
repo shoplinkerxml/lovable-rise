@@ -12,6 +12,7 @@ import type { TariffLimit } from "@/lib/tariff-service";
 type SubscriptionEntity = {
   tariff_id?: number;
   end_date?: string | null;
+  is_active?: boolean | null;
   tariffs?: {
     id?: number;
     name?: string | null;
@@ -71,6 +72,7 @@ const UserProtected = () => {
   // Проверка валидности подписки
   const checkSubscriptionValidity = useCallback((sub: SubscriptionEntity | null): boolean => {
     if (!sub) return false;
+    if (sub.is_active === false) return false;
     if (!sub.end_date) return true; // Бессрочная подписка
     return new Date(sub.end_date) > new Date();
   }, []);

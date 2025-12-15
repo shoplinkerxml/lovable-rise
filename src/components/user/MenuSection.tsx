@@ -45,13 +45,18 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
   const tree = buildTree([...items, ...children]);
   const { t } = useI18n();
 
-  const isPricingItem = (it: UserMenuItem) => {
+  const isAlwaysAccessibleItem = (it: UserMenuItem) => {
     const title = it.title || '';
     const path = it.path || '';
-    return (
+    const isTariff = (
       path === 'tariff' || path.includes('tariff') ||
       title === 'menu_pricing' || title.includes('Тариф') || title.includes('Pricing')
     );
+    const isDashboard = (
+      path === 'dashboard' ||
+      title === 'menu_dashboard' || title === 'Dashboard' || title.includes('Панель управління')
+    );
+    return isTariff || isDashboard;
   };
 
   const translateMenuItem = (title: string): string => {
@@ -133,7 +138,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
               {hasChildren ? (
                 <button
                   onClick={() => {
-                    const isDisabled = !hasAccess && !isPricingItem(item);
+                    const isDisabled = !hasAccess && !isAlwaysAccessibleItem(item);
                     if (isDisabled) return;
                     onItemClick(item);
                     toggleSubmenu(item.id);
@@ -143,7 +148,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                     "w-full text-left rounded-md text-sm transition-all duration-200 group flex items-center",
                     collapsed ? "justify-center" : "justify-between",
                     "px-3 py-2",
-                    (!hasAccess && !isPricingItem(item)) ? "opacity-50 cursor-not-allowed pointer-events-none" : (
+                    (!hasAccess && !isAlwaysAccessibleItem(item)) ? "opacity-50 cursor-not-allowed pointer-events-none" : (
                       isActiveItem(item)
                         ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50 shadow-sm"
                         : "hover:bg-emerald-50 hover:text-[#10b981] border border-transparent hover:border-emerald-200/30 hover:shadow-sm"
@@ -175,10 +180,10 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                   item={item}
                   isActive={isActiveItem(item)}
                   collapsed={collapsed}
-                  onClick={(it) => { if (!hasAccess && !isPricingItem(it)) return; onItemClick(it); }}
+                  onClick={(it) => { if (!hasAccess && !isAlwaysAccessibleItem(it)) return; onItemClick(it); }}
                   onHover={onItemHover}
                   variant={type === 'dashboard' ? 'dashboard' : 'default'}
-                  disabled={!hasAccess && !isPricingItem(item)}
+                  disabled={!hasAccess && !isAlwaysAccessibleItem(item)}
                 />
               )}
               {!collapsed && hasChildren && isExpanded && (
@@ -189,10 +194,10 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                       item={child}
                       isActive={isActiveItem(child)}
                       collapsed={false}
-                      onClick={(it) => { if (!hasAccess && !isPricingItem(it)) return; onItemClick(it); }}
+                      onClick={(it) => { if (!hasAccess && !isAlwaysAccessibleItem(it)) return; onItemClick(it); }}
                       onHover={onItemHover}
                       variant="child"
-                      disabled={!hasAccess && !isPricingItem(child)}
+                      disabled={!hasAccess && !isAlwaysAccessibleItem(child)}
                     />
                   ))}
                 </div>

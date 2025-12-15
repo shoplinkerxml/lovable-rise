@@ -41,12 +41,6 @@ const defaultMenuItems: DefaultMenuItem[] = [
     path: "dashboard",
     icon: "LayoutDashboard",
     isDefault: true as const
-  },
-  {
-    title: "Profile",
-    path: "profile",
-    icon: "User",
-    isDefault: true as const
   }
 ];
 

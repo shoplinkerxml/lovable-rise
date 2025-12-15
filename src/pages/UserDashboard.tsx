@@ -16,6 +16,7 @@ import { ProductService } from "@/lib/product-service";
 type SubscriptionEntity = {
   tariff_id?: number;
   end_date?: string | null;
+  is_active?: boolean | null;
   tariffs?: {
     id?: number;
     name?: string | null;
@@ -55,7 +56,6 @@ const UserDashboard = () => {
     current: true
   }];
 
-  // Load active subscription info (end_date) for alert
   const [endDate, setEndDate] = useState<string | null>(null);
   const [tariffName, setTariffName] = useState<string | null>(null);
   const [durationDays, setDurationDays] = useState<number | null>(null);
@@ -71,7 +71,7 @@ const UserDashboard = () => {
   
   useEffect(() => {
     const result = subscription;
-    if (result && result.hasValidSubscription && result.subscription) {
+    if (result && result.hasValidSubscription && result.subscription && result.subscription.is_active !== false) {
       const data = result.subscription;
       const end = data.end_date ? new Date(data.end_date) : null;
       setEndDate(end ? end.toISOString() : null);
@@ -99,35 +99,37 @@ const UserDashboard = () => {
       {/* Breadcrumb */}
       <Breadcrumb items={breadcrumbs} />
 
-      {/* Subscription Alert */}
-      {tariffName ? !expired ? <Alert className="relative rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 w-fit border-emerald-200 bg-emerald-50 text-emerald-900">
-            <AlertCircle />
-            <AlertTitle className="col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight">
-              {isDemo ? `${t('demo_trial_title_prefix')} ${durationDays ?? 7}${t('demo_trial_title_suffix')}` : t('active_tariff_title')}
-            </AlertTitle>
-            <AlertDescription className="col-start-2 grid justify-items-start gap-2 text-sm [&_p]:leading-relaxed">
-              {isDemo ? <p>{t('demo_trial_desc')}</p> : null}
-              {!isDemo && <div className="flex items-center gap-2">
-                  {isLifetime ? <Crown className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
-                  <span><strong>{tariffName}</strong>{endDate ? ` — ${t('end_date')}: ${new Date(endDate).toLocaleDateString()}` : ''}</span>
-                </div>}
-              <ul className="list-inside list-disc text-sm">
-                {limits.map(l => (
-                  <li key={l.id ?? `${l.limit_name}`}>{l.limit_name} - {l.value}</li>
-                ))}
-              </ul>
-              
-            </AlertDescription>
-          </Alert> : <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
-            <AlertTitle>
-              {t('subscription_expired') || 'Ваш тариф закончился'}
-            </AlertTitle>
-            <AlertDescription>
-              <span>
-                {t('please_select_new_tariff') || 'Пожалуйста, выберите новый тариф, чтобы продолжить работу.'}
-              </span>
-            </AlertDescription>
-          </Alert> : null}
+      {tariffName && !expired ? (
+        <Alert className="relative rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 w-fit border-emerald-200 bg-emerald-50 text-emerald-900">
+          <AlertCircle />
+          <AlertTitle className="col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight">
+            {isDemo ? `${t("demo_trial_title_prefix")} ${durationDays ?? 7}${t("demo_trial_title_suffix")}` : t("active_tariff_title")}
+          </AlertTitle>
+          <AlertDescription className="col-start-2 grid justify-items-start gap-2 text-sm [&_p]:leading-relaxed">
+            {isDemo ? <p>{t("demo_trial_desc")}</p> : null}
+            {!isDemo && <div className="flex items-center gap-2">
+                {isLifetime ? <Crown className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                <span><strong>{tariffName}</strong>{endDate ? ` — ${t("end_date")}: ${new Date(endDate).toLocaleDateString()}` : ""}</span>
+              </div>}
+            <ul className="list-inside list-disc text-sm">
+              {limits.map(l => (
+                <li key={l.id ?? `${l.limit_name}`}>{l.limit_name} - {l.value}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
+          <AlertTitle>
+            {t("subscription_expired") || "Ваш тариф закончился"}
+          </AlertTitle>
+          <AlertDescription>
+            <span>
+              {t("please_select_new_tariff") || "Пожалуйста, выберите новый тариф, чтобы продолжить работу."}
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       
 

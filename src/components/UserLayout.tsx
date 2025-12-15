@@ -33,7 +33,6 @@ type SubscriptionEntity = {
   };
 };
 
-// Static routes that are always available regardless of database state
 const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
   '/dashboard': {
     id: -1,
@@ -46,16 +45,16 @@ const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
     updated_at: new Date().toISOString(),
     icon_name: 'layout-dashboard'
   },
-  '/profile': {
-    id: -2,
-    title: 'Profile',
-    path: '/profile',
+  '/tariff': {
+    id: -3,
+    title: 'Тарифні плани',
+    path: '/tariff',
     page_type: 'content',
     is_active: true,
-    order_index: 1,
+    order_index: 2,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    icon_name: 'user'
+    icon_name: 'credit-card'
   }
 };
 interface UserMenuContextState {
@@ -110,7 +109,7 @@ const UserMenuProvider: React.FC<{
     queryFn: async () => {
       return await UserMenuService.getUserMenuItems(userId, true);
     },
-    enabled: !!userId && !!hasAccess,
+    enabled: !!userId,
     staleTime: 900_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -300,7 +299,6 @@ const UserLayoutContent = ({
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Auto-collapse sidebar at viewport widths ≤ 1393px
   useEffect(() => {
     const applyCollapse = () => {
       const w = window.innerWidth;
@@ -311,14 +309,63 @@ const UserLayoutContent = ({
     return () => window.removeEventListener('resize', applyCollapse);
   }, [setSidebarCollapsed]);
 
-  // Organize menu items into sections
-  const effectiveMenuItems = menuItems;
-  const menuSections = [{
-    key: 'main',
-    titleKey: 'menu_main',
-    items: effectiveMenuItems.filter(item => !item.parent_id),
-    isCollapsible: false
-  }];
+  useEffect(() => {
+    const hasValid = guardSubscription?.hasValidSubscription ?? true;
+    const path = location.pathname.toLowerCase();
+    const isTariffPage = path.startsWith("/user/tariff");
+    const isDashboardPage =
+      path === "/user/dashboard" ||
+      path === "/user" ||
+      path === "/user/";
+    if (!hasValid && !isTariffPage && !isDashboardPage) {
+      navigate("/user/tariff", { replace: true });
+    }
+  }, [guardSubscription?.hasValidSubscription, location.pathname, navigate]);
+
+  const staticMenuItems = useMemo<UserMenuItem[]>(() => {
+    const existingPaths = new Set(
+      menuItems.map(item =>
+        item.path.startsWith("/") ? item.path : `/${item.path}`,
+      ),
+    );
+    const now = new Date().toISOString();
+    return Object.entries(STATIC_ROUTES)
+      .filter(([path]) => !existingPaths.has(path))
+      .map(([path, cfg]) => ({
+        id: cfg.id ?? 0,
+        user_id: "static",
+        title: cfg.title ?? "",
+        path: (cfg.path ?? path).replace(/^\//, ""),
+        parent_id: cfg.parent_id,
+        order_index: cfg.order_index ?? 0,
+        is_active: cfg.is_active ?? true,
+        page_type: cfg.page_type ?? "content",
+        content_data: cfg.content_data ?? {},
+        template_name: cfg.template_name,
+        meta_data: cfg.meta_data,
+        icon_name: cfg.icon_name,
+        description: cfg.description,
+        created_at: cfg.created_at ?? now,
+        updated_at: cfg.updated_at ?? now,
+      }));
+  }, [menuItems]);
+
+  const effectiveMenuItems = useMemo(
+    () => [...staticMenuItems, ...menuItems],
+    [staticMenuItems, menuItems],
+  );
+
+  const menuSections = useMemo(
+    () => [
+      {
+        key: "main",
+        titleKey: "menu_main",
+        items: effectiveMenuItems.filter(item => !item.parent_id),
+        isCollapsible: false,
+      },
+    ],
+    [effectiveMenuItems],
+  );
 
   // Handle menu item click
   const handleMenuClick = (item: UserMenuItem) => {

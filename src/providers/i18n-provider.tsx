@@ -817,6 +817,8 @@ const dictionary: Dictionary = {
   // Additional tariff translations
   pricing_period_monthly: { uk: "Щомісячно", en: "Monthly" },
   pricing_period_yearly: { uk: "Щорічно", en: "Yearly" },
+  subscription_expired: { uk: "Ваш тариф закінчився", en: "Your subscription has expired" },
+  please_select_new_tariff: { uk: "Будь ласка, оберіть новий тариф, щоб продовжити роботу.", en: "Please select a new plan to continue using the service." },
   
   // Edit tariff translations
   edit_tariff_description: { uk: "Редагування тарифного плану", en: "Edit tariff plan" },
