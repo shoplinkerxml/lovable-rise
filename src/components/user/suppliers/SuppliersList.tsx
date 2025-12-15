@@ -183,9 +183,9 @@ export const SuppliersList = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {supplier.website_url && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Globe className="h-4 w-4" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Globe className="h-4 w-4" />
+                {supplier.website_url ? (
                   <a 
                     href={supplier.website_url} 
                     target="_blank" 
@@ -194,18 +194,34 @@ export const SuppliersList = ({
                   >
                     {supplier.website_url}
                   </a>
-                </div>
-              )}
+                ) : (
+                  <span className="truncate opacity-70">{t('supplier_website_empty')}</span>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Link className="h-4 w-4" />
-                <span className="truncate">{supplier.xml_feed_url}</span>
+                {supplier.xml_feed_url ? (
+                  <span className="truncate">
+                    {supplier.xml_feed_url}
+                  </span>
+                ) : (
+                  <span className="truncate opacity-70">
+                    {t('supplier_xml_feed_empty')}
+                  </span>
+                )}
               </div>
-              {supplier.phone && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <span>{supplier.phone}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Phone className="h-4 w-4" />
+                {supplier.phone ? (
+                  <span className="truncate">
+                    {supplier.phone}
+                  </span>
+                ) : (
+                  <span className="truncate opacity-70">
+                    {t('supplier_phone_empty')}
+                  </span>
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}

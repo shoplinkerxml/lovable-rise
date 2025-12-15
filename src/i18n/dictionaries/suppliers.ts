@@ -48,6 +48,18 @@ export const suppliersDictionary: Dictionary = {
     uk: "+380 XX XXX XX XX",
     en: "+380 XX XXX XX XX",
   },
+  supplier_website_empty: {
+    uk: "Додайте сайт постачальника",
+    en: "Add supplier website",
+  },
+  supplier_xml_feed_empty: {
+    uk: "Додайте посилання на прайс",
+    en: "Add price feed URL",
+  },
+  supplier_phone_empty: {
+    uk: "Додайте телефон постачальника",
+    en: "Add supplier phone",
+  },
   supplier_created: {
     uk: "Постачальника створено",
     en: "Supplier created",
