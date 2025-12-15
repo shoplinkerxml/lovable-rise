@@ -405,7 +405,7 @@ export class ShopService {
 
   /**
    * Получение агрегированных данных магазинов с кэшированием и дедупликацией.
-   * Это основной метод для получения списка магазинов в UI.
+   * Источником правды являются данные user-shops-list, где уже есть лічильники.
    */
   static async getShopsAggregated(): Promise<ShopAggregated[]> {
     if (this.isOffline()) {
@@ -418,26 +418,7 @@ export class ShopService {
     return this.deduplicateRequest("shops-aggregated", async () => {
       try {
         const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
-        const shops = response.shops || [];
-
-        const enriched = await Promise.all(
-          shops.map(async (shop) => {
-            try {
-              const { productsCount, categoriesCount } = await this.recomputeStoreCounts(
-                String(shop.id),
-              );
-              return {
-                ...shop,
-                productsCount,
-                categoriesCount,
-              };
-            } catch {
-              return shop;
-            }
-          }),
-        );
-
-        return enriched;
+        return response.shops || [];
       } catch (error) {
         console.error("Failed to fetch aggregated shops, using fallback:", error);
         const fallback = await this.getShopsFallback();
