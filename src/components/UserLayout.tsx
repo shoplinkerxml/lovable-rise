@@ -487,7 +487,7 @@ const UserLayoutContent = ({
         </nav>
 
         {/* User Menu - Desktop (Fixed at bottom) */}
-        <div className="p-4 border-t shrink-0">
+        <div className="p-4 shrink-0">
           {sidebarCollapsed ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
