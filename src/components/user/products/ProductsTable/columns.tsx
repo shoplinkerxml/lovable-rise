@@ -12,6 +12,7 @@ import { SortToggle } from "./SortToggle";
 import { ColumnFilterMenu } from "./ColumnFilterMenu";
 import { StoresBadgeCell } from "./StoresBadgeCell";
 import { ProductStatusBadge } from "./ProductStatusBadge";
+import { Image as ImageIcon } from "lucide-react";
 const ProductActionsDropdownLazy = React.lazy(() => 
   import("./RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown }))
 );
@@ -42,13 +43,6 @@ const ProductThumbnail = React.memo(({
   hasStores: boolean;
   onClick: () => void;
 }) => {
-  const initials = (product.name || product.name_ua || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
   const sizeCls = hasStores
     ? "h-[clamp(2.25rem,4vw,3rem)] w-[clamp(2.25rem,4vw,3rem)]"
     : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
@@ -95,8 +89,8 @@ const ProductThumbnail = React.memo(({
             if (baseUrl) el.src = baseUrl;
           }}
         />
-        <AvatarFallback className="bg-primary/10 text-primary rounded-md">
-          {initials}
+        <AvatarFallback className="bg-primary/5 text-primary rounded-md flex items-center justify-center">
+          <ImageIcon className="w-4 h-4" />
         </AvatarFallback>
       </Avatar>
     </button>
