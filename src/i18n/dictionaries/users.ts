@@ -347,4 +347,44 @@ export const usersDictionary: Dictionary = {
     uk: "Змінити аватар",
     en: "Change Avatar",
   },
+  profile_loading: {
+    uk: "Завантаження профілю...",
+    en: "Loading profile...",
+  },
+  profile_back_to_dashboard: {
+    uk: "Назад до панелі",
+    en: "Back to Dashboard",
+  },
+  profile_personal_information: {
+    uk: "Особиста інформація",
+    en: "Personal Information",
+  },
+  profile_update_info: {
+    uk: "Оновіть інформацію профілю та аватар",
+    en: "Update your profile information and avatar",
+  },
+  profile_uploading: {
+    uk: "Завантаження...",
+    en: "Uploading...",
+  },
+  profile_save_changes: {
+    uk: "Зберегти зміни",
+    en: "Save Changes",
+  },
+  profile_updated_success: {
+    uk: "Профіль успішно оновлено",
+    en: "Profile updated successfully",
+  },
+  failed_update_profile: {
+    uk: "Не вдалося оновити профіль",
+    en: "Failed to update profile",
+  },
+  avatar_updated_success: {
+    uk: "Аватар успішно оновлено",
+    en: "Avatar updated successfully",
+  },
+  failed_upload_avatar: {
+    uk: "Не вдалося завантажити аватар",
+    en: "Failed to upload avatar",
+  },
 };

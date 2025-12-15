@@ -395,18 +395,12 @@ export const ProductsTable = ({
     return !reverted;
   }, [setProductsCached, queryClient, t, stores]);
   useEffect(() => {
-    (async () => {
-      try {
-        const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);
-        if (Array.isArray(cachedAgg) && cachedAgg.length > 0) {
-          setStores(cachedAgg);
-          return;
-        }
-        const data = await ShopService.getShopsAggregated();
-        setStores((data || []) as ShopAggregated[]);
-        try { queryClient.setQueryData<ShopAggregated[]>(['shopsList'], (data || []) as ShopAggregated[]); } catch { void 0; }
-      } catch { void 0; }
-    })();
+    try {
+      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);
+      if (Array.isArray(cachedAgg) && cachedAgg.length > 0) {
+        setStores(cachedAgg);
+      }
+    } catch { void 0; }
   }, [queryClient]);
 
   useEffect(() => {

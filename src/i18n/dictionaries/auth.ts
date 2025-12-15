@@ -6,8 +6,22 @@ export const authDictionary: Dictionary = {
     uk: "Доступ до адмін‑панелі керування даними",
     en: "Access the data admin panel",
   },
+  login_title_user: {
+    uk: "Вхід в MarketGrow",
+    en: "Sign in to MarketGrow",
+  },
+  login_desc_user: {
+    uk: "Доступ до вашого особистого кабінету",
+    en: "Access your personal dashboard",
+  },
+  login_button_user: { uk: "Увійти", en: "Sign in" },
   email: { uk: "Ел. пошта", en: "Email" },
+  email_placeholder: {
+    uk: "example@email.com",
+    en: "example@email.com",
+  },
   password: { uk: "Пароль", en: "Password" },
+  password_placeholder: { uk: "••••••••", en: "••••••••" },
   sign_in: { uk: "Увійти", en: "Sign in" },
   no_account: { uk: "Немає акаунта?", en: "No account?" },
   sign_up: { uk: "Зареєструватись", en: "Sign up" },
@@ -18,6 +32,7 @@ export const authDictionary: Dictionary = {
   nav_get_started: { uk: "Почати безкоштовно", en: "Get started free" },
   facebook_signup: { uk: "Facebook", en: "Facebook" },
   google_signin: { uk: "Google", en: "Google" },
+  google_signup: { uk: "Google", en: "Google" },
   facebook_signin: {
     uk: "Увійти через Facebook",
     en: "Sign in with Facebook",
@@ -43,6 +58,16 @@ export const authDictionary: Dictionary = {
     uk: "Повернутися до входу",
     en: "Back to login",
   },
+  register_title: {
+    uk: "Реєстрація в MarketGrow",
+    en: "Sign up to MarketGrow",
+  },
+  register_desc: {
+    uk: "Створіть акаунт для доступу до платформи",
+    en: "Create account to access the platform",
+  },
+  register_button: { uk: "Зареєструватися", en: "Sign up" },
+  full_name: { uk: "Повне ім'я", en: "Full name" },
   name_required: { uk: "Ім'я обов'язкове", en: "Name is required" },
   name_min_length: {
     uk: "Ім'я має бути не менше 2 символів",
@@ -64,6 +89,10 @@ export const authDictionary: Dictionary = {
   passwords_match: {
     uk: "Паролі не співпадають",
     en: "Passwords don't match",
+  },
+  confirm_password: {
+    uk: "Підтвердіть пароль",
+    en: "Confirm password",
   },
   confirm_password_required: {
     uk: "Підтвердження паролю обов'язкове",
@@ -98,6 +127,10 @@ export const authDictionary: Dictionary = {
     uk: "Помилка мережі. Спробуйте пізніше.",
     en: "Network error. Please try again later.",
   },
+  name_placeholder: {
+    uk: "Введіть ваше ім'я",
+    en: "Enter your name",
+  },
   continue_with_email: {
     uk: "або продовжити з email",
     en: "or continue with email",
@@ -113,10 +146,6 @@ export const authDictionary: Dictionary = {
   email_confirmation_required: {
     uk: "Підтвердження email обов'язкове",
     en: "Email confirmation required",
-  },
-  login_success_admin: {
-    uk: "Ви успішно увійшли в кабінет адміністратора",
-    en: "You have successfully logged into the administrator dashboard",
   },
   welcome_back: { uk: "З поверненням!", en: "Welcome back!" },
   auth_failed: {
@@ -160,8 +189,101 @@ export const authDictionary: Dictionary = {
     uk: "Електронний лист для скидання пароля надіслано. Перевірте вашу поштову скриньку.",
     en: "Password reset email sent. Please check your inbox.",
   },
+  reset_title: {
+    uk: "Відновлення паролю",
+    en: "Reset password",
+  },
+  reset_desc: {
+    uk: "Введіть email для відновлення доступу",
+    en: "Enter email to reset access",
+  },
+  reset_button: {
+    uk: "Відправити",
+    en: "Send reset link",
+  },
+  reset_email_placeholder: {
+    uk: "Ваш email",
+    en: "Your email",
+  },
+  reset_password_title: {
+    uk: "Скинути пароль",
+    en: "Reset Your Password",
+  },
+  reset_password_desc: {
+    uk: "Введіть новий пароль нижче",
+    en: "Enter your new password below",
+  },
+  new_password: { uk: "Новий пароль", en: "New Password" },
+  confirm_new_password: {
+    uk: "Підтвердіть новий пароль",
+    en: "Confirm New Password",
+  },
+  password_updated: {
+    uk: "Пароль успішно оновлено",
+    en: "Password updated successfully",
+  },
+  update_password_button: {
+    uk: "Оновити пароль",
+    en: "Update Password",
+  },
+  continue_to_login: {
+    uk: "Перейти до входу",
+    en: "Continue to Login",
+  },
+  request_new_reset: {
+    uk: "Запросити нове посилання",
+    en: "Request new reset link",
+  },
+  session_expired: {
+    uk: "Сесія закінчилася",
+    en: "Session expired",
+  },
+  session_invalid: {
+    uk: "Недійсна сесія",
+    en: "Invalid session",
+  },
+  validating_session: {
+    uk: "Перевірка сесії...",
+    en: "Validating session...",
+  },
+  security_features_title: {
+    uk: "Безпечне скидання",
+    en: "Secure Reset",
+  },
+  security_features_subtitle: {
+    uk: "Безпека вашого акаунта - наш пріоритет",
+    en: "Your account security is our priority",
+  },
+  feat_secure_reset: {
+    uk: "Безпечний процес скидання паролю",
+    en: "Secure password reset process",
+  },
+  feat_token_validation: {
+    uk: "Валідація на основі токену",
+    en: "Token-based validation",
+  },
+  feat_session_timeout: {
+    uk: "Автоматичне закінчення сесії",
+    en: "Automatic session timeout",
+  },
+  feat_password_requirements: {
+    uk: "Вимоги до надійного паролю",
+    en: "Strong password requirements",
+  },
   please_log_in: {
     uk: "Будь ласка, увійдіть, щоб продовжити",
     en: "Please log in to continue",
+  },
+  failed_load_user_profile: {
+    uk: "Не вдалося завантажити профіль користувача. Оновіть сторінку та спробуйте ще раз.",
+    en: "Failed to load user profile. Please refresh and try again.",
+  },
+  unable_load_profile: {
+    uk: "Неможливо завантажити профіль. Оновіть сторінку та спробуйте ще раз.",
+    en: "Unable to load profile. Please refresh and try again.",
+  },
+  login_success_admin: {
+    uk: "Ви успішно увійшли в кабінет адміністратора",
+    en: "You have successfully logged into the administrator dashboard",
   },
 };

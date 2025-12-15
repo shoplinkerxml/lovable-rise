@@ -38,9 +38,7 @@ export const ShopDetail = () => {
 
   const { data: counts, refetch: refetchCounts } = useQuery({
     queryKey: ShopCountsService.key(shopId),
-    queryFn: async () => {
-      return await ShopService.recomputeStoreCounts(shopId);
-    },
+    queryFn: () => ShopCountsService.recompute(queryClient, shopId),
     enabled: !!shopId && !!shop,
     staleTime: 60_000,
   });
@@ -66,11 +64,7 @@ export const ShopDetail = () => {
           [shopId]
         );
 
-        await ShopCountsService.recompute(queryClient, shopId);
-
         await refetchCounts();
-        queryClient.invalidateQueries({ queryKey: ['shopsList'] });
-        queryClient.invalidateQueries({ queryKey: ['shopsAggregated'] });
         
         toast.success(t('product_removed_successfully') || 'Товар видалено');
       } catch (error) {
@@ -78,18 +72,7 @@ export const ShopDetail = () => {
         toast.error(t('failed_remove_from_store') || 'Помилка видалення');
       }
     },
-    [shopId, counts, queryClient, refetchCounts, t]
-  );
-
-  const handleProductsLoaded = useCallback(
-    async (count: number) => {
-      if (!shopId) return;
-      try {
-        await ShopCountsService.recompute(queryClient, shopId);
-      } catch {
-      }
-    },
-    [queryClient, shopId]
+    [shopId, refetchCounts, t]
   );
 
   if (isLoading) {
@@ -180,7 +163,6 @@ export const ShopDetail = () => {
           storeId={shopId}
           onEdit={(product: Product) => navigate(`/user/shops/${shopId}/products/edit/${product.id}`)}
           onDelete={handleDeleteProduct}
-          onProductsLoaded={handleProductsLoaded}
           canCreate={true}
           hideDuplicate={true}
         />

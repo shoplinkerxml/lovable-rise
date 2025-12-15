@@ -32,6 +32,7 @@ export const loadDictionary = async (lang: Lang): Promise<Dictionary> => {
     import("./suppliers").then((mod) => mod.suppliersDictionary),
     import("./shops").then((mod) => mod.shopsDictionary),
     import("./users").then((mod) => mod.usersDictionary),
+    import("./tariffs").then((mod) => mod.tariffsDictionary),
   ]).then((dicts) => mergeDictionaries(dicts));
 
   const dictionary = await loadPromise;
