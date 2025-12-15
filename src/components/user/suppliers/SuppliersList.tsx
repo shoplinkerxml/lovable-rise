@@ -100,7 +100,7 @@ export const SuppliersList = ({
       <div className="p-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={`supplier-skeleton-${i}`} className="overflow-hidden">
+            <Card key={`supplier-skeleton-${i}`} className="overflow-hidden card-elevated">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="h-8 w-8 rounded bg-muted animate-pulse" />
@@ -150,7 +150,7 @@ export const SuppliersList = ({
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {suppliers.map((supplier) => (
-          <Card key={supplier.id} className="hover:shadow-lg transition-shadow">
+          <Card key={supplier.id} className="card-elevated card-elevated-hover">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <Building2 className="h-8 w-8 text-emerald-600" />

@@ -171,6 +171,18 @@ All colors MUST be HSL.
   }
 
   /* Admin Layout Utilities */
+  .card-elevated {
+    @apply bg-card border border-primary/40 rounded-xl shadow-lg transition-all duration-200 ease-out;
+  }
+
+  .card-elevated-hover {
+    @apply hover:shadow-xl hover:-translate-y-1;
+  }
+
+  .card-elevated-hover:hover {
+    background-color: hsl(var(--primary-light));
+  }
+
   .bg-admin-page {
     background-color: hsl(var(--admin-page-bg));
   }

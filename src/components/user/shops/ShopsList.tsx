@@ -264,7 +264,7 @@ export const ShopsList = ({
         {shops.map((shop) => (
           <Card 
             key={shop.id} 
-            className="hover:shadow-lg transition-shadow cursor-pointer"
+            className="card-elevated card-elevated-hover cursor-pointer"
             onClick={() => navigate(`/user/shops/${shop.id}`)}
           >
             <CardHeader>

@@ -191,7 +191,7 @@ const TariffPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Render 3 skeleton cards while loading */}
           {Array.from({ length: 3 }).map((_, index) => (
-            <Card key={index} className="flex flex-col">
+            <Card key={index} className="flex flex-col card-elevated">
               <CardContent className="p-6">
                 <div className="flex justify-between items-start">
                   <div>
@@ -282,8 +282,8 @@ const TariffPage = () => {
           return (
             <Card 
               key={tariff.id} 
-              className={`flex flex-col relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
-                isPopular ? 'border-2 border-primary shadow-lg' : ''
+              className={`card-elevated card-elevated-hover flex flex-col relative overflow-hidden ${
+                isPopular ? 'border-2 border-primary' : ''
               } ${activeTariffId === tariff.id ? 'border-emerald-500 ring-2 ring-emerald-200' : ''}`}
             >
               {isPopular && (
