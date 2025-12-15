@@ -50,7 +50,7 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 60px hsl(158 65% 45% / 0.4);
 
     /* Admin Layout Colors */
-    --admin-page-bg: 151.8 81% 95.9%;
+    --admin-page-bg: 0 0% 100%;
     --admin-sidebar-bg: 151.8 81% 95.9%;
     --admin-header-bg: 0 0% 100%;
     --admin-content-bg: 0 0% 100%;

@@ -232,7 +232,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Show loading state while profile is being fetched
   if (profileLoading) {
     return (
-      <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex items-center justify-center">
+      <div className="min-h-screen bg-background dark:bg-neutral-950 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
           <p className="text-muted-foreground">{t("loading_admin_dashboard")}</p>

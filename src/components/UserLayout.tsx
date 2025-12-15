@@ -384,7 +384,7 @@ const UserLayoutContent = ({
     // For database routes, compare with the path without leading slash
     return activeMenuItem?.id === item.id || location.pathname === `/user/${item.path}`;
   };
-  return <div className="min-h-screen bg-emerald-50/40 dark:bg-neutral-950 flex">
+  return <div className="min-h-screen bg-background dark:bg-neutral-950 flex">
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-64 flex flex-col h-full">
@@ -589,7 +589,7 @@ const UserLayoutContent = ({
         </header>
 
         {/* Content - Scrollable */}
-        <main className="flex-1 overflow-y-auto bg-emerald-50/40 dark:bg-neutral-950">
+        <main className="flex-1 overflow-y-auto bg-background dark:bg-neutral-950">
           <div className="h-full">
             <Outlet context={{
             user,
