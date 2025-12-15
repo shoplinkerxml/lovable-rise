@@ -46,7 +46,7 @@ import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { useVirtualRows } from "@/hooks/useVirtualRows";
 import { CopyProgressDialog, DeleteDialog, DeleteProgressDialog } from "./ProductsTable/Dialogs";
 import { Toolbar } from "./ProductsTable/Toolbar";
-import { createColumns } from "./ProductsTable/columns";
+import { useProductColumns } from "./ProductsTable/columns";
 import type { ShopAggregated } from "@/lib/shop-service";
 import type { ProductRow } from "./ProductsTable/columns";
 
@@ -426,9 +426,7 @@ export const ProductsTable = ({
 
   
 
-  
-
-  const columns = useMemo<ColumnDef<ProductRow>[]>(() => createColumns({
+  const columns: ColumnDef<ProductRow>[] = useProductColumns({
     t,
     storeId,
     categoryFilterOptions,
@@ -444,7 +442,7 @@ export const ProductsTable = ({
     hideDuplicate,
     handleToggleAvailable,
     duplicating: copyDialog.open,
-  }), [t, storeId, categoryFilterOptions, storeNames, stores, loadStoresForMenu, handleRemoveStoreLink, handleStoresUpdate, onEdit, handleDuplicate, canCreate, hideDuplicate, handleToggleAvailable, copyDialog.open]);
+  });
 
   const table = useReactTable({
     data: rows,
