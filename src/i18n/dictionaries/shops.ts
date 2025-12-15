@@ -84,6 +84,14 @@ export const shopsDictionary: Dictionary = {
     uk: "https://myshop.ua",
     en: "https://myshop.ua",
   },
+  template_fetch_failed: {
+    uk: "Не вдалося отримати шаблон для формату",
+    en: "Failed to fetch template for format",
+  },
+  select_shop_format: {
+    uk: "Виберіть формат магазину",
+    en: "Select shop format",
+  },
   shop_created: { uk: "Магазин створено", en: "Shop created" },
   shop_updated: { uk: "Магазин оновлено", en: "Shop updated" },
   shop_deleted: { uk: "Магазин видалено", en: "Shop deleted" },

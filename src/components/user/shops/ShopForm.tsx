@@ -59,7 +59,7 @@ export const ShopForm = ({ shop, onSuccess, onCancel }: ShopFormProps) => {
       }));
     } catch (err) {
       console.error('Error loading template:', err);
-      toast.error('Не вдалося отримати шаблон для формату');
+      toast.error(t('template_fetch_failed'));
     }
   };
 
@@ -72,7 +72,7 @@ export const ShopForm = ({ shop, onSuccess, onCancel }: ShopFormProps) => {
     }
 
     if (!selectedMarketplace && !shop) {
-      toast.error('Виберіть формат магазину');
+      toast.error(t('select_shop_format'));
       return;
     }
 

@@ -432,4 +432,109 @@ export const productsDictionary: Dictionary = {
   stock_quantity: { uk: "Кількість на складі", en: "Stock quantity" },
   product_available: { uk: "Товар доступний", en: "Product available" },
   currency: { uk: "Валюта", en: "Currency" },
+  select_supplier: {
+    uk: "Виберіть постачальника",
+    en: "Select supplier",
+  },
+  select_supplier_error: {
+    uk: "Виберіть постачальника перед створенням категорії",
+    en: "Select a supplier before creating a category",
+  },
+  fill_required_fields: {
+    uk: "Заповніть обов'язкові поля",
+    en: "Fill required fields",
+  },
+  category_created: {
+    uk: "Категорію створено",
+    en: "Category created",
+  },
+  category_deleted: {
+    uk: "Категорію видалено",
+    en: "Category deleted",
+  },
+  failed_create_category: {
+    uk: "Не вдалося створити категорію",
+    en: "Failed to create category",
+  },
+  failed_delete_category: {
+    uk: "Не вдалося видалити категорію",
+    en: "Failed to delete category",
+  },
+  external_id_exists: {
+    uk: "Категорія з таким External ID вже існує",
+    en: "Category with this External ID already exists",
+  },
+  categories_title: {
+    uk: "Категорії",
+    en: "Categories",
+  },
+  new_category: {
+    uk: "Нова категорія",
+    en: "New category",
+  },
+  create_category_modal_title: {
+    uk: "Створити категорію",
+    en: "Create category",
+  },
+  parent_category: {
+    uk: "Батьківська категорія",
+    en: "Parent category",
+  },
+  select_parent_category: {
+    uk: "Виберіть батьківську категорію",
+    en: "Select parent category",
+  },
+  external_id_placeholder: {
+    uk: "Введіть зовнішній ID",
+    en: "Enter external ID",
+  },
+  category_name_placeholder: {
+    uk: "Введіть назву категорії",
+    en: "Enter category name",
+  },
+  create_category: {
+    uk: "Створити категорію",
+    en: "Create category",
+  },
+  search: {
+    uk: "Пошук",
+    en: "Search",
+  },
+  no_categories_title: {
+    uk: "Немає категорій",
+    en: "No categories",
+  },
+  no_categories_description: {
+    uk: "Додайте першу категорію",
+    en: "Add your first category",
+  },
+  deleting_category_title: {
+    uk: "Видалення категорії",
+    en: "Deleting category",
+  },
+  deleting_category: {
+    uk: "Йде видалення категорії",
+    en: "Deleting category",
+  },
+  menu: { uk: "Меню", en: "Menu" },
+  add_subcategory: {
+    uk: "Додати підкатегорію",
+    en: "Add subcategory",
+  },
+  rename_category: {
+    uk: "Перейменувати категорію",
+    en: "Rename category",
+  },
+  delete_category: {
+    uk: "Видалити категорію",
+    en: "Delete category",
+  },
+  category_editor_title: {
+    uk: "Редактор категорій",
+    en: "Category editor",
+  },
+  toggle_section: {
+    uk: "Перемкнути секцію",
+    en: "Toggle section",
+  },
 };

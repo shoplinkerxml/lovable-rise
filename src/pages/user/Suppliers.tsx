@@ -120,6 +120,7 @@ export const Suppliers = () => {
                   <Button 
                     onClick={handleCreateNew}
                     disabled={!limitInfo.canCreate}
+                    variant="ghost"
                     size="icon"
                     title={t('add_supplier')}
                   >
