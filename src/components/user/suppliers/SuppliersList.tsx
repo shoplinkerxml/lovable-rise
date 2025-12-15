@@ -150,11 +150,15 @@ export const SuppliersList = ({
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {suppliers.map((supplier) => (
-          <Card key={supplier.id} className="card-elevated card-elevated-hover">
+          <Card
+            key={supplier.id}
+            className="card-elevated card-elevated-hover cursor-pointer"
+            onClick={() => onEdit?.(supplier)}
+          >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <Building2 className="h-8 w-8 text-emerald-600" />
-                <div className="flex gap-1">
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     variant="ghost"
