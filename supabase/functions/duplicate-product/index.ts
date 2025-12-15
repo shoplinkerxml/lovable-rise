@@ -1,430 +1,573 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { S3Client, CopyObjectCommand } from "npm:@aws-sdk/client-s3"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.1"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { S3Client, CopyObjectCommand } from "npm:@aws-sdk/client-s3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.1";
 
-const corsHeaders = {
+// ============================================================================
+// Types
+// ============================================================================
+
+type StoreProduct = {
+  id: string;
+  store_id: string;
+  supplier_id: string | null;
+  external_id: string;
+  name: string;
+  name_ua: string | null;
+  docket: string | null;
+  docket_ua: string | null;
+  description: string | null;
+  description_ua: string | null;
+  vendor: string | null;
+  article: string | null;
+  category_id: number | null;
+  category_external_id: string | null;
+  currency_code: string | null;
+  price: number | null;
+  price_old: number | null;
+  price_promo: number | null;
+  stock_quantity: number;
+  available: boolean;
+  state: string;
+};
+
+type ProductParam = {
+  name: string;
+  value: string;
+  order_index: number;
+  paramid: string | null;
+  valueid: string | null;
+};
+
+type ProductImage = {
+  url: string;
+  order_index: number;
+  is_main: boolean;
+};
+
+type UserStore = {
+  id: string;
+  user_id: string;
+};
+
+type Subscription = {
+  id: string;
+  tariff_id: number;
+  end_date: string | null;
+  is_active: boolean;
+  start_date: string;
+};
+
+type RequestBody = {
+  productId: string;
+};
+
+type ApiResponse = {
+  success?: boolean;
+  product?: StoreProduct;
+  error?: string;
+  message?: string;
+};
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-}
+};
 
-const jsonHeaders = {
-  ...corsHeaders,
+const JSON_HEADERS = {
+  ...CORS_HEADERS,
   "Content-Type": "application/json",
+};
+
+// ============================================================================
+// Environment & Clients
+// ============================================================================
+
+const ENV = {
+  SUPABASE_URL: Deno.env.get("SUPABASE_URL") ?? "",
+  SERVICE_KEY: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  ACCOUNT_ID: Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? "",
+  BUCKET: Deno.env.get("R2_BUCKET_NAME") ?? "",
+  ACCESS_KEY_ID: Deno.env.get("R2_ACCESS_KEY_ID") ?? "",
+  SECRET_ACCESS_KEY: Deno.env.get("R2_SECRET_ACCESS_KEY") ?? "",
+} as const;
+
+// Validate environment
+if (Object.values(ENV).some(val => !val)) {
+  throw new Error("Missing required environment variables");
 }
 
-type Body = {
-  productId: string
-}
+const supabase = createClient(ENV.SUPABASE_URL, ENV.SERVICE_KEY);
+
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: `https://${ENV.ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: ENV.ACCESS_KEY_ID,
+    secretAccessKey: ENV.SECRET_ACCESS_KEY,
+  },
+});
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 function base64UrlToBase64(input: string): string {
-  return input.replace(/-/g, "+").replace(/_/g, "/")
+  return input.replace(/-/g, "+").replace(/_/g, "/");
 }
 
-function decodeJwtSub(authHeader?: string | null): string | null {
-  if (!authHeader) return null
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim()
-  const parts = token.split(".")
-  if (parts.length !== 3) return null
+function decodeJwtSub(authHeader: string | null): string | null {
+  if (!authHeader) return null;
+  
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const parts = token.split(".");
+  
+  if (parts.length !== 3) return null;
+  
   try {
-    const payload = atob(base64UrlToBase64(parts[1]))
-    const json = JSON.parse(payload)
-    return json?.sub ?? null
+    const payload = atob(base64UrlToBase64(parts[1]));
+    const json = JSON.parse(payload);
+    return json?.sub ?? null;
   } catch {
-    return null
+    return null;
   }
 }
 
 function extractObjectKeyFromUrl(url: string): string | null {
   try {
-    const u = new URL(url)
-    const host = u.host || ""
-    const pathname = (u.pathname || "/").replace(/^\/+/, "")
-    const parts = pathname.split("/").filter(Boolean)
+    const u = new URL(url);
+    const pathname = u.pathname.replace(/^\/+/, "");
+    const parts = pathname.split("/").filter(Boolean);
 
-    if (host.includes("cloudflarestorage.com")) {
-      const hostParts = host.split(".")
-      const isPathStyle = hostParts.length === 4
-      if (isPathStyle) {
-        if (parts.length >= 2) return parts.slice(1).join("/")
-        return parts[0] || null
+    // Для pub-xxx.r2.dev URLs - весь pathname это ключ
+    if (u.host.includes(".r2.dev")) {
+      return pathname || null;
+    }
+
+    // Для cloudflarestorage.com - проверяем path-style vs subdomain
+    if (u.host.includes("cloudflarestorage.com")) {
+      const hostParts = u.host.split(".");
+      // Path-style: account.r2.cloudflarestorage.com/bucket/key
+      if (hostParts[0] && !hostParts[0].startsWith("pub-")) {
+        return parts.length >= 2 ? parts.slice(1).join("/") : null;
       }
-      return pathname || null
+      // Subdomain-style: bucket.account.r2.cloudflarestorage.com/key
+      return pathname || null;
     }
 
-    if (host.includes("r2.dev")) {
-      if (parts.length >= 2) return parts.slice(1).join("/")
-      return parts[0] || null
+    // Fallback - ищем products/ в пути
+    const productsIdx = pathname.indexOf("products/");
+    if (productsIdx >= 0) {
+      return pathname.slice(productsIdx);
     }
 
-    const uploadsIdx = pathname.indexOf("uploads/")
-    if (uploadsIdx > 0) return pathname.slice(uploadsIdx)
-
-    return parts.join("/") || null
-  } catch {
-    return null
+    return pathname || null;
+  } catch (error) {
+    console.error("Failed to extract key from URL:", url, error);
+    return null;
   }
 }
 
-// Инициализация окружения и клиентов один раз (быстрее на каждом запросе)
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? ""
-const bucket = Deno.env.get("R2_BUCKET_NAME") ?? ""
-const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") ?? ""
-const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? ""
-
-if (!SUPABASE_URL || !SERVICE_KEY || !accountId || !bucket || !accessKeyId || !secretAccessKey) {
-  throw new Error("Missing environment configuration")
+function isOurBucket(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const host = u.host;
+    // Проверяем все возможные варианты наших доменов
+    return (
+      host.includes("r2.cloudflarestorage.com") ||
+      host.includes(".r2.dev") ||
+      host.includes(ENV.BUCKET) ||
+      host.includes(ENV.ACCOUNT_ID)
+    );
+  } catch {
+    return false;
+  }
 }
 
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
+function generateDatePath(): string {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(now.getUTCDate()).padStart(2, "0");
+  return `${yyyy}/${mm}/${dd}`;
+}
 
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-  credentials: { accessKeyId, secretAccessKey },
-})
+function generateUniqueId(): string {
+  return crypto.randomUUID?.() ?? 
+    `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function createResponse(data: ApiResponse, status: number): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: JSON_HEADERS,
+  });
+}
+
+// ============================================================================
+// Business Logic
+// ============================================================================
+
+async function validateSubscription(userId: string): Promise<{
+  isValid: boolean;
+  maxProducts: number;
+}> {
+  const { data: subscriptions } = await supabase
+    .from("user_subscriptions")
+    .select("id,tariff_id,end_date,is_active,start_date")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("start_date", { ascending: false })
+    .limit(1);
+
+  let activeSub = (subscriptions as Subscription[])?.[0] || null;
+
+  // Check if subscription expired
+  if (activeSub?.end_date) {
+    const endMs = new Date(activeSub.end_date).getTime();
+    if (endMs < Date.now()) {
+      await supabase
+        .from("user_subscriptions")
+        .update({ is_active: false })
+        .eq("id", activeSub.id);
+      activeSub = null;
+    }
+  }
+
+  if (!activeSub) {
+    return { isValid: false, maxProducts: 0 };
+  }
+
+  // Get tariff limits
+  const { data: limitRow } = await supabase
+    .from("tariff_limits")
+    .select("value")
+    .eq("tariff_id", activeSub.tariff_id)
+    .ilike("limit_name", "%товар%")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  const maxProducts = Number(limitRow?.value ?? 0);
+
+  return {
+    isValid: Number.isFinite(maxProducts) && maxProducts > 0,
+    maxProducts,
+  };
+}
+
+async function checkProductLimit(userId: string, maxProducts: number): Promise<boolean> {
+  const { data: userStores } = await supabase
+    .from("user_stores")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (!userStores?.length) return true;
+
+  const storeIds = userStores.map((s) => s.id);
+  
+  const { count } = await supabase
+    .from("store_products")
+    .select("id", { count: "exact", head: true })
+    .in("store_id", storeIds);
+
+  return Number(count || 0) < maxProducts;
+}
+
+async function copyImageToR2(
+  sourceUrl: string,
+  newProductId: string,
+  index: number
+): Promise<string> {
+  // Если это не наше хранилище - оставляем URL как есть
+  if (!isOurBucket(sourceUrl)) {
+    console.log(`External image, skipping copy: ${sourceUrl}`);
+    return sourceUrl;
+  }
+
+  const sourceKey = extractObjectKeyFromUrl(sourceUrl);
+  if (!sourceKey) {
+    console.error(`Failed to extract key from URL: ${sourceUrl}`);
+    return sourceUrl;
+  }
+
+  console.log(`Copying image from key: ${sourceKey}`);
+
+  // Извлекаем оригинальное имя файла
+  const parts = sourceKey.split("/").filter(Boolean);
+  const originalFileName = parts[parts.length - 1] || "image.webp";
+  const cleanName = sanitizeFilename(originalFileName);
+
+  // Создаем новый путь с ID нового продукта
+  // Формат: products/{newProductId}/{index}/original.webp (или другое имя)
+  const destKey = `products/${newProductId}/${index}/${cleanName}`;
+
+  console.log(`Destination key: ${destKey}`);
+
+  try {
+    // Копируем файл в R2
+    await s3.send(
+      new CopyObjectCommand({
+        Bucket: ENV.BUCKET,
+        Key: destKey,
+        CopySource: `${ENV.BUCKET}/${sourceKey}`,
+        // Копируем метаданные
+        MetadataDirective: "COPY",
+      })
+    );
+
+    // Формируем новый URL
+    // Используем тот же формат что и в исходном URL
+    const sourceUrlObj = new URL(sourceUrl);
+    const newUrl = `${sourceUrlObj.protocol}//${sourceUrlObj.host}/${destKey}`;
+
+    console.log(`Image copied successfully to: ${newUrl}`);
+    return newUrl;
+
+  } catch (error) {
+    console.error(`Failed to copy image from ${sourceKey} to ${destKey}:`, error);
+    // В случае ошибки возвращаем исходный URL
+    return sourceUrl;
+  }
+}
+
+async function duplicateImages(
+  images: ProductImage[],
+  newProductId: string
+): Promise<void> {
+  if (!images.length) return;
+
+  console.log(`Duplicating ${images.length} images for product ${newProductId}`);
+
+  // Копируем изображения параллельно (с индексом для пути)
+  const copiedImages = await Promise.all(
+    images.map(async (img, idx) => {
+      const newUrl = await copyImageToR2(img.url, newProductId, idx);
+      return {
+        url: newUrl,
+        order_index: typeof img.order_index === "number" ? img.order_index : idx,
+        is_main: img.is_main,
+      };
+    })
+  );
+
+  // Гарантируем что есть ровно одно главное изображение
+  const hasMain = copiedImages.some((img) => img.is_main);
+  const normalized = copiedImages.map((img, idx) => ({
+    product_id: newProductId,
+    url: img.url,
+    order_index: img.order_index,
+    is_main: hasMain ? img.is_main : idx === 0,
+  }));
+
+  // Сортируем: главное изображение первым
+  const mainIndex = normalized.findIndex((img) => img.is_main);
+  if (mainIndex > 0) {
+    const [mainImg] = normalized.splice(mainIndex, 1);
+    normalized.unshift(mainImg);
+  }
+
+  // Переназначаем order_index после сортировки
+  const ordered = normalized.map((img, idx) => ({ ...img, order_index: idx }));
+
+  console.log(`Inserting ${ordered.length} images to database`);
+
+  // Сохраняем в базу
+  const { error } = await supabase
+    .from("store_product_images")
+    .insert(ordered);
+
+  if (error) {
+    console.error("Failed to insert images:", error);
+    throw new Error(`Failed to save images: ${error.message}`);
+  }
+
+  console.log(`Successfully duplicated ${ordered.length} images`);
+}
+
+async function duplicateParams(
+  params: ProductParam[],
+  productId: string
+): Promise<void> {
+  if (!params.length) return;
+
+  const paramsData = params.map((p, idx) => ({
+    product_id: productId,
+    name: p.name,
+    value: p.value,
+    order_index: typeof p.order_index === "number" ? p.order_index : idx,
+    paramid: p.paramid ?? null,
+    valueid: p.valueid ?? null,
+  }));
+
+  await supabase.from("store_product_params").insert(paramsData);
+}
+
+async function createProductCopy(
+  original: StoreProduct,
+  attempt: number = 0
+): Promise<StoreProduct | null> {
+  const externalId = attempt === 0
+    ? original.external_id
+    : `${original.external_id}-copy-${Math.floor(Math.random() * 10000)}`;
+
+  const payload = {
+    store_id: original.store_id,
+    supplier_id: original.supplier_id,
+    external_id: externalId,
+    name: original.name,
+    name_ua: original.name_ua,
+    docket: original.docket,
+    docket_ua: original.docket_ua,
+    description: original.description,
+    description_ua: original.description_ua,
+    vendor: original.vendor,
+    article: original.article,
+    category_id: original.category_id,
+    category_external_id: original.category_external_id,
+    currency_code: original.currency_code,
+    price: original.price,
+    price_old: original.price_old,
+    price_promo: original.price_promo,
+    stock_quantity: original.stock_quantity ?? 0,
+    available: original.available ?? true,
+    state: original.state ?? "new",
+  };
+
+  const { data, error } = await supabase
+    .from("store_products")
+    .insert([payload])
+    .select("*")
+    .single();
+
+  if (error && attempt === 0) {
+    // Retry with modified external_id
+    return createProductCopy(original, 1);
+  }
+
+  return error ? null : (data as StoreProduct);
+}
+
+// ============================================================================
+// Main Handler
+// ============================================================================
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return new Response("ok", { headers: CORS_HEADERS });
   }
 
   try {
-    const auth = req.headers.get("authorization")
-    if (!auth) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
-        headers: jsonHeaders,
-      })
-    }
+    // 1. Authentication
+    const authHeader = req.headers.get("authorization");
+    const userId = decodeJwtSub(authHeader);
 
-    const userId = decodeJwtSub(auth)
     if (!userId) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
-        headers: jsonHeaders,
-      })
+      return createResponse({ error: "unauthorized" }, 401);
     }
 
-    const body = (await req.json()) as Body
-    const originalId = String(body?.productId || "")
-    if (!originalId) {
-      return new Response(JSON.stringify({ error: "invalid_body" }), {
-        status: 400,
-        headers: jsonHeaders,
-      })
+    // 2. Parse request body
+    const body = await req.json() as RequestBody;
+    const productId = String(body?.productId || "").trim();
+
+    if (!productId) {
+      return createResponse({ error: "invalid_body" }, 400);
     }
 
-    const { data: original, error: origErr } = await supabase
-      .from("store_products")
-      .select("*")
-      .eq("id", originalId)
-      .maybeSingle()
-
-    if (origErr || !original) {
-      return new Response(JSON.stringify({ error: "not_found" }), {
-        status: 404,
-        headers: jsonHeaders,
-      })
-    }
-
-    // Параллельно тянем: магазин товара, подписку, все магазины пользователя, параметры и картинки
+    // 3. Load original product and related data in parallel
     const [
-      storeRowRes,
-      subsRes,
-      userStoresRes,
-      paramsRes,
-      imagesRes,
+      { data: original },
+      { data: params },
+      { data: images },
     ] = await Promise.all([
       supabase
-        .from("user_stores")
-        .select("id,user_id")
-        .eq("id", String(original.store_id))
+        .from("store_products")
+        .select("*")
+        .eq("id", productId)
         .maybeSingle(),
-      supabase
-        .from("user_subscriptions")
-        .select("id,tariff_id,end_date,is_active,start_date")
-        .eq("user_id", String(userId))
-        .eq("is_active", true)
-        .order("start_date", { ascending: false })
-        .limit(1),
-      supabase
-        .from("user_stores")
-        .select("id")
-        .eq("user_id", String(userId))
-        .eq("is_active", true),
       supabase
         .from("store_product_params")
         .select("name,value,order_index,paramid,valueid")
-        .eq("product_id", originalId)
+        .eq("product_id", productId)
         .order("order_index", { ascending: true }),
       supabase
         .from("store_product_images")
         .select("url,order_index,is_main")
-        .eq("product_id", originalId)
+        .eq("product_id", productId)
         .order("order_index", { ascending: true }),
-    ])
+    ]);
 
-    const storeRow = (storeRowRes as any)?.data as { id: string; user_id: string } | null
-    if (!storeRow || String(storeRow.user_id) !== String(userId)) {
-      return new Response(JSON.stringify({ error: "forbidden" }), {
-        status: 403,
-        headers: jsonHeaders,
-      })
+    if (!original) {
+      return createResponse({ error: "not_found" }, 404);
     }
 
-    const subsRows = ((subsRes as any)?.data || []) as any[]
-    let activeSub: any = subsRows[0] || null
+    // 4. Verify ownership - get store and check user
+    const { data: storeRow } = await supabase
+      .from("user_stores")
+      .select("id,user_id")
+      .eq("id", (original as StoreProduct).store_id)
+      .maybeSingle();
 
-    if (activeSub && activeSub.end_date) {
-      const endMs = new Date(activeSub.end_date).getTime()
-      if (endMs < Date.now()) {
-        await supabase
-          .from("user_subscriptions")
-          .update({ is_active: false })
-          .eq("id", activeSub.id)
-        activeSub = null
-      }
+    if (!storeRow || storeRow.user_id !== userId) {
+      return createResponse({ error: "forbidden" }, 403);
     }
 
-    if (!activeSub) {
-      return new Response(
-        JSON.stringify({
-          error: "limit_reached",
-          message: "Ліміт товарів вичерпано",
-        }),
-        { status: 400, headers: jsonHeaders },
-      )
+    // 5. Validate subscription and limits
+    const { isValid, maxProducts } = await validateSubscription(userId);
+
+    if (!isValid) {
+      return createResponse({
+        error: "limit_reached",
+        message: "Ліміт товарів вичерпано",
+      }, 400);
     }
 
-    const tariffId = Number(activeSub.tariff_id)
-    const { data: limitRow } = await supabase
-      .from("tariff_limits")
-      .select("value")
-      .eq("tariff_id", tariffId)
-      .ilike("limit_name", "%товар%")
-      .eq("is_active", true)
-      .maybeSingle()
+    const hasCapacity = await checkProductLimit(userId, maxProducts);
 
-    const maxProducts = Number(limitRow?.value ?? 0)
-    if (!Number.isFinite(maxProducts) || maxProducts <= 0) {
-      return new Response(
-        JSON.stringify({
-          error: "limit_reached",
-          message: "Ліміт товарів вичерпано",
-        }),
-        { status: 400, headers: jsonHeaders },
-      )
+    if (!hasCapacity) {
+      return createResponse({
+        error: "limit_reached",
+        message: "Ліміт товарів вичерпано",
+      }, 400);
     }
 
-    const userStores = ((userStoresRes as any)?.data || []) as { id: string }[]
-    const storeIds = userStores.map((s) => String(s.id))
+    // 6. Create product copy
+    const created = await createProductCopy(original as StoreProduct);
 
-    let currentCount = 0
-    if (storeIds.length > 0) {
-      const { count } = await supabase
-        .from("store_products")
-        .select("id", { count: "exact", head: true })
-        .in("store_id", storeIds)
-      currentCount = Number(count || 0)
+    if (!created) {
+      return createResponse({ error: "create_failed" }, 500);
     }
 
-    if (currentCount >= maxProducts) {
-      return new Response(
-        JSON.stringify({
-          error: "limit_reached",
-          message: "Ліміт товарів вичерпано",
-        }),
-        { status: 400, headers: jsonHeaders },
-      )
-    }
+    // 7. Duplicate related data in parallel
+    await Promise.all([
+      duplicateImages(
+        (images as ProductImage[]) || [],
+        created.id
+      ),
+      duplicateParams(
+        (params as ProductParam[]) || [],
+        created.id
+      ),
+    ]);
 
-    const paramsRows = ((paramsRes as any)?.data || []) as any[]
-    const imageRows = ((imagesRes as any)?.data || []) as any[]
+    console.log(`Product ${productId} successfully duplicated as ${created.id}`);
 
-    const insertBase = {
-      store_id: original.store_id,
-      supplier_id: original.supplier_id ?? null,
-      external_id: original.external_id,
-      name: original.name,
-      name_ua: original.name_ua ?? null,
-      docket: original.docket ?? null,
-      docket_ua: original.docket_ua ?? null,
-      description: original.description ?? null,
-      description_ua: original.description_ua ?? null,
-      vendor: original.vendor ?? null,
-      article: original.article ?? null,
-      category_id: original.category_id ?? null,
-      category_external_id: original.category_external_id ?? null,
-      currency_code: original.currency_code ?? null,
-      price: original.price ?? null,
-      price_old: original.price_old ?? null,
-      price_promo: original.price_promo ?? null,
-      stock_quantity: original.stock_quantity ?? 0,
-      available: original.available ?? true,
-      state: original.state ?? "new",
-    } as Record<string, unknown>
+    return createResponse({ success: true, product: created }, 200);
 
-    const createOnce = async (payload: Record<string, unknown>) => {
-      const { data, error } = await supabase
-        .from("store_products")
-        .insert([payload])
-        .select("*")
-        .single()
-      return { data, error } as const
-    }
-
-    let { data: created, error: createErr } = await createOnce(insertBase)
-
-    if (createErr) {
-      const fallback = {
-        ...insertBase,
-        external_id: `${original.external_id}-copy-${Math.floor(Math.random() * 1000)}`,
-      }
-      const res = await createOnce(fallback)
-      created = res.data
-      createErr = res.error
-    }
-
-    if (!created || createErr) {
-      return new Response(JSON.stringify({ error: "create_failed" }), {
-        status: 500,
-        headers: jsonHeaders,
-      })
-    }
-
-    const now = new Date()
-    const yyyy = now.getUTCFullYear()
-    const mm = String(now.getUTCMonth() + 1).padStart(2, "0")
-    const dd = String(now.getUTCDate()).padStart(2, "0")
-    const datePath = `${yyyy}/${mm}/${dd}`
-
-    const uploaded: Array<{ url: string; order_index: number; is_main: boolean }> = []
-
-    if (imageRows.length) {
-      const copyResults = await Promise.all(
-        imageRows.map(async (img, idx) => {
-          let src = typeof img?.url === "string" ? img.url : ""
-          if (!src) return null
-
-          try {
-            const u = new URL(src)
-            const host = u.host
-            const isOurBucket =
-              host === `${bucket}.${accountId}.r2.cloudflarestorage.com` ||
-              host ===
-                "shop-linker.9ea53eb0cc570bc4b00e01008dee35e6.r2.cloudflarestorage.com"
-
-            if (isOurBucket) {
-              const sourceKey = extractObjectKeyFromUrl(src)
-              if (sourceKey) {
-                const parts = sourceKey.split("/").filter(Boolean)
-                const baseName = parts[parts.length - 1] || "file"
-                const cleanName = baseName.replace(/[^a-zA-Z0-9._-]/g, "_")
-                const suffix =
-                  crypto.randomUUID?.() ??
-                  `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-
-                const destKey = `uploads/products/${String(
-                  created.external_id || created.id,
-                )}/${datePath}/${suffix}-${cleanName}`
-
-                await s3.send(
-                  new CopyObjectCommand({
-                    Bucket: bucket,
-                    Key: destKey,
-                    CopySource: `${bucket}/${sourceKey}`,
-                  }),
-                )
-
-                src = `https://${bucket}.${accountId}.r2.cloudflarestorage.com/${destKey}`
-              }
-            }
-          } catch {
-            // игнорируем, остаётся исходный src
-          }
-
-          if (!src.trim()) return null
-
-          return {
-            url: src,
-            order_index:
-              typeof img?.order_index === "number" ? img.order_index : idx,
-            is_main: !!img?.is_main || idx === 0,
-          }
-        }),
-      )
-
-      for (const item of copyResults) {
-        if (item) uploaded.push(item)
-      }
-    }
-
-    if (uploaded.length) {
-      const hasMain = uploaded.some((i) => i.is_main === true)
-      let assigned = false
-
-      const normalized = uploaded.map((i, index) => {
-        let m = i.is_main === true && !assigned
-
-        if (hasMain) {
-          if (i.is_main === true && !assigned) {
-            assigned = true
-          } else {
-            m = false
-          }
-        } else {
-          m = index === 0
-        }
-
-        return {
-          product_id: created.id,
-          url: i.url,
-          order_index:
-            typeof i.order_index === "number" ? i.order_index : index,
-          is_main: m,
-        } as Record<string, unknown>
-      })
-
-      const mainIdx = normalized.findIndex((i) => i.is_main === true)
-
-      const ordered = (() => {
-        const arr = normalized.slice()
-        if (mainIdx > 0) {
-          const [main] = arr.splice(mainIdx, 1)
-          arr.unshift(main)
-        }
-        return arr.map((i, idx) => ({ ...i, order_index: idx }))
-      })()
-
-      await supabase.from("store_product_images").insert(ordered)
-    }
-
-    if (paramsRows.length) {
-      const paramsData = paramsRows.map((p: any, index: number) => ({
-        product_id: created.id,
-        name: p.name,
-        value: p.value,
-        order_index:
-          typeof p.order_index === "number" ? p.order_index : index,
-        paramid: p.paramid ?? null,
-        valueid: p.valueid ?? null,
-      }))
-
-      await supabase.from("store_product_params").insert(paramsData)
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, product: created }),
-      { status: 200, headers: jsonHeaders },
-    )
-  } catch (e) {
-    const msg = (e as any)?.message ?? "Duplicate failed"
-    return new Response(
-      JSON.stringify({ error: "duplicate_failed", message: msg }),
-      { status: 500, headers: jsonHeaders },
-    )
+  } catch (error) {
+    console.error("Duplicate product error:", error);
+    
+    return createResponse({
+      error: "duplicate_failed",
+      message: error instanceof Error ? error.message : "Unknown error",
+    }, 500);
   }
-})
+});
