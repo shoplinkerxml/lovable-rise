@@ -70,15 +70,19 @@ export const ProfileSheetContent: React.FC<ProfileSheetContentProps> = ({
       <div className="space-y-1">
         <Button 
           variant="ghost" 
-          className="w-full justify-start h-auto py-3 hover:bg-emerald-300/10 hover:text-emerald-600" 
+          className="w-full justify-start h-auto py-3 hover:bg-emerald-300/10 hover:text-emerald-600 flex items-start gap-3" 
           onClick={handleProfileClick}
         >
-          <div className="h-8 w-8 mr-3 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center ring-1 ring-emerald-100">
             <User2 className="h-5 w-5" />
           </div>
-          <div>
-            <div className="font-medium text-emerald-700 hover:text-emerald-600">{t("menu_profile")}</div>
-            <div className="text-xs text-muted-foreground">{t("menu_profile_desc")}</div>
+          <div className="flex-1 text-left">
+            <div className="font-medium text-emerald-700 hover:text-emerald-600">
+              {t("menu_profile")}
+            </div>
+            <div className="text-xs text-muted-foreground leading-snug whitespace-normal break-words">
+              {t("menu_profile_desc")}
+            </div>
           </div>
         </Button>
       </div>
