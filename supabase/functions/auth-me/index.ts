@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../_shared/database-types.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
@@ -25,6 +24,103 @@ const jsonResponse = (body: unknown, init?: ResponseInit) =>
     },
   })
 
+let demoTariffCache: any = null
+let demoCacheTimestamp = 0
+const DEMO_CACHE_TTL = 5 * 60 * 1000
+
+async function getDemoTariff(supabaseClient: any) {
+  if (demoTariffCache && Date.now() - demoCacheTimestamp < DEMO_CACHE_TTL) {
+    return demoTariffCache
+  }
+
+  let demoTariff: any = null
+  let lastError: any = null
+
+  const {
+    data: primaryDemoTariff,
+    error: primaryDemoError,
+  } = await supabaseClient
+    .from('tariffs')
+    .select('*')
+    .eq('is_free', true)
+    .eq('is_active', true)
+    .eq('visible', false)
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (primaryDemoTariff) {
+    demoTariff = primaryDemoTariff
+  } else if (primaryDemoError) {
+    lastError = primaryDemoError
+  }
+
+  if (!demoTariff) {
+    const {
+      data: fallbackDemoTariff,
+      error: fallbackDemoError,
+    } = await supabaseClient
+      .from('tariffs')
+      .select('*')
+      .eq('is_free', true)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (fallbackDemoTariff) {
+      demoTariff = fallbackDemoTariff
+    } else if (!lastError) {
+      lastError = fallbackDemoError
+    }
+  }
+
+  if (!demoTariff && lastError) {
+    console.error('Failed to fetch demo tariff:', lastError.message)
+  }
+
+  if (demoTariff) {
+    demoTariffCache = demoTariff
+    demoCacheTimestamp = Date.now()
+  }
+
+  return demoTariff
+}
+
+async function createDemoSubscription(
+  supabaseClient: any,
+  userId: string,
+  tariff: any
+) {
+  const startDate = new Date()
+  let endDate: string | null = null
+
+  if (!tariff.is_lifetime && tariff.duration_days) {
+    const end = new Date(startDate)
+    end.setDate(end.getDate() + tariff.duration_days)
+    endDate = end.toISOString()
+  }
+
+  const { data, error } = await supabaseClient
+    .from('user_subscriptions')
+    .insert({
+      user_id: userId,
+      tariff_id: tariff.id,
+      start_date: startDate.toISOString(),
+      end_date: endDate,
+      is_active: true,
+    })
+    .select('*, tariffs(*)')
+    .single()
+
+  if (error) {
+    console.error('Failed to create demo subscription:', error.message)
+    return null
+  }
+
+  return data
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -40,7 +136,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
         headers: { Authorization: authHeader },
       },
@@ -110,8 +206,34 @@ Deno.serve(async (req) => {
       })
     }
 
+    let finalSubscription: any = subscription
+
+    if (!finalSubscription) {
+      const { count, error: countError } = await supabaseClient
+        .from('user_subscriptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+
+      if (countError) {
+        console.error('Subscription count error:', countError.message)
+      } else if (!count || count === 0) {
+        const demoTariff = await getDemoTariff(supabaseClient)
+        if (demoTariff) {
+          const demoSubscription = await createDemoSubscription(
+            supabaseClient,
+            user.id,
+            demoTariff
+          )
+          if (demoSubscription) {
+            finalSubscription = demoSubscription
+          }
+        }
+      }
+    }
+
     const tariffId =
-      (subscription as any)?.tariffs?.id ?? (subscription as any)?.tariff_id
+      (finalSubscription as any)?.tariffs?.id ??
+      (finalSubscription as any)?.tariff_id
 
     let tariffLimits: Array<{ limit_name: string; value: number }> = []
 
@@ -135,11 +257,11 @@ Deno.serve(async (req) => {
       user: {
         id: user.id,
         email: user.email,
-        ...(profile && typeof profile === 'object' ? profile : {})
+        ...(profile && typeof profile === 'object' ? profile : {}),
       },
-      subscription,
+      subscription: finalSubscription,
       tariffLimits,
-      menuItems: menuItems || []
+      menuItems: menuItems || [],
     })
   } catch (error) {
     console.error('Unexpected error:', error)

@@ -940,6 +940,7 @@ export class UserAuthService {
    */
   private static mapSupabaseError(error: any): string {
     const message = error.message?.toLowerCase() || '';
+    const code = typeof error.code === 'string' ? error.code.toLowerCase() : '';
     
     // Email confirmation specific errors
     if (message.includes('email not confirmed') || message.includes('email_not_confirmed')) {
@@ -973,8 +974,17 @@ export class UserAuthService {
     }
     
     // Rate limiting
-    if (message.includes('too many') || message.includes('rate limit')) {
-      return 'rate_limit_exceeded';
+    if (code === 'over_email_send_rate_limit' || message.includes('too many') || message.includes('rate limit')) {
+      return UserAuthError.RATE_LIMIT_EXCEEDED;
+    }
+
+    // Email provider disabled / email signups disabled
+    if (
+      code === 'email_provider_disabled' ||
+      message.includes('email provider disabled') ||
+      message.includes('email signups are disabled')
+    ) {
+      return UserAuthError.EMAIL_PROVIDER_DISABLED;
     }
     
     // Authorization errors

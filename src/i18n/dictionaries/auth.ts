@@ -28,6 +28,10 @@ export const authDictionary: Dictionary = {
   logout: { uk: "Вийти", en: "Logout" },
   user_profile: { uk: "Профіль користувача", en: "User Profile" },
   menu_profile: { uk: "Мій профіль", en: "My Profile" },
+  menu_profile_desc: {
+    uk: "Перегляд і редагування налаштувань вашого профілю",
+    en: "View and edit your profile settings",
+  },
   nav_login: { uk: "Увійти", en: "Log in" },
   nav_get_started: { uk: "Почати безкоштовно", en: "Get started free" },
   facebook_signup: { uk: "Facebook", en: "Facebook" },

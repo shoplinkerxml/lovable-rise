@@ -72,12 +72,12 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
     try {
       await TemplateService.deleteTemplate(templateId);
       
-      toast.success('Шаблон видалено');
+      toast.success(t('template_deleted'));
       setDeleteDialog({ open: false, template: null });
       loadTemplates();
     } catch (error: any) {
       console.error('Delete error:', error);
-      toast.error(error?.message || 'Помилка видалення шаблону');
+      toast.error(error?.message || t('failed_delete_template'));
     }
   };
 
@@ -99,7 +99,7 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
             </EmptyMedia>
             <EmptyTitle>{t('no_templates')}</EmptyTitle>
             <EmptyDescription>
-              Створіть перший XML шаблон для маркетплейсу
+              {t('no_templates_description')}
             </EmptyDescription>
           </EmptyHeader>
           <Button onClick={onCreateNew} className="mt-4">
@@ -115,11 +115,18 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {templates.map((template) => (
-          <Card key={template.id} className="hover:shadow-lg transition-shadow">
+          <Card 
+            key={template.id} 
+            className="card-elevated card-elevated-hover cursor-pointer"
+            onClick={() => onSelect?.(template)}
+          >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <FileText className="h-8 w-8 text-emerald-600" />
-                <div className="flex gap-1">
+                <div 
+                  className="flex gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Button
                     size="sm"
                     variant="ghost"
@@ -161,18 +168,23 @@ export const TemplatesList = ({ onSelect, onTemplatesLoaded, onCreateNew }: Temp
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, template: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Видалити шаблон?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_template_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Цю дію неможливо скасувати. Шаблон "{deleteDialog.template?.name}" буде повністю видалено з системи.
+              <span className="block">{t('delete_template_warning')}</span>
+              {deleteDialog.template?.name && (
+                <span className="block">
+                  {t('delete_template_name_prefix')}: "{deleteDialog.template.name}"
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Скасувати</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteDialog.template && handleDelete(deleteDialog.template.id, deleteDialog.template.name)}
               className="bg-destructive hover:bg-destructive/90"
             >
-              Видалити
+              {t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

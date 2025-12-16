@@ -88,11 +88,11 @@ const TariffPage = () => {
     return !(name.includes('демо') || name.includes('demo'));
   });
 
-  type SubscriptionEntity = { tariff_id?: number; end_date?: string | null };
+  type SubscriptionEntity = { tariff_id?: number; end_date?: string | null; is_active?: boolean | null };
   const { subscription: subscriptionCtx } = useOutletContext<{ subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null }>();
   useEffect(() => {
     const sub = subscriptionCtx?.subscription || null;
-    const valid = !!sub && (sub.end_date == null || new Date(sub.end_date) > new Date());
+    const valid = !!sub && sub.is_active !== false;
     setActiveTariffId(valid ? (sub?.tariff_id ?? null) : null);
   }, [subscriptionCtx?.subscription]);
 

@@ -1,6 +1,127 @@
 import type { Dictionary } from "../types";
 
 export const commonDictionary: Dictionary = {
+  store_templates_title: { uk: "Шаблони XML", en: "XML Templates" },
+  store_templates_description: { uk: "Керування шаблонами XML для маркетплейсів", en: "Manage XML templates for marketplaces" },
+  create_template: { uk: "Створити шаблон", en: "Create template" },
+  edit_template: { uk: "Редагувати шаблон", en: "Edit template" },
+  back_to_templates: { uk: "Назад до шаблонів", en: "Back to templates" },
+  tab_upload: { uk: "Завантаження XML", en: "Upload XML" },
+  tab_structure: { uk: "Структура XML", en: "XML Structure" },
+  tab_mapping: { uk: "Перевірка парсингу", en: "Mapping review" },
+  fields_found: { uk: "полів знайдено", en: "fields found" },
+  enter_template_name: { uk: "Введіть назву шаблону", en: "Enter template name" },
+  xml_parse_error: { uk: "Помилка парсингу XML", en: "XML parsing error" },
+  template_saved: { uk: "Шаблон збережено", en: "Template saved" },
+  failed_save_template: { uk: "Не вдалося зберегти шаблон", en: "Failed to save template" },
+  no_templates: { uk: "Немає шаблонів", en: "No templates" },
+  no_templates_description: {
+    uk: "Створіть перший XML шаблон для маркетплейсу",
+    en: "Create the first XML template for a marketplace",
+  },
+  template_deleted: { uk: "Шаблон видалено", en: "Template deleted" },
+  failed_delete_template: {
+    uk: "Помилка видалення шаблону",
+    en: "Failed to delete template",
+  },
+  delete_template_confirm: {
+    uk: "Видалити шаблон?",
+    en: "Delete template?",
+  },
+  delete_template_warning: {
+    uk: "Цю дію неможливо скасувати.",
+    en: "This action cannot be undone.",
+  },
+  delete_template_name_prefix: {
+    uk: "Шаблон",
+    en: "Template",
+  },
+
+  limits_title: { uk: "Ліміти", en: "Limits" },
+  limits_description: { uk: "Керування системними лімітами", en: "Manage system limits" },
+  create_limit: { uk: "Створити ліміт", en: "Create limit" },
+  create_limit_description: { uk: "Створення нового ліміту", en: "Create a new limit" },
+  edit_limit_main: { uk: "Редагувати ліміт", en: "Edit limit" },
+  edit_limit_description: { uk: "Редагування параметрів ліміту", en: "Edit limit parameters" },
+  back_to_limits: { uk: "Назад до лімітів", en: "Back to limits" },
+  no_limits: { uk: "Немає лімітів", en: "No limits" },
+  no_limits_description: { uk: "Додайте перший ліміт", en: "Add your first limit" },
+  add_limit_btn: { uk: "Створити ліміт", en: "Create limit" },
+  limit_name_field: { uk: "Назва ліміту", en: "Limit name" },
+  limit_code_field: { uk: "Код", en: "Code" },
+  limit_description_field: { uk: "Опис", en: "Description" },
+  limit_path_field: { uk: "Шлях", en: "Path" },
+  limit_name_placeholder: {
+    uk: "Введіть назву ліміту",
+    en: "Enter limit name",
+  },
+  limit_code_placeholder: {
+    uk: "Наприклад, products_limit_per_shop",
+    en: "For example, products_limit_per_shop",
+  },
+  limit_code_hint: {
+    uk: "Використовуйте тільки малі літери, цифри та підкреслення",
+    en: "Use only lowercase letters, digits and underscores",
+  },
+  limit_name_required: {
+    uk: "Введіть назву ліміту",
+    en: "Enter limit name",
+  },
+  limit_code_required: {
+    uk: "Введіть код ліміту",
+    en: "Enter limit code",
+  },
+  limit_code_format_error: {
+    uk: "Код має бути у форматі snake_case",
+    en: "Code must be in snake_case format",
+  },
+  limit_path_placeholder: {
+    uk: "Наприклад, /functions/v1/get-product-limit",
+    en: "For example, /functions/v1/get-product-limit",
+  },
+  limit_path_hint: {
+    uk: "Необов'язково. Використовується для документації або внутрішніх посилань",
+    en: "Optional. Used for documentation or internal links",
+  },
+  limit_description_placeholder: {
+    uk: "Короткий опис призначення ліміту",
+    en: "Short description of the limit purpose",
+  },
+  limit_created: { uk: "Ліміт створено", en: "Limit created" },
+  limit_updated: { uk: "Ліміт оновлено", en: "Limit updated" },
+  limit_deleted: { uk: "Ліміт видалено", en: "Limit deleted" },
+  failed_save_limit: {
+    uk: "Не вдалося зберегти ліміт",
+    en: "Failed to save limit",
+  },
+  failed_load_limits: {
+    uk: "Не вдалося завантажити ліміти",
+    en: "Failed to load limits",
+  },
+  failed_delete_limit: {
+    uk: "Помилка видалення ліміту",
+    en: "Failed to delete limit",
+  },
+  limits_order_updated: {
+    uk: "Порядок лімітів оновлено",
+    en: "Limits order updated",
+  },
+  failed_update_limits_order: {
+    uk: "Помилка оновлення порядку лімітів",
+    en: "Failed to update limits order",
+  },
+  delete_limit_confirm: {
+    uk: "Видалити ліміт?",
+    en: "Delete limit?",
+  },
+  delete_limit_warning: {
+    uk: "Цю дію неможливо скасувати.",
+    en: "This action cannot be undone.",
+  },
+  delete_limit_name_prefix: {
+    uk: "Обмеження",
+    en: "Limit",
+  },
   form_validation_description: {
     uk: "Демонстрації валідації та допоміжні засоби.",
     en: "Validation demos and helpers.",
@@ -163,6 +284,7 @@ export const commonDictionary: Dictionary = {
   },
   feat_analytics: { uk: "Єдина аналітика", en: "Unified analytics" },
   loading: { uk: "Завантаження...", en: "Loading..." },
+  saving: { uk: "Збереження...", en: "Saving..." },
   operation_failed: {
     uk: "Збій операції",
     en: "Operation failed",

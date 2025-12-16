@@ -69,6 +69,7 @@ export enum UserAuthError {
   SESSION_EXPIRED = 'session_expired',
   INSUFFICIENT_PERMISSIONS = 'insufficient_permissions',
   AUTH_TOKEN_INVALID = 'auth_token_invalid',
+  EMAIL_PROVIDER_DISABLED = 'email_provider_disabled',
   SESSION_NOT_READY = 'session_not_ready'
 }
 

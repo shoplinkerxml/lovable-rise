@@ -140,6 +140,94 @@ export const tariffsDictionary: Dictionary = {
     uk: "Ліміти не налаштовані",
     en: "No limits configured",
   },
+  subscription_expired: {
+    uk: "Ваш тариф закінчився",
+    en: "Your plan has ended",
+  },
+  please_select_new_tariff: {
+    uk: "Будь ласка, оберіть новий тариф",
+    en: "Please select a new tariff",
+  },
+  demo_trial_title_prefix: {
+    uk: "Демо-доступ — ще",
+    en: "Demo access —",
+  },
+  demo_trial_title_suffix: {
+    uk: "днів демо-доступу",
+    en: " days left",
+  },
+  demo_trial_desc: {
+    uk: "Ви використовуєте демо-тариф. Спробуйте всі можливості сервісу.",
+    en: "You are using a demo plan. Try all features of the service.",
+  },
+  days_tariff: {
+    uk: "днів",
+    en: "days",
+  },
+  create_new_tariff: {
+    uk: "Створити новий тариф",
+    en: "Create new tariff",
+  },
+  basic_information: {
+    uk: "Основна інформація",
+    en: "Basic information",
+  },
+  description: {
+    uk: "Опис",
+    en: "Description",
+  },
+  free_plan: {
+    uk: "Безкоштовний план",
+    en: "Free plan",
+  },
+  new_price: {
+    uk: "Нова ціна",
+    en: "New price",
+  },
+  duration_days: {
+    uk: "Термін днів",
+    en: "Duration days",
+  },
+  enter_duration_days: {
+    uk: "Введіть термін днів",
+    en: "Enter duration days",
+  },
+  enter_feature_name: {
+    uk: "Введіть назву функції",
+    en: "Enter feature name",
+  },
+  features_will_be_configured_after_creating_tariff: {
+    uk: "Функції будуть налаштовані після створення тарифу",
+    en: "Features will be configured after creating the tariff",
+  },
+  limits_will_be_configured_after_creating_tariff: {
+    uk: "Ліміти будуть налаштовані після створення тарифу",
+    en: "Limits will be configured after creating the tariff",
+  },
+  select_limit: {
+    uk: "Оберіть ліміт",
+    en: "Select limit",
+  },
+  limit_value: {
+    uk: "Значення ліміту",
+    en: "Limit value",
+  },
+  enter_limit_name: {
+    uk: "Введіть назву ліміту",
+    en: "Enter limit name",
+  },
+  enter_limit_value: {
+    uk: "Введіть значення ліміту",
+    en: "Enter limit value",
+  },
+  active: {
+    uk: "Активний",
+    en: "Active",
+  },
+  sort_order: {
+    uk: "Порядок сортування",
+    en: "Sort order",
+  },
   active_tariff_button: {
     uk: "Активний тариф",
     en: "Active plan",

@@ -393,7 +393,7 @@ export const ProductsTable = ({
       toast.error(t('failed_remove_from_store'));
     }
     return !reverted;
-  }, [setProductsCached, queryClient, t, stores]);
+  }, [setProductsCached, queryClient, t]);
   useEffect(() => {
     try {
       const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);

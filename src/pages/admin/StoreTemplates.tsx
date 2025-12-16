@@ -135,7 +135,7 @@ export const StoreTemplates = () => {
     <div className="p-6 space-y-6">
       <PageHeader
         title={viewMode === 'list' ? t('store_templates_title') : viewMode === 'create' ? t('create_template') : t('edit_template')}
-        description={viewMode === 'list' ? 'Керування шаблонами XML для маркетплейсів' : 'Створення та редагування XML шаблону'}
+        description={viewMode === 'list' ? t('store_templates_description') : t('edit_template')}
         breadcrumbItems={breadcrumbs}
         actions={
           <div className="flex gap-2">
@@ -174,7 +174,7 @@ export const StoreTemplates = () => {
               2. {t('tab_structure')}
             </TabsTrigger>
             <TabsTrigger value="mapping" disabled={!xmlStructure}>
-              3. Перевірка парсингу
+              3. {t('tab_mapping')}
             </TabsTrigger>
           </TabsList>
 

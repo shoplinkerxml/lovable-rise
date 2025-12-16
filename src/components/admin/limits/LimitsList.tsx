@@ -284,7 +284,12 @@ export const LimitsList = ({
           <AlertDialogHeader>
             <AlertDialogTitle>{t('delete_limit_confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Цю дію неможливо скасувати. Обмеження "{deleteDialog.limit?.name}" буде повністю видалено з системи.
+              <span className="block">{t('delete_limit_warning')}</span>
+              {deleteDialog.limit?.name && (
+                <span className="block">
+                  {t('delete_limit_name_prefix')}: "{deleteDialog.limit.name}"
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

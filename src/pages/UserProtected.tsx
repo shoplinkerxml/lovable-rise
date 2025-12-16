@@ -73,19 +73,23 @@ const UserProtected = () => {
   const checkSubscriptionValidity = useCallback((sub: SubscriptionEntity | null): boolean => {
     if (!sub) return false;
     if (sub.is_active === false) return false;
-    if (!sub.end_date) return true; // Бессрочная подписка
-    return new Date(sub.end_date) > new Date();
+    return true;
   }, []);
 
   // Обновление данных подписки
   const updateSubscriptionData = useCallback((authMe: any) => {
     const sub = authMe.subscription as SubscriptionEntity | null;
     const valid = checkSubscriptionValidity(sub);
+    const isDemo =
+      !!sub &&
+      !!sub.tariffs &&
+      (sub.tariffs as any).is_free === true &&
+      (sub.tariffs as any).visible === false;
     
     setSubscriptionState({
       hasValidSubscription: valid,
       subscription: sub,
-      isDemo: false,
+      isDemo,
     });
     
     setTariffLimits(Array.isArray(authMe.tariffLimits) ? authMe.tariffLimits : []);

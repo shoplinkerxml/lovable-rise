@@ -33,7 +33,6 @@ async function invokeWithRetry<T>(fnName: string, init: { body?: unknown; header
   const timeoutMs = Math.max(2500, opts?.timeoutMs ?? 5000);
   const baseDelay = Math.max(250, opts?.retryDelayMs ?? 500);
   let attempt = 0;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

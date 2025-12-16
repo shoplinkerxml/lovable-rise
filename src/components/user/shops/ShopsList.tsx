@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,11 @@ export const ShopsList = ({
     refetchOnReconnect: false,
   });
 
-  const shops: ShopWithMarketplace[] = shopsData ?? [];
+  const shops: ShopWithMarketplace[] = useMemo(
+    () => shopsData ?? [],
+    [shopsData]
+  );
+  const shopsLength = shops.length;
 
   // ============================================================================
   // Lifecycle hooks
@@ -75,8 +79,8 @@ export const ShopsList = ({
   }, [onShopsLoaded]);
 
   useEffect(() => { 
-    onShopsLoadedRef.current?.(shops.length); 
-  }, [shops.length]);
+    onShopsLoadedRef.current?.(shopsLength); 
+  }, [shopsLength]);
 
   useEffect(() => {
     (async () => {

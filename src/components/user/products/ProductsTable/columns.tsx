@@ -366,20 +366,20 @@ function createActionsColumn(config: ColumnConfig): ColumnDef<ProductRow> {
 export function useProductColumns(config: ColumnConfig): ColumnDef<ProductRow>[] {
   const { t, storeId, categoryFilterOptions } = config;
 
-  const selectColumn = React.useMemo(() => createSelectColumn(config), [t]);
-  const photoColumn = React.useMemo(() => createPhotoColumn(config), [t, config.onEdit]);
-  const nameColumn = React.useMemo(() => createNameColumn(config), [t]);
+  const selectColumn = React.useMemo(() => createSelectColumn(config), [config]);
+  const photoColumn = React.useMemo(() => createPhotoColumn(config), [config]);
+  const nameColumn = React.useMemo(() => createNameColumn(config), [config]);
   const priceColumn = React.useMemo(
     () => createPriceColumn("price", "table_price", config),
-    [t]
+    [config]
   );
   const priceOldColumn = React.useMemo(
     () => createPriceColumn("price_old", "old_price", config),
-    [t]
+    [config]
   );
   const pricePromoColumn = React.useMemo(
     () => createPriceColumn("price_promo", "promo_price", config),
-    [t]
+    [config]
   );
 
   const statusColumn = React.useMemo<ColumnDef<ProductRow>>(
@@ -573,14 +573,7 @@ export function useProductColumns(config: ColumnConfig): ColumnDef<ProductRow>[]
 
   const storesColumn = React.useMemo(
     () => createStoresColumn(config),
-    [
-      t,
-      config.storeNames,
-      config.stores,
-      config.loadStoresForMenu,
-      config.handleRemoveStoreLink,
-      config.handleStoresUpdate,
-    ]
+    [config]
   );
 
   const activeColumn = React.useMemo<ColumnDef<ProductRow>>(
@@ -603,24 +596,13 @@ export function useProductColumns(config: ColumnConfig): ColumnDef<ProductRow>[]
         </div>
       ),
     }),
-    [t, config.handleToggleAvailable]
+    [t, config]
   );
 
   const actionsColumn = React.useMemo(
     () => createActionsColumn(config),
     [
-      t,
-      config.onEdit,
-      config.setDeleteDialog,
-      config.handleDuplicate,
-      config.canCreate,
-      config.hideDuplicate,
-      config.storeId,
-      config.handleStoresUpdate,
-      config.stores,
-      config.storeNames,
-      config.loadStoresForMenu,
-      config.duplicating,
+      config,
     ]
   );
 

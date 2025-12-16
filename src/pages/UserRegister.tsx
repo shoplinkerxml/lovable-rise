@@ -8,7 +8,6 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TrendingUp, User, CheckCircle2, Chrome, Facebook, Mail } from "lucide-react";
 import { useI18n } from "@/i18n";
-import { UserAuthService } from "@/lib/user-auth-service";
 import { 
   registrationSchema, 
   RegistrationData
@@ -16,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 
 const UserRegister = () => {
   const navigate = useNavigate();
@@ -35,85 +35,53 @@ const UserRegister = () => {
   const handleRegistration = async (data: RegistrationData) => {
     setLoading(true);
     try {
-      const { user, session, error } = await UserAuthService.register(data);
-      
-      if (error === 'email_exists') {
-        toast.error(
-          lang === 'uk' 
-            ? 'Акаунт з цією електронною поштою вже існує. Будь ласка, увійдіть в систему.'
-            : 'An account with this email already exists. Please sign in instead.'
-        );
-        // Automatically redirect to login page after a short delay
-        setTimeout(() => {
-          navigate('/user-auth');
-        }, 3000);
-        return;
-      }
-      
-      if (error === 'profile_creation_failed') {
-        toast.error(
-          lang === 'uk'
-            ? 'Акаунт створено, але сталася помилка налаштування профілю. Зверніться до підтримки.'
-            : 'Account created but profile setup failed. Please contact support.'
-        );
-        return;
-      }
-      
-      if (error === 'email_confirmation_required') {
-        // Show success message for email confirmation flow
-        toast.success(
-          lang === 'uk' 
-            ? 'Реєстрація успішна! Перевірте електронну пошту для підтвердження облікового запису.'
-            : 'Registration successful! Please check your email to confirm your account.'
-        );
-        // Show additional helpful message with instructions
-        setTimeout(() => {
-          toast.info(
-            lang === 'uk'
-              ? 'Після підтвердження електронної пошти поверніться сюди і увійдіть в систему.'
-              : 'After confirming your email, come back here and sign in to access your account.'
-          );
-        }, 2000);
-        // Automatically redirect to login page after email confirmation
-        setTimeout(() => {
-          navigate('/user-auth');
-        }, 6000);
-        return;
-      }
-      
-      if (error === 'network_error') {
-        toast.error(
-          lang === 'uk'
-            ? 'Помилка мережі. Перевірте підключення до інтернету та спробуйте ще раз.'
-            : 'Network error. Please check your connection and try again.'
-        );
-        return;
-      }
-      
-      if (error === 'registration_failed') {
-        toast.error(
-          lang === 'uk'
-            ? 'Реєстрація не вдалася. Спробуйте ще раз або зверніться до підтримки.'
-            : 'Registration failed. Please try again or contact support.'
-        );
-        return;
-      }
-      
-      if (error) {
-        // Fallback error handling for any other errors
-        console.error('Unhandled registration error:', error);
-        toast.error(
-          lang === 'uk'
-            ? 'Неочікувана помилка. Спробуйте ще раз або зверніться до підтримки.'
-            : 'Unexpected error. Please try again or contact support.'
-        );
-        return;
-      }
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/user-register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_PUBLISHABLE_KEY,
+          "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          name: data.name,
+        }),
+      });
 
-      // This case should be rare with email confirmation enabled
-      if (user && session) {
-        toast.success(t("registration_success"));
-        navigate("/user/dashboard");
+      const responseData: { success?: boolean; error?: string; message?: string } | null =
+        await response.json().catch(() => null);
+
+      if (!response.ok || !responseData || responseData.success !== true) {
+        const errorCode = responseData?.error || "registration_failed";
+
+        if (errorCode === "email_exists") {
+          toast.error(
+            lang === "uk"
+              ? "Акаунт з цією електронною поштою вже існує. Будь ласка, увійдіть в систему."
+              : "An account with this email already exists. Please sign in instead."
+          );
+          setTimeout(() => {
+            navigate("/user-auth");
+          }, 3000);
+          return;
+        }
+
+        if (errorCode === "invalid_input") {
+          toast.error(
+            lang === "uk"
+              ? "Неправильні дані реєстрації. Перевірте введену інформацію."
+              : "Invalid registration data. Please check your input."
+          );
+          return;
+        }
+
+        toast.error(
+          lang === "uk"
+            ? "Реєстрація не вдалася. Спробуйте ще раз або зверніться до підтримки."
+            : "Registration failed. Please try again or contact support."
+        );
+        return;
       }
     } catch (error) {
       console.error("Registration error:", error);
@@ -122,6 +90,19 @@ const UserRegister = () => {
           ? 'Неочікувана помилка. Спробуйте ще раз або зверніться до підтримки.'
           : 'Unexpected error. Please try again or contact support.'
       );
+      return;
+    }
+
+    toast.success(
+      lang === "uk"
+        ? "Реєстрація успішна! Тепер ви можете увійти в систему."
+        : "Registration successful! You can now sign in."
+    );
+    navigate("/user-auth");
+    try {
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } finally {
       setLoading(false);
     }
