@@ -173,7 +173,15 @@ export class ProductService {
   private static readonly FIRST_PAGE_INDEX_KEY = "rq:index:products:first";
 
   private static addFirstPageKeyToIndex(key: string) {
-    return;
+    try {
+      const existing = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
+      const list = Array.isArray(existing?.data) ? existing!.data! : [];
+      if (list.includes(key)) return;
+      const next = [...list, key];
+      writeCache(ProductService.FIRST_PAGE_INDEX_KEY, next, CACHE_TTL.productsPage);
+    } catch (error) {
+      console.error("ProductService.addFirstPageKeyToIndex failed", error);
+    }
   }
 
   private static castNullableNumber(value: unknown): number | null {
@@ -232,17 +240,28 @@ export class ProductService {
       categoriesCount: number;
     }>
   > {
-    const { ShopService } = await import("@/lib/shop-service");
-    const shops = await ShopService.getShopsAggregated();
-    const mapped = (shops || []).map((s) => ({
-      id: String(s.id),
-      store_name: String(s.store_name || ""),
-      store_url: s.store_url ? String(s.store_url) : null,
-      is_active: !!s.is_active,
-      productsCount: Number(s.productsCount ?? 0),
-      categoriesCount: Number(s.categoriesCount ?? 0),
-    }));
-    return mapped;
+    if (ProductService.inFlightStores) {
+      return ProductService.inFlightStores;
+    }
+    const task = (async () => {
+      const { ShopService } = await import("@/lib/shop-service");
+      const shops = await ShopService.getShopsAggregated();
+      const mapped = (shops || []).map((s) => ({
+        id: String(s.id),
+        store_name: String(s.store_name || ""),
+        store_url: s.store_url ? String(s.store_url) : null,
+        is_active: !!s.is_active,
+        productsCount: Number(s.productsCount ?? 0),
+        categoriesCount: Number(s.categoriesCount ?? 0),
+      }));
+      return mapped;
+    })();
+    ProductService.inFlightStores = task;
+    try {
+      return await task;
+    } finally {
+      ProductService.inFlightStores = null;
+    }
   }
 
   /** Получение продуктов для конкретного магазина через функцию user-products-list */
@@ -278,6 +297,13 @@ export class ProductService {
       total: number;
     };
   }> {
+    const cacheKey = `rq:products:first:${storeId ?? "all"}:${limit}`;
+    if (!options?.bypassCache) {
+      const env = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(cacheKey, false);
+      if (env?.data && Array.isArray(env.data.items) && env.data.page) {
+        return { products: env.data.items, page: env.data.page };
+      }
+    }
     try {
       const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
         store_id: storeId ?? null,
@@ -292,9 +318,14 @@ export class ProductService {
         nextOffset: fresh?.page?.nextOffset ?? null,
         total: fresh?.page?.total ?? products.length,
       };
+      ProductService.addFirstPageKeyToIndex(cacheKey);
+      writeCache(cacheKey, { items: products, page }, CACHE_TTL.productsPage);
       return { products, page };
-    } catch {
+    } catch (error) {
+      console.error("ProductService.getProductsFirstPage fallback", error);
       const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
+      ProductService.addFirstPageKeyToIndex(cacheKey);
+      writeCache(cacheKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
       return fb;
     }
   }
@@ -313,10 +344,13 @@ export class ProductService {
     }
     if (!storeIds.length) return { products: [], page: { limit, offset, hasMore: false, nextOffset: null, total: 0 } };
     const resp = await supabase
-      .from('store_products')
-      .select('id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at', { count: 'exact' })
-      .in('store_id', storeIds)
-      .order('created_at', { ascending: false })
+      .from("store_products")
+      .select(
+        "id,store_id,supplier_id,external_id,name,name_ua,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at",
+        { count: "exact" },
+      )
+      .in("store_id", storeIds)
+      .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
     const total = Number((resp as { count?: number } | null)?.count || 0);
     const rows = (resp as { data?: any[] } | null)?.data || [];
@@ -324,20 +358,22 @@ export class ProductService {
     let images: Array<{ product_id: string; url: string; is_main: boolean; order_index: number }> = [];
     if (ids.length) {
       const { data: imgData } = await supabase
-        .from('store_product_images')
-        .select('product_id,r2_key_original,url,is_main,order_index')
-        .in('product_id', ids);
+        .from("store_product_images")
+        .select("product_id,r2_key_original,url,is_main,order_index")
+        .in("product_id", ids);
       images = ((imgData || []) as any[]).map((r) => {
-        const key = String(((r as any).r2_key_original || ''))
-        const direct = String(((r as any).url || ''))
-        let u = direct
-        if (!u) { u = key ? R2Storage.makePublicUrl(key) : '' }
+        const key = String((r as any).r2_key_original || "");
+        const direct = String((r as any).url || "");
+        let u = direct;
+        if (!u) {
+          u = key ? R2Storage.makePublicUrl(key) : "";
+        }
         return {
           product_id: String((r as any).product_id),
           url: u,
           is_main: !!(r as any).is_main,
           order_index: Number((r as any).order_index || 0),
-        }
+        };
       });
     }
     const imgByPid: Record<string, { url: string; is_main: boolean; order_index: number }> = {};
@@ -420,7 +456,27 @@ export class ProductService {
     storeId: string | null,
     mutate: (items: unknown[]) => unknown[],
   ) {
-    return;
+    try {
+      const env = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
+      const keys = Array.isArray(env?.data) ? env!.data! : [];
+      if (!keys.length) return;
+      const targetStoreId = storeId == null ? null : String(storeId);
+      for (const key of keys) {
+        if (!key.startsWith("rq:products:first:")) continue;
+        const parts = key.split(":");
+        if (parts.length < 4) continue;
+        const encodedStore = parts[3];
+        if (targetStoreId !== null && encodedStore !== targetStoreId) continue;
+        const existing = readCache<{ items: unknown[]; page?: ProductListPage }>(key, true);
+        if (!existing?.data || !Array.isArray(existing.data.items)) continue;
+        const nextItems = mutate(existing.data.items);
+        if (!Array.isArray(nextItems)) continue;
+        const page = existing.data.page;
+        writeCache(key, { items: nextItems, page }, CACHE_TTL.productsPage);
+      }
+    } catch (error) {
+      console.error("ProductService.updateFirstPageCaches failed", error);
+    }
   }
 
   static patchProductCaches(
@@ -428,14 +484,23 @@ export class ProductService {
     patch: Partial<ProductAggregated>,
     storeId?: string | null,
   ) {
-    return;
+    const targetStoreId = storeId === undefined ? null : storeId;
+    ProductService.updateFirstPageCaches(targetStoreId, (items) => {
+      return items.map((row) => {
+        const p = row as ProductAggregated;
+        if (String(p.id) !== String(productId)) return p;
+        return { ...p, ...patch };
+      });
+    });
   }
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
     try {
       const names = await ProductService.getStoreCategoryFilterOptions(storeId);
       writeCache(`rq:filters:categories:${storeId}`, names, CACHE_TTL.categoryFilters);
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.recomputeStoreCategoryFilterCache failed", error);
+    }
   }
 
   static async recomputeStoreCategoryFilterCacheBatch(storeIds: string[]): Promise<void> {
@@ -444,7 +509,11 @@ export class ProductService {
       const prev = ProductService.inFlightRecomputeByStore.get(sid);
       if (prev) return prev;
       const task = ProductService.recomputeStoreCategoryFilterCache(sid).finally(() => {
-        try { ProductService.inFlightRecomputeByStore.delete(sid); } catch { /* ignore */ }
+        try {
+          ProductService.inFlightRecomputeByStore.delete(sid);
+        } catch (error) {
+          console.error("ProductService.recomputeStoreCategoryFilterCacheBatch cleanup failed", error);
+        }
       });
       ProductService.inFlightRecomputeByStore.set(sid, task);
       return task;
@@ -479,7 +548,9 @@ export class ProductService {
         const names = Array.isArray(results[sid]) ? results[sid] : (resp?.names || []);
         writeCache(`rq:filters:categories:${sid}`, names, CACHE_TTL.categoryFilters);
       }
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.refreshStoreCategoryFilterOptions cache write failed", error);
+    }
     return results;
   }
 
@@ -580,9 +651,15 @@ export class ProductService {
         ProductService.patchProductCaches(pid, patch, storeId);
         if (payload.linkPatch) {
           ProductService.invalidateStoreLinksCache(pid);
-          try { await ProductService.recomputeStoreCategoryFilterCache(storeId); } catch { /* ignore */ }
+          try {
+            await ProductService.recomputeStoreCategoryFilterCache(storeId);
+          } catch (error) {
+            console.error("ProductService.saveStoreProductEdit recomputeStoreCategoryFilterCache failed", error);
+          }
         }
-      } catch { void 0; }
+      } catch (error) {
+        console.error("ProductService.saveStoreProductEdit cache update failed", error);
+      }
     }
     return pid ? { product_id: pid, link: out.link } : null;
   }
@@ -603,7 +680,9 @@ export class ProductService {
     if (error) throw new Error((error as { message?: string } | null)?.message || "delete_failed");
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (e) {
+      console.error("ProductService.removeStoreProductLink clearAllFirstPageCaches failed", e);
+    }
   }
 
   static async bulkRemoveStoreProductLinks(
@@ -648,10 +727,14 @@ export class ProductService {
           });
         });
       }
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.bulkRemoveStoreProductLinks cache update failed", error);
+    }
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.bulkRemoveStoreProductLinks clearAllFirstPageCaches failed", error);
+    }
     try {
       const { ShopService } = await import("@/lib/shop-service");
       const catsByStore = out.categoryNamesByStore || {};
@@ -659,7 +742,9 @@ export class ProductService {
         const cnt = Array.isArray(catsByStore[sid]) ? catsByStore[sid].length : 0;
         ShopService.setCategoriesCountInCache(String(sid), cnt);
       }
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error("ProductService.bulkRemoveStoreProductLinks ShopService sync failed", error);
+    }
     return { deleted: out.deleted ?? 0, deletedByStore: out.deletedByStore ?? {}, categoryNamesByStore: out.categoryNamesByStore || {} };
   }
 
@@ -718,7 +803,9 @@ export class ProductService {
           });
         });
       }
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.bulkAddStoreProductLinks cache update failed", error);
+    }
     try {
       const { ShopService } = await import("@/lib/shop-service");
       const catsByStore = out.categoryNamesByStore || {};
@@ -726,7 +813,9 @@ export class ProductService {
         const cnt = Array.isArray(catsByStore[sid]) ? catsByStore[sid].length : 0;
         ShopService.setCategoriesCountInCache(String(sid), cnt);
       }
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error("ProductService.bulkAddStoreProductLinks ShopService sync failed", error);
+    }
     return { inserted: out.inserted ?? 0, addedByStore: out.addedByStore ?? {}, categoryNamesByStore: out.categoryNamesByStore || {} };
   }
 
@@ -754,7 +843,11 @@ export class ProductService {
   }
 
   static invalidateStoreLinksCache(productId: string) {
-    try { ProductService.inFlightLinksByProduct.delete(productId); } catch { void 0; }
+    try {
+      ProductService.inFlightLinksByProduct.delete(productId);
+    } catch (error) {
+      console.error("ProductService.invalidateStoreLinksCache failed", error);
+    }
   }
 
   /** Максимальный лимит продуктов: через отдельную функцию get-product-limit-only */
@@ -764,8 +857,13 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
     try {
+      const cached = readCache<number>("rq:products:limit", false);
+      if (typeof cached?.data === "number") {
+        return cached.data;
+      }
       const resp = await ProductService.invokeEdge<{ value?: number }>("get-product-limit-only", {});
       const v = Number(resp?.value ?? 0) || 0;
+      writeCache("rq:products:limit", v, CACHE_TTL.limits);
       return v;
     } catch (e) {
       return 0;
@@ -785,7 +883,11 @@ export class ProductService {
   }
 
   static invalidateProductLimitCache() {
-    return;
+    try {
+      removeCache("rq:products:limit");
+    } catch (error) {
+      console.error("ProductService.invalidateProductLimitCache failed", error);
+    }
   }
 
   /** Количество продуктов текущего пользователя: только функция user-products-list */
@@ -1219,7 +1321,10 @@ export class ProductService {
     removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.createProduct clearAllFirstPageCaches failed", error);
+    }
+    ProductService.invalidateProductLimitCache();
     return product;
   }
 
@@ -1235,7 +1340,9 @@ export class ProductService {
     removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.duplicateProduct clearAllFirstPageCaches failed", error);
+    }
     return product;
   }
 
@@ -1321,7 +1428,9 @@ export class ProductService {
     removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.updateProduct clearAllFirstPageCaches failed", error);
+    }
     void productId;
     return;
   }
@@ -1340,7 +1449,10 @@ export class ProductService {
     removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.deleteProduct clearAllFirstPageCaches failed", error);
+    }
+    ProductService.invalidateProductLimitCache();
   }
 
   static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
@@ -1356,12 +1468,24 @@ export class ProductService {
     removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();
-    } catch { void 0; }
+    } catch (error) {
+      console.error("ProductService.bulkDeleteProducts clearAllFirstPageCaches failed", error);
+    }
+    ProductService.invalidateProductLimitCache();
     return { deleted: validIds.length };
   }
 
   static clearAllFirstPageCaches() {
-    return;
+    try {
+      const env = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
+      const keys = Array.isArray(env?.data) ? env!.data! : [];
+      for (const key of keys) {
+        removeCache(key);
+      }
+      removeCache(ProductService.FIRST_PAGE_INDEX_KEY);
+    } catch (error) {
+      console.error("ProductService.clearAllFirstPageCaches failed", error);
+    }
   }
 
   /** Проверка только валидности сессии (без дополнительных запросов) */
@@ -1410,12 +1534,17 @@ export class ProductService {
       supplier_id: ProductService.castNullableNumber(r.supplier_id) ?? undefined,
     })) as unknown as TablesInsert<'store_products'>[];
     const { error } = await supabase
-      .from('store_products')
+      .from("store_products")
       .upsert(payload)
-      .select('id');
-    if (error) throw new Error((error as { message?: string } | null)?.message || 'bulk_upsert_failed');
-    try { ProductService.clearAllFirstPageCaches(); } catch { void 0; }
-    removeCache('rq:products:all');
+      .select("id");
+    if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_upsert_failed");
+    try {
+      ProductService.clearAllFirstPageCaches();
+    } catch (e) {
+      console.error("ProductService.bulkUpsertProducts clearAllFirstPageCaches failed", e);
+    }
+    removeCache("rq:products:all");
+    ProductService.invalidateProductLimitCache();
     return { upserted: payload.length };
   }
   /** Агрегированные справочники для страницы создания товара */
