@@ -93,6 +93,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "invalid_body", message: "store_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const currencyCode = String(body?.currency_code || "").trim();
+    if (!currencyCode) {
+      return new Response(JSON.stringify({ error: "validation_error", message: "currency_code required" }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? "";
@@ -201,7 +206,7 @@ serve(async (req) => {
       article: body.article ?? null,
       category_id: body.category_id != null ? Number(body.category_id) : null,
       category_external_id: body.category_external_id ?? null,
-      currency_code: body.currency_code ?? null,
+      currency_code: currencyCode,
       price: body.price ?? null,
       price_old: body.price_old ?? null,
       price_promo: body.price_promo ?? null,

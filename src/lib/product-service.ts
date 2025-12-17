@@ -1212,11 +1212,7 @@ export class ProductService {
 
   /** Создание нового продукта (через функцию create-product) */
   static async createProduct(productData: CreateProductData): Promise<Product> {
-    await this.ensureCanCreateProduct();
-
     let effectiveStoreId = productData.store_id;
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth?.user) throw new Error("User not authenticated");
     const allowedStoreIds = await this.getUserStoreIds();
     if (!effectiveStoreId || effectiveStoreId.trim() === "") {
       effectiveStoreId = allowedStoreIds[0];
@@ -1227,12 +1223,16 @@ export class ProductService {
       throw new Error("Store access denied");
     }
 
+    const currencyCode =
+      (productData.currency_code && String(productData.currency_code).trim()) ||
+      "UAH";
+
     const payload: Record<string, unknown> = {
       store_id: effectiveStoreId,
       supplier_id: this.castNullableNumber(productData.supplier_id),
       category_id: this.castNullableNumber(productData.category_id),
       category_external_id: productData.category_external_id ?? null,
-      currency_code: productData.currency_code ?? null,
+      currency_code: currencyCode,
       external_id: productData.external_id ?? null,
       name: productData.name,
       name_ua: productData.name_ua ?? null,

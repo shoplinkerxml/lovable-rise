@@ -826,11 +826,11 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
           <div className="flex gap-2">
             <Button type="submit" disabled={loading} className="flex-1">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {product ? 'Оновити товар' : 'Створити товар'}
+              {product ? t('edit_product') : t('create_product')}
             </Button>
             {onCancel && (
               <Button type="button" variant="outline" onClick={onCancel}>
-                Скасувати
+                {t('cancel')}
               </Button>
             )}
           </div>

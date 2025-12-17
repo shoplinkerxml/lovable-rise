@@ -6,7 +6,7 @@ export const productsDictionary: Dictionary = {
     uk: "Керування вашими товарами",
     en: "Manage your products",
   },
-  create_product: { uk: "Створити товар", en: "Create Product" },
+  create_product: { uk: "Додати товар", en: "Add Product" },
   create_product_description: {
     uk: "Створення нового товару",
     en: "Create new product",
@@ -16,7 +16,7 @@ export const productsDictionary: Dictionary = {
     uk: "Редагування інформації про товар",
     en: "Edit product information",
   },
-  add_product: { uk: "Створити товар", en: "Create Product" },
+  add_product: { uk: "Додати товар", en: "Add Product" },
   back_to_products: {
     uk: "Назад до товарів",
     en: "Back to Products",
@@ -279,6 +279,10 @@ export const productsDictionary: Dictionary = {
     uk: "Помилка завантаження даних товару",
     en: "Failed to load product data",
   },
+  failed_create_product: {
+    uk: "Не вдалося створити товар",
+    en: "Failed to create product",
+  },
   product_name_required: {
     uk: "Назва товару обов'язкова",
     en: "Product name is required",
@@ -424,12 +428,28 @@ export const productsDictionary: Dictionary = {
   old_price: { uk: "Стара ціна", en: "Old price" },
   promo_price: { uk: "Акційна ціна", en: "Promo price" },
   category: { uk: "Категорія", en: "Category" },
+  select_category: {
+    uk: "Виберіть категорію",
+    en: "Select category",
+  },
   table_stock: { uk: "Залишок", en: "Stock" },
   article: { uk: "Артикул", en: "SKU" },
+  article_placeholder: {
+    uk: "Введіть артикул",
+    en: "Enter SKU",
+  },
   vendor: { uk: "Виробник", en: "Vendor" },
   external_id: { uk: "Зовнішній ID", en: "External ID" },
   manufacturer: { uk: "Виробник", en: "Manufacturer" },
+  manufacturer_placeholder: {
+    uk: "Введіть виробника",
+    en: "Enter manufacturer",
+  },
   stock_quantity: { uk: "Кількість на складі", en: "Stock quantity" },
+  stock_quantity_placeholder: {
+    uk: "Введіть кількість на складі",
+    en: "Enter stock quantity",
+  },
   product_available: { uk: "Товар доступний", en: "Product available" },
   currency: { uk: "Валюта", en: "Currency" },
   select_supplier: {
