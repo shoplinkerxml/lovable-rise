@@ -16,7 +16,8 @@ import { toast } from "sonner";
 import { useI18n } from "@/i18n";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2, RefreshCw } from "lucide-react";
+import { runOptimisticOperation, useSyncStatus } from "@/lib/optimistic-mutation";
 type Supplier = {
   id: string;
   supplier_name: string;
@@ -83,12 +84,15 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [localNewCategories, setLocalNewCategories] = useState<(StoreCategory & { supplier_id?: string })[]>([]);
+
   const catList: StoreCategory[] = React.useMemo(() => {
     const sid = supplierId;
     if (!sid) return [];
     const key = String(sid);
     const base = supplierCategoriesMap?.[key] || [];
     const extra = (categories as any[]).filter(c => String((c as any).supplier_id) === key);
+    const locals = (localNewCategories as any[]).filter(c => String((c as any).supplier_id) === key);
     const map: Record<string, StoreCategory> = {};
     for (const it of base) {
       const ext = String(it.external_id);
@@ -108,8 +112,17 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         parent_external_id: (c as any).parent_external_id ?? null
       };
     }
+    for (const c of locals) {
+      const ext = String((c as any).external_id || "");
+      if (!ext) continue;
+      map[ext] = {
+        external_id: ext,
+        name: String((c as any).name || ""),
+        parent_external_id: (c as any).parent_external_id ?? null
+      };
+    }
     return Object.values(map);
-  }, [supplierId, supplierCategoriesMap, categories]);
+  }, [supplierId, supplierCategoriesMap, categories, localNewCategories]);
   const buildTree = useCallback((items: StoreCategory[]): {
     id: string;
     name: string;
@@ -156,48 +169,108 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
       toast.error(t("fill_required_fields"));
       return;
     }
+    const externalId = createExternalId.trim();
+    const name = createName.trim();
+    const parentExternalId = createParentExternalId || null;
+    const entityKey = supplierId ? `category:${supplierId}:${externalId}` : `category:none:${externalId}`;
+
+    const optimisticCat: StoreCategory & { supplier_id?: string } = {
+      external_id: externalId,
+      name,
+      parent_external_id: parentExternalId,
+      supplier_id: supplierId || undefined
+    };
+
+    setCreating(true);
+    setCreateExternalError(null);
+
     try {
-      setCreating(true);
-      setCreateExternalError(null);
-      const newCat = await CategoryService.createCategory({
-        supplier_id: supplierId,
-        external_id: createExternalId.trim(),
-        name: createName.trim(),
-        parent_external_id: createParentExternalId || undefined
+      await runOptimisticOperation({
+        entityKey,
+        strategy: "rollback",
+        applyOptimistic: () => {
+          setLocalNewCategories(prev => {
+            const exists = prev.some(
+              c =>
+                String(c.external_id) === String(optimisticCat.external_id) &&
+                String((c as any).supplier_id || "") === String(optimisticCat.supplier_id || ""),
+            );
+            if (exists) return prev;
+            return [...prev, optimisticCat];
+          });
+          resetCreateState();
+          setIsCreateOpen(false);
+        },
+        rollback: () => {
+          setLocalNewCategories(prev =>
+            prev.filter(
+              c =>
+                !(
+                  String(c.external_id) === String(optimisticCat.external_id) &&
+                  String((c as any).supplier_id || "") === String(optimisticCat.supplier_id || "")
+                ),
+            ),
+          );
+        },
+        run: () =>
+          CategoryService.createCategory({
+            supplier_id: supplierId,
+            external_id: externalId,
+            name,
+            parent_external_id: parentExternalId || undefined,
+          }),
+        applyServer: newCat => {
+          onCategoryCreated?.(newCat);
+          queryClient.invalidateQueries({
+            queryKey: ["categories", supplierId || "none"],
+          });
+          toast.success(t("category_created"));
+        },
+        onError: (error: any) => {
+          console.error("Create category error:", error);
+          if (error?.code === "23505" && String(error?.message || "").includes("uq_store_categories_supplier_external")) {
+            const msg = t("external_id_exists");
+            setCreateExternalError(msg);
+            toast.error(msg);
+          } else {
+            toast.error(t("failed_create_category"));
+          }
+        },
       });
-      toast.success(t("category_created"));
-      // Invalidate and refetch
-      await queryClient.invalidateQueries({
-        queryKey: ["categories", supplierId || "none"]
-      });
-      onCategoryCreated?.(newCat);
-      resetCreateState();
-      setIsCreateOpen(false);
-    } catch (error: any) {
-      console.error("Create category error:", error);
-      if (error?.code === "23505" && String(error?.message || '').includes("uq_store_categories_supplier_external")) {
-        const msg = t("external_id_exists");
-        setCreateExternalError(msg);
-        toast.error(msg);
-      } else {
-        toast.error(t("failed_create_category"));
-      }
     } finally {
       setCreating(false);
     }
   };
   const handleRename = async (externalId: string, newName: string) => {
     if (!supplierId || !newName.trim()) return;
-    try {
-      await CategoryService.updateName(supplierId, externalId, newName.trim());
-      await queryClient.invalidateQueries({
-        queryKey: ["categories", supplierId || "none"]
-      });
-      toast.success(t("btn_update"));
-    } catch (err) {
-      console.error(err);
-      toast.error(t("failed_create_category"));
-    }
+    const name = newName.trim();
+    const entityKey = supplierId ? `category:${supplierId}:${externalId}` : `category:none:${externalId}`;
+
+    await runOptimisticOperation({
+      entityKey,
+      strategy: "soft-fail",
+      applyOptimistic: () => {
+        setLocalNewCategories(prev =>
+          prev.map(c =>
+            String(c.external_id) === String(externalId) &&
+            String((c as any).supplier_id || "") === String(supplierId || "")
+              ? { ...c, name }
+              : c,
+          ),
+        );
+      },
+      run: () => CategoryService.updateName(supplierId, externalId, name),
+      applyServer: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["categories", supplierId || "none"],
+        });
+        toast.success(t("btn_update"));
+      },
+      onError: (err: any) => {
+        console.error("Update category name error:", err);
+        toast.error(t("failed_create_category"));
+      },
+    });
   };
   const handleDelete = async (externalId: string) => {
     if (!supplierId) return;
@@ -226,16 +299,23 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
       external_id: string;
       children: any[];
     };
+    entityKeyPrefix: string;
   }> = React.memo(({
-    node
+    node,
+    entityKeyPrefix
   }) => {
     const hasChildren = node.children && node.children.length > 0;
     const isOpen = expanded[node.id] ?? false;
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameValue, setRenameValue] = useState(node.name);
+    const statusEntry = useSyncStatus(`${entityKeyPrefix}:${node.external_id}`);
+    const syncStatus = statusEntry?.status || "synced";
     const onRenameSubmit = async () => {
-      await handleRename(node.external_id, renameValue);
-      setIsRenaming(false);
+      try {
+        await handleRename(node.external_id, renameValue);
+      } finally {
+        setIsRenaming(false);
+      }
     };
     return <div className="pl-[clamp(0rem,2vw,1rem)]" data-testid={`categoryTree_node_${node.external_id}`}>
         <div className="flex items-center gap-[0.5rem] rounded-md px-[0.5rem] py-[0.25rem] cursor-pointer" onClick={() => setSelected(node.external_id)}>
@@ -257,11 +337,33 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
             setIsRenaming(false);
           }} data-testid={`categoryTree_renameCancel_${node.external_id}`}>{t("btn_cancel")}</Button>
             </div> : <span
-              title={node.name}
-              className={`${selected === node.external_id ? "font-semibold text-success" : "font-extralight"} flex-1 truncate text-xs hover:font-semibold hover:text-success`}
+              title={renameValue}
+              className={`${selected === node.external_id ? "font-semibold text-success" : "font-extralight"} ${
+                syncStatus === "pending" ? "text-muted-foreground" : ""
+              } ${syncStatus === "error" ? "text-destructive" : ""} flex-1 truncate text-xs hover:font-semibold hover:text-success`}
             >
-              {node.name}
+              {renameValue}
             </span>}
+          {syncStatus === "pending" && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-hidden="true" />
+          )}
+          {syncStatus === "error" && (
+            <>
+              <X className="h-3 w-3 text-destructive" aria-hidden="true" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 text-destructive hover:text-destructive hover:bg-destructive/10"
+                aria-label="Retry"
+                onClick={e => {
+                  e.stopPropagation();
+                  handleRename(node.external_id, renameValue);
+                }}
+              >
+                <RefreshCw className="h-3 w-3" aria-hidden="true" />
+              </Button>
+            </>
+          )}
 
           <DropdownMenu onOpenChange={open => {
           if (open) setSelected(node.external_id);
@@ -302,7 +404,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         </div>
 
         {hasChildren && isOpen && <div className="mt-[0.25rem] space-y-[0.25rem]">
-            {node.children.map((child: any) => <TreeNode key={child.id} node={child} />)}
+            {node.children.map((child: any) => <TreeNode key={child.id} node={child} entityKeyPrefix={entityKeyPrefix} />)}
           </div>}
       </div>;
   });
@@ -436,7 +538,13 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
             <div className="text-sm">{t("no_categories_description")}</div>
           </div> : <ScrollArea className="max-h-[50vh]">
             <div className="space-y-[0.25rem]" data-testid="categoryTree_root">
-              {filteredTree.map(n => <TreeNode key={n.id} node={n} />)}
+              {filteredTree.map(n => (
+                <TreeNode
+                  key={n.id}
+                  node={n}
+                  entityKeyPrefix={supplierId ? `category:${supplierId}` : "category:none"}
+                />
+              ))}
             </div>
           </ScrollArea>}
       </CardContent>

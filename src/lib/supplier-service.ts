@@ -38,6 +38,7 @@ export interface SupplierLimitInfo {
 export class SupplierService {
   private static lastBackgroundRefreshAt = 0;
   private static backgroundRefreshInFlight = false;
+  private static inFlightSuppliersPromise: Promise<Supplier[]> | null = null;
 
   /** Получение только максимального лимита поставщиков (без подсчета текущих) */
   static async getSupplierLimitOnly(): Promise<number> {
@@ -174,15 +175,29 @@ export class SupplierService {
       }
     } catch (_e) { void 0; }
 
-    const { data: auth } = await supabase.auth.getSession();
-    const accessToken: string | null = auth?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
-      body: {},
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) return [];
-    const payload: { suppliers?: Supplier[] } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
-    return Array.isArray(payload?.suppliers) ? payload!.suppliers! : [];
+    if (SupplierService.inFlightSuppliersPromise) {
+      return SupplierService.inFlightSuppliersPromise;
+    }
+
+    SupplierService.inFlightSuppliersPromise = (async () => {
+      const { data: auth } = await supabase.auth.getSession();
+      const accessToken: string | null = auth?.session?.access_token || null;
+      const { data, error } = await supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
+        body: {},
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (error) return [];
+      const payload: { suppliers?: Supplier[] } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
+      const rows = Array.isArray(payload?.suppliers) ? payload!.suppliers! : [];
+      return rows;
+    })();
+
+    try {
+      const rows = await SupplierService.inFlightSuppliersPromise;
+      return rows;
+    } finally {
+      SupplierService.inFlightSuppliersPromise = null;
+    }
   }
 
   /** Отримання одного постачальника за ID */
