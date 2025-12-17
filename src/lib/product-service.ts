@@ -5,6 +5,7 @@ import { SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
 import { CACHE_TTL, readCache, writeCache, removeCache } from "./cache-utils";
 import type { TablesInsert } from "@/integrations/supabase/types";
+import { CategoryService } from "@/lib/category-service";
 
 export interface Product {
   id: string;
@@ -1350,6 +1351,17 @@ export class ProductService {
   static async updateProduct(id: string, productData: UpdateProductData): Promise<void> {
     await this.ensureCanMutateProducts();
 
+    let categoryIdValue: number | null | undefined = undefined;
+    if (productData.category_id !== undefined) {
+      categoryIdValue = this.castNullableNumber(productData.category_id);
+      if (categoryIdValue !== null) {
+        const category = await CategoryService.getById(categoryIdValue);
+        if (!category) {
+          throw new Error("Обрана категорія більше не існує");
+        }
+      }
+    }
+
     const payload: Record<string, unknown> = {
       product_id: id,
       supplier_id:
@@ -1357,9 +1369,7 @@ export class ProductService {
           ? this.castNullableNumber(productData.supplier_id)
           : undefined,
       category_id:
-        productData.category_id !== undefined
-          ? this.castNullableNumber(productData.category_id)
-          : undefined,
+        productData.category_id !== undefined ? categoryIdValue : undefined,
       category_external_id:
         productData.category_external_id !== undefined
           ? productData.category_external_id

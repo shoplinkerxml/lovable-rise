@@ -386,5 +386,6 @@ export const commonDictionary: Dictionary = {
     uk: "Опис відсутній",
     en: "No description provided",
   },
+  save: { uk: "Зберегти", en: "Save" },
   cancel: { uk: "Скасувати", en: "Cancel" },
 };

@@ -3,7 +3,7 @@ declare module "https://deno.land/std@0.168.0/http/server.ts" {
 }
 
 declare module "npm:@supabase/supabase-js" {
-  export function createClient(url: string, key: string): any
+  export function createClient(url: string, key: string, options?: any): any
 }
 
 declare module "npm:@aws-sdk/client-s3" {

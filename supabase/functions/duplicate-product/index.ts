@@ -286,17 +286,17 @@ async function copyImageToR2(
   sourceUrl: string,
   newProductId: string,
   index: number
-): Promise<string> {
+): Promise<{ url: string; key: string | null }> {
   // Если это не наше хранилище - оставляем URL как есть
   if (!isOurBucket(sourceUrl)) {
     console.log(`External image, skipping copy: ${sourceUrl}`);
-    return sourceUrl;
+    return { url: sourceUrl, key: null };
   }
 
   const sourceKey = extractObjectKeyFromUrl(sourceUrl);
   if (!sourceKey) {
     console.error(`Failed to extract key from URL: ${sourceUrl}`);
-    return sourceUrl;
+    return { url: sourceUrl, key: null };
   }
 
   console.log(`Copying image from key: ${sourceKey}`);
@@ -330,12 +330,12 @@ async function copyImageToR2(
     const newUrl = `${sourceUrlObj.protocol}//${sourceUrlObj.host}/${destKey}`;
 
     console.log(`Image copied successfully to: ${newUrl}`);
-    return newUrl;
+    return { url: newUrl, key: destKey };
 
   } catch (error) {
     console.error(`Failed to copy image from ${sourceKey} to ${destKey}:`, error);
     // В случае ошибки возвращаем исходный URL
-    return sourceUrl;
+    return { url: sourceUrl, key: null };
   }
 }
 
@@ -350,9 +350,10 @@ async function duplicateImages(
   // Копируем изображения параллельно (с индексом для пути)
   const copiedImages = await Promise.all(
     images.map(async (img, idx) => {
-      const newUrl = await copyImageToR2(img.url, newProductId, idx);
+      const copied = await copyImageToR2(img.url, newProductId, idx);
       return {
-        url: newUrl,
+        url: copied.url,
+        r2_key_original: copied.key,
         order_index: typeof img.order_index === "number" ? img.order_index : idx,
         is_main: img.is_main,
       };
@@ -364,6 +365,7 @@ async function duplicateImages(
   const normalized = copiedImages.map((img, idx) => ({
     product_id: newProductId,
     url: img.url,
+    r2_key_original: img.r2_key_original || null,
     order_index: img.order_index,
     is_main: hasMain ? img.is_main : idx === 0,
   }));
@@ -376,7 +378,10 @@ async function duplicateImages(
   }
 
   // Переназначаем order_index после сортировки
-  const ordered = normalized.map((img, idx) => ({ ...img, order_index: idx }));
+  const ordered = normalized.map((img, idx) => ({
+    ...img,
+    order_index: idx,
+  }));
 
   console.log(`Inserting ${ordered.length} images to database`);
 

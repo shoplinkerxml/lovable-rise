@@ -289,7 +289,7 @@ export const StoreProductEdit = () => {
 
     try {
       const productPayload: { params?: ProductParam[]; category_id?: number } = {};
-      
+
       if (productData.params && productData.params.length > 0) {
         productPayload.params = sanitizeParams(productData.params);
       }
@@ -301,6 +301,12 @@ export const StoreProductEdit = () => {
       if (lastCategoryId) {
         const categoryId = Number(lastCategoryId);
         if (Number.isFinite(categoryId)) {
+          const categoryRow = productData.categories?.find(c => String(c.id) === String(categoryId));
+          if (!categoryRow) {
+            toast.error("Обрана категорія більше не існує");
+            return;
+          }
+
           productPayload.category_id = categoryId;
           
           const storeCategory = productData.storeCategories.find(
@@ -308,9 +314,7 @@ export const StoreProductEdit = () => {
           );
           patch.custom_category_id = storeCategory?.store_external_id ?? null;
           
-          freshName = storeCategory?.name || 
-            productData.categories?.find(c => String(c.id) === String(categoryId))?.name || 
-            '';
+          freshName = storeCategory?.name || categoryRow.name || '';
         }
       }
 

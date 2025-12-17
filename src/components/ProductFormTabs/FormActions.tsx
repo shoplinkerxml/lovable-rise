@@ -21,9 +21,10 @@ export default function FormActions({ t, readOnly, loading, product, onCancel, o
         </Button>
       ) : null}
       <Button onClick={onSubmit} disabled={disabledSubmit} data-testid="productFormTabs_submitButton">
-        {loading ? (product ? t('loading_updating') : t('loading_creating')) : (product ? t('btn_update') : t('btn_create'))}
+        {loading
+          ? (product ? t('loading_updating') : t('loading_creating'))
+          : (product ? t('product_btn_update') : t('product_btn_create'))}
       </Button>
     </div>
   )
 }
-

@@ -30,6 +30,14 @@ export const productsDictionary: Dictionary = {
     uk: "Введіть опис товару",
     en: "Enter product description",
   },
+  product_btn_create: {
+    uk: "Створити товар",
+    en: "Create Product",
+  },
+  product_btn_update: {
+    uk: "Оновити товар",
+    en: "Update Product",
+  },
   product_created: { uk: "Товар створено", en: "Product created" },
   product_updated: { uk: "Товар оновлено", en: "Product updated" },
   product_deleted: { uk: "Товар видалено", en: "Product deleted" },

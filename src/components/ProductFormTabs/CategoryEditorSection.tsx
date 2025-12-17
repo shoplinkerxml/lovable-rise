@@ -55,7 +55,7 @@ export default function CategoryEditorSection({ t, suppliers, categories, setCat
                   name: cat.name || '',
                   external_id: String(cat.external_id || ''),
                   supplier_id: String(basicData.supplier_id || ''),
-                  parent_external_id: null
+                  parent_external_id: cat.parent_external_id == null ? null : String(cat.parent_external_id)
                 }];
                 return next;
               });

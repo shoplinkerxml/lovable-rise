@@ -86,15 +86,29 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const catList: StoreCategory[] = React.useMemo(() => {
     const sid = supplierId;
     if (!sid) return [];
-    const fromMap = supplierCategoriesMap?.[String(sid)];
-    if (Array.isArray(fromMap) && fromMap.length > 0) return fromMap;
-    const filtered = (categories as any[]).filter(c => String((c as any).supplier_id) === String(sid));
-    if (!filtered.length) return [];
-    return filtered.map((c: any) => ({
-      external_id: c.external_id,
-      name: c.name,
-      parent_external_id: c.parent_external_id ?? null
-    }) as StoreCategory);
+    const key = String(sid);
+    const base = supplierCategoriesMap?.[key] || [];
+    const extra = (categories as any[]).filter(c => String((c as any).supplier_id) === key);
+    const map: Record<string, StoreCategory> = {};
+    for (const it of base) {
+      const ext = String(it.external_id);
+      if (!ext) continue;
+      map[ext] = {
+        external_id: ext,
+        name: it.name,
+        parent_external_id: it.parent_external_id ?? null
+      };
+    }
+    for (const c of extra) {
+      const ext = String((c as any).external_id || "");
+      if (!ext) continue;
+      map[ext] = {
+        external_id: ext,
+        name: String((c as any).name || ""),
+        parent_external_id: (c as any).parent_external_id ?? null
+      };
+    }
+    return Object.values(map);
   }, [supplierId, supplierCategoriesMap, categories]);
   const buildTree = useCallback((items: StoreCategory[]): {
     id: string;

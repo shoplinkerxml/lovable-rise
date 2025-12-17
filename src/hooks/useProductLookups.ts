@@ -54,13 +54,12 @@ export function useProductLookups(
     }
   }, [preloadedCurrencies]);
 
-  // ✅ ЕФЕКТ 2: Встановлення дефолтного supplier_id, якщо він відсутній
   useEffect(() => {
-    if (!supplierId && preloadedSuppliers?.length) {
+    if (!productStoreId && !supplierId && preloadedSuppliers?.length) {
       const firstId = String(preloadedSuppliers[0].id);
       setBasicRef.current?.((prev: BasicData) => ({ ...prev, supplier_id: firstId }));
     }
-  }, [supplierId, preloadedSuppliers]);
+  }, [productStoreId, supplierId, preloadedSuppliers]);
 
   // ✅ ЕФЕКТ 3: Оновлення categories при зміні supplier_id
   useEffect(() => {
@@ -70,14 +69,33 @@ export function useProductLookups(
     }
   }, [supplierId, getCategoriesFromMap]);
 
-  // ✅ ЕФЕКТ 4: Встановлення selectedCategoryName при зміні category_id
   useEffect(() => {
-    if (categoryId && categories.length > 0) {
-      const found = categories.find(c => String(c.id) === categoryId);
-      if (found?.name) {
-        setSelectedCategoryName(found.name);
-      }
+    if (!categoryId) {
+      setSelectedCategoryName('');
+      return;
     }
+    if (categories.length === 0) {
+      setSelectedCategoryName('');
+      setBasicRef.current?.((prev: BasicData) => ({
+        ...prev,
+        category_id: '',
+        category_external_id: '',
+        category_name: '',
+      }));
+      return;
+    }
+    const found = categories.find(c => String(c.id) === categoryId);
+    if (found?.name) {
+      setSelectedCategoryName(found.name);
+      return;
+    }
+    setSelectedCategoryName('');
+    setBasicRef.current?.((prev: BasicData) => ({
+      ...prev,
+      category_id: '',
+      category_external_id: '',
+      category_name: '',
+    }));
   }, [categoryId, categories]);
 
   // ✅ ЕФЕКТ 5: Синхронізація category по external_id
