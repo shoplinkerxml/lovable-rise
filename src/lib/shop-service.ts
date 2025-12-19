@@ -85,8 +85,9 @@ interface ShopsListResponse {
   shops: ShopAggregated[];
 }
 
-interface ShopLimitResponse {
-  value: number;
+interface ShopLimitOnlyResponse {
+  totalShops: number;
+  limit: number;
 }
 
 interface ShopResponse {
@@ -323,14 +324,28 @@ export class ShopService {
   // ============================================================================
 
   static async getShopLimit(): Promise<ShopLimitInfo> {
+    if (this.isOffline()) return { current: 0, max: 3, canCreate: true };
+
+    const cacheKey = "shop-limit-info";
+    const cached = this.getCached<ShopLimitInfo>(cacheKey);
+    if (cached) return cached;
+
     await this.ensureSession();
 
-    const [max, current] = await Promise.all([
-      this.getShopLimitOnly(),
-      this.getShopsCount(),
-    ]);
-
-    return { current, max, canCreate: current < max };
+    try {
+      const response = await this.invokeEdge<ShopLimitOnlyResponse>(
+        "user-shops-list",
+        { limitOnly: true }
+      );
+      const current = Math.max(0, Number(response.totalShops) || 0);
+      const max = Math.max(3, Number(response.limit) || 0);
+      const info = { current, max, canCreate: current < max };
+      this.setCache(cacheKey, info);
+      this.setCache("shop-limit", max);
+      return info;
+    } catch {
+      return { current: 0, max: 3, canCreate: true };
+    }
   }
 
   static async getShopLimitOnly(): Promise<number> {
@@ -338,23 +353,15 @@ export class ShopService {
     const cached = this.getCached<number>(cacheKey);
     if (cached) return cached;
 
-    await this.ensureSession();
-    
-    try {
-      const response = await this.invokeEdge<ShopLimitResponse>("get-shop-limit-only", {});
-      const limit = Math.max(3, Number(response.value) || 3);
-      this.setCache(cacheKey, limit);
-      return limit;
-    } catch {
-      return 3; // Дефолтный лимит
-    }
+    const info = await this.getShopLimit();
+    this.setCache(cacheKey, info.max);
+    return info.max;
   }
 
   static async getShopsCount(): Promise<number> {
     if (this.isOffline()) return 0;
-
-    const shops = await this.getShopsAggregated();
-    return shops.length;
+    const info = await this.getShopLimit();
+    return info.current;
   }
 
   static async getShopsCountCached(): Promise<number> {
@@ -643,11 +650,24 @@ export class ShopService {
     
     await this.ensureSession();
 
-    const shops = await this.getShopsAggregated();
-    const shop = shops.find(s => s.id === storeId);
-    
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
+      store_id: storeId,
+    });
+
+    const shop = (response.shops || []).find(
+      (s) => String(s.id) === String(storeId)
+    );
+
     const productsCount = Math.max(0, Number(shop?.productsCount ?? 0));
-    const categoriesCount = productsCount === 0 ? 0 : Math.max(0, Number(shop?.categoriesCount ?? 0));
+    const categoriesCount =
+      productsCount === 0
+        ? 0
+        : Math.max(0, Number(shop?.categoriesCount ?? 0));
+
+    this.updateShopCounters(storeId, () => ({
+      productsCount,
+      categoriesCount,
+    }));
 
     return { productsCount, categoriesCount };
   }

@@ -766,9 +766,21 @@ if (r.supplier && r.supplier.id) { pm.collectionVariables.set("supplier_id", Str
               name: 'User Products List',
               method: 'POST',
               endpoint: '/functions/v1/user-products-list',
-              description: 'Список товаров текущего пользователя с пагинацией',
+              description: 'Общий список товаров пользователя (страница /user/products) с пагинацией',
               headers: { Authorization: 'Bearer {{access_token}}' },
-              body: { store_id: null, limit: 20, offset: 0 },
+              body: { limit: 20, offset: 0 },
+              response: { products: [ { id: 'uuid', store_id: 'store', name: 'Product', price: 100, stock_quantity: 10, available: true } ], page: { limit: 20, offset: 0, hasMore: true, nextOffset: 20, total: 100 } },
+              postmanScript: `pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+let r = pm.response.json();
+if (Array.isArray(r.products) && r.products.length > 0) { pm.collectionVariables.set("product_id", r.products[0].id); }`
+            },
+            {
+              name: 'Store Products List',
+              method: 'POST',
+              endpoint: '/functions/v1/store-products-list',
+              description: 'Список товаров конкретного магазина (страница /user/shops/:id) с пагинацией',
+              headers: { Authorization: 'Bearer {{access_token}}' },
+              body: { store_id: '{{store_id}}', limit: 20, offset: 0 },
               response: { products: [ { id: 'uuid', store_id: 'store', name: 'Product', price: 100, stock_quantity: 10, available: true } ], page: { limit: 20, offset: 0, hasMore: true, nextOffset: 20, total: 100 } },
               postmanScript: `pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
 let r = pm.response.json();

@@ -7,9 +7,10 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json',
 }
 
-type RequestBody = { 
+type RequestBody = {
   product_ids?: string[]
-  store_ids?: string[] 
+  store_ids?: string[]
+  include_categories?: boolean // НОВЫЙ флаг для опционального получения категорий
 }
 
 type DeleteResult = {
@@ -18,171 +19,141 @@ type DeleteResult = {
   categoryNamesByStore?: Record<string, string[]>
 }
 
-// Вынесли подсчет активных записей
-function countActiveByStore(rows: any[]): Record<string, number> {
-  return rows.reduce((acc, row) => {
-    const storeId = String(row?.store_id)
-    const isActive = row?.is_active !== false
-    
-    if (storeId && isActive) {
-      acc[storeId] = (acc[storeId] || 0) + 1
-    }
-    return acc
-  }, {} as Record<string, number>)
-}
-
-// Единая функция для удаления с предварительной выборкой
-async function deleteLinks(
+// ✅ ОПТИМИЗАЦИЯ 1: DELETE с RETURNING вместо SELECT + DELETE
+async function deleteLinksOptimized(
   supabase: any,
   filters: { productIds?: string[]; storeIds: string[] }
-): Promise<DeleteResult> {
-  // Строим запрос на выборку
-  let selectQuery = supabase
-    .from('store_product_links')
-    .select('store_id,product_id,is_active')
-    .in('store_id', filters.storeIds)
-
-  if (filters.productIds?.length) {
-    selectQuery = selectQuery.in('product_id', filters.productIds)
-  }
-
-  const { data: rowsToDelete, error: selectError } = await selectQuery
-
-  if (selectError) {
-    throw new Error(`Failed to select records: ${selectError.message}`)
-  }
-
-  // Подсчитываем до удаления
-  const deletedByStore = countActiveByStore(rowsToDelete || [])
-
-  // Строим запрос на удаление (те же условия)
+): Promise<{ deleted: any[]; deletedByStore: Record<string, number> }> {
+  
+  // Строим DELETE запрос с RETURNING
   let deleteQuery = supabase
     .from('store_product_links')
     .delete()
     .in('store_id', filters.storeIds)
+    .select('store_id, is_active') // RETURNING только нужные поля
 
   if (filters.productIds?.length) {
     deleteQuery = deleteQuery.in('product_id', filters.productIds)
   }
 
-  const { error: deleteError } = await deleteQuery
+  const { data: deletedRows, error: deleteError } = await deleteQuery
 
   if (deleteError) {
     throw new Error(`Failed to delete records: ${deleteError.message}`)
   }
 
+  // Подсчет удаленных активных записей по магазинам
+  const deletedByStore: Record<string, number> = {}
+  for (const row of deletedRows || []) {
+    const storeId = String(row?.store_id)
+    const isActive = row?.is_active !== false
+    
+    if (storeId && isActive) {
+      deletedByStore[storeId] = (deletedByStore[storeId] || 0) + 1
+    }
+  }
+
   return {
-    deleted: rowsToDelete?.length || 0,
+    deleted: deletedRows || [],
     deletedByStore,
   }
 }
 
-async function aggregateCategoryNames(supabase: any, storeIds: string[]): Promise<Record<string, string[]>> {
-  if (!Array.isArray(storeIds) || storeIds.length === 0) return {}
-  const sids = Array.from(new Set(storeIds.map(String).filter(Boolean)))
-  const [{ data: links }, { data: maps }] = await Promise.all([
-    (supabase as any)
-      .from('store_product_links')
-      .select('is_active,custom_category_id,store_id,store_products(category_id,category_external_id)')
-      .in('store_id', sids),
-    (supabase as any)
-      .from('store_store_categories')
-      .select('store_id,category_id,external_id,is_active')
-      .in('store_id', sids),
-  ])
+// ✅ ОПТИМИЗАЦИЯ 2: Упрощенная функция получения категорий
+// Теперь делает 2 запроса вместо 4
+async function getCategoryNamesByStore(
+  supabase: any,
+  storeIds: string[]
+): Promise<Record<string, string[]>> {
+  if (!storeIds.length) return {}
 
-  const byStoreCatId: Record<string, Record<string, string | null>> = {}
-  for (const m of maps || []) {
-    const active = (m as any)?.is_active !== false
-    if (!active) continue
-    const sid = String((m as any)?.store_id || '')
-    const cid = (m as any)?.category_id != null ? String((m as any).category_id) : null
-    const ext = (m as any)?.external_id != null ? String((m as any).external_id) : null
-    if (!sid || !cid) continue
-    if (!byStoreCatId[sid]) byStoreCatId[sid] = {}
-    byStoreCatId[sid][cid] = ext || null
+  // 1 запрос: Получаем все активные связи + категории из store_products
+  const { data: links } = await supabase
+    .from('store_product_links')
+    .select('store_id, custom_category_id, store_products!inner(category_id, category_external_id)')
+    .in('store_id', storeIds)
+    .eq('is_active', true) // ✅ Фильтрация на уровне БД!
+
+  if (!links?.length) return {}
+
+  // Собираем уникальные ID категорий и external_id
+  const categoryIds = new Set<string>()
+  const externalIds = new Set<string>()
+
+  for (const link of links) {
+    const customCat = link.custom_category_id
+    const baseCat = link.store_products?.category_id
+    const baseExt = link.store_products?.category_external_id
+
+    if (customCat) externalIds.add(String(customCat))
+    else if (baseExt) externalIds.add(String(baseExt))
+    else if (baseCat) categoryIds.add(String(baseCat))
   }
 
-  const idsByStore: Record<string, Set<string>> = {}
-  const extsByStore: Record<string, Set<string>> = {}
-  for (const r of links || []) {
-    const active = (r as any)?.is_active !== false
-    if (!active) continue
-    const sid = String((r as any)?.store_id || '')
-    if (!sid) continue
+  // 2 запрос: Получаем имена категорий одним запросом с OR условием
+  const idsArray = Array.from(categoryIds)
+  const extsArray = Array.from(externalIds)
 
-    const linkExt = (r as any)?.custom_category_id != null ? String((r as any).custom_category_id) : null
-    const baseCid = (r as any)?.store_products?.category_id != null ? String((r as any).store_products.category_id) : null
-    const baseExt = (r as any)?.store_products?.category_external_id != null ? String((r as any).store_products.category_external_id) : null
+  let categoryQuery = supabase
+    .from('store_categories')
+    .select('id, external_id, name')
 
-    if (!idsByStore[sid]) idsByStore[sid] = new Set<string>()
-    if (!extsByStore[sid]) extsByStore[sid] = new Set<string>()
-
-    if (linkExt) {
-      extsByStore[sid].add(linkExt)
-    } else if (baseCid && byStoreCatId[sid] && byStoreCatId[sid][baseCid]) {
-      extsByStore[sid].add(String(byStoreCatId[sid][baseCid]))
-    } else if (baseExt) {
-      extsByStore[sid].add(baseExt)
-    } else if (baseCid) {
-      idsByStore[sid].add(baseCid)
-    }
+  // Используем OR для объединения условий
+  const filters = []
+  if (idsArray.length) filters.push(`id.in.(${idsArray.join(',')})`)
+  if (extsArray.length) filters.push(`external_id.in.(${extsArray.join(',')})`)
+  
+  if (filters.length) {
+    categoryQuery = categoryQuery.or(filters.join(','))
   }
 
-  const allIdSet = new Set<string>()
-  const allExtSet = new Set<string>()
-  for (const sid of sids) {
-    const ids = Array.from(idsByStore[sid] || [])
-    const exts = Array.from(extsByStore[sid] || [])
-    for (const v of ids) allIdSet.add(v)
-    for (const v of exts) allExtSet.add(v)
-  }
-  const idListAll = Array.from(allIdSet)
-  const extListAll = Array.from(allExtSet)
+  const { data: categories } = await categoryQuery
 
-  const [catByIdRes, catByExtRes] = await Promise.all([
-    idListAll.length
-      ? (supabase as any).from('store_categories').select('id,name').in('id', idListAll)
-      : Promise.resolve({ data: [] }),
-    extListAll.length
-      ? (supabase as any).from('store_categories').select('external_id,name').in('external_id', extListAll)
-      : Promise.resolve({ data: [] }),
-  ])
-
+  // Создаем мапы для быстрого поиска
   const nameById = new Map<string, string>()
   const nameByExt = new Map<string, string>()
-  for (const r of ((catByIdRes as any)?.data || [])) {
-    const id = String((r as any)?.id || '')
-    const nm = (r as any)?.name
-    if (id && nm) nameById.set(id, String(nm))
-  }
-  for (const r of ((catByExtRes as any)?.data || [])) {
-    const ext = String((r as any)?.external_id || '')
-    const nm = (r as any)?.name
-    if (ext && nm) nameByExt.set(ext, String(nm))
+
+  for (const cat of categories || []) {
+    if (cat.id) nameById.set(String(cat.id), cat.name)
+    if (cat.external_id) nameByExt.set(String(cat.external_id), cat.name)
   }
 
-  const results: Record<string, string[]> = {}
-  for (const sid of sids) {
-    const namesSet = new Set<string>()
-    const ids = Array.from(idsByStore[sid] || [])
-    const exts = Array.from(extsByStore[sid] || [])
-    for (const id of ids) {
-      const nm = nameById.get(id)
-      if (nm) namesSet.add(nm)
+  // Группируем по магазинам
+  const result: Record<string, Set<string>> = {}
+
+  for (const link of links) {
+    const storeId = String(link.store_id)
+    if (!result[storeId]) result[storeId] = new Set<string>()
+
+    const customCat = link.custom_category_id
+    const baseCat = link.store_products?.category_id
+    const baseExt = link.store_products?.category_external_id
+
+    let categoryName: string | undefined
+
+    if (customCat) {
+      categoryName = nameByExt.get(String(customCat))
+    } else if (baseExt) {
+      categoryName = nameByExt.get(String(baseExt))
+    } else if (baseCat) {
+      categoryName = nameById.get(String(baseCat))
     }
-    for (const ext of exts) {
-      const nm = nameByExt.get(ext)
-      if (nm) namesSet.add(nm)
+
+    if (categoryName) {
+      result[storeId].add(categoryName)
     }
-    results[sid] = Array.from(namesSet).sort((a, b) => a.localeCompare(b))
   }
 
-  return results
+  // Конвертируем Set в отсортированные массивы
+  return Object.fromEntries(
+    Object.entries(result).map(([storeId, names]) => [
+      storeId,
+      Array.from(names).sort((a, b) => a.localeCompare(b))
+    ])
+  )
 }
 
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
   }
@@ -195,7 +166,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Инициализация клиента
     const authHeader = req.headers.get('Authorization') || ''
     const token = authHeader.replace(/^Bearer\s+/i, '').trim()
 
@@ -210,7 +180,6 @@ Deno.serve(async (req) => {
       global: token ? { headers: { Authorization: `Bearer ${token}` } } : {},
     })
 
-    // Парсинг и валидация
     const body: RequestBody = await req.json().catch(() => ({}))
 
     const productIds = Array.isArray(body.product_ids)
@@ -221,7 +190,8 @@ Deno.serve(async (req) => {
       ? body.store_ids.filter(Boolean).map(String)
       : []
 
-    // Ранний выход: нет магазинов = нечего удалять
+    const includeCategories = body.include_categories !== false // По умолчанию true для обратной совместимости
+
     if (!storeIds.length) {
       return new Response(
         JSON.stringify({ deleted: 0, deletedByStore: {} }),
@@ -229,20 +199,30 @@ Deno.serve(async (req) => {
       )
     }
 
-  // Удаление с одним набором логики
-  const result = await deleteLinks(supabase, {
-    productIds: productIds.length ? productIds : undefined,
-    storeIds,
-  })
+    // ✅ Удаление с RETURNING (1 запрос вместо 2)
+    const { deleted, deletedByStore } = await deleteLinksOptimized(supabase, {
+      productIds: productIds.length ? productIds : undefined,
+      storeIds,
+    })
 
-    // Собираем имена категорий по задействованным магазинам, чтобы фронт не делал второй запрос
+    // ✅ ОПЦИОНАЛЬНО получаем категории (если нужно фронту)
     let categoryNamesByStore: Record<string, string[]> = {}
-    try {
-      categoryNamesByStore = await aggregateCategoryNames(supabase, storeIds)
-    } catch { categoryNamesByStore = {} }
+    
+    if (includeCategories) {
+      try {
+        categoryNamesByStore = await getCategoryNamesByStore(supabase, storeIds)
+      } catch (err) {
+        console.error('Failed to fetch categories:', err)
+        // Не падаем, просто не возвращаем категории
+      }
+    }
 
-  return new Response(
-      JSON.stringify({ ...result, categoryNamesByStore }),
+    return new Response(
+      JSON.stringify({
+        deleted: deleted.length,
+        deletedByStore,
+        ...(includeCategories && { categoryNamesByStore }),
+      }),
       { status: 200, headers: CORS_HEADERS }
     )
 

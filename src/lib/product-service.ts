@@ -224,6 +224,84 @@ export class ProductService {
     return resp;
   }
 
+  static async getUserLookups(): Promise<{
+    suppliers: Array<{ id: string; supplier_name: string }>;
+    currencies: Array<{ id: number; name: string; code: string; status: boolean }>;
+    supplierCategoriesMap: Record<
+      string,
+      Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>
+    >;
+  }> {
+    const cacheKey = "rq:user:lookups";
+    const cached = readCache<any>(cacheKey, false);
+    if (cached?.data) return cached.data;
+    const resp = await ProductService.invokeEdge<{
+      suppliers?: any[];
+      currencies?: any[];
+      supplierCategoriesMap?: Record<string, any[]>;
+    }>("get-user-lookups", {});
+    const result = {
+      suppliers: Array.isArray(resp.suppliers) ? resp.suppliers : [],
+      currencies: Array.isArray(resp.currencies) ? resp.currencies : [],
+      supplierCategoriesMap: resp.supplierCategoriesMap || {},
+    };
+    writeCache(cacheKey, result, 30 * 60 * 1000);
+    return result;
+  }
+
+  private static async getCategoriesMapForEdge(storeId?: string | null): Promise<Record<string, string>> {
+    const cacheKey = storeId ? `rq:edge:categories-map:store:${String(storeId)}` : "rq:edge:categories-map:all";
+    const cached = readCache<Record<string, string>>(cacheKey, false);
+    if (cached?.data && typeof cached.data === "object") return cached.data;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth?.user?.id ? String(auth.user.id) : null;
+      if (!userId) return {};
+      let storeIds: string[] = [];
+      if (storeId) {
+        storeIds = [String(storeId)];
+      } else {
+        const { data: stores } = await supabase
+          .from("user_stores")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("is_active", true);
+        storeIds = (stores || []).map((s: any) => String(s.id)).filter(Boolean);
+      }
+      if (storeIds.length === 0) return {};
+      const { data } = await supabase
+        .from("store_store_categories")
+        .select("id, external_id, custom_name, store_categories(name)")
+        .in("store_id", storeIds)
+        .eq("is_active", true);
+      const map: Record<string, string> = {};
+      for (const row of data || []) {
+        const r: any = row as any;
+        const name = String(r.custom_name ?? r.store_categories?.name ?? "");
+        if (r.id != null) map[String(r.id)] = name;
+        if (r.external_id != null) map[String(r.external_id)] = name;
+      }
+      writeCache(cacheKey, map, 30 * 60 * 1000);
+      return map;
+    } catch {
+      return {};
+    }
+  }
+
+  static clearLookupsCache(): void {
+    try {
+      removeCache("rq:user:lookups");
+    } catch (error) {
+      console.error("ProductService.clearLookupsCache failed", error);
+    }
+  }
+
   /** Получение store_ids текущего пользователя (через функции) */
   private static async getUserStoreIds(): Promise<string[]> {
     const stores = await ProductService.getUserStores();
@@ -265,49 +343,55 @@ export class ProductService {
     }
   }
 
-  /** Получение продуктов для конкретного магазина через функцию user-products-list */
-  static async getProductsForStore(storeId: string): Promise<Product[]> {
-    const productsAgg = await ProductService.getProductsAggregated(storeId);
-    return productsAgg as Product[];
-  }
-
-  /** Агрегированный список продуктов (только функция user-products-list) */
-  static async getProductsAggregated(storeId?: string | null): Promise<ProductAggregated[]> {
+  static async getUserMasterProducts(): Promise<ProductAggregated[]> {
     try {
-      const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", { store_id: storeId ?? null });
-      const rows = Array.isArray(resp?.products) ? resp!.products! : [];
+      const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {});
+      const rows = Array.isArray(resp?.products) ? resp.products! : [];
       return rows;
-    } catch (e) {
-      const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, 50, 0);
+    } catch {
+      const fb = await ProductService.fetchProductsPageFallback(null, 50, 0);
       return fb.products;
     }
   }
-  
 
-  static async getProductsFirstPage(
-    storeId: string | null,
+  static async getStoreProducts(storeId: string): Promise<ProductAggregated[]> {
+    if (!storeId || storeId.trim() === "") {
+      throw new Error("Store ID is required");
+    }
+    try {
+      const resp = await ProductService.invokeEdge<ProductListResponseObj>("store-products-list", {
+        store_id: String(storeId),
+      });
+      const rows = Array.isArray(resp?.products) ? resp.products! : [];
+      return rows;
+    } catch {
+      const fb = await ProductService.fetchProductsPageFallback(String(storeId), 50, 0);
+      return fb.products;
+    }
+  }
+
+  static async getUserMasterProductsPage(
     limit: number,
     options?: { bypassCache?: boolean },
   ): Promise<{
     products: ProductAggregated[];
-    page: {
-      limit: number;
-      offset: number;
-      hasMore: boolean;
-      nextOffset: number | null;
-      total: number;
-    };
+    page: ProductListPage;
   }> {
-    const cacheKey = `rq:products:first:${storeId ?? "all"}:${limit}`;
-    if (!options?.bypassCache) {
-      const env = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(cacheKey, false);
-      if (env?.data && Array.isArray(env.data.items) && env.data.page) {
-        return { products: env.data.items, page: env.data.page };
+    const cacheKey = `rq:products:master:first:${limit}`;
+    if (options?.bypassCache) {
+      try {
+        removeCache(cacheKey);
+      } catch {
+        void 0;
       }
     }
+    const cached = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(cacheKey, false);
+    if (cached?.data && Array.isArray(cached.data.items)) {
+      return { products: cached.data.items, page: cached.data.page };
+    }
+
     try {
       const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-        store_id: storeId ?? null,
         limit,
         offset: 0,
       });
@@ -323,12 +407,96 @@ export class ProductService {
       writeCache(cacheKey, { items: products, page }, CACHE_TTL.productsPage);
       return { products, page };
     } catch (error) {
-      console.error("ProductService.getProductsFirstPage fallback", error);
-      const fb = await ProductService.fetchProductsPageFallback(storeId ?? null, limit, 0);
+      const fb = await ProductService.fetchProductsPageFallback(null, limit, 0);
       ProductService.addFirstPageKeyToIndex(cacheKey);
       writeCache(cacheKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
       return fb;
     }
+  }
+
+  static async getStoreProductsPage(
+    storeId: string,
+    limit: number,
+    options?: { bypassCache?: boolean },
+  ): Promise<{
+    products: ProductAggregated[];
+    page: ProductListPage;
+  }> {
+    if (!storeId || storeId.trim() === "") {
+      throw new Error("Store ID is required");
+    }
+
+    const cacheKey = `rq:products:store:${storeId}:first:${limit}`;
+    if (options?.bypassCache) {
+      try {
+        removeCache(cacheKey);
+      } catch {
+        void 0;
+      }
+    }
+    const cached = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(cacheKey, false);
+    if (cached?.data && Array.isArray(cached.data.items)) {
+      return { products: cached.data.items, page: cached.data.page };
+    }
+
+    try {
+      const fresh = await ProductService.invokeEdge<ProductListResponseObj>("store-products-list", {
+        store_id: String(storeId),
+        limit,
+        offset: 0,
+      });
+      const products = Array.isArray(fresh?.products) ? fresh.products! : [];
+      const page: ProductListPage = {
+        limit,
+        offset: 0,
+        hasMore: !!fresh?.page?.hasMore,
+        nextOffset: fresh?.page?.nextOffset ?? null,
+        total: fresh?.page?.total ?? products.length,
+      };
+      ProductService.addFirstPageKeyToIndex(cacheKey);
+      writeCache(cacheKey, { items: products, page }, CACHE_TTL.productsPage);
+      return { products, page };
+    } catch (error) {
+      const fb = await ProductService.fetchProductsPageFallback(String(storeId), limit, 0);
+      ProductService.addFirstPageKeyToIndex(cacheKey);
+      writeCache(cacheKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
+      return fb;
+    }
+  }
+
+  /**
+   * @deprecated Використовуй getStoreProducts(storeId)
+   */
+  static async getProductsForStore(storeId: string): Promise<Product[]> {
+    const productsAgg = await ProductService.getStoreProducts(storeId);
+    return productsAgg as unknown as Product[];
+  }
+
+  /**
+   * @deprecated Використовуй getUserMasterProducts() або getStoreProducts(storeId)
+   */
+  static async getProductsAggregated(storeId?: string | null): Promise<ProductAggregated[]> {
+    if (storeId) {
+      return ProductService.getStoreProducts(storeId);
+    }
+    return ProductService.getUserMasterProducts();
+  }
+
+  /**
+   * @deprecated Використовуй getUserMasterProductsPage() або getStoreProductsPage()
+   */
+  static async getProductsFirstPage(
+    storeId: string | null,
+    limit: number,
+    options?: { bypassCache?: boolean },
+  ): Promise<{
+    products: ProductAggregated[];
+    page: ProductListPage;
+  }> {
+    if (storeId) {
+      return ProductService.getStoreProductsPage(storeId, limit, options);
+    }
+    return ProductService.getUserMasterProductsPage(limit, options);
   }
 
   private static async fetchProductsPageFallback(
@@ -434,8 +602,8 @@ export class ProductService {
     };
   }> {
     try {
-      const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-        store_id: storeId ?? null,
+      const resp = await ProductService.invokeEdge<ProductListResponseObj>(storeId ? "store-products-list" : "user-products-list", {
+        ...(storeId ? { store_id: storeId } : {}),
         limit,
         offset,
       });
@@ -463,11 +631,11 @@ export class ProductService {
       if (!keys.length) return;
       const targetStoreId = storeId == null ? null : String(storeId);
       for (const key of keys) {
-        if (!key.startsWith("rq:products:first:")) continue;
-        const parts = key.split(":");
-        if (parts.length < 4) continue;
-        const encodedStore = parts[3];
-        if (targetStoreId !== null && encodedStore !== targetStoreId) continue;
+        if (targetStoreId === null) {
+          if (!key.startsWith("rq:products:master:first:")) continue;
+        } else {
+          if (!key.startsWith(`rq:products:store:${targetStoreId}:first:`)) continue;
+        }
         const existing = readCache<{ items: unknown[]; page?: ProductListPage }>(key, true);
         if (!existing?.data || !Array.isArray(existing.data.items)) continue;
         const nextItems = mutate(existing.data.items);
@@ -680,9 +848,9 @@ export class ProductService {
     );
     if (error) throw new Error((error as { message?: string } | null)?.message || "delete_failed");
     try {
-      ProductService.clearAllFirstPageCaches();
+      ProductService.clearStoreProductsCaches(String(storeId));
     } catch (e) {
-      console.error("ProductService.removeStoreProductLink clearAllFirstPageCaches failed", e);
+      console.error("ProductService.removeStoreProductLink clearStoreProductsCaches failed", e);
     }
   }
 
@@ -732,9 +900,11 @@ export class ProductService {
       console.error("ProductService.bulkRemoveStoreProductLinks cache update failed", error);
     }
     try {
-      ProductService.clearAllFirstPageCaches();
+      for (const sid of (storeIds || []).map(String)) {
+        ProductService.clearStoreProductsCaches(sid);
+      }
     } catch (error) {
-      console.error("ProductService.bulkRemoveStoreProductLinks clearAllFirstPageCaches failed", error);
+      console.error("ProductService.bulkRemoveStoreProductLinks clearStoreProductsCaches failed", error);
     }
     try {
       const { ShopService } = await import("@/lib/shop-service");
@@ -803,6 +973,9 @@ export class ProductService {
             return { ...p, linkedStoreIds: merged };
           });
         });
+      }
+      for (const sid of sidsUnique) {
+        ProductService.clearStoreProductsCaches(sid);
       }
     } catch (error) {
       console.error("ProductService.bulkAddStoreProductLinks cache update failed", error);
@@ -1321,9 +1494,16 @@ export class ProductService {
     }
     removeCache("rq:products:all");
     try {
-      ProductService.clearAllFirstPageCaches();
+      ProductService.clearMasterProductsCaches();
+      if (productData.links) {
+        for (const link of productData.links) {
+          if (link.store_id) {
+            ProductService.clearStoreProductsCaches(String(link.store_id));
+          }
+        }
+      }
     } catch (error) {
-      console.error("ProductService.createProduct clearAllFirstPageCaches failed", error);
+      console.error("ProductService.createProduct clear caches failed", error);
     }
     ProductService.invalidateProductLimitCache();
     return product;
@@ -1350,6 +1530,20 @@ export class ProductService {
   /** Обновление товара через функцию update-product */
   static async updateProduct(id: string, productData: UpdateProductData): Promise<void> {
     await this.ensureCanMutateProducts();
+
+    let storeIdToInvalidate: string | null = null;
+    try {
+      const { data: row } = await supabase
+        .from("store_products")
+        .select("store_id")
+        .eq("id", String(id))
+        .maybeSingle();
+      if (row && (row as any).store_id != null) {
+        storeIdToInvalidate = String((row as any).store_id);
+      }
+    } catch {
+      storeIdToInvalidate = null;
+    }
 
     let categoryIdValue: number | null | undefined = undefined;
     if (productData.category_id !== undefined) {
@@ -1437,9 +1631,14 @@ export class ProductService {
     const productId = respUpdate?.product_id || id;
     removeCache("rq:products:all");
     try {
-      ProductService.clearAllFirstPageCaches();
+      ProductService.clearMasterProductsCaches();
+      if (storeIdToInvalidate) {
+        ProductService.clearStoreProductsCaches(storeIdToInvalidate);
+      } else {
+        ProductService.clearAllFirstPageCaches();
+      }
     } catch (error) {
-      console.error("ProductService.updateProduct clearAllFirstPageCaches failed", error);
+      console.error("ProductService.updateProduct clear caches failed", error);
     }
     void productId;
     return;
@@ -1448,6 +1647,19 @@ export class ProductService {
   /** Удаление товара */
   static async deleteProduct(id: string): Promise<void> {
     await this.ensureCanMutateProducts();
+    let storeIdToInvalidate: string | null = null;
+    try {
+      const { data: row } = await supabase
+        .from("store_products")
+        .select("store_id")
+        .eq("id", String(id))
+        .maybeSingle();
+      if (row && (row as any).store_id != null) {
+        storeIdToInvalidate = String((row as any).store_id);
+      }
+    } catch {
+      storeIdToInvalidate = null;
+    }
     const respDel = await ProductService.invokeEdge<{ success?: boolean }>(
       "delete-product",
       { product_ids: [String(id)] },
@@ -1458,9 +1670,14 @@ export class ProductService {
     }
     removeCache("rq:products:all");
     try {
-      ProductService.clearAllFirstPageCaches();
+      ProductService.clearMasterProductsCaches();
+      if (storeIdToInvalidate) {
+        ProductService.clearStoreProductsCaches(storeIdToInvalidate);
+      } else {
+        ProductService.clearAllProductsCaches();
+      }
     } catch (error) {
-      console.error("ProductService.deleteProduct clearAllFirstPageCaches failed", error);
+      console.error("ProductService.deleteProduct clear caches failed", error);
     }
     ProductService.invalidateProductLimitCache();
   }
@@ -1469,6 +1686,18 @@ export class ProductService {
     await this.ensureCanMutateProducts();
     const validIds = Array.from(new Set(ids.map(String).filter(Boolean)));
     if (validIds.length === 0) return { deleted: 0 };
+    let storeIdsToInvalidate: string[] = [];
+    try {
+      const { data } = await supabase
+        .from("store_products")
+        .select("id, store_id")
+        .in("id", validIds);
+      storeIdsToInvalidate = Array.from(
+        new Set((data || []).map((r: any) => String(r.store_id)).filter(Boolean)),
+      );
+    } catch {
+      storeIdsToInvalidate = [];
+    }
     const respDel2 = await ProductService.invokeEdge<{ success?: boolean }>(
       "delete-product",
       { product_ids: validIds },
@@ -1477,9 +1706,16 @@ export class ProductService {
     if (!ok) throw new Error("delete_failed");
     removeCache("rq:products:all");
     try {
-      ProductService.clearAllFirstPageCaches();
+      ProductService.clearMasterProductsCaches();
+      if (storeIdsToInvalidate.length > 0) {
+        for (const sid of storeIdsToInvalidate) {
+          ProductService.clearStoreProductsCaches(sid);
+        }
+      } else {
+        ProductService.clearAllProductsCaches();
+      }
     } catch (error) {
-      console.error("ProductService.bulkDeleteProducts clearAllFirstPageCaches failed", error);
+      console.error("ProductService.bulkDeleteProducts clear caches failed", error);
     }
     ProductService.invalidateProductLimitCache();
     return { deleted: validIds.length };
@@ -1496,6 +1732,39 @@ export class ProductService {
     } catch (error) {
       console.error("ProductService.clearAllFirstPageCaches failed", error);
     }
+  }
+
+  static clearMasterProductsCaches(): void {
+    try {
+      const allKeys = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
+      const keys = Array.isArray(allKeys?.data) ? allKeys.data : [];
+      for (const key of keys) {
+        if (key.startsWith("rq:products:master:")) {
+          removeCache(key);
+        }
+      }
+    } catch (error) {
+      console.error("ProductService.clearMasterProductsCaches failed", error);
+    }
+  }
+
+  static clearStoreProductsCaches(storeId: string): void {
+    try {
+      const allKeys = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
+      const keys = Array.isArray(allKeys?.data) ? allKeys.data : [];
+      const pattern = `rq:products:store:${storeId}:`;
+      for (const key of keys) {
+        if (key.includes(pattern)) {
+          removeCache(key);
+        }
+      }
+    } catch (error) {
+      console.error("ProductService.clearStoreProductsCaches failed", error);
+    }
+  }
+
+  static clearAllProductsCaches(): void {
+    ProductService.clearAllFirstPageCaches();
   }
 
   /** Проверка только валидности сессии (без дополнительных запросов) */
@@ -1549,9 +1818,9 @@ export class ProductService {
       .select("id");
     if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_upsert_failed");
     try {
-      ProductService.clearAllFirstPageCaches();
+      ProductService.clearAllProductsCaches();
     } catch (e) {
-      console.error("ProductService.bulkUpsertProducts clearAllFirstPageCaches failed", e);
+      console.error("ProductService.bulkUpsertProducts clearAllProductsCaches failed", e);
     }
     removeCache("rq:products:all");
     ProductService.invalidateProductLimitCache();

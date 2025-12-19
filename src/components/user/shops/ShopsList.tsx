@@ -58,8 +58,8 @@ export const ShopsList = ({
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 900_000, // 15 хвилин
-    refetchOnMount: false,
+    staleTime: 900_000,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

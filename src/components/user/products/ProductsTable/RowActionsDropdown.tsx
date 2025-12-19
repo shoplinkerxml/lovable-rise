@@ -10,6 +10,7 @@ import { ShopService } from "@/lib/shop-service";
 import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
 import type { ShopAggregated } from "@/lib/shop-service";
+import { useSyncStatus } from "@/lib/optimistic-mutation";
 
 type ProductRow = Product & {
   linkedStoreIds?: string[];
@@ -26,6 +27,9 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
   const [togglingStoreIds, setTogglingStoreIds] = useState<string[]>([]);
+  const duplicationStatus = useSyncStatus(`product:duplicate:${product.id}`);
+  const isDupPending = duplicationStatus?.status === "pending";
+  const isDupError = duplicationStatus?.status === "error";
 
   const loadStoresAndLinks = async () => {
     try {
@@ -66,8 +70,8 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
           className="h-8 w-8 p-0"
           aria-label="Open row actions"
           onClick={() => { onTrigger?.(); }}
-          disabled={duplicating === true}
-          aria-disabled={duplicating === true}
+          disabled={duplicating === true || isDupPending}
+          aria-disabled={duplicating === true || isDupPending}
           data-testid="user_products_row_actions"
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -79,8 +83,18 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
           {t("edit")}
         </DropdownMenuItem>
         {hideDuplicate ? null : (
-          <DropdownMenuItem onClick={onDuplicate} className="cursor-pointer" data-testid="user_products_row_duplicate" disabled={canCreate === false || duplicating === true} aria-disabled={canCreate === false || duplicating === true}>
-            <Copy className="mr-2 h-4 w-4" />
+          <DropdownMenuItem
+            onClick={onDuplicate}
+            className="cursor-pointer"
+            data-testid="user_products_row_duplicate"
+            disabled={canCreate === false || duplicating === true || isDupPending}
+            aria-disabled={canCreate === false || duplicating === true || isDupPending}
+          >
+            {isDupPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Copy className={`mr-2 h-4 w-4 ${isDupError ? "text-destructive" : ""}`} />
+            )}
             {t("duplicate")}
           </DropdownMenuItem>
         )}

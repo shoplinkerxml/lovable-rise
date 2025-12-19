@@ -2,13 +2,14 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Copy, Edit, Trash2 } from "lucide-react";
+import { Plus, Copy, Edit, Trash2, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/lib/product-service";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Table as TanTable } from "@tanstack/react-table";
 import type { ProductRow } from "./columns";
 import type { ShopAggregated } from "@/lib/shop-service";
+import { useSyncStatus } from "@/lib/optimistic-mutation";
 
 const ViewOptionsMenuLazy = React.lazy(() => import("./ViewOptionsMenu").then((m) => ({ default: m.ViewOptionsMenu })));
 const AddToStoresMenuLazy = React.lazy(() => import("./AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
@@ -78,7 +79,10 @@ export function Toolbar({
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedCount = selectedRows.length;
   const selectedRow = selectedRows[0]?.original as ProductRow | undefined;
-  const canDuplicate = selectedCount === 1 && canCreate !== false && hideDuplicate !== true && !duplicating;
+  const duplicationStatus = useSyncStatus(selectedRow ? `product:duplicate:${selectedRow.id}` : null);
+  const isDupPending = duplicationStatus?.status === "pending";
+  const isDupError = duplicationStatus?.status === "error";
+  const canDuplicate = selectedCount === 1 && canCreate !== false && hideDuplicate !== true && !duplicating && !isDupPending;
   const canEditSelected = selectedCount === 1 && !duplicating;
   const canDeleteSelected = selectedCount >= 1 && !duplicating;
   const createDisabled = (canCreate === false) || !!duplicating;
@@ -125,7 +129,11 @@ export function Toolbar({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => selectedRow && handleDuplicate(selectedRow)} aria-label={t("duplicate")} disabled={!canDuplicate} aria-disabled={!canDuplicate} data-testid="user_products_dataTable_duplicateSelected">
-                    <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : "text-foreground"}`} />
+                    {isDupPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                    ) : (
+                      <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : isDupError ? "text-destructive" : "text-foreground"}`} />
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_duplicate">

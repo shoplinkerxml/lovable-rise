@@ -118,8 +118,7 @@ const UserProtected = () => {
     const isProductEdit = path.includes('/user/products/edit');
     const isShopsListPage = path === '/user/shops' || path === '/user/shops/';
     const isProductsListPage = path === '/user/products' || path === '/user/products/';
-    
-    const needsShops = isShopsListPage || (isProductsListPage && !isProductEdit);
+    const needsShops = isShopsListPage;
     
     if (needsShops) {
       ProductService.getUserStores().catch(() => void 0);
@@ -217,29 +216,43 @@ const UserProtected = () => {
       try {
         setPrefetchState({ open: true, progress: 10 });
 
-        // Используем React Query для prefetch вместо localStorage
-        await Promise.allSettled([
-          queryClient.prefetchQuery({
-            queryKey: ['tariffs', 'list'],
-            queryFn: async () => {
-              const { TariffService } = await import('@/lib/tariff-service');
-              const tariffs = await TariffService.getTariffsAggregated(false);
-              setPrefetchState(prev => ({ ...prev, progress: 50 }));
-              return tariffs;
-            },
-            staleTime: 900_000, // 15 минут
-          }),
-          queryClient.prefetchQuery({
-            queryKey: ['suppliers', 'list'],
-            queryFn: async () => {
-              const { SupplierService } = await import('@/lib/supplier-service');
-              const suppliers = await SupplierService.getSuppliers();
-              setPrefetchState(prev => ({ ...prev, progress: 80 }));
-              return suppliers;
-            },
-            staleTime: 900_000,
-          }),
-        ]);
+        const path = (typeof window !== "undefined" ? window.location.pathname : "").toLowerCase();
+        const shouldPrefetchTariffs = path.startsWith("/user/tariff");
+        const shouldPrefetchSuppliers =
+          path.startsWith("/user/suppliers") ||
+          path.includes("/user/products/new") ||
+          path.includes("/user/products/edit");
+
+        const tasks: Promise<unknown>[] = [];
+        if (shouldPrefetchTariffs) {
+          tasks.push(
+            queryClient.prefetchQuery({
+              queryKey: ["tariffs", "list"],
+              queryFn: async () => {
+                const { TariffService } = await import("@/lib/tariff-service");
+                const tariffs = await TariffService.getTariffsAggregated(false);
+                setPrefetchState((prev) => ({ ...prev, progress: 50 }));
+                return tariffs;
+              },
+              staleTime: 900_000,
+            }),
+          );
+        }
+        if (shouldPrefetchSuppliers) {
+          tasks.push(
+            queryClient.prefetchQuery({
+              queryKey: ["suppliers", "list"],
+              queryFn: async () => {
+                const { SupplierService } = await import("@/lib/supplier-service");
+                const suppliers = await SupplierService.getSuppliers();
+                setPrefetchState((prev) => ({ ...prev, progress: 80 }));
+                return suppliers;
+              },
+              staleTime: 900_000,
+            }),
+          );
+        }
+        await Promise.allSettled(tasks);
 
         setPrefetchState(prev => ({ ...prev, progress: 100 }));
       } catch (error) {

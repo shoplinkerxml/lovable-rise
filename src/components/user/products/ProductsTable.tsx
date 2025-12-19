@@ -33,6 +33,7 @@ import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
 import { readCache, writeCache, CACHE_TTL } from "@/lib/cache-utils";
+import { runOptimisticOperation } from "@/lib/optimistic-mutation";
  
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableHeader } from "./ProductsTable/SortableHeader";
@@ -133,14 +134,15 @@ export const ProductsTable = ({
     setItems((prev) => updater(prev));
     queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
     try {
-      const sizedKey = `rq:products:first:${storeId ?? 'all'}:${pagination.pageSize}`;
+      const sizedKey = storeId
+        ? `rq:products:store:${storeId}:first:${pagination.pageSize}`
+        : `rq:products:master:first:${pagination.pageSize}`;
       const env = readCache<{ items: ProductRow[]; page?: PageInfo }>(sizedKey, true);
       if (env?.data && Array.isArray(env.data.items)) {
         const nextItems = updater(env.data.items as ProductRow[]);
         writeCache(sizedKey, { items: nextItems, page: env.data.page }, CACHE_TTL.productsPage);
       }
       ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
-      ProductService.updateFirstPageCaches(null, (arr) => updater(arr as ProductRow[]));
     } catch { void 0; }
   }, [queryClient, storeId, pagination.pageSize]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
@@ -162,7 +164,9 @@ export const ProductsTable = ({
     requestedOffsets.current.clear();
     try {
       const initialFetchSize = Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize);
-      const { products, page } = await ProductService.getProductsFirstPage(storeId ?? null, initialFetchSize, { bypassCache: true });
+      const { products, page } = storeId
+        ? await ProductService.getStoreProductsPage(String(storeId), initialFetchSize, { bypassCache: true })
+        : await ProductService.getUserMasterProductsPage(initialFetchSize, { bypassCache: true });
       setItems(products as ProductRow[]);
       setPageInfo(page);
       onProductsLoadedRef.current?.(page?.total ?? products.length);
@@ -234,7 +238,6 @@ export const ProductsTable = ({
 
   
 
-  // Дублирование товара и обновление таблицы
   const handleDuplicate = useCallback(async (product: Product) => {
     try {
       if (duplicatingRef.current) return;
@@ -245,8 +248,13 @@ export const ProductsTable = ({
       const nameForUi = product.name_ua || product.name || product.external_id || product.id;
       setCopyDialog({ open: true, name: nameForUi });
       duplicatingRef.current = true;
-      await ProductService.duplicateProduct(product.id);
-      await loadFirstPage();
+      await runOptimisticOperation({
+        entityKey: `product:duplicate:${product.id}`,
+        run: async () => {
+          await ProductService.duplicateProduct(product.id);
+          await loadFirstPage();
+        },
+      });
     } catch (error) {
       console.error("Duplicate product failed", error);
       const err = error as unknown as { message?: unknown };

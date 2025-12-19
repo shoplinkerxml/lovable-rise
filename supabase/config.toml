@@ -60,9 +60,6 @@ verify_jwt = false
 [functions.get-store-products-count]
 verify_jwt = true
 
-[functions.get-shop-limit-only]
-verify_jwt = true
-
 [functions.categories]
 verify_jwt = true
 
@@ -70,4 +67,13 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.update-store-category]
+verify_jwt = true
+
+[functions.user-products-list]
+verify_jwt = true
+
+[functions.store-products-list]
+verify_jwt = true
+
+[functions.user-shops-list]
 verify_jwt = true

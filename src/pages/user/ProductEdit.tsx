@@ -1,14 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { ContentSkeleton, ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
-import { ArrowLeft, Loader2, Package } from 'lucide-react';
+import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
+import { ArrowLeft, Package } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/i18n';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';
-import { ShopService } from '@/lib/shop-service';
 import { ShopCountsService } from '@/lib/shop-counts';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,7 +14,6 @@ import { toast } from 'sonner';
 
 export const ProductEdit = () => {
   const { t } = useI18n();
-  const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -36,14 +33,18 @@ export const ProductEdit = () => {
       if (!id) return;
       setLoading(true);
       try {
-        const agg = await ProductService.getProductEditData(id);
+        const [agg, lookups] = await Promise.all([
+          ProductService.getProductEditData(id),
+          ProductService.getUserLookups(),
+        ]);
         setProduct(agg.product);
         preloadedImagesRef.current = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }>;
         preloadedParamsRef.current = (agg.params || []) as Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }>;
-        aggSuppliersRef.current = agg.suppliers;
-        aggCurrenciesRef.current = agg.currencies;
-        aggCategoriesRef.current = agg.categories;
-        aggSupplierCategoriesMapRef.current = agg.supplierCategoriesMap;
+        aggSuppliersRef.current = lookups.suppliers;
+        aggCurrenciesRef.current = lookups.currencies;
+        aggSupplierCategoriesMapRef.current = lookups.supplierCategoriesMap;
+        const sid = agg.product?.supplier_id != null ? String(agg.product.supplier_id) : '';
+        aggCategoriesRef.current = sid ? (lookups.supplierCategoriesMap?.[sid] || []) : [];
         if (agg.categoryName) setCategoryName(agg.categoryName);
       } catch (error) {
         console.error('Failed to load product:', error);
@@ -138,9 +139,10 @@ export const ProductEdit = () => {
         const cidNum = formData.category_id ? Number(formData.category_id) : null;
         let catName = '';
         if (cidNum != null) {
-          const list = aggCategoriesRef.current || [];
-          const found = list.find((c) => String(c.id) === String(cidNum));
-          catName = found?.name || '';
+          const map = aggSupplierCategoriesMapRef.current || {};
+          const all = Object.values(map).flat();
+          const found = all.find((c) => String((c as any).id) === String(cidNum));
+          catName = (found as any)?.name || '';
         } else if (formData.supplier_id && formData.category_external_id) {
           const map = aggSupplierCategoriesMapRef.current || {};
           const arr = map[String(formData.supplier_id)] || [];

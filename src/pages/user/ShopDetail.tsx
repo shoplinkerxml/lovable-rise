@@ -12,7 +12,7 @@ import { FullPageLoader } from '@/components/LoadingSkeletons';
 
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/i18n';
-import { ShopService, type Shop } from '@/lib/shop-service';
+import { ShopService, type ShopAggregated } from '@/lib/shop-service';
 import { ProductService, type Product } from '@/lib/product-service';
 import { useShopRealtimeSync } from "@/hooks/useShopRealtimeSync";
 import { ShopCountsService } from "@/lib/shop-counts";
@@ -29,18 +29,11 @@ export const ShopDetail = () => {
     if (!shopId) navigate('/user/shops');
   }, [shopId, navigate]);
 
-  const { data: shop, isLoading, isError } = useQuery<Shop | null>({
+  const { data: shop, isLoading, isError } = useQuery<ShopAggregated | null>({
     queryKey: ['shopDetail', shopId],
     queryFn: async () => (shopId ? await ShopService.getShop(shopId) : null),
     enabled: !!shopId,
     staleTime: 900_000,
-  });
-
-  const { data: counts, refetch: refetchCounts } = useQuery({
-    queryKey: ShopCountsService.key(shopId),
-    queryFn: () => ShopCountsService.recompute(queryClient, shopId),
-    enabled: !!shopId && !!shop,
-    staleTime: 60_000,
   });
 
   useShopRealtimeSync({ 
@@ -64,7 +57,14 @@ export const ShopDetail = () => {
           [shopId]
         );
 
-        await refetchCounts();
+        ShopCountsService.bumpProducts(queryClient, shopId, -1);
+        queryClient.setQueryData<ShopAggregated | null>(['shopDetail', shopId], (prev) => {
+          if (!prev) return prev;
+          const nextProductsCount = Math.max(0, Number(prev.productsCount ?? 0) - 1);
+          const nextCategoriesCount =
+            nextProductsCount === 0 ? 0 : Math.max(0, Number(prev.categoriesCount ?? 0));
+          return { ...prev, productsCount: nextProductsCount, categoriesCount: nextCategoriesCount };
+        });
         
         toast.success(t('product_removed_successfully') || 'Товар видалено');
       } catch (error) {
@@ -72,7 +72,7 @@ export const ShopDetail = () => {
         toast.error(t('failed_remove_from_store') || 'Помилка видалення');
       }
     },
-    [shopId, refetchCounts, t]
+    [shopId, queryClient, t]
   );
 
   if (isLoading) {
@@ -108,8 +108,9 @@ export const ShopDetail = () => {
     );
   }
 
-  const productsCount = counts?.productsCount ?? 0;
-  const categoriesCount = counts?.categoriesCount ?? 0;
+  const productsCount = Math.max(0, Number(shop.productsCount ?? 0));
+  const categoriesCount =
+    productsCount === 0 ? 0 : Math.max(0, Number(shop.categoriesCount ?? 0));
 
   return (
     <div className="p-6 space-y-6">
@@ -159,13 +160,27 @@ export const ShopDetail = () => {
       />
 
       <div className="bg-background border rounded-md">
-        <ProductsTable
-          storeId={shopId}
-          onEdit={(product: Product) => navigate(`/user/shops/${shopId}/products/edit/${product.id}`)}
-          onDelete={handleDeleteProduct}
-          canCreate={true}
-          hideDuplicate={true}
-        />
+        {productsCount === 0 ? (
+          <div className="p-6">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia className="text-primary">
+                  <Package className="h-[1.5rem] w-[1.5rem]" />
+                </EmptyMedia>
+                <EmptyTitle>{t('no_products')}</EmptyTitle>
+                <EmptyDescription>{t('no_products_description')}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        ) : (
+          <ProductsTable
+            storeId={shopId}
+            onEdit={(product: Product) => navigate(`/user/shops/${shopId}/products/edit/${product.id}`)}
+            onDelete={handleDeleteProduct}
+            canCreate={true}
+            hideDuplicate={true}
+          />
+        )}
       </div>
     </div>
   );

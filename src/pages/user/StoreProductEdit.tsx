@@ -170,7 +170,11 @@ export const StoreProductEdit = () => {
     setUiState(prev => ({ ...prev, loading: true }));
     
     try {
-      const agg = await ProductService.getProductEditData(pid, storeId);
+      const [agg, lookups] = await Promise.all([
+        ProductService.getProductEditData(pid, storeId),
+        ProductService.getUserLookups(),
+      ]);
+      const sid = agg.product?.supplier_id != null ? String(agg.product.supplier_id) : "";
       
       setProductData({
         product: agg.product,
@@ -185,10 +189,10 @@ export const StoreProductEdit = () => {
           store_external_id: r.store_external_id,
           is_active: r.is_active,
         })),
-        suppliers: agg.suppliers,
-        currencies: agg.currencies,
-        categories: agg.categories,
-        supplierCategoriesMap: agg.supplierCategoriesMap,
+        suppliers: lookups.suppliers,
+        currencies: lookups.currencies,
+        categories: sid ? (lookups.supplierCategoriesMap?.[sid] || []) : [],
+        supplierCategoriesMap: lookups.supplierCategoriesMap,
       });
 
       setForm(getInitialFormState(agg.link, agg.product));

@@ -46,7 +46,7 @@ export const ProductCreate = () => {
   useEffect(() => {
     (async () => {
       try {
-        const { suppliers: aggSuppliers, currencies: aggCurrencies, supplierCategoriesMap } = await ProductService.getNewProductLookup();
+        const { suppliers: aggSuppliers, currencies: aggCurrencies, supplierCategoriesMap } = await ProductService.getUserLookups();
         const suppliers: SupplierOption[] = (aggSuppliers || []).map((s) => ({ id: String(s.id), supplier_name: String(s.supplier_name || '') }));
         setPreloadedSuppliers(suppliers);
 
