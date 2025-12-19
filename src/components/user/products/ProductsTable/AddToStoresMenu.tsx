@@ -9,7 +9,6 @@ import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
-import { ShopService } from "@/lib/shop-service";
 import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
 
@@ -65,11 +64,56 @@ async function updateStoreCounts(
 ) {
   try {
     const uniqueIds = Array.from(new Set(storeIds.map(String).filter(Boolean)));
-    await Promise.all(uniqueIds.map((sid) => ShopCountsService.recompute(queryClient, String(sid))));
+    const deltas: Record<string, number> = productDelta || {};
+    for (const sid of uniqueIds) {
+      const delta = Number(deltas[String(sid)] ?? 0) || 0;
+      if (delta !== 0) {
+        ShopCountsService.bumpProducts(queryClient, String(sid), delta);
+      }
+    }
+
+    const categoriesByStore = categoryResultsOverride || {};
+    const categoryStoreIds = Object.keys(categoriesByStore);
+    if (categoryStoreIds.length > 0) {
+      for (const sid of categoryStoreIds) {
+        const cnt = Array.isArray(categoriesByStore[sid]) ? categoriesByStore[sid].length : 0;
+        queryClient.setQueryData(ShopCountsService.key(String(sid)), (old: any) => {
+          const prevProducts = Number(old?.productsCount ?? 0) || 0;
+          return { productsCount: prevProducts, categoriesCount: cnt };
+        });
+      }
+
+      queryClient.setQueryData<StoreAgg[]>(["shopsList"], (prev) => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.map((s) => {
+          const sid = String((s as any).id);
+          if (!Object.prototype.hasOwnProperty.call(categoriesByStore, sid)) return s;
+          const cnt = Array.isArray(categoriesByStore[sid]) ? categoriesByStore[sid].length : 0;
+          return { ...(s as any), categoriesCount: cnt };
+        }) as any;
+      });
+    }
+
     try {
-      const updated = queryClient.getQueryData<StoreAgg[]>(['shopsList']) || [];
-      setStores(updated as StoreAgg[]);
+      const updated = queryClient.getQueryData<StoreAgg[]>(["shopsList"]) || [];
+      if (Array.isArray(updated) && updated.length > 0) {
+        setStores(updated as StoreAgg[]);
+        return;
+      }
     } catch { /* ignore */ }
+
+    const byIdDelta: Record<string, number> = {};
+    for (const sid of uniqueIds) byIdDelta[sid] = Number(deltas[sid] ?? 0) || 0;
+    const next = (currentStores || []).map((s) => {
+      const sid = String(s.id);
+      const delta = byIdDelta[sid] || 0;
+      const nextProducts = Math.max(0, Number(s.productsCount ?? 0) + delta);
+      const nextCategories = Object.prototype.hasOwnProperty.call(categoriesByStore, sid)
+        ? (Array.isArray(categoriesByStore[sid]) ? categoriesByStore[sid].length : 0)
+        : (nextProducts === 0 ? 0 : Number(s.categoriesCount ?? 0) || 0);
+      return { ...s, productsCount: nextProducts, categoriesCount: nextCategories };
+    });
+    setStores(next);
   } catch (error) {
     console.error('Failed to update store counts:', error);
   }

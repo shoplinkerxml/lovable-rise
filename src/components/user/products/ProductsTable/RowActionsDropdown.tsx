@@ -134,7 +134,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                   setTogglingStoreIds((prev) => Array.from(new Set([...prev, id])));
                                   try {
                                     if (v) {
-                                      const { categoryNamesByStore } = await ProductService.bulkAddStoreProductLinks([
+                                      const { addedByStore, categoryNamesByStore } = await ProductService.bulkAddStoreProductLinks([
                                             {
                                               product_id: String(product.id),
                                               store_id: String(id),
@@ -155,7 +155,20 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                             toast.success(t("product_added_to_store"));
                                           {
                                             const idStr = String(id);
-                                            await ShopCountsService.recompute(queryClient, idStr);
+                                            const added = Math.max(0, Number(addedByStore?.[idStr] ?? 1) || 0);
+                                            if (added > 0) ShopCountsService.bumpProducts(queryClient, idStr, added);
+                                            const cats = categoryNamesByStore?.[idStr];
+                                            if (Array.isArray(cats)) {
+                                              const cnt = cats.length;
+                                              queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                                const prevProducts = Number(old?.productsCount ?? 0) || 0;
+                                                return { productsCount: prevProducts, categoriesCount: cnt };
+                                              });
+                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                                if (!Array.isArray(prev)) return prev;
+                                                return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
+                                              });
+                                            }
                                             try {
                                               const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                               setStores(updated || []);
@@ -163,7 +176,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                           }
                                           }
                                         } else {
-                                          const { categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
+                                          const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
                                           ProductService.invalidateStoreLinksCache(String(product.id));
                                           const fetched = await ProductService.getStoreLinksForProduct(product.id);
                                           setLinkedStoreIds(fetched);
@@ -173,7 +186,20 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                             toast.success(t("product_removed_from_store"));
                                             {
                                               const idStr = String(id);
-                                              await ShopCountsService.recompute(queryClient, idStr);
+                                              const deleted = Math.max(0, Number(deletedByStore?.[idStr] ?? 1) || 0);
+                                              if (deleted > 0) ShopCountsService.bumpProducts(queryClient, idStr, -deleted);
+                                              const cats = categoryNamesByStore?.[idStr];
+                                              if (Array.isArray(cats)) {
+                                                const cnt = cats.length;
+                                                queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                                  const prevProducts = Number(old?.productsCount ?? 0) || 0;
+                                                  return { productsCount: prevProducts, categoriesCount: cnt };
+                                                });
+                                                queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                                  if (!Array.isArray(prev)) return prev;
+                                                  return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
+                                                });
+                                              }
                                               try {
                                                 const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
                                                 setStores(updated || []);

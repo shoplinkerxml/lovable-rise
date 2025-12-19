@@ -57,22 +57,10 @@ const TariffPage = () => {
   const { data: tariffsData, isLoading } = useQuery<TariffWithDetails[]>({
     queryKey: ['tariffs','visible'],
     queryFn: async () => {
-      const cacheKey = 'rq:tariffs:list';
       try {
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { items: TariffWithDetails[]; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            return parsed.items;
-          }
-        }
+        if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list');
       } catch { void 0; }
-      const rows = await TariffService.getTariffsAggregated(false);
-      try {
-        const payload = JSON.stringify({ items: rows as TariffWithDetails[], expiresAt: Date.now() + 900_000 });
-        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-      } catch { void 0; }
-      return rows as TariffWithDetails[];
+      return await TariffService.getTariffsAggregated(false);
     },
     retry: false,
     staleTime: 900_000,

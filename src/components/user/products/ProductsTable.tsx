@@ -387,8 +387,23 @@ export const ProductsTable = ({
     let reverted = false;
     setProductsCached((prev) => prev.map((p) => p.id === pid ? { ...p, linkedStoreIds: (p.linkedStoreIds || []).filter((id) => String(id) !== sid) } : p));
     try {
-      await ProductService.bulkRemoveStoreProductLinks([pid], [sid]);
-      await ShopCountsService.recompute(queryClient, String(sid));
+      const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([pid], [sid]);
+      const deleted = Math.max(0, Number(deletedByStore?.[sid] ?? 1) || 0);
+      if (deleted > 0) {
+        ShopCountsService.bumpProducts(queryClient, sid, -deleted);
+      }
+      const cats = categoryNamesByStore?.[sid];
+      if (Array.isArray(cats)) {
+        const cnt = cats.length;
+        queryClient.setQueryData(ShopCountsService.key(sid), (old: any) => {
+          const prevProducts = Number(old?.productsCount ?? 0) || 0;
+          return { productsCount: prevProducts, categoriesCount: cnt };
+        });
+        queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.map((s) => (String(s.id) === sid ? { ...s, categoriesCount: cnt } : s));
+        });
+      }
       try {
         const updated = queryClient.getQueryData<ShopAggregated[]>(['shopsList']) || [];
         setStores(updated);

@@ -121,6 +121,9 @@ export class ShopService {
   // Кэш данных (простой in-memory)
   private static dataCache = new Map<string, { data: any; timestamp: number }>();
   private static readonly CACHE_TTL = 30000; // 30 секунд
+  private static readonly PERSISTED_SHOPS_CACHE_TTL = 10 * 60 * 1000;
+  private static readonly PERSISTED_SHOPS_CACHE_PREFIX = "shops-aggregated:";
+  private static lastUserId: string | null = null;
 
   // ============================================================================
   // ПРИВАТНЫЕ УТИЛИТЫ
@@ -260,6 +263,66 @@ export class ShopService {
     }
   }
 
+  private static getPersistedShopsKey(userId: string): string {
+    return `${this.PERSISTED_SHOPS_CACHE_PREFIX}${userId}`;
+  }
+
+  private static async getSessionUserId(): Promise<string | null> {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const userId = data?.session?.user?.id ? String(data.session.user.id) : null;
+      if (userId) this.lastUserId = userId;
+      return userId;
+    } catch {
+      return null;
+    }
+  }
+
+  private static getPersistedShops(userId: string): ShopAggregated[] | null {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return null;
+      const raw = window.localStorage.getItem(this.getPersistedShopsKey(userId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { timestamp?: number; shops?: ShopAggregated[] };
+      const timestamp = Number(parsed?.timestamp ?? 0) || 0;
+      if (!timestamp) return null;
+      if (Date.now() - timestamp > this.PERSISTED_SHOPS_CACHE_TTL) return null;
+      const shops = parsed?.shops;
+      if (!Array.isArray(shops)) return null;
+      return shops;
+    } catch {
+      return null;
+    }
+  }
+
+  private static setPersistedShops(userId: string, shops: ShopAggregated[]): void {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return;
+      window.localStorage.setItem(
+        this.getPersistedShopsKey(userId),
+        JSON.stringify({ timestamp: Date.now(), shops })
+      );
+    } catch {
+      return;
+    }
+  }
+
+  private static clearPersistedShops(userId: string): void {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return;
+      window.localStorage.removeItem(this.getPersistedShopsKey(userId));
+    } catch {
+      return;
+    }
+  }
+
+  private static async clearShopsCaches(): Promise<void> {
+    this.clearCache("shops");
+    this.clearCache("shop-limit");
+    const userId = this.lastUserId ?? (await this.getSessionUserId());
+    if (userId) this.clearPersistedShops(userId);
+  }
+
   /**
    * Обновление счетчиков в кэше
    */
@@ -277,6 +340,17 @@ export class ShopService {
     );
     
     this.setCache(cacheKey, updated);
+
+    const userId = this.lastUserId;
+    if (!userId) return;
+
+    const persisted = this.getPersistedShops(userId);
+    if (!persisted) return;
+
+    const persistedUpdated = persisted.map(shop =>
+      shop.id === storeId ? { ...shop, ...update(shop) } : shop
+    );
+    this.setPersistedShops(userId, persistedUpdated);
   }
 
   /**
@@ -381,11 +455,21 @@ export class ShopService {
    * Получение агрегированных данных магазинов с кэшированием и fallback.
    */
   static async getShopsAggregated(): Promise<ShopAggregated[]> {
-    if (this.isOffline()) return [];
-
     const cacheKey = "shops-aggregated";
+
     const cached = this.getCached<ShopAggregated[]>(cacheKey);
     if (cached) return cached;
+
+    const userId = await this.getSessionUserId();
+    if (userId) {
+      const persisted = this.getPersistedShops(userId);
+      if (persisted) {
+        this.setCache(cacheKey, persisted);
+        return persisted;
+      }
+    }
+
+    if (this.isOffline()) return [];
 
     await this.ensureSession();
 
@@ -394,6 +478,7 @@ export class ShopService {
         const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
         const shops = response.shops || [];
         this.setCache(cacheKey, shops);
+        if (userId) this.setPersistedShops(userId, shops);
         return shops;
       } catch (error) {
         console.error("Failed to fetch aggregated shops, using fallback:", error);
@@ -475,7 +560,7 @@ export class ShopService {
       });
       
       // Очищаем кэш после создания
-      this.clearCache("shops");
+      await this.clearShopsCaches();
       
       return response.shop;
     } catch (e) {
@@ -536,7 +621,7 @@ export class ShopService {
     const response = await this.invokeEdge<ShopResponse>("update-shop", { id, patch });
     
     // Очищаем кэш после обновления
-    this.clearCache("shops");
+    await this.clearShopsCaches();
     
     return response.shop;
   }
@@ -557,7 +642,7 @@ export class ShopService {
           .eq("id", id)
           .eq("user_id", uid);
         if (!delErr) {
-          this.clearCache("shops");
+          await this.clearShopsCaches();
           return;
         }
       }
@@ -566,7 +651,7 @@ export class ShopService {
     // 2) Основной путь через Edge Function
     try {
       await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
-      this.clearCache("shops");
+      await this.clearShopsCaches();
     } catch (e) {
       const msg = String((e as { message?: string })?.message || "");
       
@@ -577,7 +662,7 @@ export class ShopService {
       if (/409|Conflict/i.test(msg)) {
         await this.cleanupShopDependencies(id);
         await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
-        this.clearCache("shops");
+        await this.clearShopsCaches();
       } else {
         throw e;
       }
