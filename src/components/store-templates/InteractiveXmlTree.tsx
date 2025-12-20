@@ -317,59 +317,6 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
   // Парсим XML напрямую если есть (приоритет: xmlContent prop, потом structure.originalXml)
   const xml = xmlContent || structure.originalXml;
   const prevXmlRef = React.useRef(xml);
-  
-  const buildTreeFromStructure = React.useCallback((structure: XMLStructure, xml?: string): TreeNode[] => {
-    if (xml) {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@',
-        textNodeName: '_text',
-        parseAttributeValue: true,
-        parseTagValue: true,
-      });
-      
-      const parsed = parser.parse(xml);
-      return buildTree(parsed);
-    }
-    
-    // Fallback - строим из полей
-    const obj: any = {};
-    
-    // Собираем объект из полей
-    structure.fields.forEach(field => {
-      const parts = field.path.split('.');
-      let current = obj;
-      
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        const isLast = i === parts.length - 1;
-        
-        const arrayMatch = part.match(/(.+)\[(\d+)\]/);
-        if (arrayMatch) {
-          const [, name, index] = arrayMatch;
-          const idx = parseInt(index);
-          
-          if (!current[name]) current[name] = [];
-          
-          if (isLast) {
-            current[name][idx] = field.sample;
-          } else {
-            if (!current[name][idx]) current[name][idx] = {};
-            current = current[name][idx];
-          }
-        } else {
-          if (isLast) {
-            current[part] = field.sample;
-          } else {
-            if (!current[part]) current[part] = {};
-            current = current[part];
-          }
-        }
-      }
-    });
-    
-    return buildTree(obj);
-  }, [buildTree]);
 
   const buildTree = React.useCallback((obj: any, parentPath = '', parentName = ''): TreeNode[] => {
     const nodes: TreeNode[] = [];
@@ -669,6 +616,57 @@ export function InteractiveXmlTree({ structure, xmlContent, onSave }: Interactiv
 
     return nodes;
   }, []);
+
+  const buildTreeFromStructure = React.useCallback((structure: XMLStructure, xml?: string): TreeNode[] => {
+    if (xml) {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@',
+        textNodeName: '_text',
+        parseAttributeValue: true,
+        parseTagValue: true,
+      });
+
+      const parsed = parser.parse(xml);
+      return buildTree(parsed);
+    }
+
+    const obj: any = {};
+
+    structure.fields.forEach(field => {
+      const parts = field.path.split('.');
+      let current = obj;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLast = i === parts.length - 1;
+
+        const arrayMatch = part.match(/(.+)\[(\d+)\]/);
+        if (arrayMatch) {
+          const [, name, index] = arrayMatch;
+          const idx = parseInt(index);
+
+          if (!current[name]) current[name] = [];
+
+          if (isLast) {
+            current[name][idx] = field.sample;
+          } else {
+            if (!current[name][idx]) current[name][idx] = {};
+            current = current[name][idx];
+          }
+        } else {
+          if (isLast) {
+            current[part] = field.sample;
+          } else {
+            if (!current[part]) current[part] = {};
+            current = current[part];
+          }
+        }
+      }
+    });
+
+    return buildTree(obj);
+  }, [buildTree]);
 
   const buildTreeFromFields = (fields: XMLField[]): TreeNode[] => {
     // Fallback если нет XML

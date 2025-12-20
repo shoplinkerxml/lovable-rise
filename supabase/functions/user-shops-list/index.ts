@@ -3,6 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const REDIS_REST_URL =
+  Deno.env.get('UPSTASH_REDIS_REST_URL') || Deno.env.get('REDIS_REST_URL') || ''
+const REDIS_REST_TOKEN =
+  Deno.env.get('UPSTASH_REDIS_REST_TOKEN') || Deno.env.get('REDIS_REST_TOKEN') || ''
+const SHOP_COUNTS_TTL_SECONDS = Math.max(
+  5,
+  Number(Deno.env.get('SHOP_COUNTS_TTL_SECONDS') || '30') || 30
+)
+const SHOP_COUNTS_KEY_PREFIX =
+  Deno.env.get('SHOP_COUNTS_KEY_PREFIX') || 'shop:counts:'
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
@@ -28,6 +38,78 @@ type RequestBody = {
   includeConfig?: boolean
   store_id?: string
   limitOnly?: boolean
+  forceCounts?: boolean
+}
+
+type ShopCounts = { productsCount: number; categoriesCount: number }
+
+function normalizeCounts(input: any): ShopCounts {
+  const products = Math.max(0, Number(input?.productsCount ?? 0) || 0)
+  const catsRaw = Math.max(0, Number(input?.categoriesCount ?? 0) || 0)
+  return { productsCount: products, categoriesCount: products === 0 ? 0 : catsRaw }
+}
+
+async function redisPipeline(commands: any[]): Promise<any[] | null> {
+  if (!REDIS_REST_URL || !REDIS_REST_TOKEN) return null
+  try {
+    const base = REDIS_REST_URL.replace(/\/+$/, '')
+    const res = await fetch(`${base}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${REDIS_REST_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commands),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return Array.isArray(json) ? json : null
+  } catch {
+    return null
+  }
+}
+
+function buildCountsKey(storeId: string): string {
+  return `${SHOP_COUNTS_KEY_PREFIX}${storeId}`
+}
+
+async function getCountsFromRedis(storeIds: string[]): Promise<Map<string, ShopCounts>> {
+  const out = new Map<string, ShopCounts>()
+  const ids = (storeIds || []).map(String).filter(Boolean)
+  if (ids.length === 0) return out
+  const commands = ids.map((id) => ['GET', buildCountsKey(id)])
+  const resp = await redisPipeline(commands)
+  if (!resp) return out
+  for (let i = 0; i < ids.length; i++) {
+    const item = resp[i]
+    const raw = item?.result
+    if (!raw) continue
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      out.set(ids[i], normalizeCounts(parsed))
+    } catch {
+      continue
+    }
+  }
+  return out
+}
+
+async function setCountsToRedis(rows: Array<{ storeId: string; counts: ShopCounts }>): Promise<void> {
+  if (!REDIS_REST_URL || !REDIS_REST_TOKEN) return
+  const items = (rows || [])
+    .map((r) => ({ storeId: String(r.storeId || '').trim(), counts: normalizeCounts(r.counts) }))
+    .filter((r) => r.storeId.length > 0)
+  if (items.length === 0) return
+
+  const now = Date.now()
+  const commands = items.map((r) => [
+    'SET',
+    buildCountsKey(r.storeId),
+    JSON.stringify({ ...r.counts, ts: now }),
+    'EX',
+    SHOP_COUNTS_TTL_SECONDS,
+  ])
+  await redisPipeline(commands)
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -84,7 +166,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // Если body пустой или невалидный, используем дефолтные значения
     }
 
-    const { limitOnly = false, store_id: storeId, includeConfig } = body
+    const { limitOnly = false, store_id: storeId, includeConfig, forceCounts = false } = body
 
     if (limitOnly) {
       const { count, error: countError } = await supabaseClient
@@ -176,28 +258,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     )
 
-    // Параллельное получение связанных данных
-    const [
-      { data: templates },
-      { data: links }
-    ] = await Promise.all([
+    const [{ data: templates }, cachedCounts] = await Promise.all([
       templateIds.length > 0
         ? supabaseClient
             .from('store_templates')
             .select('id, marketplace')
             .in('id', templateIds)
         : Promise.resolve({ data: [] }),
-      storeId
-        ? supabaseClient
-            .from('store_product_links')
-            .select('store_id, is_active, product_id, custom_category_id, store_products!inner(category_id,category_external_id)')
-            .eq('store_id', storeId)
-            .eq('is_active', true)
-        : supabaseClient
-            .from('store_product_links')
-            .select('store_id, is_active, product_id, custom_category_id, store_products!inner(category_id,category_external_id)')
-            .in('store_id', storeIds)
-            .eq('is_active', true),
+      forceCounts ? Promise.resolve(new Map<string, ShopCounts>()) : getCountsFromRedis(storeIds.map(String)),
     ])
 
     const templatesMap = new Map<string, string>()
@@ -210,51 +278,67 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    const productsCountByStore = new Map<string, number>()
-    const categoriesSets = new Map<string, Set<string>>()
+    const countsByStore = cachedCounts || new Map<string, ShopCounts>()
+    const missingStoreIds = storeIds
+      .map((id: any) => String(id))
+      .filter((id) => id.length > 0 && !countsByStore.has(id))
 
-    for (const link of links || []) {
-      const sid = (link as any)?.store_id
-      if (!sid) continue
+    if (missingStoreIds.length > 0) {
+      const { data: links } = await supabaseClient
+        .from('store_product_links')
+        .select(
+          'store_id, is_active, product_id, custom_category_id, store_products!inner(category_id,category_external_id)'
+        )
+        .in('store_id', missingStoreIds)
+        .eq('is_active', true)
 
-      const keyStore = String(sid)
+      const productsCountByStore = new Map<string, number>()
+      const categoriesSets = new Map<string, Set<string>>()
 
-      productsCountByStore.set(
-        keyStore,
-        (productsCountByStore.get(keyStore) || 0) + 1
-      )
+      for (const link of links || []) {
+        const sid = (link as any)?.store_id
+        if (!sid) continue
+        const keyStore = String(sid)
+        productsCountByStore.set(keyStore, (productsCountByStore.get(keyStore) || 0) + 1)
 
-      const base = (link as any)?.store_products || {}
-      const customCat = (link as any)?.custom_category_id
-      const catKey =
-        customCat != null
-          ? `ext:${String(customCat)}`
-          : base?.category_id != null
-          ? `cat:${String(base.category_id)}`
-          : base?.category_external_id != null
-          ? `ext:${String(base.category_external_id)}`
-          : null
+        const base = (link as any)?.store_products || {}
+        const customCat = (link as any)?.custom_category_id
+        const catKey =
+          customCat != null
+            ? `ext:${String(customCat)}`
+            : base?.category_id != null
+            ? `cat:${String(base.category_id)}`
+            : base?.category_external_id != null
+            ? `ext:${String(base.category_external_id)}`
+            : null
 
-      if (catKey) {
-        if (!categoriesSets.has(keyStore)) {
-          categoriesSets.set(keyStore, new Set<string>())
+        if (catKey) {
+          if (!categoriesSets.has(keyStore)) categoriesSets.set(keyStore, new Set<string>())
+          categoriesSets.get(keyStore)!.add(catKey)
         }
-        categoriesSets.get(keyStore)!.add(catKey)
       }
+
+      const toWrite: Array<{ storeId: string; counts: ShopCounts }> = []
+      for (const sid of missingStoreIds) {
+        const products = productsCountByStore.get(sid) ?? 0
+        const catsRaw = categoriesSets.get(sid)?.size ?? 0
+        const counts = normalizeCounts({ productsCount: products, categoriesCount: catsRaw })
+        countsByStore.set(sid, counts)
+        toWrite.push({ storeId: sid, counts })
+      }
+      await setCountsToRedis(toWrite)
     }
 
     const aggregated = stores.map((store: any) => {
       const pid = String(store.id)
-      const products = productsCountByStore.get(pid) ?? 0
-      const catsRaw = categoriesSets.get(pid)?.size ?? 0
-      const cats = products === 0 ? 0 : catsRaw
+      const counts = countsByStore.get(pid) || { productsCount: 0, categoriesCount: 0 }
       return {
         ...store,
         marketplace: store.template_id
           ? templatesMap.get(String(store.template_id)) ?? 'Не вказано'
           : 'Не вказано',
-        productsCount: products,
-        categoriesCount: cats,
+        productsCount: counts.productsCount,
+        categoriesCount: counts.categoriesCount,
       }
     })
 

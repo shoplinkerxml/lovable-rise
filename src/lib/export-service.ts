@@ -120,11 +120,11 @@ export const ExportService = {
       .update({ auto_generate: auto })
       .eq("id", linkId)
       .select("id,store_id")
-      .returns<Pick<ExportLink, "id" | "store_id">>()
       .maybeSingle();
     if (error) return false;
-    if (data?.store_id) {
-      ExportService.invalidateLinksCache(data.store_id, session.user?.id);
+    const row = data as Pick<ExportLink, "id" | "store_id"> | null;
+    if (row?.store_id) {
+      ExportService.invalidateLinksCache(String(row.store_id), session.user?.id);
     }
     return !!data;
   },

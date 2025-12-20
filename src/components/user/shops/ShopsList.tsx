@@ -54,11 +54,11 @@ export const ShopsList = ({
   const { data: shopsData, isLoading, isFetching } = useQuery<ShopWithMarketplace[]>({
     queryKey: ['shopsList'],
     queryFn: async () => {
-      const rows = await ShopService.getShopsAggregated();
+      const rows = await ShopService.getShopsAggregated({ force: true });
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 900_000,
+    staleTime: 5_000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -119,18 +119,25 @@ export const ShopsList = ({
   // Realtime синхронізація (оптимістичні оновлення)
   // ============================================================================
   const refetchDebounceRef = useRef<number | null>(null);
+  const pendingRecomputeStoreIdsRef = useRef<Set<string>>(new Set());
   
   useEffect(() => {
     // Оптимістичне оновлення лічильників товарів
     const updateProductsCount = (storeId: string, delta: number) => {
-      ShopCountsService.bumpProducts(queryClient, storeId, delta);
+      const sid = String(storeId || "").trim();
+      if (!sid) return;
+      ShopCountsService.bumpProducts(queryClient, sid, delta);
+      pendingRecomputeStoreIdsRef.current.add(sid);
 
-      // Через 750мс робимо повний refetch для синхронізації
       if (refetchDebounceRef.current != null) {
         window.clearTimeout(refetchDebounceRef.current);
       }
-      refetchDebounceRef.current = window.setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['shopsList'], exact: false });
+      refetchDebounceRef.current = window.setTimeout(async () => {
+        const ids = Array.from(pendingRecomputeStoreIdsRef.current);
+        pendingRecomputeStoreIdsRef.current.clear();
+        await Promise.all(
+          ids.map((id) => ShopCountsService.recompute(queryClient, id).catch(() => void 0))
+        );
         refetchDebounceRef.current = null;
       }, 750);
     };

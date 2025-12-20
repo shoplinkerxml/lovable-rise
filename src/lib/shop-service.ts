@@ -454,14 +454,17 @@ export class ShopService {
   /**
    * Получение агрегированных данных магазинов с кэшированием и fallback.
    */
-  static async getShopsAggregated(): Promise<ShopAggregated[]> {
+  static async getShopsAggregated(options?: { force?: boolean }): Promise<ShopAggregated[]> {
+    const force = options?.force === true
     const cacheKey = "shops-aggregated";
 
-    const cached = this.getCached<ShopAggregated[]>(cacheKey);
-    if (cached) return cached;
+    if (!force) {
+      const cached = this.getCached<ShopAggregated[]>(cacheKey);
+      if (cached) return cached;
+    }
 
     const userId = await this.getSessionUserId();
-    if (userId) {
+    if (!force && userId && this.isOffline()) {
       const persisted = this.getPersistedShops(userId);
       if (persisted) {
         this.setCache(cacheKey, persisted);
@@ -496,6 +499,7 @@ export class ShopService {
     const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
       store_id: id,
       includeConfig: true,
+      forceCounts: true,
     });
 
     const shop = response.shops?.[0];
@@ -737,6 +741,7 @@ export class ShopService {
 
     const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
       store_id: storeId,
+      forceCounts: true,
     });
 
     const shop = (response.shops || []).find(

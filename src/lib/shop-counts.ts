@@ -18,6 +18,10 @@ export const ShopCountsService = {
           : s
       );
     });
+    queryClient.setQueryData<ShopAggregated | null>(["shopDetail", storeId], (prev) => {
+      if (!prev) return prev;
+      return { ...prev, productsCount: counts.productsCount, categoriesCount: counts.categoriesCount };
+    });
   },
   bumpProducts(queryClient: QueryClient, storeId: string, delta: number) {
     queryClient.setQueryData<ShopCounts>(this.key(storeId), (old) => {
@@ -38,6 +42,12 @@ export const ShopCountsService = {
             }
           : s
       );
+    });
+    queryClient.setQueryData<ShopAggregated | null>(["shopDetail", storeId], (prev) => {
+      if (!prev) return prev;
+      const nextProductsCount = Math.max(0, Number(prev.productsCount ?? 0) + delta);
+      const nextCategoriesCount = nextProductsCount === 0 ? 0 : Math.max(0, Number(prev.categoriesCount ?? 0));
+      return { ...prev, productsCount: nextProductsCount, categoriesCount: nextCategoriesCount };
     });
   },
   async recompute(queryClient: QueryClient, storeId: string) {
