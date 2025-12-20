@@ -21,7 +21,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <div className="space-x-2 flex items-center justify-center">
-          <div className="bg-gradient-success p-2 rounded-lg shadow-glow">
+          <div className="bg-gradient-success p-2 rounded-lg shadow-glow ring-1 ring-white/10">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
           <span data-testid="header_brand" className="inline-flex items-center px-3 py-1 rounded-md border border-success/20 text-base font-semibold text-secondary-foreground bg-primary-foreground font-sans">
@@ -35,7 +35,7 @@ export function Header() {
           
           
           <a href="/docs" className="text-muted-foreground hover:text-primary transition-colors">
-            API Docs
+            {t("nav_api_docs")}
           </a>
         </nav>
 
@@ -43,7 +43,7 @@ export function Header() {
         <div className="hidden md:flex items-center space-x-3">
           <Button variant="ghost" size="icon" onClick={toggleLanguage} className="relative">
             <Globe className="h-5 w-5" />
-            <span className="sr-only">Toggle language</span>
+            <span className="sr-only">{t("toggle_language")}</span>
           </Button>
           <ThemeToggle />
           <Button variant="ghost" size="sm" onClick={() => navigate('/user-auth')}>
@@ -73,7 +73,7 @@ export function Header() {
             
             
             <a href="/docs" className="text-muted-foreground py-2">
-              API Docs
+              {t("nav_api_docs")}
             </a>
             <div className="pt-3 space-y-2">
               <Button variant="outline" className="w-full" onClick={() => {

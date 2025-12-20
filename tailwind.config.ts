@@ -1,5 +1,10 @@
 import type { Config } from "tailwindcss";
-import tailwindcssAnimate from "tailwindcss-animate";
+import type { PluginCreator } from "tailwindcss/types/config";
+import * as tailwindcssAnimateModule from "tailwindcss-animate";
+
+const tailwindcssAnimate =
+	((tailwindcssAnimateModule as unknown as { default?: PluginCreator }).default ??
+		(tailwindcssAnimateModule as unknown as PluginCreator)) as PluginCreator;
 
 export default {
     darkMode: ["class"],
@@ -137,6 +142,33 @@ export default {
     				'50%': {
     					transform: 'translateY(-10px)'
     				}
+    			},
+    			blob: {
+    				'0%, 100%': {
+    					transform: 'translate3d(0, 0, 0) scale(1)'
+    				},
+    				'30%': {
+    					transform: 'translate3d(36px, -28px, 0) scale(1.06)'
+    				},
+    				'60%': {
+    					transform: 'translate3d(-22px, 18px, 0) scale(0.94)'
+    				}
+    			},
+    			shimmer: {
+    				'0%': {
+    					transform: 'translateX(-60%)'
+    				},
+    				'100%': {
+    					transform: 'translateX(140%)'
+    				}
+    			},
+    			float: {
+    				'0%, 100%': {
+    					transform: 'translate3d(0, 0, 0)'
+    				},
+    				'50%': {
+    					transform: 'translate3d(0, -10px, 0)'
+    				}
     			}
     		},
     		animation: {
@@ -144,7 +176,13 @@ export default {
     			'accordion-up': 'accordion-up 0.2s ease-out',
     			'grow-bar': 'grow-bar 1s ease-out forwards',
     			'fade-slide-up': 'fade-slide-up 0.6s ease-out',
-    			'bounce-gentle': 'bounce-gentle 2s ease-in-out infinite'
+    			'bounce-gentle': 'bounce-gentle 2s ease-in-out infinite',
+    			'blob-slow': 'blob 18s ease-in-out infinite',
+    			'blob-slower': 'blob 26s ease-in-out infinite',
+    			'blob-slowest': 'blob 34s ease-in-out infinite',
+    			'shimmer-slow': 'shimmer 2.6s ease-in-out infinite',
+    			'float-slow': 'float 6s ease-in-out infinite',
+    			'float-slower': 'float 8s ease-in-out infinite'
     		}
     	}
     },

@@ -129,6 +129,8 @@ export const commonDictionary: Dictionary = {
   nav_features: { uk: "Можливості", en: "Features" },
   nav_how_it_works: { uk: "Як це працює", en: "How it works" },
   nav_pricing: { uk: "Тарифи", en: "Pricing" },
+  nav_api_docs: { uk: "Документація API", en: "API Docs" },
+  toggle_language: { uk: "Перемкнути мову", en: "Toggle language" },
   brand_name: { uk: "MarketGrow", en: "MarketGrow" },
   hero_badge: {
     uk: "Автоматизація бізнесу на маркетплейсах",
@@ -136,11 +138,18 @@ export const commonDictionary: Dictionary = {
   },
   hero_title_1: { uk: "Збільшуйте продажі на", en: "Boost your" },
   hero_title_accent: { uk: "маркетплейсах", en: "marketplace sales" },
-  hero_title_2: { uk: "на автопілоті", en: "on autopilot" },
+  hero_title_2: { uk: "— на автопілоті", en: "on autopilot" },
   hero_subtitle: {
     uk: "Автоматизуємо роботу з прайсами та постачальниками. Перетворюємо складні дані в простий прибуток. Економимо ваш час для росту бізнесу.",
     en: "Automate price lists and supplier management. Turn complex data into simple profit. Save your time for business growth.",
   },
+  hero_mockup_alt: {
+    uk: "Макет таблиці з бізнес‑даними",
+    en: "Business data spreadsheet mockup",
+  },
+  hero_bullet_1: { uk: "Імпорт прайсів за хвилини", en: "Import price lists in minutes" },
+  hero_bullet_2: { uk: "Розумна категоризація", en: "Smart categorization" },
+  hero_bullet_3: { uk: "Експорт під маркетплейси", en: "Marketplace-ready export" },
   hero_cta_primary: {
     uk: "Спробувати безкоштовно",
     en: "Try for free",
