@@ -441,6 +441,7 @@ export const productsDictionary: Dictionary = {
     en: "Select category",
   },
   table_stock: { uk: "Залишок", en: "Stock" },
+  table_active: { uk: "Активний", en: "Active" },
   article: { uk: "Артикул", en: "SKU" },
   article_placeholder: {
     uk: "Введіть артикул",
