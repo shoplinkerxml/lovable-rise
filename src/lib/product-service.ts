@@ -394,6 +394,7 @@ export class ProductService {
       const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
         limit,
         offset: 0,
+        bypassCache: options?.bypassCache === true,
       });
       const products = Array.isArray(fresh?.products) ? fresh.products! : [];
       const page: ProductListPage = {
@@ -444,6 +445,7 @@ export class ProductService {
         store_id: String(storeId),
         limit,
         offset: 0,
+        bypassCache: options?.bypassCache === true,
       });
       const products = Array.isArray(fresh?.products) ? fresh.products! : [];
       const page: ProductListPage = {

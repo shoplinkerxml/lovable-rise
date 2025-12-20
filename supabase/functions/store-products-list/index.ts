@@ -64,10 +64,18 @@ function getImagePublicUrl(r2Key: string | null, fallbackUrl: string): string {
   return `${cleanBase}/${r2Key}`
 }
 
-async function buildCategoriesMap(client: any, userId: string, storeId: string): Promise<Record<string, string>> {
+async function buildCategoriesMap(
+  client: any,
+  userId: string,
+  storeId: string,
+  options?: { bypassCache?: boolean },
+): Promise<Record<string, string>> {
+  const bypassCache = options?.bypassCache === true
   const cacheKey = `${userId}:${storeId}`
-  const cached = cache.getCategories(cacheKey)
-  if (cached) return cached
+  if (!bypassCache) {
+    const cached = cache.getCategories(cacheKey)
+    if (cached) return cached
+  }
 
   const { data } = await client
     .from('store_store_categories')
@@ -83,7 +91,9 @@ async function buildCategoriesMap(client: any, userId: string, storeId: string):
     if (r.external_id != null) map[String(r.external_id)] = name
   }
 
-  cache.setCategories(cacheKey, map)
+  if (!bypassCache) {
+    cache.setCategories(cacheKey, map)
+  }
   return map
 }
 
@@ -230,26 +240,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const limit = Math.min(Math.max(1, body.limit ?? DEFAULT_LIMIT), MAX_LIMIT)
     const offset = Math.max(0, body.offset ?? 0)
+    const bypassCache = body?.bypassCache === true || body?.bypassCache === 'true'
 
     const cacheKey = `${user.id}:${storeId}:${limit}:${offset}`
-    const cachedResult = cache.getProducts(cacheKey)
-    if (cachedResult) {
-      const { products, totalCount } = cachedResult
-      return jsonResponse({
-        products,
-        page: {
-          limit,
-          offset,
-          hasMore: offset + limit < totalCount,
-          nextOffset: offset + limit < totalCount ? offset + limit : null,
-          total: totalCount,
-        },
-      })
+    if (!bypassCache) {
+      const cachedResult = cache.getProducts(cacheKey)
+      if (cachedResult) {
+        const { products, totalCount } = cachedResult
+        return jsonResponse({
+          products,
+          page: {
+            limit,
+            offset,
+            hasMore: offset + limit < totalCount,
+            nextOffset: offset + limit < totalCount ? offset + limit : null,
+            total: totalCount,
+          },
+        })
+      }
     }
 
     let categoriesMap: Record<string, string> = {}
     try {
-      categoriesMap = await buildCategoriesMap(client, String(user.id), storeId)
+      categoriesMap = await buildCategoriesMap(client, String(user.id), storeId, { bypassCache })
     } catch {
       categoriesMap = {}
     }
@@ -260,7 +273,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const { products, totalCount } = result
-    cache.setProducts(cacheKey, { products, totalCount })
+    if (!bypassCache) {
+      cache.setProducts(cacheKey, { products, totalCount })
+    }
 
     const hasMore = offset + limit < totalCount
     const nextOffset = hasMore ? offset + limit : null
@@ -273,4 +288,3 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ error: (error as Error)?.message || 'Internal server error' }, 500)
   }
 })
-

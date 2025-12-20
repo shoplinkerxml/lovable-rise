@@ -253,10 +253,11 @@ export function ProductFormTabs({
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsHeader t={t} tabsOverflow={tabsOverflow} tabsScrollRef={tabsScrollRef} />
 
-          <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
+            <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
             <InfoTab
               formState={{ basicData, priceData, stockData }}
               formActions={{ updateBasicData, setPriceData, setStockData, setBasicData }}
+              onExternalChange={onChange as any}
               lookups={{
                 currencies,
                 categories,

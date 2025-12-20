@@ -195,23 +195,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const storeId = null
     const limit = Math.min(Math.max(1, body.limit ?? DEFAULT_LIMIT), MAX_LIMIT)
     const offset = Math.max(0, body.offset ?? 0)
+    const bypassCache = body?.bypassCache === true || body?.bypassCache === 'true'
     // Кэш ключ
     const cacheKey = `${user.id}:${storeId || 'all'}:${limit}:${offset}`
-    const cachedResult = cache.getProducts(cacheKey)
-    
-    if (cachedResult) {
-      console.log('Cache hit:', cacheKey)
-      const { products, totalCount } = cachedResult
-      return jsonResponse({
-        products,
-        page: {
-          limit,
-          offset,
-          hasMore: offset + limit < totalCount,
-          nextOffset: offset + limit < totalCount ? offset + limit : null,
-          total: totalCount,
-        },
-      })
+    if (!bypassCache) {
+      const cachedResult = cache.getProducts(cacheKey)
+      if (cachedResult) {
+        console.log('Cache hit:', cacheKey)
+        const { products, totalCount } = cachedResult
+        return jsonResponse({
+          products,
+          page: {
+            limit,
+            offset,
+            hasMore: offset + limit < totalCount,
+            nextOffset: offset + limit < totalCount ? offset + limit : null,
+            total: totalCount,
+          },
+        })
+      }
     }
 
     // Получение продуктов
@@ -220,7 +222,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { products, totalCount } = result
 
     // Кэшируем результат
-    cache.setProducts(cacheKey, { products, totalCount })
+    if (!bypassCache) {
+      cache.setProducts(cacheKey, { products, totalCount })
+    }
 
     const hasMore = offset + limit < totalCount
     const nextOffset = hasMore ? offset + limit : null

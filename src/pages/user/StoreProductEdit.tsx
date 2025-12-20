@@ -270,24 +270,6 @@ export const StoreProductEdit = () => {
     };
   }, [form]);
 
-  const updateCategoryCache = useCallback(async (
-    categoryId: number,
-    categoryExtId: string | null,
-    categoryName: string
-  ) => {
-    try {
-      const namesByStore = await ProductService.refreshStoreCategoryFilterOptions([storeId]);
-      const names = Array.isArray(namesByStore?.[storeId]) ? namesByStore[storeId] : [];
-      
-      const existing = queryClient.getQueryData<any>(ShopCountsService.key(storeId)) as { productsCount?: number; categoriesCount?: number } | undefined;
-      const productsCount = Math.max(0, (existing?.productsCount ?? 0));
-      const categoriesCount = productsCount === 0 ? 0 : Math.max(0, names.length);
-      ShopCountsService.set(queryClient, storeId, { productsCount, categoriesCount });
-    } catch (error) {
-      console.error("Failed to update category cache:", error);
-    }
-  }, [storeId, queryClient]);
-
   const handleSave = useCallback(async () => {
     setUiState(prev => ({ ...prev, saving: true }));
 
@@ -343,13 +325,9 @@ export const StoreProductEdit = () => {
           category_external_id: patch.custom_category_id,
           categoryName: freshName,
         }, storeId);
-        
-        await updateCategoryCache(
-          productPayload.category_id,
-          patch.custom_category_id,
-          freshName || ''
-        );
       }
+
+      await ShopCountsService.recompute(queryClient, storeId).catch(() => void 0);
 
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}`);
@@ -367,7 +345,7 @@ export const StoreProductEdit = () => {
     lastCategoryId,
     pid,
     storeId,
-    updateCategoryCache,
+    queryClient,
     t,
     navigate,
   ]);

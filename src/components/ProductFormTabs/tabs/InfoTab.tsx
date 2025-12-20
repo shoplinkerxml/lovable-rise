@@ -24,6 +24,7 @@ export function InfoTab(props: {
     setStockData: (s: StockData) => void;
     setBasicData: (next: BasicData) => void;
   };
+  onExternalChange?: (partial: Partial<BasicData & PriceData & StockData>) => void;
   lookups: {
     currencies: CurrencyOption[];
     categories: CategoryOption[];
@@ -91,6 +92,7 @@ export function InfoTab(props: {
   } = imageHandlers;
   const onChange = (partial: Partial<BasicData & PriceData & StockData>) => {
     updateBasicData(partial);
+    props.onExternalChange?.(partial);
   };
 
   return (
