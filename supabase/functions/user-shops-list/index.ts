@@ -301,6 +301,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (!stores || stores.length === 0) {
+      if (includeLimit) {
+        const limit = await getLimitForUser(user.id)
+        return jsonResponse({ shops: [], totalShops: 0, limit })
+      }
       return jsonResponse({ shops: [] })
     }
 

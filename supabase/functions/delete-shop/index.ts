@@ -6,6 +6,50 @@ const corsHeaders: Record<string, string> = {
   "Content-Type": "application/json",
 }
 
+const REDIS_REST_URL =
+  Deno.env.get("UPSTASH_REDIS_REST_URL") || Deno.env.get("REDIS_REST_URL") || ""
+const REDIS_REST_TOKEN =
+  Deno.env.get("UPSTASH_REDIS_REST_TOKEN") || Deno.env.get("REDIS_REST_TOKEN") || ""
+const SHOP_CONFIG_KEY_PREFIX =
+  Deno.env.get("SHOP_CONFIG_KEY_PREFIX") || "shop:config:"
+const SHOP_COUNTS_KEY_PREFIX =
+  Deno.env.get("SHOP_COUNTS_KEY_PREFIX") || "shop:counts:"
+
+async function redisPipeline(commands: any[]): Promise<any[] | null> {
+  if (!REDIS_REST_URL || !REDIS_REST_TOKEN) return null
+  try {
+    const base = REDIS_REST_URL.replace(/\/+$/, "")
+    const res = await fetch(`${base}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${REDIS_REST_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(commands),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return Array.isArray(json) ? json : null
+  } catch {
+    return null
+  }
+}
+
+function buildConfigKey(storeId: string): string {
+  return `${SHOP_CONFIG_KEY_PREFIX}${storeId}`
+}
+
+function buildCountsKey(storeId: string): string {
+  return `${SHOP_COUNTS_KEY_PREFIX}${storeId}`
+}
+
+async function deleteShopFromRedis(storeId: string): Promise<void> {
+  if (!REDIS_REST_URL || !REDIS_REST_TOKEN) return
+  const sid = String(storeId || "").trim()
+  if (!sid) return
+  await redisPipeline([["DEL", buildConfigKey(sid)], ["DEL", buildCountsKey(sid)]])
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -57,6 +101,11 @@ Deno.serve(async (req) => {
     const { error } = await supabase.from("user_stores").delete().eq("id", id)
     if (error) {
       return new Response(JSON.stringify({ error: "db_error" }), { status: 500, headers: corsHeaders })
+    }
+    try {
+      await deleteShopFromRedis(id)
+    } catch {
+      void 0
     }
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders })
   } catch (e) {

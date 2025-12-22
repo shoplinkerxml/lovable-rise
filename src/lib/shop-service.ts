@@ -320,7 +320,9 @@ export class ShopService {
 
   private static async clearShopsCaches(): Promise<void> {
     this.clearCache("shops");
+    this.clearCache("shops-aggregated");
     this.clearCache("shop-limit");
+    this.clearCache("shop-limit-info");
     const userId = this.lastUserId ?? (await this.getSessionUserId());
     if (userId) this.clearPersistedShops(userId);
     try {
@@ -705,24 +707,6 @@ export class ShopService {
 
     await this.ensureSession();
 
-    // 1) Пробуем быстрое удаление для владельца (оптимизация для пустых магазинов)
-    try {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = String(auth?.user?.id || "");
-      if (uid) {
-        const { error: delErr } = await supabase
-          .from("user_stores")
-          .delete()
-          .eq("id", id)
-          .eq("user_id", uid);
-        if (!delErr) {
-          await this.clearShopsCaches();
-          return;
-        }
-      }
-    } catch { /* ignore - попробуем основной путь */ }
-
-    // 2) Основной путь через Edge Function
     try {
       await this.invokeEdge<{ ok: boolean }>("delete-shop", { id });
       await this.clearShopsCaches();

@@ -10,6 +10,10 @@ import { toast } from "sonner";
 import TariffPage from "./TariffPage";
 import { ListPage } from "@/pages/page-types/ListPage";
 import { DashboardPage } from "@/pages/page-types/DashboardPage";
+import { useQuery } from "@tanstack/react-query";
+import { ShopService, type Shop } from "@/lib/shop-service";
+import { ShopStructureEditor } from "@/components/user/shops";
+import { ExportDialog } from "@/components/user/shops/ExportDialog";
 
 interface UserDashboardContextType {
   user: UserProfile;
@@ -29,6 +33,34 @@ const UserMenuContentByPath = () => {
   // Get the full path including any nested routes
   const location = useLocation();
   const fullPath = location.pathname.replace('/user/', '');
+  const shopRoute = useMemo(() => {
+    const raw = String(fullPath || path || "");
+    const normalized = raw.startsWith("/") ? raw.slice(1) : raw;
+    const match = normalized.match(/^shops\/([^/]+)\/(structure|export)\/?$/);
+    if (!match) return null;
+    return { storeId: String(match[1] || ""), action: match[2] as "structure" | "export" };
+  }, [fullPath, path]);
+  const [shopDialogOpen, setShopDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!shopRoute) return;
+    setShopDialogOpen(true);
+  }, [shopRoute]);
+
+  const {
+    data: shopForStructure,
+    isLoading: shopForStructureLoading,
+  } = useQuery<Shop | null>({
+    queryKey: ["shopStructure", shopRoute?.storeId || ""],
+    queryFn: async () => {
+      if (!shopRoute?.storeId) return null;
+      return await ShopService.getShop(shopRoute.storeId);
+    },
+    enabled: !!shopRoute?.storeId && shopRoute.action === "structure",
+    staleTime: 900_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
 
   const dashboardWidgets = useMemo(() => {
     const cfg = (menuItem?.content_data || {}) as Record<string, unknown>;
@@ -43,6 +75,11 @@ const UserMenuContentByPath = () => {
 
   useEffect(() => {
     const loadMenuItem = async () => {
+      if (shopRoute) {
+        setError(null);
+        setLoading(false);
+        return;
+      }
       // Use the full path instead of just the path parameter
       const currentPath = fullPath || path;
       
@@ -108,7 +145,38 @@ const UserMenuContentByPath = () => {
     };
 
     loadMenuItem();
-  }, [path, fullPath, user.id, t, menuItems]);
+  }, [path, fullPath, user.id, t, menuItems, shopRoute]);
+
+  if (shopRoute) {
+    const handleClose = (open: boolean) => {
+      setShopDialogOpen(open);
+      if (!open) {
+        navigate(`/user/shops/${shopRoute.storeId}`);
+      }
+    };
+
+    if (shopRoute.action === "export") {
+      return (
+        <div className="p-6">
+          <ExportDialog storeId={shopRoute.storeId} open={shopDialogOpen} onOpenChange={handleClose} />
+        </div>
+      );
+    }
+
+    if (shopForStructureLoading || !shopForStructure) {
+      return (
+        <div className="flex h-full items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-6">
+        <ShopStructureEditor shop={shopForStructure} open={shopDialogOpen} onOpenChange={handleClose} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
