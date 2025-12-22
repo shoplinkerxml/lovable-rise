@@ -52,18 +52,27 @@ export const ShopDetail = () => {
       if (!shopId) return;
 
       try {
-        await ProductService.bulkRemoveStoreProductLinks(
+        const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(
           [String(product.id)],
           [shopId]
         );
 
-        ShopCountsService.bumpProducts(queryClient, shopId, -1);
-        queryClient.setQueryData<ShopAggregated | null>(['shopDetail', shopId], (prev) => {
-          if (!prev) return prev;
-          const nextProductsCount = Math.max(0, Number(prev.productsCount ?? 0) - 1);
-          const nextCategoriesCount =
-            nextProductsCount === 0 ? 0 : Math.max(0, Number(prev.categoriesCount ?? 0));
-          return { ...prev, productsCount: nextProductsCount, categoriesCount: nextCategoriesCount };
+        const current = queryClient.getQueryData<ShopAggregated | null>(['shopDetail', shopId]);
+        const baseProductsCount = Math.max(0, Number(current?.productsCount ?? 0));
+        const baseCategoriesCount = Math.max(0, Number(current?.categoriesCount ?? 0));
+        const deleted = Math.max(0, Number(deletedByStore?.[String(shopId)] ?? 1) || 0);
+        const nextProductsCount = Math.max(0, baseProductsCount - deleted);
+        const cats = categoryNamesByStore?.[String(shopId)];
+        const nextCategoriesCount =
+          nextProductsCount === 0
+            ? 0
+            : Array.isArray(cats)
+              ? cats.length
+              : baseCategoriesCount;
+
+        ShopCountsService.set(queryClient, shopId, {
+          productsCount: nextProductsCount,
+          categoriesCount: nextCategoriesCount,
         });
         
         toast.success(t('product_removed_successfully') || 'Товар видалено');

@@ -34,22 +34,21 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
       }, 500);
     };
 
-    const updateProductCount = (delta: number) => {
-      ShopCountsService.bumpProducts(queryClient, shopId, delta);
+    const triggerCountsRefetch = () => {
       scheduleCountsRefetch();
     };
 
     const handleInsert = (payload: any) => {
       const { store_id, is_active } = payload.new;
       if (String(store_id) === shopId && is_active !== false) {
-        updateProductCount(+1);
+        triggerCountsRefetch();
       }
     };
 
     const handleDelete = (payload: any) => {
       const { store_id, is_active } = payload.old;
       if (String(store_id) === shopId && is_active !== false) {
-        updateProductCount(-1);
+        triggerCountsRefetch();
       }
     };
 
@@ -58,18 +57,18 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
       const { store_id: newStoreId, is_active: isActive } = payload.new;
       if (oldStoreId !== newStoreId) {
         if (String(oldStoreId) === shopId && wasActive !== false) {
-          updateProductCount(-1);
+          triggerCountsRefetch();
         }
         if (String(newStoreId) === shopId && isActive !== false) {
-          updateProductCount(+1);
+          triggerCountsRefetch();
         }
         return;
       }
       if (String(newStoreId) === shopId) {
         if (wasActive !== false && isActive === false) {
-          updateProductCount(-1);
+          triggerCountsRefetch();
         } else if (wasActive === false && isActive !== false) {
-          updateProductCount(+1);
+          triggerCountsRefetch();
         }
       }
     };

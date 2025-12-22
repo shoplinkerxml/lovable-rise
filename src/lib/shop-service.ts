@@ -321,6 +321,12 @@ export class ShopService {
     this.clearCache("shop-limit");
     const userId = this.lastUserId ?? (await this.getSessionUserId());
     if (userId) this.clearPersistedShops(userId);
+    try {
+      const { UserAuthService } = await import("@/lib/user-auth-service");
+      UserAuthService.clearAuthMeCache();
+    } catch {
+      void 0;
+    }
   }
 
   /**
@@ -461,6 +467,42 @@ export class ShopService {
     if (!force) {
       const cached = this.getCached<ShopAggregated[]>(cacheKey);
       if (cached) return cached;
+    }
+
+    if (!force) {
+      try {
+        const validation = await SessionValidator.ensureValidSession();
+        if (validation.isValid && validation.user?.id) {
+          const sessionKey = `${validation.user.id}:${validation.expiresAt ?? 0}`;
+          const raw = typeof window !== "undefined" ? window.localStorage?.getItem(`rq:authMe:${sessionKey}`) : null;
+          if (raw) {
+            const parsed = JSON.parse(raw) as any;
+            const stores = parsed?.data?.userStores;
+            if (Array.isArray(stores) && stores.length > 0) {
+              const lite = stores.map((s: any) => ({
+                id: String(s.id),
+                user_id: String(validation.user!.id),
+                store_name: String(s.store_name || ""),
+                store_company: null,
+                store_url: null,
+                template_id: null,
+                xml_config: null,
+                custom_mapping: null,
+                marketplace: "Не вказано",
+                is_active: true,
+                created_at: "",
+                updated_at: "",
+                productsCount: 0,
+                categoriesCount: 0,
+              })) as ShopAggregated[];
+              this.setCache(cacheKey, lite);
+              return lite;
+            }
+          }
+        }
+      } catch {
+        void 0;
+      }
     }
 
     const userId = await this.getSessionUserId();

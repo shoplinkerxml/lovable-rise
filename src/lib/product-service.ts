@@ -323,6 +323,23 @@ export class ProductService {
       return ProductService.inFlightStores;
     }
     const task = (async () => {
+      try {
+        const { UserAuthService } = await import("@/lib/user-auth-service");
+        const authMe = await UserAuthService.fetchAuthMe();
+        if (Array.isArray((authMe as any)?.userStores)) {
+          return (authMe.userStores || []).map((s: any) => ({
+            id: String(s.id),
+            store_name: String(s.store_name || ""),
+            store_url: null,
+            is_active: true,
+            productsCount: 0,
+            categoriesCount: 0,
+          }));
+        }
+      } catch {
+        void 0;
+      }
+
       const { ShopService } = await import("@/lib/shop-service");
       const shops = await ShopService.getShopsAggregated();
       const mapped = (shops || []).map((s) => ({

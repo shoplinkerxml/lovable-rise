@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
       { data: profile, error: profileError },
       { data: subscriptions, error: subscriptionError },
       { data: menuItems, error: menuItemsError },
+      { data: userStores, error: userStoresError },
     ] = await Promise.all([
       // Профиль пользователя
       supabaseClient
@@ -93,6 +94,13 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('is_active', true)
         .order('order_index', { ascending: true }),
+
+      supabaseClient
+        .from('user_stores')
+        .select('id, store_name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('store_name', { ascending: true }),
     ])
 
     // Обработка ошибок профиля
@@ -116,6 +124,12 @@ Deno.serve(async (req) => {
     if (menuItemsError) {
       console.log('Menu items fetch error', {
         error: menuItemsError.message,
+      })
+    }
+
+    if (userStoresError) {
+      console.log('User stores fetch error', {
+        error: userStoresError.message,
       })
     }
 
@@ -171,6 +185,7 @@ Deno.serve(async (req) => {
       subscription: activeSubscription || null,
       tariffLimits,
       menuItems: menuItems || [],
+      userStores: userStores || [],
     })
   } catch (error) {
     console.error('Unexpected error:', error)

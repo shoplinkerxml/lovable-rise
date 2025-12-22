@@ -50,6 +50,7 @@ import { Toolbar } from "./ProductsTable/Toolbar";
 import { useProductColumns } from "./ProductsTable/columns";
 import type { ShopAggregated } from "@/lib/shop-service";
 import type { ProductRow } from "./ProductsTable/columns";
+import { UserAuthService } from "@/lib/user-auth-service";
 
  
 
@@ -351,11 +352,15 @@ export const ProductsTable = ({
   // ViewOptionsMenu manages its own open state
   const [storesMenuOpen, setStoresMenuOpen] = useState(false);
   const [stores, setStores] = useState<ShopAggregated[]>([]);
+  const [authStoreNames, setAuthStoreNames] = useState<Record<string, string>>({});
   const storeNames = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const s of stores || []) m[String(s.id)] = String(s.store_name || "");
+    const m: Record<string, string> = { ...(authStoreNames || {}) };
+    for (const s of stores || []) {
+      const name = String(s.store_name || "");
+      if (name) m[String(s.id)] = name;
+    }
     return m;
-  }, [stores]);
+  }, [stores, authStoreNames]);
   
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const loadStoresForMenu = useCallback(async () => {
@@ -425,6 +430,24 @@ export const ProductsTable = ({
       }
     } catch { void 0; }
   }, [queryClient]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const auth = await UserAuthService.fetchAuthMe();
+        if (cancelled) return;
+        const names: Record<string, string> = {};
+        for (const s of auth?.userStores || []) {
+          const id = String((s as any)?.id ?? "");
+          if (!id) continue;
+          names[id] = String((s as any)?.store_name ?? "");
+        }
+        if (Object.keys(names).length > 0) setAuthStoreNames(names);
+      } catch { void 0; }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     setColumnOrder((prev) => {

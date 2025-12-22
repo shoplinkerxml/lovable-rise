@@ -172,12 +172,59 @@ const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptions = {
   retryDelay: 500 // 0.5 seconds
 };
 
+type UserStoreLite = { id: string; store_name: string };
+
+type AuthMeData = {
+  user: UserProfile | null;
+  subscription: any | null;
+  tariffLimits: Array<{ limit_name: string; value: number }>;
+  menuItems: UserMenuItem[];
+  userStores: UserStoreLite[];
+};
+
 export class UserAuthService {
-  private static authMeCacheBySession: Map<string, { timestamp: number; data: { user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] } }> =
+  private static authMeCacheBySession: Map<string, { timestamp: number; data: AuthMeData }> =
     new Map();
-  private static authMeInFlightBySession: Map<string, Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }>> =
+  private static authMeInFlightBySession: Map<string, Promise<AuthMeData>> =
     new Map();
   private static readonly AUTH_ME_TTL_MS = 900000;
+  private static readonly PERSISTED_AUTH_ME_CACHE_PREFIX = "rq:authMe:";
+
+  private static getPersistedAuthMeKey(sessionKey: string): string {
+    return `${this.PERSISTED_AUTH_ME_CACHE_PREFIX}${sessionKey}`;
+  }
+
+  private static getPersistedAuthMe(sessionKey: string): { timestamp: number; data: AuthMeData } | null {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return null;
+      const raw = window.localStorage.getItem(this.getPersistedAuthMeKey(sessionKey));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { timestamp?: number; data?: AuthMeData };
+      const timestamp = Number(parsed?.timestamp ?? 0) || 0;
+      if (!timestamp) return null;
+      if (Date.now() - timestamp > this.AUTH_ME_TTL_MS) return null;
+      const data = parsed?.data;
+      if (!data || typeof data !== "object") return null;
+      if (!Array.isArray((data as any).tariffLimits)) return null;
+      if (!Array.isArray((data as any).menuItems)) return null;
+      if (!Array.isArray((data as any).userStores)) return null;
+      return { timestamp, data: data as AuthMeData };
+    } catch {
+      return null;
+    }
+  }
+
+  private static setPersistedAuthMe(sessionKey: string, data: AuthMeData): void {
+    try {
+      if (typeof window === "undefined" || !window.localStorage) return;
+      window.localStorage.setItem(
+        this.getPersistedAuthMeKey(sessionKey),
+        JSON.stringify({ timestamp: Date.now(), data })
+      );
+    } catch {
+      return;
+    }
+  }
   /**
    * Register a new user with email confirmation flow
    * Following Supabase email confirmation workflow:
@@ -605,18 +652,23 @@ export class UserAuthService {
     }
   }
 
-  static async fetchAuthMe(): Promise<{ user: UserProfile | null; subscription: any | null; tariffLimits: Array<{ limit_name: string; value: number }>; menuItems: UserMenuItem[] }> {
+  static async fetchAuthMe(): Promise<AuthMeData> {
     const validation = await SessionValidator.ensureValidSession();
     if (!validation.isValid || !validation.session || !validation.user) {
       this.authMeCacheBySession.clear();
       this.authMeInFlightBySession.clear();
-      return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
+      return { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
     }
     const sessionKey = `${validation.user.id}:${validation.expiresAt ?? 0}`;
     const now = Date.now();
     const cached = this.authMeCacheBySession.get(sessionKey);
     if (cached && now - cached.timestamp < this.AUTH_ME_TTL_MS) {
       return cached.data;
+    }
+    const persisted = this.getPersistedAuthMe(sessionKey);
+    if (persisted) {
+      this.authMeCacheBySession.set(sessionKey, { timestamp: persisted.timestamp, data: persisted.data });
+      return persisted.data;
     }
     const inFlight = this.authMeInFlightBySession.get(sessionKey);
     if (inFlight) {
@@ -630,19 +682,39 @@ export class UserAuthService {
       });
       if (error) {
         this.authMeInFlightBySession.delete(sessionKey);
-        return { user: null, subscription: null, tariffLimits: [], menuItems: [] };
+        return { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
       }
-      const resp: { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] } =
+      const resp: {
+        user?: UserProfile | null;
+        subscription?: unknown | null;
+        tariffLimits?: Array<{ limit_name: string; value: number }>;
+        menuItems?: UserMenuItem[];
+        userStores?: UserStoreLite[];
+      } =
         typeof data === 'string'
-          ? (JSON.parse(data) as { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] })
-          : (data as { user?: UserProfile | null; subscription?: unknown | null; tariffLimits?: Array<{ limit_name: string; value: number }>; menuItems?: UserMenuItem[] });
+          ? (JSON.parse(data) as {
+              user?: UserProfile | null;
+              subscription?: unknown | null;
+              tariffLimits?: Array<{ limit_name: string; value: number }>;
+              menuItems?: UserMenuItem[];
+              userStores?: UserStoreLite[];
+            })
+          : (data as {
+              user?: UserProfile | null;
+              subscription?: unknown | null;
+              tariffLimits?: Array<{ limit_name: string; value: number }>;
+              menuItems?: UserMenuItem[];
+              userStores?: UserStoreLite[];
+            });
       const result = {
         user: (resp?.user ?? null) as UserProfile | null,
         subscription: resp?.subscription ?? null,
         tariffLimits: Array.isArray(resp?.tariffLimits) ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>) : [],
         menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
+        userStores: Array.isArray(resp?.userStores) ? (resp.userStores as UserStoreLite[]) : [],
       };
       this.authMeCacheBySession.set(sessionKey, { timestamp: Date.now(), data: result });
+      this.setPersistedAuthMe(sessionKey, result);
       this.authMeInFlightBySession.delete(sessionKey);
       return result;
     })();
@@ -656,6 +728,14 @@ export class UserAuthService {
     try {
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem('rq:authMe');
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith(this.PERSISTED_AUTH_ME_CACHE_PREFIX)) {
+            keysToRemove.push(key);
+          }
+        }
+        for (const k of keysToRemove) window.localStorage.removeItem(k);
       }
     } catch {}
   }
