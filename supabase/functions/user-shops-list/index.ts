@@ -13,6 +13,12 @@ const SHOP_COUNTS_TTL_SECONDS = Math.max(
 )
 const SHOP_COUNTS_KEY_PREFIX =
   Deno.env.get('SHOP_COUNTS_KEY_PREFIX') || 'shop:counts:'
+const SHOP_CONFIG_TTL_SECONDS = Math.max(
+  60,
+  Number(Deno.env.get('SHOP_CONFIG_TTL_SECONDS') || '3600') || 3600
+)
+const SHOP_CONFIG_KEY_PREFIX =
+  Deno.env.get('SHOP_CONFIG_KEY_PREFIX') || 'shop:config:'
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
@@ -42,6 +48,7 @@ type RequestBody = {
 }
 
 type ShopCounts = { productsCount: number; categoriesCount: number }
+type ShopConfig = { xml_config: unknown; custom_mapping: unknown }
 
 function normalizeCounts(input: any): ShopCounts {
   const products = Math.max(0, Number(input?.productsCount ?? 0) || 0)
@@ -108,6 +115,56 @@ async function setCountsToRedis(rows: Array<{ storeId: string; counts: ShopCount
     JSON.stringify({ ...r.counts, ts: now }),
     'EX',
     SHOP_COUNTS_TTL_SECONDS,
+  ])
+  await redisPipeline(commands)
+}
+
+function normalizeConfig(input: any): ShopConfig {
+  return {
+    xml_config: input?.xml_config ?? null,
+    custom_mapping: input?.custom_mapping ?? null,
+  }
+}
+
+function buildConfigKey(storeId: string): string {
+  return `${SHOP_CONFIG_KEY_PREFIX}${storeId}`
+}
+
+async function getConfigFromRedis(storeIds: string[]): Promise<Map<string, ShopConfig>> {
+  const out = new Map<string, ShopConfig>()
+  const ids = (storeIds || []).map(String).filter(Boolean)
+  if (ids.length === 0) return out
+  const commands = ids.map((id) => ['GET', buildConfigKey(id)])
+  const resp = await redisPipeline(commands)
+  if (!resp) return out
+  for (let i = 0; i < ids.length; i++) {
+    const item = resp[i]
+    const raw = item?.result
+    if (!raw) continue
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      out.set(ids[i], normalizeConfig(parsed))
+    } catch {
+      continue
+    }
+  }
+  return out
+}
+
+async function setConfigToRedis(rows: Array<{ storeId: string; config: ShopConfig }>): Promise<void> {
+  if (!REDIS_REST_URL || !REDIS_REST_TOKEN) return
+  const items = (rows || [])
+    .map((r) => ({ storeId: String(r.storeId || '').trim(), config: normalizeConfig(r.config) }))
+    .filter((r) => r.storeId.length > 0)
+  if (items.length === 0) return
+
+  const now = Date.now()
+  const commands = items.map((r) => [
+    'SET',
+    buildConfigKey(r.storeId),
+    JSON.stringify({ ...r.config, ts: now }),
+    'EX',
+    SHOP_CONFIG_TTL_SECONDS,
   ])
   await redisPipeline(commands)
 }
@@ -220,11 +277,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
     }
 
-    const finalIncludeConfig = includeConfig === true || !!storeId
+    const finalIncludeConfig = includeConfig === true || (includeConfig == null && !!storeId)
 
-    const baseSelect = finalIncludeConfig
-      ? 'id, user_id, store_name, store_company, store_url, template_id, xml_config, custom_mapping, is_active, created_at, updated_at'
-      : 'id, user_id, store_name, store_company, store_url, template_id, is_active, created_at, updated_at'
+    const baseSelect = 'id, user_id, store_name, store_company, store_url, template_id, is_active, created_at, updated_at'
 
     // Получение магазинов с фильтрацией по user_id
     let storesQuery = supabaseClient
@@ -250,6 +305,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const storeIds = stores.map((s: any) => s.id)
+    const storeIdsStrings = storeIds.map((id: any) => String(id)).filter((id) => id.length > 0)
     const templateIds = Array.from(
       new Set(
         stores
@@ -258,14 +314,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     )
 
-    const [{ data: templates }, cachedCounts] = await Promise.all([
+    const [cachedConfig, { data: templates }, cachedCounts] = await Promise.all([
+      finalIncludeConfig ? getConfigFromRedis(storeIdsStrings) : Promise.resolve(new Map<string, ShopConfig>()),
       templateIds.length > 0
         ? supabaseClient
             .from('store_templates')
             .select('id, marketplace')
             .in('id', templateIds)
         : Promise.resolve({ data: [] }),
-      forceCounts ? Promise.resolve(new Map<string, ShopCounts>()) : getCountsFromRedis(storeIds.map(String)),
+      forceCounts ? Promise.resolve(new Map<string, ShopCounts>()) : getCountsFromRedis(storeIdsStrings),
     ])
 
     const templatesMap = new Map<string, string>()
@@ -278,10 +335,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    const configsByStore = cachedConfig || new Map<string, ShopConfig>()
+    const missingConfigStoreIds = finalIncludeConfig
+      ? storeIdsStrings.filter((id) => !configsByStore.has(id))
+      : []
+
+    if (finalIncludeConfig && missingConfigStoreIds.length > 0) {
+      const { data: cfgRows, error: cfgErr } = await supabaseClient
+        .from('user_stores')
+        .select('id, xml_config, custom_mapping')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .in('id', missingConfigStoreIds)
+
+      if (!cfgErr && Array.isArray(cfgRows) && cfgRows.length > 0) {
+        const toWrite: Array<{ storeId: string; config: ShopConfig }> = []
+        for (const row of cfgRows as any[]) {
+          const sid = String((row as any)?.id || '')
+          if (!sid) continue
+          const config = normalizeConfig(row)
+          configsByStore.set(sid, config)
+          toWrite.push({ storeId: sid, config })
+        }
+        await setConfigToRedis(toWrite)
+      }
+    }
+
     const countsByStore = cachedCounts || new Map<string, ShopCounts>()
-    const missingStoreIds = storeIds
-      .map((id: any) => String(id))
-      .filter((id) => id.length > 0 && !countsByStore.has(id))
+    const missingStoreIds = storeIdsStrings.filter((id) => !countsByStore.has(id))
 
     if (missingStoreIds.length > 0) {
       const { data: links } = await supabaseClient
@@ -332,13 +413,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const aggregated = stores.map((store: any) => {
       const pid = String(store.id)
       const counts = countsByStore.get(pid) || { productsCount: 0, categoriesCount: 0 }
-      return {
+      const base = {
         ...store,
         marketplace: store.template_id
           ? templatesMap.get(String(store.template_id)) ?? 'Не вказано'
           : 'Не вказано',
         productsCount: counts.productsCount,
         categoriesCount: counts.categoriesCount,
+      }
+      if (!finalIncludeConfig) return base
+      const config = configsByStore.get(pid)
+      return {
+        ...base,
+        xml_config: config?.xml_config ?? null,
+        custom_mapping: config?.custom_mapping ?? null,
       }
     })
 

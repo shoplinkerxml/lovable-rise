@@ -29,11 +29,23 @@ export const ShopDetail = () => {
     if (!shopId) navigate('/user/shops');
   }, [shopId, navigate]);
 
+  const cachedShopFromList = useMemo(() => {
+    const list = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);
+    const found = (list || []).find((s) => String(s.id) === String(shopId));
+    return found ?? null;
+  }, [queryClient, shopId]);
+
   const { data: shop, isLoading, isError } = useQuery<ShopAggregated | null>({
     queryKey: ['shopDetail', shopId],
-    queryFn: async () => (shopId ? await ShopService.getShop(shopId) : null),
+    queryFn: async () => (shopId ? await ShopService.getShopLite(shopId) : null),
     enabled: !!shopId,
     staleTime: 900_000,
+    ...(cachedShopFromList
+      ? {
+          initialData: cachedShopFromList,
+          initialDataUpdatedAt: Date.now(),
+        }
+      : {}),
   });
 
   useShopRealtimeSync({ 

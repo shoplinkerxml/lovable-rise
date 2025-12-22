@@ -541,7 +541,22 @@ export class ShopService {
     const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
       store_id: id,
       includeConfig: true,
-      forceCounts: true,
+    });
+
+    const shop = response.shops?.[0];
+    if (!shop) throw new Error(`Shop with ID ${id} not found`);
+
+    return shop;
+  }
+
+  static async getShopLite(id: string): Promise<ShopAggregated> {
+    if (!id) throw new Error("Shop ID is required");
+
+    await this.ensureSession();
+
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
+      store_id: id,
+      includeConfig: false,
     });
 
     const shop = response.shops?.[0];
@@ -783,6 +798,7 @@ export class ShopService {
 
     const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
       store_id: storeId,
+      includeConfig: false,
       forceCounts: true,
     });
 
