@@ -138,7 +138,7 @@ export const commonDictionary: Dictionary = {
   },
   hero_title_1: { uk: "Збільшуйте продажі на", en: "Boost your" },
   hero_title_accent: { uk: "маркетплейсах", en: "marketplace sales" },
-  hero_title_2: { uk: "— на автопілоті", en: "on autopilot" },
+  hero_title_2: { uk: "на автопілоті", en: "on autopilot" },
   hero_subtitle: {
     uk: "Автоматизуємо роботу з прайсами та постачальниками. Перетворюємо складні дані в простий прибуток. Економимо ваш час для росту бізнесу.",
     en: "Automate price lists and supplier management. Turn complex data into simple profit. Save your time for business growth.",
