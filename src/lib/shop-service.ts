@@ -83,6 +83,8 @@ interface EdgeResponse<T> {
 
 interface ShopsListResponse {
   shops: ShopAggregated[];
+  totalShops?: number;
+  limit?: number;
 }
 
 interface ShopLimitOnlyResponse {
@@ -522,6 +524,17 @@ export class ShopService {
       try {
         const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
         const shops = response.shops || [];
+        const limit = Number(response.limit ?? NaN);
+        if (Number.isFinite(limit)) {
+          const current = Math.max(
+            0,
+            Number(response.totalShops ?? shops.length) || 0
+          );
+          const max = Math.max(3, limit || 0);
+          const info = { current, max, canCreate: current < max };
+          this.setCache("shop-limit-info", info);
+          this.setCache("shop-limit", info.max);
+        }
         this.setCache(cacheKey, shops);
         if (userId) this.setPersistedShops(userId, shops);
         return shops;

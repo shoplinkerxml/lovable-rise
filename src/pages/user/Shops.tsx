@@ -8,7 +8,7 @@ import { useI18n } from '@/i18n';
 import { ShopsList, ShopForm } from '@/components/user/shops';
 import { ShopService, type ShopLimitInfo } from '@/lib/shop-service';
 import { toast } from 'sonner';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { SessionValidator } from '@/lib/session-validation';
 
@@ -23,23 +23,6 @@ export const Shops = () => {
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
   const queryClient = useQueryClient();
 
-  const { data: limitMax } = useQuery<number>({
-    queryKey: ['shopLimit'],
-    queryFn: async () => ShopService.getShopLimitOnly(),
-    staleTime: 3_600_000,
-    gcTime: 86_400_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    retry: false,
-  });
-
-  useEffect(() => {
-    const max = Number(limitMax || 0);
-    if (max > 0) {
-      setLimitInfo(prev => ({ ...prev, max, canCreate: prev.current < max }));
-    }
-  }, [limitMax]);
-
   const handleShopsLoaded = (count: number) => {
     setShopsCount(count);
     setLimitInfo(prev => ({
@@ -47,6 +30,14 @@ export const Shops = () => {
       current: count,
       canCreate: count < prev.max
     }));
+    void (async () => {
+      try {
+        const info = await ShopService.getShopLimit();
+        setLimitInfo(info);
+      } catch {
+        void 0;
+      }
+    })();
   };
 
   useEffect(() => {
@@ -58,7 +49,7 @@ export const Shops = () => {
         const channel = supabase
           .channel(`shop_limit_${userId}`)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'user_subscriptions', filter: `user_id=eq.${userId}` }, () => {
-            queryClient.invalidateQueries({ queryKey: ['shopLimit'] });
+            queryClient.invalidateQueries({ queryKey: ['shopsList'] });
           })
           .subscribe();
         return () => { try { supabase.removeChannel(channel); } catch { void 0; } };

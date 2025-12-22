@@ -56,6 +56,37 @@ function normalizeCounts(input: any): ShopCounts {
   return { productsCount: products, categoriesCount: products === 0 ? 0 : catsRaw }
 }
 
+async function getLimitForUser(userId: string): Promise<number> {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return 0
+  try {
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    const { data: subscriptions, error: subscriptionError } = await adminClient
+      .from('user_subscriptions')
+      .select('tariff_id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('start_date', { ascending: false })
+      .limit(1)
+
+    if (subscriptionError || !subscriptions?.[0]?.tariff_id) return 0
+    const tariffId = subscriptions[0].tariff_id
+
+    const { data: limitData, error: limitError } = await adminClient
+      .from('tariff_limits')
+      .select('value')
+      .eq('tariff_id', tariffId)
+      .ilike('limit_name', '%магазин%')
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (limitError) return 0
+    return Number(limitData?.value ?? 0) || 0
+  } catch {
+    return 0
+  }
+}
+
 async function redisPipeline(commands: any[]): Promise<any[] | null> {
   if (!REDIS_REST_URL || !REDIS_REST_TOKEN) return null
   try {
@@ -237,39 +268,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         return jsonResponse({ error: 'Failed to count shops' }, { status: 500 })
       }
 
-      let limit = 0
-      if (SUPABASE_SERVICE_ROLE_KEY) {
-        try {
-          const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-          const { data: subscriptions, error: subscriptionError } =
-            await adminClient
-              .from('user_subscriptions')
-              .select('tariff_id')
-              .eq('user_id', user.id)
-              .eq('is_active', true)
-              .order('start_date', { ascending: false })
-              .limit(1)
-
-          if (!subscriptionError && subscriptions?.[0]?.tariff_id) {
-            const tariffId = subscriptions[0].tariff_id
-
-            const { data: limitData, error: limitError } = await adminClient
-              .from('tariff_limits')
-              .select('value')
-              .eq('tariff_id', tariffId)
-              .ilike('limit_name', '%магазин%')
-              .eq('is_active', true)
-              .maybeSingle()
-
-            if (!limitError) {
-              limit = Number(limitData?.value ?? 0) || 0
-            }
-          }
-        } catch {
-          limit = 0
-        }
-      }
+      const limit = await getLimitForUser(user.id)
 
       return jsonResponse({
         totalShops: count ?? 0,
@@ -278,6 +277,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const finalIncludeConfig = includeConfig === true || (includeConfig == null && !!storeId)
+    const includeLimit = !storeId
 
     const baseSelect = 'id, user_id, store_name, store_company, store_url, template_id, is_active, created_at, updated_at'
 
@@ -314,7 +314,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     )
 
-    const [cachedConfig, { data: templates }, cachedCounts] = await Promise.all([
+    const [cachedConfig, { data: templates }, cachedCounts, limit] = await Promise.all([
       finalIncludeConfig ? getConfigFromRedis(storeIdsStrings) : Promise.resolve(new Map<string, ShopConfig>()),
       templateIds.length > 0
         ? supabaseClient
@@ -323,6 +323,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             .in('id', templateIds)
         : Promise.resolve({ data: [] }),
       forceCounts ? Promise.resolve(new Map<string, ShopCounts>()) : getCountsFromRedis(storeIdsStrings),
+      includeLimit ? getLimitForUser(user.id) : Promise.resolve(0),
     ])
 
     const templatesMap = new Map<string, string>()
@@ -432,7 +433,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.log('Shops fetched successfully', { count: aggregated.length })
 
-    return jsonResponse({ shops: aggregated })
+    return jsonResponse({
+      shops: aggregated,
+      ...(includeLimit ? { totalShops: aggregated.length, limit } : {}),
+    })
 
   } catch (error) {
     console.error('Unexpected error:', error)
