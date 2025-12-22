@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ProductService, type Product, type ProductParam } from "@/lib/product-service";
 import { useI18n } from "@/i18n";
@@ -10,7 +9,6 @@ import { ProductFormTabs } from "@/components/ProductFormTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
-import { ShopCountsService } from "@/lib/shop-counts";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 
 // ============================================================================
@@ -133,7 +131,6 @@ export const StoreProductEdit = () => {
   const pid = String(productId || "");
   const { t } = useI18n();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   // Consolidated state
   const [form, setForm] = useState<StoreProductLinkForm>({
@@ -327,8 +324,6 @@ export const StoreProductEdit = () => {
         }, storeId);
       }
 
-      await ShopCountsService.recompute(queryClient, storeId).catch(() => void 0);
-
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}`);
     } catch (error) {
@@ -345,7 +340,6 @@ export const StoreProductEdit = () => {
     lastCategoryId,
     pid,
     storeId,
-    queryClient,
     t,
     navigate,
   ]);
