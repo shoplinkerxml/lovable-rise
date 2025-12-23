@@ -76,6 +76,42 @@ type ProductsTableProps = {
 
 type PageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
 type ResponseData = { products: ProductRow[]; page: PageInfo };
+
+const FIRST_PAGE_INDEX_KEY = "rq:index:products:first";
+
+const readBestFirstPageCache = (
+  storeId: string | undefined,
+  requiredLimit: number,
+): { items: ProductRow[]; page: PageInfo } | null => {
+  try {
+    const env = readCache<string[]>(FIRST_PAGE_INDEX_KEY, true);
+    const keys = Array.isArray(env?.data) ? env.data : [];
+    const prefix = storeId
+      ? `rq:products:store:${String(storeId)}:first:`
+      : "rq:products:master:first:";
+    const candidates = keys
+      .filter((k) => typeof k === "string" && k.startsWith(prefix))
+      .map((k) => {
+        const raw = k.slice(prefix.length);
+        const limit = Number.parseInt(raw, 10);
+        return Number.isFinite(limit) ? { key: k, limit } : null;
+      })
+      .filter((v): v is { key: string; limit: number } => !!v)
+      .sort((a, b) => a.limit - b.limit);
+
+    if (!candidates.length) return null;
+
+    const best =
+      candidates.find((c) => c.limit >= requiredLimit) ??
+      candidates[candidates.length - 1];
+
+    const cached = readCache<{ items: ProductRow[]; page: PageInfo }>(best.key, false);
+    if (!cached?.data || !Array.isArray(cached.data.items)) return null;
+    return { items: cached.data.items, page: cached.data.page };
+  } catch {
+    return null;
+  }
+};
  
 
 export const ProductsTable = ({
@@ -91,7 +127,6 @@ export const ProductsTable = ({
 }: ProductsTableProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
     open: false,
     product: null,
@@ -106,10 +141,6 @@ export const ProductsTable = ({
 
   let productsCount = 0;
 
-  const [items, setItems] = useState<ProductRow[]>([]);
-  const itemsRef = useRef<ProductRow[]>([]);
-  useEffect(() => { itemsRef.current = items; }, [items]);
-  const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [pagination, setPagination] = useState(() => {
     const env = readCache<{ pageIndex?: number; pageSize?: number }>("user_products_pagination", true);
     if (env?.data) {
@@ -131,6 +162,19 @@ export const ProductsTable = ({
     } catch { void 0; }
     return { pageIndex: 0, pageSize: 10 };
   });
+  const requiredInitialFetchSize = useMemo(
+    () => Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize),
+    [pagination.pageIndex, pagination.pageSize],
+  );
+  const initialCachedPage = useMemo(
+    () => readBestFirstPageCache(storeId, requiredInitialFetchSize),
+    [storeId, requiredInitialFetchSize],
+  );
+  const [loading, setLoading] = useState(() => initialCachedPage == null);
+  const [items, setItems] = useState<ProductRow[]>(() => initialCachedPage?.items ?? []);
+  const itemsRef = useRef<ProductRow[]>(initialCachedPage?.items ?? []);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  const [pageInfo, setPageInfo] = useState<PageInfo | null>(() => initialCachedPage?.page ?? null);
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
     setItems((prev) => updater(prev));
     queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
@@ -157,11 +201,12 @@ export const ProductsTable = ({
   useEffect(() => { onProductsLoadedRef.current = onProductsLoaded; }, [onProductsLoaded]);
   useEffect(() => { onLoadingChangeRef.current = onLoadingChange; }, [onLoadingChange]);
 
-  const loadFirstPage = useCallback(async (opts?: { silent?: boolean }) => {
+  const loadFirstPage = useCallback(async (opts?: { silent?: boolean; bypassCache?: boolean }) => {
     if (loadingFirstRef.current) return;
     loadingFirstRef.current = true;
     const silent = !!opts?.silent;
-    if (!silent) {
+    const shouldShowLoading = !silent && itemsRef.current.length === 0;
+    if (shouldShowLoading) {
       setLoading(true);
       onLoadingChangeRef.current?.(true);
     }
@@ -169,13 +214,13 @@ export const ProductsTable = ({
     try {
       const initialFetchSize = Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize);
       const { products, page } = storeId
-        ? await ProductService.getStoreProductsPage(String(storeId), initialFetchSize, { bypassCache: true })
-        : await ProductService.getUserMasterProductsPage(initialFetchSize, { bypassCache: true });
+        ? await ProductService.getStoreProductsPage(String(storeId), initialFetchSize, { bypassCache: opts?.bypassCache === true })
+        : await ProductService.getUserMasterProductsPage(initialFetchSize, { bypassCache: opts?.bypassCache === true });
       setItems(products as ProductRow[]);
       setPageInfo(page);
       onProductsLoadedRef.current?.(page?.total ?? products.length);
     } finally {
-      if (!silent) {
+      if (shouldShowLoading) {
         setLoading(false);
         onLoadingChangeRef.current?.(false);
       }
@@ -215,7 +260,16 @@ export const ProductsTable = ({
     }
   }, [storeId, items]);
 
-  useEffect(() => { loadFirstPage(); }, [loadFirstPage, refreshTrigger]);
+  useEffect(() => { loadFirstPage(); }, [loadFirstPage]);
+  const refreshFirstRef = useRef(true);
+  useEffect(() => {
+    if (refreshFirstRef.current) {
+      refreshFirstRef.current = false;
+      return;
+    }
+    if (refreshTrigger == null) return;
+    loadFirstPage({ bypassCache: true });
+  }, [refreshTrigger, loadFirstPage]);
   useEffect(() => {
     try {
       writeCache('user_products_pagination', { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }, CACHE_TTL.uiPrefs);
@@ -258,7 +312,7 @@ export const ProductsTable = ({
         entityKey: `product:duplicate:${product.id}`,
         run: async () => {
           await ProductService.duplicateProduct(product.id);
-          await loadFirstPage({ silent: true });
+          await loadFirstPage({ silent: true, bypassCache: true });
         },
       });
     } catch (error) {

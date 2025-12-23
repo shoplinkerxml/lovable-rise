@@ -3,8 +3,8 @@ import type { Dictionary } from "../types";
 export const shopsDictionary: Dictionary = {
   shops_title: { uk: "Магазини", en: "Shops" },
   shops_description: {
-    uk: "Керування вашими магазинами",
-    en: "Manage your shops",
+    uk: "Список ваших магазинів",
+    en: "Your shops list",
   },
   create_shop: { uk: "Створити магазин", en: "Create Shop" },
   create_shop_description: {

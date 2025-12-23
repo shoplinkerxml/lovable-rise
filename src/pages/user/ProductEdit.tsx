@@ -104,91 +104,81 @@ export const ProductEdit = () => {
   };
   const handleFormSubmit = async ({ formData, images, parameters }: { formData: FormDataInput; images: Array<{ url: string; order_index: number; is_main: boolean; object_key?: string }>; parameters: ProductParam[] }) => {
     if (!id) return;
+    const payload: any = {
+      external_id: formData.external_id,
+      category_id: formData.category_id || null,
+      category_external_id: formData.category_external_id ? String(formData.category_external_id) : undefined,
+      supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
+      currency_code: formData.currency_code || null,
+      name: formData.name,
+      name_ua: formData.name_ua || null,
+      docket: formData.docket || null,
+      docket_ua: formData.docket_ua || null,
+      vendor: formData.vendor || null,
+      article: formData.article || null,
+      available: !!formData.available,
+      stock_quantity: Number(formData.stock_quantity) || 0,
+      price: typeof formData.price === 'number' ? formData.price : null,
+      price_old: typeof formData.price_old === 'number' ? formData.price_old : null,
+      price_promo: typeof formData.price_promo === 'number' ? formData.price_promo : null,
+      description: formData.description || null,
+      description_ua: formData.description_ua || null,
+      state: formData.state || 'new',
+      params: parameters || [],
+    };
+    const mappedImages = (images || []).map((img, index: number) => ({
+      url: img.url,
+      order_index: typeof img.order_index === 'number' ? img.order_index : index,
+      is_main: !!img.is_main,
+      object_key: img.object_key,
+    }));
+    if (mappedImages.length > 0) payload.images = mappedImages;
+
     try {
-      const payload: any = {
-        external_id: formData.external_id,
-        category_id: formData.category_id || null,
-        category_external_id: formData.category_external_id ? String(formData.category_external_id) : undefined,
-        supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
-        currency_code: formData.currency_code || null,
+      const cidNum = formData.category_id ? Number(formData.category_id) : null;
+      let catName = '';
+      if (cidNum != null) {
+        const map = aggSupplierCategoriesMapRef.current || {};
+        const all = Object.values(map).flat();
+        const found = all.find((c) => String((c as any).id) === String(cidNum));
+        catName = (found as any)?.name || '';
+      } else if (formData.supplier_id && formData.category_external_id) {
+        const map = aggSupplierCategoriesMapRef.current || {};
+        const arr = map[String(formData.supplier_id)] || [];
+        const found = arr.find((c) => String(c.external_id) === String(formData.category_external_id));
+        catName = found?.name || '';
+      }
+      const patch: Partial<Product> = {
         name: formData.name,
         name_ua: formData.name_ua || null,
-        docket: formData.docket || null,
-        docket_ua: formData.docket_ua || null,
         vendor: formData.vendor || null,
         article: formData.article || null,
-        available: !!formData.available,
-        stock_quantity: Number(formData.stock_quantity) || 0,
         price: typeof formData.price === 'number' ? formData.price : null,
         price_old: typeof formData.price_old === 'number' ? formData.price_old : null,
         price_promo: typeof formData.price_promo === 'number' ? formData.price_promo : null,
-        description: formData.description || null,
-        description_ua: formData.description_ua || null,
-        state: formData.state || 'new',
-        params: parameters || [],
+        available: !!formData.available,
+        stock_quantity: Number(formData.stock_quantity) || 0,
+        category_id: cidNum ?? null,
+        category_external_id: formData.category_external_id || null,
       };
-      const mappedImages = (images || []).map((img, index: number) => ({
-        url: img.url,
-        order_index: typeof img.order_index === 'number' ? img.order_index : index,
-        is_main: !!img.is_main,
-        object_key: img.object_key
-      }));
-      if (mappedImages.length > 0) payload.images = mappedImages;
-      await ProductService.updateProduct(id, payload);
-      try {
-        const cidNum = formData.category_id ? Number(formData.category_id) : null;
-        let catName = '';
-        if (cidNum != null) {
-          const map = aggSupplierCategoriesMapRef.current || {};
-          const all = Object.values(map).flat();
-          const found = all.find((c) => String((c as any).id) === String(cidNum));
-          catName = (found as any)?.name || '';
-        } else if (formData.supplier_id && formData.category_external_id) {
-          const map = aggSupplierCategoriesMapRef.current || {};
-          const arr = map[String(formData.supplier_id)] || [];
-          const found = arr.find((c) => String(c.external_id) === String(formData.category_external_id));
-          catName = found?.name || '';
-        }
-        const patch: Partial<Product> = {
-          name: formData.name,
-          name_ua: formData.name_ua || null,
-          vendor: formData.vendor || null,
-          article: formData.article || null,
-          price: typeof formData.price === 'number' ? formData.price : null,
-          price_old: typeof formData.price_old === 'number' ? formData.price_old : null,
-          price_promo: typeof formData.price_promo === 'number' ? formData.price_promo : null,
-          available: !!formData.available,
-          stock_quantity: Number(formData.stock_quantity) || 0,
-          category_id: cidNum ?? null,
-          category_external_id: formData.category_external_id || null,
-        };
-        ProductService.patchProductCaches(String(id), { ...(patch as Partial<ProductAggregated>), categoryName: catName || undefined });
-        queryClient.setQueryData(['products', 'all'], (prev: ProductAggregated[] | undefined) => {
-          const arr = prev || [];
-          return arr.map((p) => String(p.id) === String(id)
-            ? { ...p, ...(patch as Partial<ProductAggregated>), categoryName: catName || p.categoryName }
-            : p);
-        });
-        if (cidNum != null || patch.category_external_id != null) {
-          try {
-            const linked = await ProductService.getStoreLinksForProduct(String(id));
-            const namesByStore = await ProductService.refreshStoreCategoryFilterOptions(linked);
-            for (const sid of linked) {
-              const idStr = String(sid);
-              const names = Array.isArray(namesByStore?.[idStr]) ? namesByStore![idStr] : [];
-              const existing = queryClient.getQueryData<any>(ShopCountsService.key(idStr)) as { productsCount?: number; categoriesCount?: number } | undefined;
-              const productsCount = Math.max(0, (existing?.productsCount ?? 0));
-              const categoriesCount = productsCount === 0 ? 0 : Math.max(0, names.length);
-              ShopCountsService.set(queryClient, idStr, { productsCount, categoriesCount });
-            }
-          } catch { /* ignore */ }
-        }
-      } catch { void 0; }
-      toast.success(t('product_updated'));
-      navigate('/user/products');
-    } catch {
-      toast.error(t('failed_save_product'));
-    }
+      ProductService.patchProductCaches(String(id), { ...(patch as Partial<ProductAggregated>), categoryName: catName || undefined });
+      queryClient.setQueryData(['products', 'all'], (prev: ProductAggregated[] | undefined) => {
+        const arr = prev || [];
+        return arr.map((p) => String(p.id) === String(id)
+          ? { ...p, ...(patch as Partial<ProductAggregated>), categoryName: catName || p.categoryName }
+          : p);
+      });
+    } catch { void 0; }
+
+    navigate('/user/products');
+    void ProductService.updateProduct(id, payload)
+      .then(() => {
+        toast.success(t('product_updated'));
+      })
+      .catch((error) => {
+        console.error('Failed to save product:', error);
+        toast.error(t('failed_save_product'));
+      });
   };
 
   const pageBreadcrumbs = [

@@ -94,7 +94,7 @@ export function Toolbar({
           <Skeleton className="h-9 w-[clamp(12rem,40vw,28rem)] rounded-md" />
         ) : (
           <Input
-            placeholder={t("search_placeholder")}
+            placeholder={t("products_search_placeholder")}
             value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
             onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
             className="flex-1 min-w-0 w-[clamp(10rem,40vw,24rem)] sm:w-[clamp(12rem,40vw,28rem)]"

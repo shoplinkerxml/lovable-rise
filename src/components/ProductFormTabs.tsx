@@ -194,8 +194,6 @@ export function ProductFormTabs({
         });
       }
       markSaved();
-      toast.success(t('product_saved_successfully'));
-      navigate('/user/products');
     } catch (error) {
       console.error('Error saving product:', error);
       toast.error(t('failed_save_product'));

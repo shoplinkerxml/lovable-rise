@@ -837,14 +837,6 @@ export class ProductService {
           if (main?.url) patch.mainImageUrl = String(main.url);
         }
         ProductService.patchProductCaches(pid, patch, storeId);
-        if (payload.linkPatch) {
-          ProductService.invalidateStoreLinksCache(pid);
-          try {
-            await ProductService.recomputeStoreCategoryFilterCache(storeId);
-          } catch (error) {
-            console.error("ProductService.saveStoreProductEdit recomputeStoreCategoryFilterCache failed", error);
-          }
-        }
       } catch (error) {
         console.error("ProductService.saveStoreProductEdit cache update failed", error);
       }
@@ -1549,31 +1541,10 @@ export class ProductService {
   /** Обновление товара через функцию update-product */
   static async updateProduct(id: string, productData: UpdateProductData): Promise<void> {
     await this.ensureCanMutateProducts();
-
-    let storeIdToInvalidate: string | null = null;
-    try {
-      const { data: row } = await supabase
-        .from("store_products")
-        .select("store_id")
-        .eq("id", String(id))
-        .maybeSingle();
-      if (row && (row as any).store_id != null) {
-        storeIdToInvalidate = String((row as any).store_id);
-      }
-    } catch {
-      storeIdToInvalidate = null;
-    }
-
-    let categoryIdValue: number | null | undefined = undefined;
-    if (productData.category_id !== undefined) {
-      categoryIdValue = this.castNullableNumber(productData.category_id);
-      if (categoryIdValue !== null) {
-        const category = await CategoryService.getById(categoryIdValue);
-        if (!category) {
-          throw new Error("Обрана категорія більше не існує");
-        }
-      }
-    }
+    const categoryIdValue: number | null | undefined =
+      productData.category_id !== undefined
+        ? this.castNullableNumber(productData.category_id)
+        : undefined;
 
     const payload: Record<string, unknown> = {
       product_id: id,
@@ -1648,16 +1619,31 @@ export class ProductService {
       payload,
     );
     const productId = respUpdate?.product_id || id;
-    removeCache("rq:products:all");
     try {
-      ProductService.clearMasterProductsCaches();
-      if (storeIdToInvalidate) {
-        ProductService.clearStoreProductsCaches(storeIdToInvalidate);
-      } else {
-        ProductService.clearAllFirstPageCaches();
+      const patch: Partial<ProductAggregated> = {};
+      if (payload.name !== undefined) patch.name = payload.name as string;
+      if (payload.name_ua !== undefined) patch.name_ua = (payload.name_ua as string | null) ?? null;
+      if (payload.price !== undefined) patch.price = (payload.price as number | null) ?? null;
+      if (payload.price_old !== undefined) patch.price_old = (payload.price_old as number | null) ?? null;
+      if (payload.price_promo !== undefined) patch.price_promo = (payload.price_promo as number | null) ?? null;
+      if (payload.available !== undefined) patch.available = !!payload.available;
+      if (payload.stock_quantity !== undefined) patch.stock_quantity = Number(payload.stock_quantity || 0);
+      if (payload.vendor !== undefined) patch.vendor = (payload.vendor as string | null) ?? null;
+      if (payload.article !== undefined) patch.article = (payload.article as string | null) ?? null;
+      if (payload.category_id !== undefined) patch.category_id = (payload.category_id as number | null) ?? null;
+      if (payload.category_external_id !== undefined) patch.category_external_id = (payload.category_external_id as string | null) ?? null;
+      if (payload.state !== undefined) patch.state = payload.state as string;
+      if (Array.isArray(payload.images)) {
+        const images = payload.images as Array<{ url: string; is_main?: boolean }>;
+        const main = images.find((i) => !!i.is_main) || images[0];
+        if (main?.url) patch.mainImageUrl = String(main.url);
+      }
+      ProductService.patchProductCaches(String(productId), patch, null);
+      if (productData.store_id != null && String(productData.store_id).trim() !== "") {
+        ProductService.patchProductCaches(String(productId), patch, String(productData.store_id));
       }
     } catch (error) {
-      console.error("ProductService.updateProduct clear caches failed", error);
+      console.error("ProductService.updateProduct cache update failed", error);
     }
     void productId;
     return;
