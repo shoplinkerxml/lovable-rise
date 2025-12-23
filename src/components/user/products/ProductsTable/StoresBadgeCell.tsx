@@ -56,12 +56,15 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
       setStores(shops.length > 0 ? shops : fallback);
       setLoadingStores(false);
     }
-    try {
-      ProductService.invalidateStoreLinksCache(String(product.id));
-      const ids = await ProductService.getStoreLinksForProduct(product.id);
-      setLinkedStoreIds(ids);
-    } catch {
-      setLinkedStoreIds(product.linkedStoreIds || []);
+    const initialLinked = Array.isArray(product.linkedStoreIds) ? product.linkedStoreIds.map(String) : [];
+    setLinkedStoreIds(initialLinked);
+    if (!Array.isArray(product.linkedStoreIds)) {
+      try {
+        const ids = await ProductService.getStoreLinksForProduct(product.id);
+        setLinkedStoreIds(ids);
+      } catch {
+        setLinkedStoreIds([]);
+      }
     }
   }, [queryClient, product.id, storesList, storeNames, product.linkedStoreIds, prefetchStores]);
 
@@ -78,7 +81,6 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
             variant="ghost"
             className="h-6 w-6 p-0 mx-auto border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
             aria-label={t("menu_stores")}
-            onClick={() => { setOpen(true); loadStoresAndLinks(); }}
             data-testid={`user_products_store_add_trigger_${product.id}`}
           >
             <Store className="h-3.5 w-3.5" />
@@ -211,13 +213,19 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
               variant="secondary"
               className="text-[11px] pr-0 border border-emerald-200 bg-emerald-50 text-emerald-700 transition-transform shadow-sm hover:shadow-md hover:-translate-y-[1px] hover:border-emerald-300"
             >
-              <DropdownMenu open={isOpen} onOpenChange={(v) => setBadgeOpenId(v ? String(id) : (badgeOpenId === String(id) ? null : badgeOpenId))}>
+              <DropdownMenu
+                open={isOpen}
+                onOpenChange={(v) => {
+                  const next = v ? String(id) : (badgeOpenId === String(id) ? null : badgeOpenId);
+                  setBadgeOpenId(next);
+                  if (v) loadStoresAndLinks();
+                }}
+              >
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
                     className="pl-1 pr-1 select-none"
                     title={name}
-                    onClick={() => { setBadgeOpenId(String(id)); loadStoresAndLinks(); }}
                     data-testid={`user_products_store_badge_trigger_${product.id}_${id}`}
                   >
                     {label}

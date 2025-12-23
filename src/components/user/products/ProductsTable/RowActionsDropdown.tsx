@@ -33,9 +33,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
 
   const loadStoresAndLinks = async () => {
     const initialLinked = Array.isArray(product.linkedStoreIds) ? (product.linkedStoreIds as string[]).map(String) : [];
-    if (initialLinked.length > 0) {
-      setLinkedStoreIds(initialLinked);
-    }
+    setLinkedStoreIds(initialLinked);
 
     try {
       try { await prefetchStores?.(); } catch { void 0; }
@@ -53,8 +51,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
           setLoadingStores(false);
         }
       }
-      if (initialLinked.length === 0) {
-        ProductService.invalidateStoreLinksCache(String(product.id));
+      if (!Array.isArray(product.linkedStoreIds)) {
         const ids = await ProductService.getStoreLinksForProduct(product.id);
         setLinkedStoreIds(ids);
       }
@@ -112,8 +109,6 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
         {storeId ? null : (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger
-              onPointerEnter={loadStoresAndLinks}
-              onFocus={loadStoresAndLinks}
               onClick={loadStoresAndLinks}
               data-testid={`user_products_row_stores_trigger_${product.id}`}
             >
@@ -148,84 +143,82 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                 onClick={(e) => e.stopPropagation()}
                                 onCheckedChange={async (v) => {
                                   setTogglingStoreIds((prev) => Array.from(new Set([...prev, id])));
+                                  const baseIds = Array.from(new Set([...initialLinked.map(String), ...linkedStoreIds.map(String)]));
+                                  const nextIds = v
+                                    ? Array.from(new Set([...baseIds, id]))
+                                    : baseIds.filter((x) => String(x) !== String(id));
+                                  setLinkedStoreIds(nextIds);
+                                  const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
+                                  try { onStoresUpdate?.(product.id, nextIds, { storeIdChanged: id, added: !!v, categoryKey }); } catch { void 0; }
                                   try {
                                     if (v) {
                                       const { addedByStore, categoryNamesByStore } = await ProductService.bulkAddStoreProductLinks([
-                                            {
-                                              product_id: String(product.id),
-                                              store_id: String(id),
-                                              is_active: true,
-                                              custom_price: product.price ?? null,
-                                              custom_price_old: product.price_old ?? null,
-                                              custom_price_promo: product.price_promo ?? null,
-                                              custom_stock_quantity: product.stock_quantity ?? null,
-                                              custom_available: product.available ?? true,
-                                            },
-                                          ]);
-                                          ProductService.invalidateStoreLinksCache(String(product.id));
-                                          const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                                          setLinkedStoreIds(fetched);
-                                          {
-                                            const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                            onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: true, categoryKey });
-                                            toast.success(t("product_added_to_store"));
-                                          {
-                                            const idStr = String(id);
-                                            const added = Math.max(0, Number(addedByStore?.[idStr] ?? 1) || 0);
-                                            if (added > 0) ShopCountsService.bumpProducts(queryClient, idStr, added);
-                                            const cats = categoryNamesByStore?.[idStr];
-                                            if (Array.isArray(cats)) {
-                                              const cnt = cats.length;
-                                              queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
-                                                const prevProducts = Number(old?.productsCount ?? 0) || 0;
-                                                return { productsCount: prevProducts, categoriesCount: cnt };
-                                              });
-                                              queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                                if (!Array.isArray(prev)) return prev;
-                                                return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
-                                              });
-                                            }
-                                            try {
-                                              const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                              setStores(updated || []);
-                                            } catch { /* ignore */ }
-                                          }
-                                          }
-                                        } else {
-                                          const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([String(product.id)], [String(id)]);
-                                          ProductService.invalidateStoreLinksCache(String(product.id));
-                                          const fetched = await ProductService.getStoreLinksForProduct(product.id);
-                                          setLinkedStoreIds(fetched);
-                                          {
-                                            const categoryKey = product.category_id != null ? `cat:${product.category_id}` : product.category_external_id ? `ext:${product.category_external_id}` : null;
-                                            onStoresUpdate?.(product.id, fetched, { storeIdChanged: id, added: false, categoryKey });
-                                            toast.success(t("product_removed_from_store"));
-                                            {
-                                              const idStr = String(id);
-                                              const deleted = Math.max(0, Number(deletedByStore?.[idStr] ?? 1) || 0);
-                                              if (deleted > 0) ShopCountsService.bumpProducts(queryClient, idStr, -deleted);
-                                              const cats = categoryNamesByStore?.[idStr];
-                                              if (Array.isArray(cats)) {
-                                                const cnt = cats.length;
-                                                queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
-                                                  const prevProducts = Number(old?.productsCount ?? 0) || 0;
-                                                  return { productsCount: prevProducts, categoriesCount: cnt };
-                                                });
-                                                queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
-                                                  if (!Array.isArray(prev)) return prev;
-                                                  return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
-                                                });
-                                              }
-                                              try {
-                                                const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
-                                                setStores(updated || []);
-                                              } catch { /* ignore */ }
-                                            }
-                                          }
+                                        {
+                                          product_id: String(product.id),
+                                          store_id: String(id),
+                                          is_active: true,
+                                          custom_price: product.price ?? null,
+                                          custom_price_old: product.price_old ?? null,
+                                          custom_price_promo: product.price_promo ?? null,
+                                          custom_stock_quantity: product.stock_quantity ?? null,
+                                          custom_available: product.available ?? true,
+                                        },
+                                      ]);
+                                      toast.success(t("product_added_to_store"));
+                                      {
+                                        const idStr = String(id);
+                                        const added = Math.max(0, Number(addedByStore?.[idStr] ?? 1) || 0);
+                                        if (added > 0) ShopCountsService.bumpProducts(queryClient, idStr, added);
+                                        const cats = categoryNamesByStore?.[idStr];
+                                        if (Array.isArray(cats)) {
+                                          const cnt = cats.length;
+                                          queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                            const prevProducts = Number(old?.productsCount ?? 0) || 0;
+                                            return { productsCount: prevProducts, categoriesCount: cnt };
+                                          });
+                                          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                            if (!Array.isArray(prev)) return prev;
+                                            return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
+                                          });
                                         }
-                                      } catch {
-                                        toast.error(t("operation_failed"));
-                                      } finally {
+                                        try {
+                                          const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                          setStores(updated || []);
+                                        } catch { /* ignore */ }
+                                      }
+                                    } else {
+                                      const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(
+                                        [String(product.id)],
+                                        [String(id)]
+                                      );
+                                      toast.success(t("product_removed_from_store"));
+                                      {
+                                        const idStr = String(id);
+                                        const deleted = Math.max(0, Number(deletedByStore?.[idStr] ?? 1) || 0);
+                                        if (deleted > 0) ShopCountsService.bumpProducts(queryClient, idStr, -deleted);
+                                        const cats = categoryNamesByStore?.[idStr];
+                                        if (Array.isArray(cats)) {
+                                          const cnt = cats.length;
+                                          queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                            const prevProducts = Number(old?.productsCount ?? 0) || 0;
+                                            return { productsCount: prevProducts, categoriesCount: cnt };
+                                          });
+                                          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                            if (!Array.isArray(prev)) return prev;
+                                            return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
+                                          });
+                                        }
+                                        try {
+                                          const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                          setStores(updated || []);
+                                        } catch { /* ignore */ }
+                                      }
+                                    }
+                                  } catch {
+                                    setLinkedStoreIds(baseIds);
+                                    try { onStoresUpdate?.(product.id, baseIds, { storeIdChanged: id, added: !v, categoryKey }); } catch { void 0; }
+                                    toast.error(t("operation_failed"));
+                                  } finally {
                                     setTogglingStoreIds((prev) => prev.filter((sid) => sid !== id));
                                     try { setActionsOpen(true); } catch { void 0; }
                                   }
