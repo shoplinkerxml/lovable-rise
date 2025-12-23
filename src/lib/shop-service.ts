@@ -573,7 +573,16 @@ export class ShopService {
 
     // Спочатку перевіряємо кеш (lite версія там є)
     const cacheKey = "shops-aggregated";
-    const cachedList = this.getCached<ShopAggregated[]>(cacheKey);
+    let cachedList = this.getCached<ShopAggregated[]>(cacheKey);
+
+    // Якщо немає в пам'яті, спробуємо знайти в localStorage
+    if (!cachedList) {
+      const userId = this.lastUserId ?? (await this.getSessionUserId());
+      if (userId) {
+        cachedList = this.getPersistedShops(userId);
+      }
+    }
+
     if (cachedList) {
       const found = cachedList.find(s => String(s.id) === String(id));
       if (found) {
