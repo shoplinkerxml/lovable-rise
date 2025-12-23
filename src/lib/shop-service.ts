@@ -571,6 +571,16 @@ export class ShopService {
   static async getShopLite(id: string): Promise<ShopAggregated> {
     if (!id) throw new Error("Shop ID is required");
 
+    // Спочатку перевіряємо кеш (lite версія там є)
+    const cacheKey = "shops-aggregated";
+    const cachedList = this.getCached<ShopAggregated[]>(cacheKey);
+    if (cachedList) {
+      const found = cachedList.find(s => String(s.id) === String(id));
+      if (found) {
+        return { ...found };
+      }
+    }
+
     await this.ensureSession();
 
     const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
