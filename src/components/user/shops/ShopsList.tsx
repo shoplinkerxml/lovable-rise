@@ -15,7 +15,7 @@ import {
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { Store, Trash2, Package, List } from 'lucide-react';
 import { useI18n } from "@/i18n";
-import { ShopService, type ShopAggregated } from '@/lib/shop-service';
+import { ShopService, type ShopAggregated, type ShopLimitInfo } from '@/lib/shop-service';
 import { ShopCountsService } from '@/lib/shop-counts';
 import { supabase } from '@/integrations/supabase/client';
 import { SessionValidator } from '@/lib/session-validation';
@@ -29,7 +29,7 @@ type ShopWithMarketplace = ShopAggregated;
 interface ShopsListProps {
   onDelete?: (id: string) => void;
   onCreateNew?: () => void;
-  onShopsLoaded?: (count: number) => void;
+  onShopsLoaded?: (count: number, limitInfo?: ShopLimitInfo | null) => void;
   refreshTrigger?: number;
 }
 
@@ -79,7 +79,8 @@ export const ShopsList = ({
   }, [onShopsLoaded]);
 
   useEffect(() => { 
-    onShopsLoadedRef.current?.(shopsLength); 
+    const info = ShopService.getShopLimitInfoCached();
+    onShopsLoadedRef.current?.(shopsLength, info); 
   }, [shopsLength]);
 
   useEffect(() => {

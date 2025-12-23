@@ -23,21 +23,17 @@ export const Shops = () => {
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
   const queryClient = useQueryClient();
 
-  const handleShopsLoaded = (count: number) => {
+  const handleShopsLoaded = (count: number, info?: ShopLimitInfo | null) => {
     setShopsCount(count);
-    setLimitInfo(prev => ({
+    if (info) {
+      setLimitInfo(info);
+      return;
+    }
+    setLimitInfo((prev) => ({
       ...prev,
       current: count,
-      canCreate: count < prev.max
+      canCreate: count < prev.max,
     }));
-    void (async () => {
-      try {
-        const info = await ShopService.getShopLimit();
-        setLimitInfo(info);
-      } catch {
-        void 0;
-      }
-    })();
   };
 
   useEffect(() => {

@@ -432,6 +432,10 @@ export class ShopService {
     }
   }
 
+  static getShopLimitInfoCached(): ShopLimitInfo | null {
+    return this.getCached<ShopLimitInfo>("shop-limit-info");
+  }
+
   static async getShopLimitOnly(): Promise<number> {
     const cacheKey = "shop-limit";
     const cached = this.getCached<number>(cacheKey);

@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import spreadsheetMockup from "@/assets/spreadsheet-mockup.jpg";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/i18n";
@@ -76,17 +75,83 @@ export function HeroSection() {
             </Button>
           </div>
 
-          <div className={`relative mt-10 w-full ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{
+          <div className={`relative mt-10 w-full flex justify-center ${isVisible ? 'animate-fade-slide-up' : 'opacity-0'}`} style={{
           animationDelay: '0.2s'
         }}>
-            <div className="relative group">
-              <div className="absolute -inset-8 rounded-[2.25rem] bg-gradient-to-r from-primary/35 via-success/15 to-primary/15 blur-3xl opacity-80 group-hover:opacity-100 transition-opacity motion-reduce:hidden" />
-              <div className="relative rounded-[1.75rem] overflow-hidden border border-primary/20 shadow-[0_24px_90px_-32px_rgba(0,0,0,0.45)] bg-background/40 backdrop-blur-md transition-shadow duration-700 ease-out group-hover:shadow-[0_36px_120px_-54px_rgba(0,0,0,0.55)]">
-                <div className="pointer-events-none absolute -inset-px rounded-[1.75rem] bg-gradient-to-b from-white/20 via-transparent to-black/10 opacity-80" />
-                <div className="relative transition-transform duration-700 ease-out will-change-transform motion-reduce:transition-none group-hover:-translate-y-1.5 group-hover:scale-[1.02]">
-                  <img src={spreadsheetMockup} alt={t("hero_mockup_alt")} className="w-full h-auto" />
+            <div className="relative group max-w-4xl w-full">
+              {/* Glow effects - adjusted for laptop shape */}
+              <div className="absolute -inset-10 rounded-[2.25rem] bg-gradient-to-r from-primary/30 via-success/10 to-primary/10 blur-3xl opacity-60 group-hover:opacity-80 transition-opacity motion-reduce:hidden" />
+              
+              {/* CSS Laptop Mockup */}
+              <div className="relative mx-auto">
+                {/* Laptop Top (Screen) */}
+                <div className="relative mx-auto border-gray-950 dark:border-gray-950 bg-gray-950 border-[8px] rounded-t-xl h-[172px] max-w-[301px] md:h-[294px] md:max-w-[512px] shadow-2xl transition-transform duration-700 ease-out will-change-transform group-hover:-translate-y-1 group-hover:scale-[1.01]">
+                    <div className="relative h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden select-none flex flex-col">
+                        {/* Mock Header */}
+                        <div className="h-8 border-b bg-white dark:bg-gray-800 dark:border-gray-700 flex items-center px-4 justify-between shrink-0">
+                           <div className="flex items-center gap-3">
+                              <div className="h-4 w-4 rounded bg-primary"></div>
+                              <div className="h-2.5 w-20 rounded bg-gray-200 dark:bg-gray-700"></div>
+                           </div>
+                           <div className="flex gap-2">
+                              <div className="h-2.5 w-2.5 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                              <div className="h-2.5 w-2.5 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                           </div>
+                        </div>
+                        <div className="flex flex-1 overflow-hidden">
+                           {/* Mock Sidebar */}
+                           <div className="w-14 md:w-20 border-r bg-white dark:bg-gray-800 dark:border-gray-700 flex flex-col items-center py-3 gap-3 shrink-0">
+                              <div className="h-6 w-8 md:w-12 rounded bg-primary/10"></div>
+                              <div className="h-6 w-8 md:w-12 rounded bg-gray-100 dark:bg-gray-700/50"></div>
+                              <div className="h-6 w-8 md:w-12 rounded bg-gray-100 dark:bg-gray-700/50"></div>
+                           </div>
+                           {/* Mock Content */}
+                           <div className="flex-1 p-3 md:p-5 flex flex-col gap-3 md:gap-4 overflow-hidden bg-gray-50/50 dark:bg-gray-900/50">
+                              {/* Product Card / Stats Row */}
+                              <div className="grid grid-cols-3 gap-3">
+                                  <div className="rounded-lg border bg-white p-2 md:p-3 shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col gap-1.5">
+                                     <div className="h-1.5 w-8 rounded bg-gray-200 dark:bg-gray-600"></div>
+                                     <div className="h-3 w-12 rounded bg-primary/20"></div>
+                                  </div>
+                                  <div className="rounded-lg border bg-white p-2 md:p-3 shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col gap-1.5">
+                                     <div className="h-1.5 w-8 rounded bg-gray-200 dark:bg-gray-600"></div>
+                                     <div className="h-3 w-12 rounded bg-green-500/20"></div>
+                                  </div>
+                                  <div className="rounded-lg border bg-white p-2 md:p-3 shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col gap-1.5">
+                                     <div className="h-1.5 w-8 rounded bg-gray-200 dark:bg-gray-600"></div>
+                                     <div className="h-3 w-12 rounded bg-blue-500/20"></div>
+                                  </div>
+                              </div>
+                              {/* Mock Table */}
+                              <div className="flex-1 rounded-lg border bg-white shadow-sm dark:bg-gray-800 dark:border-gray-700 overflow-hidden flex flex-col">
+                                 <div className="h-7 border-b bg-gray-50/50 px-3 flex items-center gap-4 dark:bg-gray-700/30">
+                                    <div className="h-2 w-16 rounded bg-gray-200 dark:bg-gray-600"></div>
+                                    <div className="h-2 w-12 rounded bg-gray-200 dark:bg-gray-600"></div>
+                                    <div className="h-2 w-12 rounded bg-gray-200 dark:bg-gray-600 ml-auto"></div>
+                                 </div>
+                                 <div className="p-3 space-y-2.5">
+                                    {[1, 2, 3, 4].map((i) => (
+                                       <div key={i} className="flex items-center gap-4 opacity-60 md:opacity-100">
+                                          <div className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-700 shrink-0"></div>
+                                          <div className="flex flex-col gap-1 flex-1">
+                                             <div className="h-2 w-24 rounded bg-gray-200 dark:bg-gray-600"></div>
+                                             <div className="h-1.5 w-16 rounded bg-gray-100 dark:bg-gray-700"></div>
+                                          </div>
+                                          <div className="h-2 w-10 rounded bg-gray-100 dark:bg-gray-700 ml-auto"></div>
+                                       </div>
+                                    ))}
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+                        {/* Screen Glare/Reflection */}
+                        <div className="pointer-events-none absolute -left-1/3 top-0 h-full w-2/3 rotate-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 animate-shimmer-slow motion-reduce:hidden" />
+                    </div>
                 </div>
-                <div className="pointer-events-none absolute -left-1/3 top-0 h-full w-2/3 rotate-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 animate-shimmer-slow motion-reduce:hidden" />
+                {/* Laptop Bottom (Base) */}
+                <div className="relative mx-auto bg-slate-700 dark:bg-slate-700 rounded-b-xl rounded-t-sm h-[17px] max-w-[351px] md:h-[21px] md:max-w-[597px] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)]">
+                    <div className="absolute left-1/2 top-0 -translate-x-1/2 rounded-b-xl w-[56px] h-[5px] md:w-[96px] md:h-[8px] bg-slate-800"></div>
+                </div>
               </div>
             </div>
           </div>
