@@ -51,6 +51,13 @@ export class TariffService {
     if (error) throw error;
     return (typeof data === 'string' ? JSON.parse(data) : data) as T;
   }
+
+  static async activateMyTariff(tariffId: number): Promise<{ success: boolean; subscription?: unknown }> {
+    return await TariffService.invokeEdge<{ success: boolean; subscription?: unknown }>(
+      'user-activate-tariff',
+      { tariffId },
+    );
+  }
   static async getTariffsAggregated(includeInactive = false, includeDemo = false): Promise<TariffWithDetails[]> {
     const rows = await getTariffsListCached<TariffWithDetails>(async () => {
       try {

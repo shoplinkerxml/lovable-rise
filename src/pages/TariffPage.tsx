@@ -42,10 +42,9 @@ import {
 import { useI18n } from "@/i18n";
 import { PageHeader } from "@/components/PageHeader";
 import { useOutletContext } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { AdminService } from "@/lib/admin-service";
 import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 import { useQuery } from "@tanstack/react-query";
+import { UserAuthService } from "@/lib/user-auth-service";
 
 const TariffPage = () => {
   const { t } = useI18n();
@@ -440,17 +439,15 @@ const TariffPage = () => {
                     disabled={activeTariffId === tariff.id}
                     onClick={async () => {
                       try {
-                        const { data } = await supabase.auth.getUser();
-                        const userId = data.user?.id;
-                        if (!userId) {
-                          toast.error(t('please_log_in'));
-                          return;
-                        }
-                        await AdminService.activateUserTariff(userId, Number(tariff.id));
+                        const resp = await TariffService.activateMyTariff(Number(tariff.id));
+                        if (!resp?.success) throw new Error("failed_update_tariff");
+                        UserAuthService.clearAuthMeCache();
+                        setActiveTariffId(Number(tariff.id));
                         toast.success(t('tariff_updated_successfully'));
                         window.location.href = '/user/dashboard';
                       } catch (e) {
-                        toast.error(t('failed_update_tariff'));
+                        const msg = String((e as any)?.message || "").trim();
+                        toast.error(msg && msg !== "failed_update_tariff" ? msg : t('failed_update_tariff'));
                       }
                     }}
                   >

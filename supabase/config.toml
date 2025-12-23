@@ -77,3 +77,6 @@ verify_jwt = true
 
 [functions.user-shops-list]
 verify_jwt = true
+
+[functions.user-activate-tariff]
+verify_jwt = true
