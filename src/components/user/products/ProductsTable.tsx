@@ -157,11 +157,14 @@ export const ProductsTable = ({
   useEffect(() => { onProductsLoadedRef.current = onProductsLoaded; }, [onProductsLoaded]);
   useEffect(() => { onLoadingChangeRef.current = onLoadingChange; }, [onLoadingChange]);
 
-  const loadFirstPage = useCallback(async () => {
-    setLoading(true);
-    onLoadingChangeRef.current?.(true);
+  const loadFirstPage = useCallback(async (opts?: { silent?: boolean }) => {
     if (loadingFirstRef.current) return;
     loadingFirstRef.current = true;
+    const silent = !!opts?.silent;
+    if (!silent) {
+      setLoading(true);
+      onLoadingChangeRef.current?.(true);
+    }
     requestedOffsets.current.clear();
     try {
       const initialFetchSize = Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize);
@@ -172,8 +175,10 @@ export const ProductsTable = ({
       setPageInfo(page);
       onProductsLoadedRef.current?.(page?.total ?? products.length);
     } finally {
-      setLoading(false);
-      onLoadingChangeRef.current?.(false);
+      if (!silent) {
+        setLoading(false);
+        onLoadingChangeRef.current?.(false);
+      }
       loadingFirstRef.current = false;
     }
   }, [storeId, pagination.pageSize, pagination.pageIndex]);
@@ -253,7 +258,7 @@ export const ProductsTable = ({
         entityKey: `product:duplicate:${product.id}`,
         run: async () => {
           await ProductService.duplicateProduct(product.id);
-          await loadFirstPage();
+          await loadFirstPage({ silent: true });
         },
       });
     } catch (error) {
@@ -430,6 +435,11 @@ export const ProductsTable = ({
       }
     } catch { void 0; }
   }, [queryClient]);
+
+  useEffect(() => {
+    if (storeId) return;
+    loadStoresForMenu().catch(() => void 0);
+  }, [storeId, loadStoresForMenu]);
 
   useEffect(() => {
     let cancelled = false;

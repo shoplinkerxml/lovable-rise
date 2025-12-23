@@ -126,16 +126,30 @@ export function Toolbar({
             loading ? (
               <Skeleton className="h-8 w-8 rounded-md" />
             ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => selectedRow && handleDuplicate(selectedRow)} aria-label={t("duplicate")} disabled={!canDuplicate} aria-disabled={!canDuplicate} data-testid="user_products_dataTable_duplicateSelected">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={async () => {
+                      if (!selectedRow) return;
+                      await handleDuplicate(selectedRow);
+                      table.resetRowSelection();
+                      setLastSelectedProductIds?.([]);
+                    }}
+                    aria-label={t("duplicate")}
+                    disabled={!canDuplicate}
+                    aria-disabled={!canDuplicate}
+                    data-testid="user_products_dataTable_duplicateSelected"
+                  >
                     {isDupPending ? (
                       <Loader2 className="h-4 w-4 animate-spin text-foreground" />
                     ) : (
                       <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : isDupError ? "text-destructive" : "text-foreground"}`} />
                     )}
                   </Button>
-                </TooltipTrigger>
+                  </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_duplicate">
                   {t("duplicate")}
                 </TooltipContent>

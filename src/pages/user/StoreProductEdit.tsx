@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
+import { useQueryClient } from "@tanstack/react-query";
+import { ShopCountsService } from "@/lib/shop-counts";
 
 // ============================================================================
 // Types
@@ -131,6 +133,7 @@ export const StoreProductEdit = () => {
   const pid = String(productId || "");
   const { t } = useI18n();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Consolidated state
   const [form, setForm] = useState<StoreProductLinkForm>({
@@ -319,6 +322,9 @@ export const StoreProductEdit = () => {
           category_external_id: patch.custom_category_id,
           categoryName: freshName,
         }, storeId);
+        try {
+          await ShopCountsService.recompute(queryClient, storeId);
+        } catch { void 0; }
       }
 
       toast.success(t("product_updated"));
@@ -337,6 +343,7 @@ export const StoreProductEdit = () => {
     lastCategoryId,
     pid,
     storeId,
+    queryClient,
     t,
     navigate,
   ]);

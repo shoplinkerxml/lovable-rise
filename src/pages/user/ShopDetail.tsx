@@ -48,6 +48,11 @@ export const ShopDetail = () => {
       : {}),
   });
 
+  useEffect(() => {
+    if (!shopId || !shop) return;
+    ShopCountsService.recompute(queryClient, shopId).catch(() => void 0);
+  }, [queryClient, shopId, shop]);
+
   useShopRealtimeSync({ 
     shopId: shopId, 
     enabled: !!shopId

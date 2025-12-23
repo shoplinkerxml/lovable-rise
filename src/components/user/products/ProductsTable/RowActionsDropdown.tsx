@@ -32,6 +32,11 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
   const isDupError = duplicationStatus?.status === "error";
 
   const loadStoresAndLinks = async () => {
+    const initialLinked = Array.isArray(product.linkedStoreIds) ? (product.linkedStoreIds as string[]).map(String) : [];
+    if (initialLinked.length > 0) {
+      setLinkedStoreIds(initialLinked);
+    }
+
     try {
       try { await prefetchStores?.(); } catch { void 0; }
       const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
@@ -39,21 +44,27 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
         setStores(cachedAgg);
       } else {
         setLoadingStores(true);
-        const data = await ShopService.getShopsAggregated();
-        const arr = data || [];
-        setStores(arr);
-        try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], arr); } catch { void 0; }
-        setLoadingStores(false);
+        try {
+          const data = await ShopService.getShopsAggregated();
+          const arr = data || [];
+          setStores(arr);
+          try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], arr); } catch { void 0; }
+        } finally {
+          setLoadingStores(false);
+        }
       }
-      ProductService.invalidateStoreLinksCache(String(product.id));
-      const ids = await ProductService.getStoreLinksForProduct(product.id);
-      setLinkedStoreIds(ids);
+      if (initialLinked.length === 0) {
+        ProductService.invalidateStoreLinksCache(String(product.id));
+        const ids = await ProductService.getStoreLinksForProduct(product.id);
+        setLinkedStoreIds(ids);
+      }
     } catch {
       const fallback = Array.isArray(storesList) && storesList.length > 0
         ? storesList
         : Object.entries(storeNames || {}).map(([id, name]) => ({ id: String(id), store_name: name })) as ShopAggregated[];
       setStores(fallback);
-      setLinkedStoreIds(product.linkedStoreIds || []);
+      setLinkedStoreIds(initialLinked);
+      setLoadingStores(false);
     }
   };
 
@@ -100,7 +111,12 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
         )}
         {storeId ? null : (
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger onClick={loadStoresAndLinks} data-testid={`user_products_row_stores_trigger_${product.id}`}>
+            <DropdownMenuSubTrigger
+              onPointerEnter={loadStoresAndLinks}
+              onFocus={loadStoresAndLinks}
+              onClick={loadStoresAndLinks}
+              data-testid={`user_products_row_stores_trigger_${product.id}`}
+            >
               <Store className="h-4 w-4" />
               {t("menu_stores")}
             </DropdownMenuSubTrigger>

@@ -1,6 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { ShopService } from "./shop-service";
-import { ProductService } from "./product-service";
 import type { ShopAggregated } from "./shop-service";
 import type { ShopCounts } from "@/types/shop";
 
@@ -19,7 +18,14 @@ export const ShopCountsService = {
       );
     });
     queryClient.setQueryData<ShopAggregated | null>(["shopDetail", storeId], (prev) => {
-      if (!prev) return prev;
+      if (prev === undefined) {
+        const list = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+        const fromList = (list || []).find((s) => String(s.id) === String(storeId));
+        return fromList
+          ? { ...fromList, productsCount: counts.productsCount, categoriesCount: counts.categoriesCount }
+          : prev;
+      }
+      if (prev === null) return null;
       return { ...prev, productsCount: counts.productsCount, categoriesCount: counts.categoriesCount };
     });
   },

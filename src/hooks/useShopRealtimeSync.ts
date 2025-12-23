@@ -53,24 +53,15 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
     };
 
     const handleUpdate = (payload: any) => {
-      const { store_id: oldStoreId, is_active: wasActive } = payload.old;
-      const { store_id: newStoreId, is_active: isActive } = payload.new;
-      if (oldStoreId !== newStoreId) {
-        if (String(oldStoreId) === shopId && wasActive !== false) {
-          triggerCountsRefetch();
-        }
-        if (String(newStoreId) === shopId && isActive !== false) {
-          triggerCountsRefetch();
-        }
-        return;
-      }
-      if (String(newStoreId) === shopId) {
-        if (wasActive !== false && isActive === false) {
-          triggerCountsRefetch();
-        } else if (wasActive === false && isActive !== false) {
-          triggerCountsRefetch();
-        }
-      }
+      const oldRow = payload?.old || {};
+      const newRow = payload?.new || {};
+      const sidOld = oldRow?.store_id ? String(oldRow.store_id) : "";
+      const sidNew = newRow?.store_id ? String(newRow.store_id) : "";
+      const wasActive = oldRow?.is_active !== false;
+      const isActive = newRow?.is_active !== false;
+
+      if (sidOld === shopId && wasActive) triggerCountsRefetch();
+      if (sidNew === shopId && isActive) triggerCountsRefetch();
     };
 
     const client = supabase as SupabaseClient;
