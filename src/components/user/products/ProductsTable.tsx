@@ -780,12 +780,37 @@ export const ProductsTable = ({
                 try {
                   const ids = selected.map((p) => String(p.id)).filter(Boolean);
                   setDeleteProgress({ open: true });
-                  const { deleted } = await ProductService.bulkRemoveStoreProductLinks(ids, [String(storeId)]);
+                  const { deleted, deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks(
+                    ids,
+                    [String(storeId)]
+                  );
                   setProductsCached((prev) => prev.filter((p) => !ids.includes(String(p.id))));
-                  const removedCount = Number(deleted ?? ids.length) || ids.length;
+                  const sid = String(storeId);
+                  const removedCount = Math.max(
+                    0,
+                    Number(deletedByStore?.[sid] ?? deleted ?? ids.length) || 0
+                  );
                   setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - removedCount) } : prev);
                   try {
-                    await ShopCountsService.recompute(queryClient, String(storeId));
+                    if (removedCount > 0) {
+                      ShopCountsService.bumpProducts(queryClient, sid, -removedCount);
+                    }
+                    const cats = categoryNamesByStore?.[sid];
+                    if (Array.isArray(cats)) {
+                      const cnt = cats.length;
+                      queryClient.setQueryData(ShopCountsService.key(sid), (old: any) => {
+                        const prevProducts = Number(old?.productsCount ?? 0) || 0;
+                        return { productsCount: prevProducts, categoriesCount: cnt };
+                      });
+                      queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                        if (!Array.isArray(prev)) return prev;
+                        return prev.map((s) => (String(s.id) === sid ? { ...s, categoriesCount: cnt } : s));
+                      });
+                      queryClient.setQueryData<ShopAggregated | null>(["shopDetail", sid], (prev) => {
+                        if (!prev) return prev;
+                        return { ...prev, categoriesCount: cnt };
+                      });
+                    }
                   } catch { void 0; }
                   toast.success(t('product_removed_from_store'));
                   try { await loadFirstPage(); } catch { void 0; }
@@ -793,7 +818,6 @@ export const ProductsTable = ({
                   toast.error(t('failed_remove_from_store'));
                 } finally { setDeleteProgress({ open: false }); }
                 table.resetRowSelection();
-                try { queryClient.invalidateQueries({ queryKey: ['shopsList'] }); } catch { void 0; }
               } else {
                 const ids = selected.map((p) => String(p.id));
                 if (onDelete && selected.length === 1) {

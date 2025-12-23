@@ -556,10 +556,11 @@ export class ShopService {
     if (!id) throw new Error("Shop ID is required");
 
     await this.ensureSession();
-
-    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
-      store_id: id,
-      includeConfig: true,
+    const response = await this.deduplicateRequest(`shop:get:${id}`, async () => {
+      return await this.invokeEdge<ShopsListResponse>("user-shops-list", {
+        store_id: id,
+        includeConfig: true,
+      });
     });
 
     const shop = response.shops?.[0];
@@ -591,10 +592,11 @@ export class ShopService {
     }
 
     await this.ensureSession();
-
-    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
-      store_id: id,
-      includeConfig: false,
+    const response = await this.deduplicateRequest(`shop:lite:${id}`, async () => {
+      return await this.invokeEdge<ShopsListResponse>("user-shops-list", {
+        store_id: id,
+        includeConfig: false,
+      });
     });
 
     const shop = response.shops?.[0];
@@ -607,11 +609,12 @@ export class ShopService {
     if (!storeId) throw new Error("Store ID is required");
     
     await this.ensureSession();
-
-    const response = await this.invokeEdge<ShopSettingsAggregated>(
-      "shop-settings-aggregated",
-      { store_id: storeId }
-    );
+    const response = await this.deduplicateRequest(`shop:settings-agg:${storeId}`, async () => {
+      return await this.invokeEdge<ShopSettingsAggregated>(
+        "shop-settings-aggregated",
+        { store_id: storeId }
+      );
+    });
 
     return {
       shop: response.shop,
@@ -815,11 +818,12 @@ export class ShopService {
     if (!storeId) return { productsCount: 0, categoriesCount: 0 };
     
     await this.ensureSession();
-
-    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {
-      store_id: storeId,
-      includeConfig: false,
-      forceCounts: true,
+    const response = await this.deduplicateRequest(`shop:recompute-counts:${storeId}`, async () => {
+      return await this.invokeEdge<ShopsListResponse>("user-shops-list", {
+        store_id: storeId,
+        includeConfig: false,
+        forceCounts: true,
+      });
     });
 
     const shop = (response.shops || []).find(

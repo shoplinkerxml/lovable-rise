@@ -24,15 +24,6 @@ export function useNavigationRefetch(refreshAuth?: () => Promise<void> | void) {
           await ProductService.recomputeStoreCategoryFilterCache(storeId).catch(() => void 0);
         }
       }
-      // Shop detail and settings
-      if (p.includes("/user/shops/") && !p.includes("/products")) {
-        const match = p.match(/\/user\/shops\/(.+?)(?:\/settings)?$/);
-        const storeId = match?.[1];
-        if (storeId) {
-          await queryClient.refetchQueries({ queryKey: ["shopDetail", storeId], exact: false });
-          await queryClient.refetchQueries({ queryKey: ["storeCategories", storeId], exact: false });
-        }
-      }
       // Tariffs and suppliers
       if (p.includes("/user/tariff")) {
         await queryClient.refetchQueries({ queryKey: ["tariffs:list"], exact: false });

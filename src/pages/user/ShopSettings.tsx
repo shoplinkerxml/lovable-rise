@@ -20,7 +20,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ShopSettingsAggregated } from "@/lib/shop-service";
 import { useMarketplaces } from "@/hooks/useMarketplaces";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 import { toast } from "sonner";
@@ -115,17 +114,6 @@ export default function ShopSettings() {
     }));
   }, [aggData]);
   
-  useEffect(() => {
-    if (!id) return;
-    const channel = supabase.channel(`store_store_categories_${id}`).on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'store_store_categories', filter: `store_id=eq.${id}` },
-      () => {
-        queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
-      }
-    ).subscribe();
-    return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
-  }, [id, queryClient]);
   const filtered = useMemo(() => rows.filter(r => r.name.toLowerCase().includes(search.toLowerCase())), [rows, search]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize);
