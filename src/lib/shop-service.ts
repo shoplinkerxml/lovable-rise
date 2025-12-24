@@ -123,8 +123,6 @@ export class ShopService {
   // Кэш данных (простой in-memory)
   private static dataCache = new Map<string, { data: any; timestamp: number }>();
   private static readonly CACHE_TTL = 30000; // 30 секунд
-  private static readonly PERSISTED_SHOPS_CACHE_TTL = 10 * 60 * 1000;
-  private static readonly PERSISTED_SHOPS_CACHE_PREFIX = "shops-aggregated:";
   private static lastUserId: string | null = null;
 
   // ============================================================================
@@ -265,10 +263,6 @@ export class ShopService {
     }
   }
 
-  private static getPersistedShopsKey(userId: string): string {
-    return `${this.PERSISTED_SHOPS_CACHE_PREFIX}${userId}`;
-  }
-
   private static async getSessionUserId(): Promise<string | null> {
     try {
       const { data } = await supabase.auth.getSession();
@@ -280,51 +274,11 @@ export class ShopService {
     }
   }
 
-  private static getPersistedShops(userId: string): ShopAggregated[] | null {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return null;
-      const raw = window.localStorage.getItem(this.getPersistedShopsKey(userId));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { timestamp?: number; shops?: ShopAggregated[] };
-      const timestamp = Number(parsed?.timestamp ?? 0) || 0;
-      if (!timestamp) return null;
-      if (Date.now() - timestamp > this.PERSISTED_SHOPS_CACHE_TTL) return null;
-      const shops = parsed?.shops;
-      if (!Array.isArray(shops)) return null;
-      return shops;
-    } catch {
-      return null;
-    }
-  }
-
-  private static setPersistedShops(userId: string, shops: ShopAggregated[]): void {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return;
-      window.localStorage.setItem(
-        this.getPersistedShopsKey(userId),
-        JSON.stringify({ timestamp: Date.now(), shops })
-      );
-    } catch {
-      return;
-    }
-  }
-
-  private static clearPersistedShops(userId: string): void {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return;
-      window.localStorage.removeItem(this.getPersistedShopsKey(userId));
-    } catch {
-      return;
-    }
-  }
-
   private static async clearShopsCaches(): Promise<void> {
     this.clearCache("shops");
     this.clearCache("shops-aggregated");
     this.clearCache("shop-limit");
     this.clearCache("shop-limit-info");
-    const userId = this.lastUserId ?? (await this.getSessionUserId());
-    if (userId) this.clearPersistedShops(userId);
     try {
       const { UserAuthService } = await import("@/lib/user-auth-service");
       UserAuthService.clearAuthMeCache();
@@ -350,17 +304,6 @@ export class ShopService {
     );
     
     this.setCache(cacheKey, updated);
-
-    const userId = this.lastUserId;
-    if (!userId) return;
-
-    const persisted = this.getPersistedShops(userId);
-    if (!persisted) return;
-
-    const persistedUpdated = persisted.map(shop =>
-      shop.id === storeId ? { ...shop, ...update(shop) } : shop
-    );
-    this.setPersistedShops(userId, persistedUpdated);
   }
 
   /**
@@ -477,51 +420,6 @@ export class ShopService {
       if (cached) return cached;
     }
 
-    if (!force) {
-      try {
-        const validation = await SessionValidator.ensureValidSession();
-        if (validation.isValid && validation.user?.id) {
-          const sessionKey = `${validation.user.id}:${validation.expiresAt ?? 0}`;
-          const raw = typeof window !== "undefined" ? window.localStorage?.getItem(`rq:authMe:${sessionKey}`) : null;
-          if (raw) {
-            const parsed = JSON.parse(raw) as any;
-            const stores = parsed?.data?.userStores;
-            if (Array.isArray(stores) && stores.length > 0) {
-              const lite = stores.map((s: any) => ({
-                id: String(s.id),
-                user_id: String(validation.user!.id),
-                store_name: String(s.store_name || ""),
-                store_company: null,
-                store_url: null,
-                template_id: null,
-                xml_config: null,
-                custom_mapping: null,
-                marketplace: "Не вказано",
-                is_active: true,
-                created_at: "",
-                updated_at: "",
-                productsCount: 0,
-                categoriesCount: 0,
-              })) as ShopAggregated[];
-              this.setCache(cacheKey, lite);
-              return lite;
-            }
-          }
-        }
-      } catch {
-        void 0;
-      }
-    }
-
-    const userId = await this.getSessionUserId();
-    if (!force && userId && this.isOffline()) {
-      const persisted = this.getPersistedShops(userId);
-      if (persisted) {
-        this.setCache(cacheKey, persisted);
-        return persisted;
-      }
-    }
-
     if (this.isOffline()) return [];
 
     await this.ensureSession();
@@ -542,7 +440,6 @@ export class ShopService {
           this.setCache("shop-limit", info.max);
         }
         this.setCache(cacheKey, shops);
-        if (userId) this.setPersistedShops(userId, shops);
         return shops;
       } catch (error) {
         console.error("Failed to fetch aggregated shops, using fallback:", error);
@@ -574,15 +471,7 @@ export class ShopService {
 
     // Спочатку перевіряємо кеш (lite версія там є)
     const cacheKey = "shops-aggregated";
-    let cachedList = this.getCached<ShopAggregated[]>(cacheKey);
-
-    // Якщо немає в пам'яті, спробуємо знайти в localStorage
-    if (!cachedList) {
-      const userId = this.lastUserId ?? (await this.getSessionUserId());
-      if (userId) {
-        cachedList = this.getPersistedShops(userId);
-      }
-    }
+    const cachedList = this.getCached<ShopAggregated[]>(cacheKey);
 
     if (cachedList) {
       const found = cachedList.find(s => String(s.id) === String(id));

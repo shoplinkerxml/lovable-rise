@@ -72,8 +72,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || ""
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") || "", apiKey || "")
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+    const anonKey = req.headers.get("apikey") || Deno.env.get("SUPABASE_ANON_KEY") || ""
+    const supabaseKey = serviceRoleKey || anonKey
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
     const userId = decodeJwtSub(authHeader)
     if (!userId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders })
 
