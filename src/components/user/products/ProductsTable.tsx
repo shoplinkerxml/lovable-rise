@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -13,7 +13,6 @@ import {
   getFacetedUniqueValues,
   useReactTable,
 } from "@tanstack/react-table";
-import type { Table as TanTable } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 // dropdown components moved to subcomponents
 import {
@@ -39,9 +38,8 @@ import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "
 import { SortableHeader } from "./ProductsTable/SortableHeader";
 import { LoadingSkeleton } from "./ProductsTable/LoadingSkeleton";
 import { PaginationFooter } from "./ProductsTable/PaginationFooter";
-import { SortableContext, useSortable, arrayMove } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useQueryClient } from "@tanstack/react-query";
+import { SortableContext, arrayMove } from "@dnd-kit/sortable";
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { ShopCountsService } from "@/lib/shop-counts";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { useVirtualRows } from "@/hooks/useVirtualRows";
@@ -76,42 +74,6 @@ type ProductsTableProps = {
 
 type PageInfo = { limit: number; offset: number; hasMore: boolean; nextOffset: number | null; total: number };
 type ResponseData = { products: ProductRow[]; page: PageInfo };
-
-const FIRST_PAGE_INDEX_KEY = "rq:index:products:first";
-
-const readBestFirstPageCache = (
-  storeId: string | undefined,
-  requiredLimit: number,
-): { items: ProductRow[]; page: PageInfo } | null => {
-  try {
-    const env = readCache<string[]>(FIRST_PAGE_INDEX_KEY, true);
-    const keys = Array.isArray(env?.data) ? env.data : [];
-    const prefix = storeId
-      ? `rq:products:store:${String(storeId)}:first:`
-      : "rq:products:master:first:";
-    const candidates = keys
-      .filter((k) => typeof k === "string" && k.startsWith(prefix))
-      .map((k) => {
-        const raw = k.slice(prefix.length);
-        const limit = Number.parseInt(raw, 10);
-        return Number.isFinite(limit) ? { key: k, limit } : null;
-      })
-      .filter((v): v is { key: string; limit: number } => !!v)
-      .sort((a, b) => a.limit - b.limit);
-
-    if (!candidates.length) return null;
-
-    const best =
-      candidates.find((c) => c.limit >= requiredLimit) ??
-      candidates[candidates.length - 1];
-
-    const cached = readCache<{ items: ProductRow[]; page: PageInfo }>(best.key, false);
-    if (!cached?.data || !Array.isArray(cached.data.items)) return null;
-    return { items: cached.data.items, page: cached.data.page };
-  } catch {
-    return null;
-  }
-};
  
 
 export const ProductsTable = ({
@@ -162,94 +124,59 @@ export const ProductsTable = ({
     } catch { void 0; }
     return { pageIndex: 0, pageSize: 10 };
   });
-  const requiredInitialFetchSize = useMemo(
-    () => Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize),
-    [pagination.pageIndex, pagination.pageSize],
+  const productsQueryKey = useMemo(
+    () => ["products", storeId ?? "all", "pageSize", pagination.pageSize] as const,
+    [storeId, pagination.pageSize],
   );
-  const initialCachedPage = useMemo(
-    () => readBestFirstPageCache(storeId, requiredInitialFetchSize),
-    [storeId, requiredInitialFetchSize],
+  const productsQuery = useInfiniteQuery<ResponseData, Error, InfiniteData<ResponseData, number>, typeof productsQueryKey, number>({
+    queryKey: productsQueryKey,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const offset = Number.isFinite(pageParam) ? pageParam : 0;
+      const { products, page } = await ProductService.getProductsPage(storeId ?? null, pagination.pageSize, offset);
+      return { products: products as unknown as ProductRow[], page: page as unknown as PageInfo };
+    },
+    getNextPageParam: (lastPage) => (lastPage?.page?.nextOffset == null ? undefined : lastPage.page.nextOffset),
+    placeholderData: (prev) => prev,
+  });
+  const items = useMemo(
+    () => (productsQuery.data?.pages || []).flatMap((p) => (Array.isArray(p?.products) ? p.products : [])),
+    [productsQuery.data],
   );
-  const [loading, setLoading] = useState(() => initialCachedPage == null);
-  const [items, setItems] = useState<ProductRow[]>(() => initialCachedPage?.items ?? []);
-  const itemsRef = useRef<ProductRow[]>(initialCachedPage?.items ?? []);
-  useEffect(() => { itemsRef.current = items; }, [items]);
-  const [pageInfo, setPageInfo] = useState<PageInfo | null>(() => initialCachedPage?.page ?? null);
+  const pageInfo: PageInfo | null = useMemo(() => {
+    const pages = productsQuery.data?.pages || [];
+    const last = pages.length > 0 ? pages[pages.length - 1] : null;
+    return (last?.page as PageInfo | undefined) ?? null;
+  }, [productsQuery.data]);
+  const loading = productsQuery.isPending || (productsQuery.isFetching && items.length === 0);
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
-    setItems((prev) => updater(prev));
-    queryClient.setQueryData(['products', storeId ?? 'all'], (prev: ProductRow[] | undefined) => updater(prev ?? []));
-    try {
-      const sizedKey = storeId
-        ? `rq:products:store:${storeId}:first:${pagination.pageSize}`
-        : `rq:products:master:first:${pagination.pageSize}`;
-      const env = readCache<{ items: ProductRow[]; page?: PageInfo }>(sizedKey, true);
-      if (env?.data && Array.isArray(env.data.items)) {
-        const nextItems = updater(env.data.items as ProductRow[]);
-        writeCache(sizedKey, { items: nextItems, page: env.data.page }, CACHE_TTL.productsPage);
+    queryClient.setQueriesData({ queryKey: ["products", storeId ?? "all"], exact: false }, (old: any) => {
+      if (!old) return old;
+      if (Array.isArray(old)) return updater(old as ProductRow[]);
+      if (typeof old === "object" && Array.isArray((old as any).pages)) {
+        const prev = old as any;
+        return {
+          ...prev,
+          pages: prev.pages.map((p: any) => {
+            const products = Array.isArray(p?.products) ? (p.products as ProductRow[]) : [];
+            return { ...p, products: updater(products) };
+          }),
+        };
       }
-      ProductService.updateFirstPageCaches(storeId ?? null, (arr) => updater(arr as ProductRow[]));
-    } catch { void 0; }
-  }, [queryClient, storeId, pagination.pageSize]);
+      return old;
+    });
+  }, [queryClient, storeId]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
-  const requestedOffsets = useRef<Set<number>>(new Set());
-  const loadingFirstRef = useRef(false);
-  const loadingNextRef = useRef(false);
-  const [lastSelectedProductIds, setLastSelectedProductIds] = useState<string[]>([]);
+  const [, setLastSelectedProductIds] = useState<string[]>([]);
 
   const onProductsLoadedRef = useRef(onProductsLoaded);
   const onLoadingChangeRef = useRef(onLoadingChange);
   useEffect(() => { onProductsLoadedRef.current = onProductsLoaded; }, [onProductsLoaded]);
   useEffect(() => { onLoadingChangeRef.current = onLoadingChange; }, [onLoadingChange]);
 
-  const loadFirstPage = useCallback(async (opts?: { silent?: boolean; bypassCache?: boolean }) => {
-    if (loadingFirstRef.current) return;
-    loadingFirstRef.current = true;
-    const silent = !!opts?.silent;
-    const shouldShowLoading = !silent && itemsRef.current.length === 0;
-    if (shouldShowLoading) {
-      setLoading(true);
-      onLoadingChangeRef.current?.(true);
-    }
-    requestedOffsets.current.clear();
-    try {
-      const initialFetchSize = Math.max(pagination.pageSize, (pagination.pageIndex + 1) * pagination.pageSize);
-      const { products, page } = storeId
-        ? await ProductService.getStoreProductsPage(String(storeId), initialFetchSize, { bypassCache: opts?.bypassCache === true })
-        : await ProductService.getUserMasterProductsPage(initialFetchSize, { bypassCache: opts?.bypassCache === true });
-      setItems(products as ProductRow[]);
-      setPageInfo(page);
-      onProductsLoadedRef.current?.(page?.total ?? products.length);
-    } finally {
-      if (shouldShowLoading) {
-        setLoading(false);
-        onLoadingChangeRef.current?.(false);
-      }
-      loadingFirstRef.current = false;
-    }
-  }, [storeId, pagination.pageSize, pagination.pageIndex]);
-
-  const loadNextPage = useCallback(async (override?: { limit: number; offset: number | null }) => {
-    const nextOffset = override?.offset ?? pageInfo?.nextOffset ?? null;
-    const nextLimit = override?.limit ?? pagination.pageSize;
-    if (nextOffset == null) return;
-    if (pageInfo && !pageInfo.hasMore) return;
-    if (loadingNextRef.current) return;
-    if (requestedOffsets.current.has(nextOffset)) return;
-    requestedOffsets.current.add(nextOffset);
-    setLoading(true);
-    onLoadingChangeRef.current?.(true);
-    loadingNextRef.current = true;
-    try {
-      const { products, page } = await ProductService.getProductsPage(storeId ?? null, nextLimit, nextOffset);
-      setItems((prev) => [...prev, ...(products as ProductRow[])]);
-      setPageInfo(page ?? null);
-      onProductsLoadedRef.current?.(page?.total ?? (items.length + products.length));
-    } finally {
-      setLoading(false);
-      onLoadingChangeRef.current?.(false);
-      loadingNextRef.current = false;
-    }
-  }, [pageInfo, storeId, items.length, pagination.pageSize]);
+  useEffect(() => {
+    onLoadingChangeRef.current?.(productsQuery.isFetching);
+  }, [productsQuery.isFetching]);
 
   useEffect(() => {
     if (storeId) {
@@ -259,8 +186,6 @@ export const ProductsTable = ({
       setCategoryFilterOptions([]);
     }
   }, [storeId, items]);
-
-  useEffect(() => { loadFirstPage(); }, [loadFirstPage]);
   const refreshFirstRef = useRef(true);
   useEffect(() => {
     if (refreshFirstRef.current) {
@@ -268,25 +193,37 @@ export const ProductsTable = ({
       return;
     }
     if (refreshTrigger == null) return;
-    loadFirstPage({ bypassCache: true });
-  }, [refreshTrigger, loadFirstPage]);
+    queryClient.invalidateQueries({ queryKey: ["products", storeId ?? "all"], exact: false });
+  }, [refreshTrigger, queryClient, storeId]);
   useEffect(() => {
     try {
       writeCache('user_products_pagination', { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }, CACHE_TTL.uiPrefs);
     } catch { void 0; }
   }, [pagination.pageIndex, pagination.pageSize]);
+  const hasNextPage = productsQuery.hasNextPage;
+  const isFetchingNextPage = productsQuery.isFetchingNextPage;
+  const fetchNextPage = productsQuery.fetchNextPage;
   useEffect(() => {
     const requiredForCurrent = (pagination.pageIndex + 1) * pagination.pageSize;
     const requiredForPrefetch = (pagination.pageIndex + 2) * pagination.pageSize;
-    const canLoad = pageInfo && pageInfo.hasMore && pageInfo.nextOffset != null;
+    const canLoad = !!hasNextPage;
     if (!canLoad) return;
-    if (loadingFirstRef.current) return;
-    if (items.length < requiredForCurrent && !loadingNextRef.current && !requestedOffsets.current.has(pageInfo!.nextOffset!)) {
-      loadNextPage();
+    if (isFetchingNextPage) return;
+    if (items.length < requiredForCurrent) {
+      void fetchNextPage();
       return;
     }
-    
-  }, [pagination.pageIndex, pagination.pageSize, items.length, pageInfo, loadNextPage]);
+    if (items.length < requiredForPrefetch) {
+      void fetchNextPage();
+    }
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    items.length,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  ]);
 
   const products: ProductRow[] = items;
   productsCount = pageInfo?.total ?? products.length;
@@ -312,7 +249,7 @@ export const ProductsTable = ({
         entityKey: `product:duplicate:${product.id}`,
         run: async () => {
           await ProductService.duplicateProduct(product.id);
-          await loadFirstPage({ silent: true, bypassCache: true });
+          await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false });
         },
       });
     } catch (error) {
@@ -328,7 +265,7 @@ export const ProductsTable = ({
       setCopyDialog({ open: false, name: null });
       duplicatingRef.current = false;
     }
-  }, [canCreate, t, loadFirstPage]);
+  }, [canCreate, queryClient, storeId, t]);
 
   
 
@@ -367,13 +304,13 @@ export const ProductsTable = ({
     try {
       const env = readCache<VisibilityState>(COLUMN_VIS_KEY, true);
       if (env?.data) {
-        setColumnVisibility((prev) => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(env.data || {}) }));
+        setColumnVisibility(() => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(env.data || {}) }));
         return;
       }
       const saved = typeof window !== "undefined" ? localStorage.getItem(COLUMN_VIS_KEY) : null;
       if (saved) {
         const parsed = JSON.parse(saved) as VisibilityState;
-        setColumnVisibility((prev) => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(parsed || {}) }));
+        setColumnVisibility(() => ({ ...DEFAULT_COLUMN_VISIBILITY, ...(parsed || {}) }));
         writeCache(COLUMN_VIS_KEY, parsed, CACHE_TTL.uiPrefs);
       } else {
         setColumnVisibility(DEFAULT_COLUMN_VISIBILITY);
@@ -580,7 +517,7 @@ export const ProductsTable = ({
   const tableElRef = useRef<HTMLTableElement | null>(null);
   const rowHeight = 44;
   const enableVirtual = pagination.pageSize >= 50;
-  const { virtualStart, virtualEnd, topH, bottomH } = useVirtualRows(enableVirtual, rows.length, tableElRef, rowHeight);
+  const { virtualStart, virtualEnd } = useVirtualRows(enableVirtual, rows.length, tableElRef, rowHeight);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -771,8 +708,7 @@ export const ProductsTable = ({
             if (productToDelete) {
               await onDelete?.(productToDelete);
               setProductsCached((prev) => prev.filter((p) => String(p.id) !== String(productToDelete.id)));
-              setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - 1) } : prev);
-              try { await loadFirstPage(); } catch { void 0; }
+              try { await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false }); } catch { void 0; }
             } else {
               const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
               if (storeId) {
@@ -790,7 +726,6 @@ export const ProductsTable = ({
                     0,
                     Number(deletedByStore?.[sid] ?? deleted ?? ids.length) || 0
                   );
-                  setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - removedCount) } : prev);
                   try {
                     if (removedCount > 0) {
                       ShopCountsService.bumpProducts(queryClient, sid, -removedCount);
@@ -813,7 +748,7 @@ export const ProductsTable = ({
                     }
                   } catch { void 0; }
                   toast.success(t('product_removed_from_store'));
-                  try { await loadFirstPage(); } catch { void 0; }
+                  try { await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false }); } catch { void 0; }
                 } catch (_) {
                   toast.error(t('failed_remove_from_store'));
                 } finally { setDeleteProgress({ open: false }); }
@@ -827,10 +762,9 @@ export const ProductsTable = ({
                     setDeleteProgress({ open: true });
                     await ProductService.bulkDeleteProducts(ids);
                     setProductsCached((prev) => prev.filter((p) => !ids.includes(String(p.id))));
-                    setPageInfo((prev) => prev ? { ...prev, total: Math.max(0, (prev.total ?? 0) - ids.length) } : prev);
                     didBatch = true;
                     toast.success(t('products_deleted_successfully'));
-                    try { await loadFirstPage(); } catch { void 0; }
+                    try { await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false }); } catch { void 0; }
                   } catch (_) {
                     toast.error(t('failed_delete_product'));
                   } finally { setDeleteProgress({ open: false }); }
@@ -839,7 +773,7 @@ export const ProductsTable = ({
               }
             }
             if (didBatch || typeof refreshTrigger === 'undefined') {
-              queryClient.invalidateQueries({ queryKey: ['products', storeId ?? 'all'] });
+              queryClient.invalidateQueries({ queryKey: ["products", storeId ?? "all"], exact: false });
             }
           } catch (error) {
             console.error("Delete error:", error);

@@ -171,19 +171,6 @@ export class ProductService {
 
   private static inFlightLinksByProduct: Map<string, Promise<string[]>> = new Map();
   private static inFlightRecomputeByStore: Map<string, Promise<void>> = new Map();
-  private static readonly FIRST_PAGE_INDEX_KEY = "rq:index:products:first";
-
-  private static addFirstPageKeyToIndex(key: string) {
-    try {
-      const existing = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
-      const list = Array.isArray(existing?.data) ? existing!.data! : [];
-      if (list.includes(key)) return;
-      const next = [...list, key];
-      writeCache(ProductService.FIRST_PAGE_INDEX_KEY, next, CACHE_TTL.productsPage);
-    } catch (error) {
-      console.error("ProductService.addFirstPageKeyToIndex failed", error);
-    }
-  }
 
   private static castNullableNumber(value: unknown): number | null {
     if (value === undefined || value === null || value === "") return null;
@@ -394,19 +381,6 @@ export class ProductService {
     products: ProductAggregated[];
     page: ProductListPage;
   }> {
-    const cacheKey = `rq:products:master:first:${limit}`;
-    if (options?.bypassCache) {
-      try {
-        removeCache(cacheKey);
-      } catch {
-        void 0;
-      }
-    }
-    const cached = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(cacheKey, false);
-    if (cached?.data && Array.isArray(cached.data.items)) {
-      return { products: cached.data.items, page: cached.data.page };
-    }
-
     try {
       const fresh = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
         limit,
@@ -421,13 +395,9 @@ export class ProductService {
         nextOffset: fresh?.page?.nextOffset ?? null,
         total: fresh?.page?.total ?? products.length,
       };
-      ProductService.addFirstPageKeyToIndex(cacheKey);
-      writeCache(cacheKey, { items: products, page }, CACHE_TTL.productsPage);
       return { products, page };
     } catch (error) {
       const fb = await ProductService.fetchProductsPageFallback(null, limit, 0);
-      ProductService.addFirstPageKeyToIndex(cacheKey);
-      writeCache(cacheKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
       return fb;
     }
   }
@@ -442,19 +412,6 @@ export class ProductService {
   }> {
     if (!storeId || storeId.trim() === "") {
       throw new Error("Store ID is required");
-    }
-
-    const cacheKey = `rq:products:store:${storeId}:first:${limit}`;
-    if (options?.bypassCache) {
-      try {
-        removeCache(cacheKey);
-      } catch {
-        void 0;
-      }
-    }
-    const cached = readCache<{ items: ProductAggregated[]; page: ProductListPage }>(cacheKey, false);
-    if (cached?.data && Array.isArray(cached.data.items)) {
-      return { products: cached.data.items, page: cached.data.page };
     }
 
     try {
@@ -472,13 +429,9 @@ export class ProductService {
         nextOffset: fresh?.page?.nextOffset ?? null,
         total: fresh?.page?.total ?? products.length,
       };
-      ProductService.addFirstPageKeyToIndex(cacheKey);
-      writeCache(cacheKey, { items: products, page }, CACHE_TTL.productsPage);
       return { products, page };
     } catch (error) {
       const fb = await ProductService.fetchProductsPageFallback(String(storeId), limit, 0);
-      ProductService.addFirstPageKeyToIndex(cacheKey);
-      writeCache(cacheKey, { items: fb.products, page: fb.page }, CACHE_TTL.productsPage);
       return fb;
     }
   }
@@ -644,27 +597,8 @@ export class ProductService {
     storeId: string | null,
     mutate: (items: unknown[]) => unknown[],
   ) {
-    try {
-      const env = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
-      const keys = Array.isArray(env?.data) ? env!.data! : [];
-      if (!keys.length) return;
-      const targetStoreId = storeId == null ? null : String(storeId);
-      for (const key of keys) {
-        if (targetStoreId === null) {
-          if (!key.startsWith("rq:products:master:first:")) continue;
-        } else {
-          if (!key.startsWith(`rq:products:store:${targetStoreId}:first:`)) continue;
-        }
-        const existing = readCache<{ items: unknown[]; page?: ProductListPage }>(key, true);
-        if (!existing?.data || !Array.isArray(existing.data.items)) continue;
-        const nextItems = mutate(existing.data.items);
-        if (!Array.isArray(nextItems)) continue;
-        const page = existing.data.page;
-        writeCache(key, { items: nextItems, page }, CACHE_TTL.productsPage);
-      }
-    } catch (error) {
-      console.error("ProductService.updateFirstPageCaches failed", error);
-    }
+    void storeId;
+    void mutate;
   }
 
   static patchProductCaches(
@@ -672,14 +606,9 @@ export class ProductService {
     patch: Partial<ProductAggregated>,
     storeId?: string | null,
   ) {
-    const targetStoreId = storeId === undefined ? null : storeId;
-    ProductService.updateFirstPageCaches(targetStoreId, (items) => {
-      return items.map((row) => {
-        const p = row as ProductAggregated;
-        if (String(p.id) !== String(productId)) return p;
-        return { ...p, ...patch };
-      });
-    });
+    void productId;
+    void patch;
+    void storeId;
   }
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
@@ -888,36 +817,6 @@ export class ProductService {
         ? (JSON.parse(data) as { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> })
         : (data as { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }));
     try {
-      const sids = (storeIds || []).map(String);
-      ProductService.updateFirstPageCaches(null, (arr) => {
-        const items = arr as ProductAggregated[];
-        return items.map((p) => {
-          if (!productIds.map(String).includes(String(p.id))) return p;
-          const next = (p.linkedStoreIds || []).filter((sid) => !sids.includes(String(sid)));
-          return { ...p, linkedStoreIds: next };
-        });
-      });
-      for (const sid of sids) {
-        ProductService.updateFirstPageCaches(sid, (arr) => {
-          const items = arr as ProductAggregated[];
-          return items.map((p) => {
-            if (!productIds.map(String).includes(String(p.id))) return p;
-            const next = (p.linkedStoreIds || []).filter((x) => String(x) !== String(sid));
-            return { ...p, linkedStoreIds: next };
-          });
-        });
-      }
-    } catch (error) {
-      console.error("ProductService.bulkRemoveStoreProductLinks cache update failed", error);
-    }
-    try {
-      for (const sid of (storeIds || []).map(String)) {
-        ProductService.clearStoreProductsCaches(sid);
-      }
-    } catch (error) {
-      console.error("ProductService.bulkRemoveStoreProductLinks clearStoreProductsCaches failed", error);
-    }
-    try {
       const { ShopService } = await import("@/lib/shop-service");
       const catsByStore = out.categoryNamesByStore || {};
       for (const sid of Object.keys(catsByStore)) {
@@ -958,39 +857,6 @@ export class ProductService {
       (typeof data === "string"
         ? (JSON.parse(data) as { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> })
         : (data as { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }));
-    try {
-      const links = (payload || []).map((l) => ({ pid: String(l.product_id), sid: String(l.store_id) }));
-      const groupedByPid: Record<string, string[]> = {};
-      for (const { pid, sid } of links) {
-        groupedByPid[pid] = Array.from(new Set([...(groupedByPid[pid] || []), sid]));
-      }
-      ProductService.updateFirstPageCaches(null, (arr) => {
-        const items = arr as ProductAggregated[];
-        return items.map((p) => {
-          const add = groupedByPid[String(p.id)] || [];
-          if (add.length === 0) return p;
-          const merged = Array.from(new Set([...(p.linkedStoreIds || []).map(String), ...add]));
-          return { ...p, linkedStoreIds: merged };
-        });
-      });
-      const sidsUnique = Array.from(new Set(links.map((x) => x.sid)));
-      for (const sid of sidsUnique) {
-        ProductService.updateFirstPageCaches(sid, (arr) => {
-          const items = arr as ProductAggregated[];
-          return items.map((p) => {
-            const add = groupedByPid[String(p.id)] || [];
-            if (add.length === 0) return p;
-            const merged = Array.from(new Set([...(p.linkedStoreIds || []).map(String), ...add]));
-            return { ...p, linkedStoreIds: merged };
-          });
-        });
-      }
-      for (const sid of sidsUnique) {
-        ProductService.clearStoreProductsCaches(sid);
-      }
-    } catch (error) {
-      console.error("ProductService.bulkAddStoreProductLinks cache update failed", error);
-    }
     try {
       const { ShopService } = await import("@/lib/shop-service");
       const catsByStore = out.categoryNamesByStore || {};
@@ -1727,45 +1593,15 @@ export class ProductService {
   }
 
   static clearAllFirstPageCaches() {
-    try {
-      const env = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
-      const keys = Array.isArray(env?.data) ? env!.data! : [];
-      for (const key of keys) {
-        removeCache(key);
-      }
-      removeCache(ProductService.FIRST_PAGE_INDEX_KEY);
-    } catch (error) {
-      console.error("ProductService.clearAllFirstPageCaches failed", error);
-    }
+    void 0;
   }
 
   static clearMasterProductsCaches(): void {
-    try {
-      const allKeys = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
-      const keys = Array.isArray(allKeys?.data) ? allKeys.data : [];
-      for (const key of keys) {
-        if (key.startsWith("rq:products:master:")) {
-          removeCache(key);
-        }
-      }
-    } catch (error) {
-      console.error("ProductService.clearMasterProductsCaches failed", error);
-    }
+    void 0;
   }
 
   static clearStoreProductsCaches(storeId: string): void {
-    try {
-      const allKeys = readCache<string[]>(ProductService.FIRST_PAGE_INDEX_KEY, true);
-      const keys = Array.isArray(allKeys?.data) ? allKeys.data : [];
-      const pattern = `rq:products:store:${storeId}:`;
-      for (const key of keys) {
-        if (key.includes(pattern)) {
-          removeCache(key);
-        }
-      }
-    } catch (error) {
-      console.error("ProductService.clearStoreProductsCaches failed", error);
-    }
+    void storeId;
   }
 
   static clearAllProductsCaches(): void {
