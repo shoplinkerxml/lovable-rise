@@ -3,7 +3,6 @@ import { R2Storage } from "@/lib/r2-storage";
 import { ApiError } from "./user-service";
 import { SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
-import { CACHE_TTL, readCache, writeCache, removeCache } from "./cache-utils";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { CategoryService } from "@/lib/category-service";
 
@@ -225,9 +224,6 @@ export class ProductService {
       }>
     >;
   }> {
-    const cacheKey = "rq:user:lookups";
-    const cached = readCache<any>(cacheKey, false);
-    if (cached?.data) return cached.data;
     const resp = await ProductService.invokeEdge<{
       suppliers?: any[];
       currencies?: any[];
@@ -238,14 +234,10 @@ export class ProductService {
       currencies: Array.isArray(resp.currencies) ? resp.currencies : [],
       supplierCategoriesMap: resp.supplierCategoriesMap || {},
     };
-    writeCache(cacheKey, result, 30 * 60 * 1000);
     return result;
   }
 
   private static async getCategoriesMapForEdge(storeId?: string | null): Promise<Record<string, string>> {
-    const cacheKey = storeId ? `rq:edge:categories-map:store:${String(storeId)}` : "rq:edge:categories-map:all";
-    const cached = readCache<Record<string, string>>(cacheKey, false);
-    if (cached?.data && typeof cached.data === "object") return cached.data;
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id ? String(auth.user.id) : null;
@@ -274,18 +266,9 @@ export class ProductService {
         if (r.id != null) map[String(r.id)] = name;
         if (r.external_id != null) map[String(r.external_id)] = name;
       }
-      writeCache(cacheKey, map, 30 * 60 * 1000);
       return map;
     } catch {
       return {};
-    }
-  }
-
-  static clearLookupsCache(): void {
-    try {
-      removeCache("rq:user:lookups");
-    } catch (error) {
-      console.error("ProductService.clearLookupsCache failed", error);
     }
   }
 
@@ -613,8 +596,7 @@ export class ProductService {
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
     try {
-      const names = await ProductService.getStoreCategoryFilterOptions(storeId);
-      writeCache(`rq:filters:categories:${storeId}`, names, CACHE_TTL.categoryFilters);
+      await ProductService.getStoreCategoryFilterOptions(storeId);
     } catch (error) {
       console.error("ProductService.recomputeStoreCategoryFilterCache failed", error);
     }
@@ -639,16 +621,11 @@ export class ProductService {
   }
 
   static async getStoreCategoryFilterOptions(storeId: string): Promise<string[]> {
-    const key = `rq:filters:categories:${storeId}`;
-    const cached = readCache<string[]>(key, false);
-    if (cached?.data && Array.isArray(cached.data)) return cached.data;
-
     const resp = await ProductService.invokeEdge<{ names?: string[] }>(
       "store-category-filter-options",
       { store_id: storeId },
     );
     const names = (resp?.names || []).filter((v) => typeof v === "string");
-    writeCache(key, names, CACHE_TTL.categoryFilters);
     return names;
   }
 
@@ -660,14 +637,6 @@ export class ProductService {
       { store_ids: unique },
     );
     const results: Record<string, string[]> = resp?.results || {};
-    try {
-      for (const sid of unique) {
-        const names = Array.isArray(results[sid]) ? results[sid] : (resp?.names || []);
-        writeCache(`rq:filters:categories:${sid}`, names, CACHE_TTL.categoryFilters);
-      }
-    } catch (error) {
-      console.error("ProductService.refreshStoreCategoryFilterOptions cache write failed", error);
-    }
     return results;
   }
 
@@ -908,13 +877,8 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
     try {
-      const cached = readCache<number>("rq:products:limit", false);
-      if (typeof cached?.data === "number") {
-        return cached.data;
-      }
       const resp = await ProductService.invokeEdge<{ value?: number }>("get-product-limit-only", {});
       const v = Number(resp?.value ?? 0) || 0;
-      writeCache("rq:products:limit", v, CACHE_TTL.limits);
       return v;
     } catch (e) {
       return 0;
@@ -934,11 +898,7 @@ export class ProductService {
   }
 
   static invalidateProductLimitCache() {
-    try {
-      removeCache("rq:products:limit");
-    } catch (error) {
-      console.error("ProductService.invalidateProductLimitCache failed", error);
-    }
+    void 0;
   }
 
   /** Количество продуктов текущего пользователя: только функция user-products-list */
@@ -1369,7 +1329,6 @@ export class ProductService {
     if (needUpdate) {
       await ProductService.updateProduct(String(productId), { images: processed as unknown as ProductImage[] });
     }
-    removeCache("rq:products:all");
     try {
       ProductService.clearMasterProductsCaches();
       if (productData.links) {
@@ -1395,7 +1354,6 @@ export class ProductService {
     if (!product) {
       throw new Error("duplicate_failed");
     }
-    removeCache("rq:products:all");
     try {
       ProductService.clearAllFirstPageCaches();
     } catch (error) {
@@ -1539,7 +1497,6 @@ export class ProductService {
     if (!ok) {
       throw new Error("delete_failed");
     }
-    removeCache("rq:products:all");
     try {
       ProductService.clearMasterProductsCaches();
       if (storeIdToInvalidate) {
@@ -1575,7 +1532,6 @@ export class ProductService {
     );
     const ok = respDel2?.success === true;
     if (!ok) throw new Error("delete_failed");
-    removeCache("rq:products:all");
     try {
       ProductService.clearMasterProductsCaches();
       if (storeIdsToInvalidate.length > 0) {
@@ -1663,7 +1619,6 @@ export class ProductService {
     } catch (e) {
       console.error("ProductService.bulkUpsertProducts clearAllProductsCaches failed", e);
     }
-    removeCache("rq:products:all");
     ProductService.invalidateProductLimitCache();
     return { upserted: payload.length };
   }

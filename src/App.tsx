@@ -7,6 +7,8 @@ import { useEffect, useMemo, Suspense, lazy } from "react";
 import { R2Storage } from "@/lib/r2-storage";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
 import { I18nProvider } from "@/i18n";
+import { supabase } from "@/integrations/supabase/client";
+import { removeCache } from "@/lib/cache-utils";
 // Dev diagnostics removed per request
 
 const Index = lazy(() => import("./pages/Index"));
@@ -63,6 +65,23 @@ const App = () => {
   // Clean up orphan temporary uploads for the current user on app start
   useEffect(() => {
     R2Storage.cleanupPendingUploads().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      try {
+        queryClient.removeQueries({ queryKey: ["auth", "me"], exact: true });
+        queryClient.removeQueries({ queryKey: ["auth", "session"], exact: true });
+      } catch {
+        void 0;
+      }
+      try {
+        removeCache("rq:auth:me");
+      } catch {
+        void 0;
+      }
+    });
+    return () => data.subscription.unsubscribe();
   }, []);
 
   const router = useMemo(() => createBrowserRouter([

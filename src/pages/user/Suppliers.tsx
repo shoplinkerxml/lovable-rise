@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, Truck, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -7,9 +7,10 @@ import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/i18n';
 import { SuppliersList } from '@/components/user/suppliers';
 import { SupplierForm } from '@/components/user/suppliers';
-import { SupplierService, type Supplier, type SupplierLimitInfo } from '@/lib/supplier-service';
+import { SupplierService, type Supplier } from '@/lib/supplier-service';
 import { toast } from 'sonner';
 import { useOutletContext } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type ViewMode = 'list' | 'create' | 'edit';
 
@@ -18,31 +19,32 @@ export const Suppliers = () => {
   const breadcrumbs = useBreadcrumbs();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [suppliersCount, setSuppliersCount] = useState(0);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [limitInfo, setLimitInfo] = useState<SupplierLimitInfo>({ current: 0, max: 0, canCreate: false });
+  const queryClient = useQueryClient();
 
   const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
-  useEffect(() => {
-    const supplierLimit = (tariffLimits || [])
-      .find((l) => {
+  const supplierLimit = useMemo(() => {
+    return (
+      (tariffLimits || []).find((l) => {
         const n = String(l.limit_name || '').toLowerCase();
         return n.includes('постач') || n.includes('supplier');
-      })?.value ?? 0;
-    setLimitInfo(prev => ({ ...prev, max: supplierLimit, canCreate: prev.current < supplierLimit }));
+      })?.value ?? 0
+    );
   }, [tariffLimits]);
 
-  const handleSuppliersLoaded = useCallback((count: number) => {
-    (async () => {
-      const cachedCount = await SupplierService.getSuppliersCountCached();
-      setSuppliersCount(cachedCount);
-      setLimitInfo(prev => ({
-        ...prev,
-        current: cachedCount,
-        canCreate: cachedCount < prev.max,
-      }));
-    })();
-  }, []);
+  const { data: suppliersData } = useQuery<Supplier[]>({
+    queryKey: ['suppliers', 'list'],
+    queryFn: async () => {
+      return await SupplierService.getSuppliers();
+    },
+    staleTime: 900_000,
+    gcTime: 86_400_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as Supplier[] | undefined,
+  });
+
+  const suppliersCount = suppliersData?.length ?? 0;
+  const canCreate = suppliersCount < supplierLimit;
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -50,7 +52,7 @@ export const Suppliers = () => {
   };
 
   const handleCreateNew = () => {
-    if (!limitInfo.canCreate) {
+    if (!canCreate) {
       toast.error(t('suppliers_limit_reached') + '. ' + t('upgrade_plan'));
       return;
     }
@@ -61,15 +63,20 @@ export const Suppliers = () => {
   const handleBackToList = () => {
     setSelectedSupplier(null);
     setViewMode('list');
-    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleDelete = async (id: number) => {
+    const queryKey = ['suppliers', 'list'] as const;
+    const previous = queryClient.getQueryData<Supplier[]>(queryKey);
+    queryClient.setQueryData<Supplier[]>(queryKey, (old) => {
+      const list = Array.isArray(old) ? old : [];
+      return list.filter((s) => Number(s.id) !== Number(id));
+    });
     try {
       await SupplierService.deleteSupplier(id);
       toast.success(t('supplier_deleted'));
-      setRefreshTrigger(prev => prev + 1);
     } catch (error: unknown) {
+      queryClient.setQueryData(queryKey, previous);
       const message = error instanceof Error ? error.message : '';
       toast.error(message || t('failed_delete_supplier'));
     }
@@ -99,19 +106,15 @@ export const Suppliers = () => {
               <>
                 <Badge variant="outline" className="text-sm flex items-center gap-1.5">
                   <Truck className="h-4 w-4" />
-                  <span>{limitInfo.current} / {limitInfo.max}</span>
+                  <span>{suppliersCount} / {supplierLimit}</span>
                 </Badge>
                 <Button 
                   variant="ghost"
                   size="icon"
                   title={t('refresh') || 'Оновити'}
                   onClick={() => {
-                    try {
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.removeItem('rq:suppliers:list');
-                      }
-                    } catch (_e) { void 0; }
-                    setRefreshTrigger(prev => prev + 1);
+                    SupplierService.clearSuppliersCache();
+                    queryClient.invalidateQueries({ queryKey: ['suppliers', 'list'] });
                   }}
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -119,7 +122,7 @@ export const Suppliers = () => {
                 {suppliersCount > 0 && (
                   <Button 
                     onClick={handleCreateNew}
-                    disabled={!limitInfo.canCreate}
+                    disabled={!canCreate}
                     variant="ghost"
                     size="icon"
                     title={t('add_supplier')}
@@ -144,8 +147,6 @@ export const Suppliers = () => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCreateNew={handleCreateNew}
-          onSuppliersLoaded={handleSuppliersLoaded}
-          refreshTrigger={refreshTrigger}
         />
       )}
 

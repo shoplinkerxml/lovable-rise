@@ -1,24 +1,19 @@
 import { Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { UserAuthService } from '@/lib/user-auth-service';
 
 export const AdminRoute = ({ children }: { children: JSX.Element }) => {
-  const [role, setRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { user } = await UserAuthService.fetchAuthMe();
-        if (!mounted) return;
-        setRole(user?.role ?? null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: async () => UserAuthService.fetchAuthMe(),
+    retry: false,
+    staleTime: 900_000,
+    gcTime: 86_400_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const role = data?.user?.role ?? null;
 
   if (loading) {
     return (
@@ -39,22 +34,17 @@ export const AdminRoute = ({ children }: { children: JSX.Element }) => {
 };
 
 export const UserRoute = ({ children }: { children: JSX.Element }) => {
-  const [role, setRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { user } = await UserAuthService.fetchAuthMe();
-        if (!mounted) return;
-        setRole(user?.role ?? null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: async () => UserAuthService.fetchAuthMe(),
+    retry: false,
+    staleTime: 900_000,
+    gcTime: 86_400_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const role = data?.user?.role ?? null;
 
   if (loading) {
     return (

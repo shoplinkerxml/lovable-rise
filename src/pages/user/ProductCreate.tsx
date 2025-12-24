@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from "react";
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -6,75 +6,92 @@ import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/i18n';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
-import { ProductService, type ProductLimitInfo, type ProductImage, type ProductParam } from '@/lib/product-service';
+import { ProductService, type ProductImage, type ProductParam } from "@/lib/product-service";
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from "sonner";
+import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
  
 import type { SupplierOption, CategoryOption, CurrencyOption } from '@/components/ProductFormTabs/types';
+import type { ProductRow } from "@/components/user/products/ProductsTable/columns";
 
 export const ProductCreate = () => {
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
-  const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
+  const queryClient = useQueryClient();
   const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
-  const [preloadedSuppliers, setPreloadedSuppliers] = useState<SupplierOption[]>([]);
-  const [preloadedCurrencies, setPreloadedCurrencies] = useState<CurrencyOption[]>([]);
-  const [preloadedSupplierCategoriesMap, setPreloadedSupplierCategoriesMap] = useState<Record<string, CategoryOption[]>>({});
+  const productLimit = useMemo(() => {
+    return (
+      (tariffLimits || [])
+        .find((l) => {
+          const n = String(l.limit_name || "").toLowerCase();
+          return n.includes("товар") || n.includes("product");
+        })?.value ?? 0
+    );
+  }, [tariffLimits]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const productLimit = (tariffLimits || [])
-          .find((l) => {
-            const n = String(l.limit_name || '').toLowerCase();
-            return n.includes('товар') || n.includes('product');
-          })?.value ?? 0;
-        const current = await ProductService.getProductsCountCached();
-        const canCreate = current < productLimit;
-        setLimitInfo({ current, max: productLimit, canCreate });
-        if (!canCreate) {
-          toast.error(t('products_limit_reached') + '. ' + t('upgrade_plan'));
-        }
-      } catch {
-        setLimitInfo({ current: 0, max: 0, canCreate: false });
-        toast.error(t('failed_load_limit'));
-      }
-    })();
-  }, [tariffLimits, t]);
+  const productsCountQuery = useQuery<number>({
+    queryKey: ["products", "count"],
+    queryFn: async () => {
+      const cached = queryClient.getQueryData<InfiniteData<{ products: ProductRow[]; page: { total: number } }>>([
+        "products",
+        "all",
+      ]);
+      const firstTotal = cached?.pages?.[0]?.page?.total;
+      if (typeof firstTotal === "number") return firstTotal;
+      return await ProductService.getProductsCount();
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as number | undefined,
+  });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { suppliers: aggSuppliers, currencies: aggCurrencies, supplierCategoriesMap } = await ProductService.getUserLookups();
-        const suppliers: SupplierOption[] = (aggSuppliers || []).map((s) => ({ id: String(s.id), supplier_name: String(s.supplier_name || '') }));
-        setPreloadedSuppliers(suppliers);
+  const lookupsQuery = useQuery({
+    queryKey: ["user", "lookups"],
+    queryFn: async () => {
+      return await ProductService.getUserLookups();
+    },
+    staleTime: 900_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as any,
+  });
 
-        const categoriesMap: Record<string, CategoryOption[]> = Object.fromEntries(Object.entries(supplierCategoriesMap || {}).map(([sid, list]) => [sid, (list || []).map((c: any) => ({
+  const preloadedSuppliers: SupplierOption[] = useMemo(() => {
+    const aggSuppliers = lookupsQuery.data?.suppliers || [];
+    return (aggSuppliers || []).map((s: any) => ({
+      id: String(s.id),
+      supplier_name: String(s.supplier_name || ""),
+    }));
+  }, [lookupsQuery.data?.suppliers]);
+
+  const preloadedSupplierCategoriesMap: Record<string, CategoryOption[]> = useMemo(() => {
+    const supplierCategoriesMap = lookupsQuery.data?.supplierCategoriesMap || {};
+    return Object.fromEntries(
+      Object.entries(supplierCategoriesMap || {}).map(([sid, list]) => [
+        sid,
+        (list || []).map((c: any) => ({
           id: String(c.id),
-          name: String(c.name || ''),
-          external_id: String(c.external_id || ''),
-          supplier_id: String(c.supplier_id || ''),
-          parent_external_id: c.parent_external_id == null ? null : String(c.parent_external_id)
-        }))]));
-        setPreloadedSupplierCategoriesMap(categoriesMap);
+          name: String(c.name || ""),
+          external_id: String(c.external_id || ""),
+          supplier_id: String(c.supplier_id || ""),
+          parent_external_id: c.parent_external_id == null ? null : String(c.parent_external_id),
+        })),
+      ]),
+    );
+  }, [lookupsQuery.data?.supplierCategoriesMap]);
 
-        const currencies: CurrencyOption[] = (aggCurrencies || []).map((c: any) => ({
-          id: Number(c.id),
-          name: String(c.name || ''),
-          code: String(c.code || ''),
-          status: c.status ?? null
-        }));
-        setPreloadedCurrencies(currencies);
-      } catch {
-        toast.error(t('failed_load_data'));
-      }
-    })();
-  }, [t]);
-  const handleSuccess = () => {
-    toast.success(t('product_created'));
-    navigate('/user/products');
-  };
+  const preloadedCurrencies: CurrencyOption[] = useMemo(() => {
+    const aggCurrencies = lookupsQuery.data?.currencies || [];
+    return (aggCurrencies || []).map((c: any) => ({
+      id: Number(c.id),
+      name: String(c.name || ""),
+      code: String(c.code || ""),
+      status: c.status ?? null,
+    }));
+  }, [lookupsQuery.data?.currencies]);
+
+  const current = productsCountQuery.data ?? 0;
+  const canCreate = current < productLimit;
 
   const handleCancel = () => {
     navigate('/user/products');
@@ -131,6 +148,10 @@ export const ProductCreate = () => {
           is_main: !!img.is_main
         }))
       });
+      queryClient.setQueryData(["products", "count"], (prev: number | undefined) => {
+        const v = typeof prev === "number" ? prev : current;
+        return Math.max(0, v + 1);
+      });
       toast.success(t('product_created'));
       navigate('/user/products');
     } catch {
@@ -149,7 +170,7 @@ export const ProductCreate = () => {
           <div className="flex gap-2 items-center">
             <Badge variant="outline" className="text-sm flex items-center gap-1.5 shrink-0">
               <Package className="h-4 w-4" />
-              <span>{limitInfo.current} / {limitInfo.max}</span>
+              <span>{current} / {productLimit}</span>
             </Badge>
             <Button
               variant="ghost"

@@ -14,6 +14,7 @@ import {
 } from "./user-auth-schemas";
 import { AuthorizationErrorHandler } from "./error-handler";
 import { SessionValidator, isAuthenticationError } from "./session-validation";
+import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
 
 /**
  * Configuration options for registration with session management
@@ -183,47 +184,11 @@ type AuthMeData = {
 };
 
 export class UserAuthService {
-  private static authMeCacheBySession: Map<string, { timestamp: number; data: AuthMeData }> =
-    new Map();
   private static authMeInFlightBySession: Map<string, Promise<AuthMeData>> =
     new Map();
-  private static readonly AUTH_ME_TTL_MS = 900000;
-  private static readonly PERSISTED_AUTH_ME_CACHE_PREFIX = "rq:authMe:";
 
-  private static getPersistedAuthMeKey(sessionKey: string): string {
-    return `${this.PERSISTED_AUTH_ME_CACHE_PREFIX}${sessionKey}`;
-  }
-
-  private static getPersistedAuthMe(sessionKey: string): { timestamp: number; data: AuthMeData } | null {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return null;
-      const raw = window.localStorage.getItem(this.getPersistedAuthMeKey(sessionKey));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { timestamp?: number; data?: AuthMeData };
-      const timestamp = Number(parsed?.timestamp ?? 0) || 0;
-      if (!timestamp) return null;
-      if (Date.now() - timestamp > this.AUTH_ME_TTL_MS) return null;
-      const data = parsed?.data;
-      if (!data || typeof data !== "object") return null;
-      if (!Array.isArray((data as any).tariffLimits)) return null;
-      if (!Array.isArray((data as any).menuItems)) return null;
-      if (!Array.isArray((data as any).userStores)) return null;
-      return { timestamp, data: data as AuthMeData };
-    } catch {
-      return null;
-    }
-  }
-
-  private static setPersistedAuthMe(sessionKey: string, data: AuthMeData): void {
-    try {
-      if (typeof window === "undefined" || !window.localStorage) return;
-      window.localStorage.setItem(
-        this.getPersistedAuthMeKey(sessionKey),
-        JSON.stringify({ timestamp: Date.now(), data })
-      );
-    } catch {
-      return;
-    }
+  private static getAuthMeCacheKey(userId: string): string {
+    return `auth-me:${userId}`;
   }
   /**
    * Register a new user with email confirmation flow
@@ -541,6 +506,7 @@ export class UserAuthService {
       }
 
       if (authData.user && authData.session) {
+        this.clearAuthMeCache();
         // Use edge function as single source of truth and avoid extra profiles query
         const authMe = await UserAuthService.fetchAuthMe();
         if (!authMe.user) {
@@ -655,89 +621,109 @@ export class UserAuthService {
   static async fetchAuthMe(): Promise<AuthMeData> {
     const validation = await SessionValidator.ensureValidSession();
     if (!validation.isValid || !validation.session || !validation.user) {
-      this.authMeCacheBySession.clear();
-      this.authMeInFlightBySession.clear();
+      this.clearAuthMeCache();
       return { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
     }
+    const cacheKey = this.getAuthMeCacheKey(validation.user.id);
     const sessionKey = `${validation.user.id}:${validation.expiresAt ?? 0}`;
-    const now = Date.now();
-    const cached = this.authMeCacheBySession.get(sessionKey);
-    if (cached && now - cached.timestamp < this.AUTH_ME_TTL_MS) {
-      return cached.data;
-    }
-    const persisted = this.getPersistedAuthMe(sessionKey);
-    if (persisted) {
-      this.authMeCacheBySession.set(sessionKey, { timestamp: persisted.timestamp, data: persisted.data });
-      return persisted.data;
-    }
     const inFlight = this.authMeInFlightBySession.get(sessionKey);
     if (inFlight) {
       return inFlight;
     }
+    const cached = readCache<AuthMeData>(cacheKey);
+    if (cached?.data) {
+      return cached.data;
+    }
     const promise = (async () => {
-      const accessToken = validation.accessToken || await this.getCurrentAccessToken();
-      const { data, error } = await supabase.functions.invoke('auth-me', {
-        body: {},
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      if (error) {
+      try {
+        const accessToken = validation.accessToken || await this.getCurrentAccessToken();
+        const { data, error } = await supabase.functions.invoke('auth-me', {
+          body: {},
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        });
+        if (error) {
+          this.authMeInFlightBySession.delete(sessionKey);
+          const cachedFallback = readCache<AuthMeData>(cacheKey, true);
+          return cachedFallback?.data || { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
+        }
+        const resp: {
+          user?: UserProfile | null;
+          subscription?: unknown | null;
+          tariffLimits?: Array<{ limit_name: string; value: number }>;
+          menuItems?: UserMenuItem[];
+          userStores?: UserStoreLite[];
+        } =
+          typeof data === 'string'
+            ? (JSON.parse(data) as {
+                user?: UserProfile | null;
+                subscription?: unknown | null;
+                tariffLimits?: Array<{ limit_name: string; value: number }>;
+                menuItems?: UserMenuItem[];
+                userStores?: UserStoreLite[];
+              })
+            : (data as {
+                user?: UserProfile | null;
+                subscription?: unknown | null;
+                tariffLimits?: Array<{ limit_name: string; value: number }>;
+                menuItems?: UserMenuItem[];
+                userStores?: UserStoreLite[];
+              });
+        const result = {
+          user: (resp?.user ?? null) as UserProfile | null,
+          subscription: resp?.subscription ?? null,
+          tariffLimits: Array.isArray(resp?.tariffLimits) ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>) : [],
+          menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
+          userStores: Array.isArray(resp?.userStores) ? (resp.userStores as UserStoreLite[]) : [],
+        };
+        writeCache(cacheKey, result, CACHE_TTL.authMe);
         this.authMeInFlightBySession.delete(sessionKey);
-        return { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
+        return result;
+      } catch {
+        this.authMeInFlightBySession.delete(sessionKey);
+        const cachedFallback = readCache<AuthMeData>(cacheKey, true);
+        return cachedFallback?.data || { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
       }
-      const resp: {
-        user?: UserProfile | null;
-        subscription?: unknown | null;
-        tariffLimits?: Array<{ limit_name: string; value: number }>;
-        menuItems?: UserMenuItem[];
-        userStores?: UserStoreLite[];
-      } =
-        typeof data === 'string'
-          ? (JSON.parse(data) as {
-              user?: UserProfile | null;
-              subscription?: unknown | null;
-              tariffLimits?: Array<{ limit_name: string; value: number }>;
-              menuItems?: UserMenuItem[];
-              userStores?: UserStoreLite[];
-            })
-          : (data as {
-              user?: UserProfile | null;
-              subscription?: unknown | null;
-              tariffLimits?: Array<{ limit_name: string; value: number }>;
-              menuItems?: UserMenuItem[];
-              userStores?: UserStoreLite[];
-            });
-      const result = {
-        user: (resp?.user ?? null) as UserProfile | null,
-        subscription: resp?.subscription ?? null,
-        tariffLimits: Array.isArray(resp?.tariffLimits) ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>) : [],
-        menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
-        userStores: Array.isArray(resp?.userStores) ? (resp.userStores as UserStoreLite[]) : [],
-      };
-      this.authMeCacheBySession.set(sessionKey, { timestamp: Date.now(), data: result });
-      this.setPersistedAuthMe(sessionKey, result);
-      this.authMeInFlightBySession.delete(sessionKey);
-      return result;
     })();
     this.authMeInFlightBySession.set(sessionKey, promise);
     return promise;
   }
 
   static clearAuthMeCache(): void {
-    this.authMeCacheBySession.clear();
     this.authMeInFlightBySession.clear();
+    removeCache("auth-me");
     try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem('rq:authMe');
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < window.localStorage.length; i++) {
-          const key = window.localStorage.key(i);
-          if (key && key.startsWith(this.PERSISTED_AUTH_ME_CACHE_PREFIX)) {
-            keysToRemove.push(key);
+      if (typeof window === "undefined") return;
+      const storages: Storage[] = [];
+      try {
+        storages.push(window.localStorage);
+      } catch {
+        void 0;
+      }
+      try {
+        storages.push(window.sessionStorage);
+      } catch {
+        void 0;
+      }
+      for (const s of storages) {
+        const keys: string[] = [];
+        for (let i = 0; i < s.length; i++) {
+          const k = s.key(i);
+          if (!k) continue;
+          if (k === "auth-me" || k === "v1:auth-me" || k.startsWith("auth-me:") || k.startsWith("v1:auth-me:")) {
+            keys.push(k);
           }
         }
-        for (const k of keysToRemove) window.localStorage.removeItem(k);
+        for (const k of keys) {
+          try {
+            s.removeItem(k);
+          } catch {
+            void 0;
+          }
+        }
       }
-    } catch {}
+    } catch {
+      void 0;
+    }
   }
 
   /**

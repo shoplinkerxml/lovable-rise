@@ -734,15 +734,15 @@ export class ShopService {
   }
 
   static async getStoreProductsCount(storeId: string): Promise<number> {
-    if (!storeId) return 0;
-    
-    try {
-      const { productsCount } = await this.recomputeStoreCounts(storeId);
-      return productsCount;
-    } catch (error) {
-      console.warn("getStoreProductsCount failed:", error);
-      return 0;
-    }
+    const sid = String(storeId || "").trim();
+    if (!sid) return 0;
+
+    const cacheKey = "shops-aggregated";
+    const cachedList = this.getCached<ShopAggregated[]>(cacheKey);
+    const found = Array.isArray(cachedList)
+      ? cachedList.find((s) => String(s.id) === sid)
+      : null;
+    return Math.max(0, Number(found?.productsCount ?? 0));
   }
 
   // ============================================================================

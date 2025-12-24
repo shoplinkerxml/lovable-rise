@@ -54,14 +54,13 @@ export const ShopsList = ({
   const { data: shopsData, isLoading, isFetching } = useQuery<ShopWithMarketplace[]>({
     queryKey: ['shopsList'],
     queryFn: async () => {
-      const rows = await ShopService.getShopsAggregated({ force: true });
+      const rows = await ShopService.getShopsAggregated();
       return rows as ShopWithMarketplace[];
     },
     retry: false,
-    staleTime: 5_000,
-    refetchOnMount: 'always',
+    staleTime: 900_000,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   });
 
   const shops: ShopWithMarketplace[] = useMemo(
@@ -79,8 +78,7 @@ export const ShopsList = ({
   }, [onShopsLoaded]);
 
   useEffect(() => { 
-    const info = ShopService.getShopLimitInfoCached();
-    onShopsLoadedRef.current?.(shopsLength, info); 
+    onShopsLoadedRef.current?.(shopsLength, null); 
   }, [shopsLength]);
 
   useEffect(() => {
@@ -119,40 +117,87 @@ export const ShopsList = ({
   // ============================================================================
   // Realtime синхронізація (оптимістичні оновлення)
   // ============================================================================
-  const refetchDebounceRef = useRef<number | null>(null);
-  const pendingRecomputeStoreIdsRef = useRef<Set<string>>(new Set());
-  
   useEffect(() => {
     // Оптимістичне оновлення лічильників товарів
     const updateProductsCount = (storeId: string, delta: number) => {
       const sid = String(storeId || "").trim();
       if (!sid) return;
       ShopCountsService.bumpProducts(queryClient, sid, delta);
-      pendingRecomputeStoreIdsRef.current.add(sid);
+    };
 
-      if (refetchDebounceRef.current != null) {
-        window.clearTimeout(refetchDebounceRef.current);
-      }
-      refetchDebounceRef.current = window.setTimeout(async () => {
-        const ids = Array.from(pendingRecomputeStoreIdsRef.current);
-        pendingRecomputeStoreIdsRef.current.clear();
-        await Promise.all(
-          ids.map((id) => ShopCountsService.recompute(queryClient, id).catch(() => void 0))
-        );
-        refetchDebounceRef.current = null;
-      }, 750);
+    const upsertShopFromRow = (row: any) => {
+      if (!row) return;
+      const sid = String(row.id || "").trim();
+      if (!sid) return;
+      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+        const list = Array.isArray(prev) ? [...prev] : [];
+        const idx = list.findIndex((s) => String(s.id) === sid);
+        const existing = idx >= 0 ? list[idx] : null;
+
+        const merged: ShopWithMarketplace = {
+          ...(existing || {}),
+          id: sid,
+          user_id: String(row.user_id ?? existing?.user_id ?? ''),
+          store_name: String(row.store_name ?? existing?.store_name ?? ''),
+          store_company: row.store_company ?? existing?.store_company ?? null,
+          store_url: row.store_url ?? existing?.store_url ?? null,
+          template_id: row.template_id ?? existing?.template_id ?? null,
+          xml_config: row.xml_config ?? existing?.xml_config ?? null,
+          custom_mapping: row.custom_mapping ?? existing?.custom_mapping ?? null,
+          marketplace: String(row.marketplace ?? existing?.marketplace ?? 'Не вказано'),
+          is_active: row.is_active !== false,
+          created_at: String(row.created_at ?? existing?.created_at ?? ''),
+          updated_at: String(row.updated_at ?? existing?.updated_at ?? ''),
+          productsCount: Math.max(0, Number(existing?.productsCount ?? 0)),
+          categoriesCount: Math.max(0, Number(existing?.categoriesCount ?? 0)),
+        };
+
+        const normalized = {
+          ...merged,
+          categoriesCount: (merged.productsCount ?? 0) === 0 ? 0 : (merged.categoriesCount ?? 0),
+        };
+
+        if (idx >= 0) {
+          list[idx] = normalized;
+          return list;
+        }
+        return [normalized, ...list];
+      });
+    };
+
+    const removeShopFromCache = (row: any) => {
+      const sid = String(row?.id || '').trim();
+      if (!sid) return;
+      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.filter((s) => String(s.id) !== sid);
+      });
     };
 
     const channel = (supabase as SupabaseClient)
       .channel('shops_realtime')
       
-      // Зміни в таблиці user_stores → повна інвалідація
+      // Зміни в таблиці user_stores → оновлення кеша без refetch
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'user_stores' 
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+      }, (payload: any) => {
+        upsertShopFromRow(payload?.new);
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'user_stores' 
+      }, (payload: any) => {
+        upsertShopFromRow(payload?.new);
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'user_stores' 
+      }, (payload: any) => {
+        removeShopFromCache(payload?.old);
       })
       
       // INSERT товару → +1 до лічильника
@@ -226,9 +271,13 @@ export const ShopsList = ({
     if (!deleteDialog.shop) return;
 
     try {
-      await onDelete?.(deleteDialog.shop.id);
+      const id = String(deleteDialog.shop.id);
+      await onDelete?.(id);
       setDeleteDialog({ open: false, shop: null });
-      queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.filter((s) => String(s.id) !== id);
+      });
     } catch (error: unknown) {
       const message = typeof (error as { message?: string }).message === 'string' 
         ? (error as { message?: string }).message 

@@ -107,10 +107,41 @@ const UserMenuProvider: React.FC<{
   const { data: menuItemsData, isLoading: menuLoading } = useQuery<UserMenuItem[]>({
     queryKey: ['userMenu', userId],
     queryFn: async () => {
+      const auth = queryClient.getQueryData<any>(["auth", "me"]);
+      let items = Array.isArray(auth?.menuItems) ? (auth.menuItems as UserMenuItem[]) : [];
+      items = items.filter((i) => i && typeof i === "object");
+      items = items.map((i) => ({ ...i })) as UserMenuItem[];
+      items = items.filter((i) => i.user_id ? String(i.user_id) === String(userId) : true);
+      items = items.filter((i) => i && typeof i.title === "string" && typeof i.path === "string");
+      items = items.filter((i) => i && typeof i.is_active === "boolean" ? i.is_active === true : true);
+      items = items.map((item: UserMenuItem) => {
+        const title = String(item.title || "").toLowerCase();
+        const path = String(item.path || "").toLowerCase();
+        if (
+          (!item.icon_name || item.icon_name === "circle" || item.icon_name === "Circle") &&
+          (title.includes("supplier") ||
+            title.includes("постачальник") ||
+            title.includes("shop") ||
+            title.includes("магазин") ||
+            title.includes("payment") ||
+            title.includes("платеж") ||
+            path.includes("supplier") ||
+            path.includes("постачальник") ||
+            path.includes("shop") ||
+            path.includes("магазин") ||
+            path.includes("payment") ||
+            path.includes("платеж"))
+        ) {
+          return { ...item, icon_name: UserMenuService.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
+        }
+        return item;
+      });
+      if (items.length > 0) return items;
       return await UserMenuService.getUserMenuItems(userId, true);
     },
     enabled: !!userId,
     staleTime: 900_000,
+    gcTime: 86_400_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

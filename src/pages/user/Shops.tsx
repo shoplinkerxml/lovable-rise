@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { SessionValidator } from '@/lib/session-validation';
+import { useOutletContext } from 'react-router-dom';
 
 type ViewMode = 'list' | 'create';
 
@@ -22,19 +23,25 @@ export const Shops = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
   const queryClient = useQueryClient();
+  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
 
   const handleShopsLoaded = (count: number, info?: ShopLimitInfo | null) => {
     setShopsCount(count);
-    if (info) {
-      setLimitInfo(info);
-      return;
-    }
     setLimitInfo((prev) => ({
       ...prev,
       current: count,
       canCreate: count < prev.max,
     }));
   };
+
+  useEffect(() => {
+    const shopLimit = (tariffLimits || [])
+      .find((l) => {
+        const n = String(l.limit_name || '').toLowerCase();
+        return n.includes('магазин') || n.includes('store');
+      })?.value ?? 0;
+    setLimitInfo((prev) => ({ ...prev, max: shopLimit, canCreate: prev.current < shopLimit }));
+  }, [tariffLimits]);
 
   useEffect(() => {
     (async () => {
@@ -64,14 +71,12 @@ export const Shops = () => {
 
   const handleBackToList = () => {
     setViewMode('list');
-    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleDelete = async (id: string) => {
     try {
       await ShopService.deleteShop(id);
       toast.success(t('shop_deleted'));
-      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       const message = (error as Error)?.message || t('failed_delete_shop');
       toast.error(message);

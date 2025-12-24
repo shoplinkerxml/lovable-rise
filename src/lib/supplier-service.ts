@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
-import { removeCache } from "@/lib/cache-utils";
+import { readCache, writeCache, CACHE_TTL } from "./cache-utils";
 
 export interface Supplier {
   id: number;
@@ -36,9 +36,76 @@ export interface SupplierLimitInfo {
 }
 
 export class SupplierService {
-  private static lastBackgroundRefreshAt = 0;
-  private static backgroundRefreshInFlight = false;
   private static inFlightSuppliersPromise: Promise<Supplier[]> | null = null;
+  private static readonly SOFT_REFRESH_THRESHOLD_MS = 120_000;
+
+  private static getSuppliersCacheKey(userId: string): string {
+    return `rq:suppliers:list:${userId}`;
+  }
+
+  private static setSuppliersCache(userId: string, rows: Supplier[]): void {
+    const key = SupplierService.getSuppliersCacheKey(userId);
+    writeCache(key, rows, CACHE_TTL.suppliersList);
+  }
+
+  private static getCachedSuppliers(userId: string): { rows: Supplier[]; expiresAt: number } | null {
+    const key = SupplierService.getSuppliersCacheKey(userId);
+    const cached = readCache<Supplier[]>(key);
+    if (!cached || !Array.isArray(cached.data)) return null;
+    const expiresAt = typeof cached.expiresAt === "number" ? cached.expiresAt : 0;
+    return { rows: cached.data, expiresAt };
+  }
+
+  private static async fetchSuppliersFromApi(accessToken: string | null): Promise<Supplier[]> {
+    const { data, error } = await supabase.functions.invoke<{ suppliers?: Supplier[] }>("suppliers-list", {
+      body: {},
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    });
+    if (error) return [];
+    const payload: { suppliers?: Supplier[] } = typeof data === "string" ? JSON.parse(data as string) : (data as any);
+    const rows = Array.isArray(payload?.suppliers) ? payload!.suppliers! : [];
+    return rows;
+  }
+
+  static clearSuppliersCache(): void {
+    SupplierService.inFlightSuppliersPromise = null;
+    try {
+      if (typeof window === "undefined") return;
+      const storages: Storage[] = [];
+      try {
+        storages.push(window.localStorage);
+      } catch {
+        void 0;
+      }
+      try {
+        storages.push(window.sessionStorage);
+      } catch {
+        void 0;
+      }
+      for (const s of storages) {
+        const keys: string[] = [];
+        for (let i = 0; i < s.length; i++) {
+          const k = s.key(i);
+          if (!k) continue;
+          if (
+            k.startsWith("rq:suppliers:list:") ||
+            k.startsWith("v1:rq:suppliers:list:")
+          ) {
+            keys.push(k);
+          }
+        }
+        for (const k of keys) {
+          try {
+            s.removeItem(k);
+          } catch {
+            void 0;
+          }
+        }
+      }
+    } catch {
+      void 0;
+    }
+  }
 
   /** Получение только максимального лимита поставщиков (без подсчета текущих) */
   static async getSupplierLimitOnly(): Promise<number> {
@@ -77,38 +144,12 @@ export class SupplierService {
 
   /** Получение количества поставщиков текущего пользователя */
   static async getSuppliersCount(): Promise<number> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
-    try {
-      if (typeof window !== 'undefined') {
-        const p = window.location.pathname.toLowerCase();
-        const allowed = p.includes('/user/suppliers');
-        if (!allowed) {
-          return 0;
-        }
-      }
-    } catch { /* ignore */ }
-
     const list = await SupplierService.getSuppliers();
     return Array.isArray(list) ? list.length : 0;
   }
 
   static async getSuppliersCountCached(): Promise<number> {
-    try {
-      const cacheKey = 'rq:suppliers:list';
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as { items: Supplier[]; expiresAt: number };
-        if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-          return parsed.items.length;
-        }
-      }
-    } catch { /* ignore */ }
-    const count = await this.getSuppliersCount();
-    return count;
+    return await this.getSuppliersCount();
   }
 
   /** Отримання списку постачальників поточного користувача */
@@ -117,63 +158,26 @@ export class SupplierService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
-
-    try {
-      const cacheKey = 'rq:suppliers:list';
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as { items: Supplier[]; expiresAt: number };
-        if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-          const timeLeft = parsed.expiresAt - Date.now();
-          const refreshThresholdMs = 2 * 60 * 1000;
-          if (timeLeft < refreshThresholdMs && !SupplierService.backgroundRefreshInFlight && Date.now() - SupplierService.lastBackgroundRefreshAt > 60 * 1000) {
-            SupplierService.backgroundRefreshInFlight = true;
-            SupplierService.lastBackgroundRefreshAt = Date.now();
-            (async () => {
-              try {
-                const { data: auth } = await supabase.auth.getSession();
-                const accessToken: string | null = auth?.session?.access_token || null;
-                const timeoutMs = 4000;
-                const invokePromise = supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
-                  body: {},
-                  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-                });
-                const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
-                const resp = await Promise.race([invokePromise, timeoutPromise]);
-                let rows: Supplier[] | null = null;
-                if (resp && typeof resp === 'object' && resp !== null) {
-                  const r = resp as { data: unknown; error: unknown };
-                  if (r.error == null) {
-                    const payload: { suppliers?: Supplier[] } = typeof r.data === 'string'
-                      ? (JSON.parse(r.data as string) as { suppliers?: Supplier[] })
-                      : (r.data as { suppliers?: Supplier[] });
-                    rows = Array.isArray(payload?.suppliers) ? payload!.suppliers! : null;
-                  }
-                }
-                if (!rows) {
-                  const { data, error } = await supabase
-                    .from('user_suppliers')
-                    .select('id,user_id,supplier_name,website_url,xml_feed_url,phone,created_at,updated_at,is_active')
-                    .eq('user_id', sessionValidation.user.id)
-                    .order('created_at', { ascending: false });
-                  rows = error ? null : (data || []);
-                }
-                if (rows) {
-                  try {
-                    const payload = JSON.stringify({ items: rows, expiresAt: Date.now() + 900_000 });
-                    if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-                  } catch { /* noop */ }
-                }
-              } catch { /* noop */ }
-              finally {
-                SupplierService.backgroundRefreshInFlight = false;
-              }
-            })();
-          }
-          return parsed.items;
+    const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
+    const cached = userId ? SupplierService.getCachedSuppliers(userId) : null;
+    if (cached) {
+      const timeLeft = cached.expiresAt - Date.now();
+      if (timeLeft > 0 && userId) {
+        if (timeLeft < SupplierService.SOFT_REFRESH_THRESHOLD_MS) {
+          void (async () => {
+            try {
+              const { data: auth } = await supabase.auth.getSession();
+              const accessToken: string | null = auth?.session?.access_token || null;
+              const rows = await SupplierService.fetchSuppliersFromApi(accessToken);
+              SupplierService.setSuppliersCache(userId, rows);
+            } catch {
+              void 0;
+            }
+          })();
         }
+        return cached.rows;
       }
-    } catch (_e) { void 0; }
+    }
 
     if (SupplierService.inFlightSuppliersPromise) {
       return SupplierService.inFlightSuppliersPromise;
@@ -182,13 +186,10 @@ export class SupplierService {
     SupplierService.inFlightSuppliersPromise = (async () => {
       const { data: auth } = await supabase.auth.getSession();
       const accessToken: string | null = auth?.session?.access_token || null;
-      const { data, error } = await supabase.functions.invoke<{ suppliers?: Supplier[] }>('suppliers-list', {
-        body: {},
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
-      if (error) return [];
-      const payload: { suppliers?: Supplier[] } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
-      const rows = Array.isArray(payload?.suppliers) ? payload!.suppliers! : [];
+      const rows = await SupplierService.fetchSuppliersFromApi(accessToken);
+      if (userId) {
+        SupplierService.setSuppliersCache(userId, rows);
+      }
       return rows;
     })();
 
@@ -227,16 +228,11 @@ export class SupplierService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
+    const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error("User not authenticated");
-    }
-
-    // Check if user can create more suppliers
-    const limitInfo = await this.getSupplierLimit();
-    if (!limitInfo.canCreate) {
-      throw new Error(`Досягнуто ліміту постачальників (${limitInfo.max}). Оновіть тарифний план.`);
     }
 
     const xmlUrl = supplierData.xml_feed_url ? supplierData.xml_feed_url.trim() : '';
@@ -256,8 +252,11 @@ export class SupplierService {
     const payload: { supplier?: Supplier } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
     const row = payload?.supplier as Supplier | undefined;
     if (!row) throw new Error('Create failed');
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
-    try { removeCache('rq:supplierCategoriesMap'); } catch { /* ignore */ }
+    if (userId) {
+      const cached = SupplierService.getCachedSuppliers(userId);
+      const next = [row, ...(cached?.rows || [])].filter((v) => v && typeof v === "object");
+      SupplierService.setSuppliersCache(userId, next);
+    }
     return row;
   }
 
@@ -269,6 +268,7 @@ export class SupplierService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
+    const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
 
     const cleanData: Partial<Pick<Supplier, 'supplier_name' | 'website_url' | 'xml_feed_url' | 'phone'>> & { updated_at?: string } = {};
     if (supplierData.supplier_name !== undefined) {
@@ -305,8 +305,13 @@ export class SupplierService {
     const payload: { supplier?: Supplier } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
     const row = payload?.supplier as Supplier | undefined;
     if (!row) throw new Error('Update failed');
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
-    try { removeCache('rq:supplierCategoriesMap'); } catch { /* ignore */ }
+    if (userId) {
+      const cached = SupplierService.getCachedSuppliers(userId);
+      const prev = cached?.rows || [];
+      const next = prev.map((s) => (Number(s.id) === Number(row.id) ? row : s));
+      const exists = next.some((s) => Number(s.id) === Number(row.id));
+      SupplierService.setSuppliersCache(userId, exists ? next : [row, ...next]);
+    }
     return row;
   }
 
@@ -318,6 +323,7 @@ export class SupplierService {
     if (!sessionValidation.isValid) {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
+    const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
 
     const { data: auth } = await supabase.auth.getSession();
     const accessToken: string | null = auth?.session?.access_token || null;
@@ -326,7 +332,11 @@ export class SupplierService {
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     });
     if (error) throw new Error(error.message ?? 'Delete failed');
-    try { if (typeof window !== 'undefined') window.localStorage.removeItem('rq:suppliers:list'); } catch (_e) { void 0; }
-    try { removeCache('rq:supplierCategoriesMap'); } catch { /* ignore */ }
+    if (userId) {
+      const cached = SupplierService.getCachedSuppliers(userId);
+      const prev = cached?.rows || [];
+      const next = prev.filter((s) => Number(s.id) !== Number(id));
+      SupplierService.setSuppliersCache(userId, next);
+    }
   }
 }

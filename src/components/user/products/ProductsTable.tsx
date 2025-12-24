@@ -48,7 +48,6 @@ import { Toolbar } from "./ProductsTable/Toolbar";
 import { useProductColumns } from "./ProductsTable/columns";
 import type { ShopAggregated } from "@/lib/shop-service";
 import type { ProductRow } from "./ProductsTable/columns";
-import { UserAuthService } from "@/lib/user-auth-service";
 
  
 
@@ -433,22 +432,19 @@ export const ProductsTable = ({
   }, [storeId, loadStoresForMenu]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const auth = await UserAuthService.fetchAuthMe();
-        if (cancelled) return;
-        const names: Record<string, string> = {};
-        for (const s of auth?.userStores || []) {
-          const id = String((s as any)?.id ?? "");
-          if (!id) continue;
-          names[id] = String((s as any)?.store_name ?? "");
-        }
-        if (Object.keys(names).length > 0) setAuthStoreNames(names);
-      } catch { void 0; }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    try {
+      const auth = queryClient.getQueryData<any>(["auth", "me"]);
+      const names: Record<string, string> = {};
+      for (const s of auth?.userStores || []) {
+        const id = String((s as any)?.id ?? "");
+        if (!id) continue;
+        names[id] = String((s as any)?.store_name ?? "");
+      }
+      if (Object.keys(names).length > 0) setAuthStoreNames(names);
+    } catch {
+      void 0;
+    }
+  }, [queryClient]);
 
   useEffect(() => {
     setColumnOrder((prev) => {

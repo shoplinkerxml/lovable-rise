@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,45 +16,24 @@ import { Building2, Edit, Trash2, Loader2, Globe, Link, Phone } from 'lucide-rea
 import { useI18n } from "@/i18n";
 import { SupplierService, type Supplier } from '@/lib/supplier-service';
 import { toast } from 'sonner';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface SuppliersListProps {
   onEdit?: (supplier: Supplier) => void;
   onDelete?: (id: number) => void;
   onCreateNew?: () => void;
-  onSuppliersLoaded?: (count: number) => void;
-  refreshTrigger?: number;
 }
 
 export const SuppliersList = ({ 
   onEdit, 
   onDelete, 
-  onCreateNew, 
-  onSuppliersLoaded,
-  refreshTrigger 
+  onCreateNew
 }: SuppliersListProps) => {
   const { t } = useI18n();
-  const queryClient = useQueryClient();
   const { data: suppliersData, isLoading: loading } = useQuery<Supplier[]>({
-    queryKey: ['suppliersList'],
+    queryKey: ['suppliers', 'list'],
     queryFn: async () => {
-      const cacheKey = 'rq:suppliers:list';
-      try {
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
-        if (raw) {
-          const parsed = JSON.parse(raw) as { items: Supplier[]; expiresAt: number };
-          if (parsed && Array.isArray(parsed.items) && typeof parsed.expiresAt === 'number' && parsed.expiresAt > Date.now()) {
-            return parsed.items;
-          }
-        }
-      } catch (_e) { void 0; }
-      const data = await SupplierService.getSuppliers();
-      try {
-        const payload = JSON.stringify({ items: data, expiresAt: Date.now() + 900_000 });
-        if (typeof window !== 'undefined') window.localStorage.setItem(cacheKey, payload);
-      } catch (_e) { void 0; }
-      return data;
+      return await SupplierService.getSuppliers();
     },
     staleTime: 900_000,
     refetchOnMount: false,
@@ -67,28 +46,12 @@ export const SuppliersList = ({
     supplier: null
   });
 
-  useEffect(() => { onSuppliersLoaded?.(suppliers.length); }, [suppliers.length, onSuppliersLoaded]);
-  useEffect(() => { queryClient.invalidateQueries({ queryKey: ['suppliersList'] }); }, [refreshTrigger, queryClient]);
-
-  useEffect(() => {
-    // Optionally add realtime invalidation when suppliers change
-    try {
-      const channel = supabase.channel('suppliers_realtime').on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_suppliers' },
-        () => queryClient.invalidateQueries({ queryKey: ['suppliersList'] })
-      ).subscribe();
-      return () => { try { supabase.removeChannel(channel); } catch (_e) { void 0; } };
-    } catch (_e) { void 0; }
-  }, [queryClient]);
-
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.supplier) return;
 
     try {
       await onDelete?.(deleteDialog.supplier.id);
       setDeleteDialog({ open: false, supplier: null });
-      queryClient.invalidateQueries({ queryKey: ['suppliersList'] });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '';
       toast.error(message || t('failed_delete_supplier'));

@@ -14,6 +14,7 @@ import { R2Storage } from "@/lib/r2-storage";
 import { useI18n } from "@/i18n";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 import { ImageHelpers } from "@/utils/imageHelpers";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface ProductFormProps {
   product?: any | null;
@@ -37,6 +38,7 @@ interface ProductImage {
 
 export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) => {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Основна інформація
@@ -80,6 +82,16 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
   
 
   // Debug logging (removed stores logging)
+
+  const productLimitQuery = useQuery({
+    queryKey: ['products', 'limit'],
+    queryFn: async () => {
+      return await ProductService.getProductLimit();
+    },
+    staleTime: 900_000,
+    refetchOnWindowFocus: false,
+    enabled: !product,
+  });
 
   const loadProductData = useCallback(async () => {
     if (!product) return;
@@ -369,7 +381,13 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
 
       // Check product limit before creating new product
       if (!product) {
-        const limitInfo = await ProductService.getProductLimit();
+        const limitInfo = productLimitQuery.data ?? await queryClient.fetchQuery({
+          queryKey: ['products', 'limit'],
+          queryFn: async () => {
+            return await ProductService.getProductLimit();
+          },
+          staleTime: 900_000,
+        });
         if (!limitInfo.canCreate) {
           toast.error(`Досягнуто ліміт товарів: ${limitInfo.current}/${limitInfo.max}. Оновіть тарифний план для створення нових товарів.`);
           return;
@@ -405,6 +423,12 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         toast.success('Товар успішно оновлено');
       } else {
         savedProduct = await ProductService.createProduct(productData);
+        queryClient.setQueryData(['products', 'limit'], (old: any) => {
+          if (!old) return old;
+          const nextCurrent = Math.max(0, Number(old.current ?? 0) + 1);
+          const max = Math.max(0, Number(old.max ?? 0));
+          return { ...old, current: nextCurrent, canCreate: nextCurrent < max };
+        });
         toast.success('Товар успішно створено');
       }
 

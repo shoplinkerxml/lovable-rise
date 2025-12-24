@@ -10,8 +10,8 @@ import { toast } from "sonner";
 import TariffPage from "./TariffPage";
 import { ListPage } from "@/pages/page-types/ListPage";
 import { DashboardPage } from "@/pages/page-types/DashboardPage";
-import { useQuery } from "@tanstack/react-query";
-import { ShopService, type Shop } from "@/lib/shop-service";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ShopService, type Shop, type ShopAggregated } from "@/lib/shop-service";
 import { ShopStructureEditor } from "@/components/user/shops";
 import { ExportDialog } from "@/components/user/shops/ExportDialog";
 
@@ -26,6 +26,7 @@ const UserMenuContentByPath = () => {
   const navigate = useNavigate();
   const { user, menuItems, onMenuUpdate } = useOutletContext<UserDashboardContextType>();
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [menuItem, setMenuItem] = useState<UserMenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +54,23 @@ const UserMenuContentByPath = () => {
   } = useQuery<Shop | null>({
     queryKey: ["shopStructure", shopRoute?.storeId || ""],
     queryFn: async () => {
-      if (!shopRoute?.storeId) return null;
-      return await ShopService.getShop(shopRoute.storeId);
+      const storeId = String(shopRoute?.storeId || "").trim();
+      if (!storeId) return null;
+
+      const cached = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]);
+      const fromCache = Array.isArray(cached)
+        ? cached.find((s) => String(s.id) === storeId)
+        : null;
+      if (fromCache) return fromCache;
+
+      const list = await ShopService.getShopsAggregated();
+      const found = Array.isArray(list) ? list.find((s) => String(s.id) === storeId) : null;
+      if (Array.isArray(list)) {
+        try {
+          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], list);
+        } catch { void 0; }
+      }
+      return found ?? null;
     },
     enabled: !!shopRoute?.storeId && shopRoute.action === "structure",
     staleTime: 900_000,

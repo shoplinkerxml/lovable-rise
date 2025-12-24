@@ -29,29 +29,22 @@ export const ShopDetail = () => {
     if (!shopId) navigate('/user/shops');
   }, [shopId, navigate]);
 
-  const cachedShopFromList = useMemo(() => {
-    const list = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);
-    const found = (list || []).find((s) => String(s.id) === String(shopId));
-    return found ?? null;
-  }, [queryClient, shopId]);
-
-  const { data: shop, isLoading, isError } = useQuery<ShopAggregated | null>({
-    queryKey: ['shopDetail', shopId],
-    queryFn: async () => (shopId ? await ShopService.getShopLite(shopId) : null),
-    enabled: !!shopId,
+  const { data: shopsList, isLoading, isError } = useQuery<ShopAggregated[]>({
+    queryKey: ['shopsList'],
+    queryFn: async () => await ShopService.getShopsAggregated(),
+    enabled: true,
+    retry: false,
     staleTime: 900_000,
-    ...(cachedShopFromList
-      ? {
-          initialData: cachedShopFromList,
-          initialDataUpdatedAt: Date.now(),
-        }
-      : {}),
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => (prev || []) as ShopAggregated[],
   });
 
-  useEffect(() => {
-    if (!shopId || !shop) return;
-    ShopCountsService.recompute(queryClient, shopId).catch(() => void 0);
-  }, [queryClient, shopId, shop]);
+  const shop: ShopAggregated | null = useMemo(() => {
+    const list = Array.isArray(shopsList) ? shopsList : [];
+    const found = list.find((s) => String(s.id) === String(shopId));
+    return found ?? null;
+  }, [shopsList, shopId]);
 
   useShopRealtimeSync({ 
     shopId: shopId, 
@@ -74,7 +67,8 @@ export const ShopDetail = () => {
           [shopId]
         );
 
-        const current = queryClient.getQueryData<ShopAggregated | null>(['shopDetail', shopId]);
+        const list = queryClient.getQueryData<ShopAggregated[]>(['shopsList']) || [];
+        const current = (list || []).find((s) => String(s.id) === String(shopId)) ?? null;
         const baseProductsCount = Math.max(0, Number(current?.productsCount ?? 0));
         const baseCategoriesCount = Math.max(0, Number(current?.categoriesCount ?? 0));
         const deleted = Math.max(0, Number(deletedByStore?.[String(shopId)] ?? 1) || 0);

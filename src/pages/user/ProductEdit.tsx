@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 import { ArrowLeft, Package } from 'lucide-react';
@@ -9,7 +9,7 @@ import { ProductService, type Product, type ProductParam, type ProductAggregated
 import { CategoryService } from '@/lib/category-service';
 import { ShopCountsService } from '@/lib/shop-counts';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from 'sonner';
 
 export const ProductEdit = () => {
@@ -28,23 +28,25 @@ export const ProductEdit = () => {
   const preloadedImagesRef = useRef<Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }> | undefined>(undefined);
   const preloadedParamsRef = useRef<Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }> | undefined>(undefined);
 
+  const lookupsQuery = useQuery({
+    queryKey: ["user", "lookups"],
+    queryFn: async () => {
+      return await ProductService.getUserLookups();
+    },
+    staleTime: 900_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as any,
+  });
+
   useEffect(() => {
     const loadProductAgg = async () => {
       if (!id) return;
       setLoading(true);
       try {
-        const [agg, lookups] = await Promise.all([
-          ProductService.getProductEditData(id),
-          ProductService.getUserLookups(),
-        ]);
+        const agg = await ProductService.getProductEditData(id);
         setProduct(agg.product);
         preloadedImagesRef.current = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }>;
         preloadedParamsRef.current = (agg.params || []) as Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }>;
-        aggSuppliersRef.current = lookups.suppliers;
-        aggCurrenciesRef.current = lookups.currencies;
-        aggSupplierCategoriesMapRef.current = lookups.supplierCategoriesMap;
-        const sid = agg.product?.supplier_id != null ? String(agg.product.supplier_id) : '';
-        aggCategoriesRef.current = sid ? (lookups.supplierCategoriesMap?.[sid] || []) : [];
         if (agg.categoryName) setCategoryName(agg.categoryName);
       } catch (error) {
         console.error('Failed to load product:', error);
@@ -55,6 +57,23 @@ export const ProductEdit = () => {
     };
     loadProductAgg();
   }, [id, t]);
+
+  useEffect(() => {
+    const lookups = lookupsQuery.data;
+    if (!lookups) return;
+    aggSuppliersRef.current = lookups.suppliers;
+    aggCurrenciesRef.current = lookups.currencies;
+    aggSupplierCategoriesMapRef.current = lookups.supplierCategoriesMap;
+  }, [lookupsQuery.data]);
+
+  const supplierId = useMemo(() => {
+    return product?.supplier_id != null ? String(product.supplier_id) : "";
+  }, [product?.supplier_id]);
+
+  useEffect(() => {
+    const map = lookupsQuery.data?.supplierCategoriesMap || {};
+    aggCategoriesRef.current = supplierId ? (map[supplierId] || []) : [];
+  }, [lookupsQuery.data?.supplierCategoriesMap, supplierId]);
 
   useEffect(() => {
     if (categoryName) return;
@@ -211,7 +230,7 @@ export const ProductEdit = () => {
       />
 
       <ProgressiveLoader
-        isLoading={loading}
+        isLoading={loading || lookupsQuery.isLoading}
         delay={150}
         fallback={
           <FullPageLoader

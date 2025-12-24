@@ -23,6 +23,7 @@ import { useMarketplaces } from "@/hooks/useMarketplaces";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 import { toast } from "sonner";
+import { ShopCountsService } from "@/lib/shop-counts";
 type StoreCategoryRow = {
   store_category_id: number;
   store_id: string;
@@ -498,14 +499,18 @@ export default function ShopSettings() {
                                 await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
                                 queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
                                 try {
-                                  const { productsCount, categoriesCount } = await ShopService.recomputeStoreCounts(String(id!));
-                                  try {
-                                    queryClient.setQueryData(['shopsList'], (prev: any) => {
-                                      const arr = Array.isArray(prev) ? prev : [];
-                                      return arr.map((s: any) => String(s.id) === String(id!) ? { ...s, productsCount, categoriesCount } : s);
-                                    });
-                                  } catch { /* ignore */ }
-                                } catch { /* ignore */ }
+                                  const sid = String(id!);
+                                  const list = queryClient.getQueryData<any[]>(['shopsList']) || [];
+                                  const current = Array.isArray(list) ? list.find((s: any) => String(s?.id) === sid) : null;
+                                  const prevProductsCount = Math.max(0, Number(current?.productsCount ?? 0));
+                                  const prevCategoriesCount = Math.max(0, Number(current?.categoriesCount ?? 0));
+                                  const nextCategoriesCount =
+                                    prevProductsCount === 0 ? 0 : Math.max(0, prevCategoriesCount - 1);
+                                  ShopCountsService.set(queryClient, sid, {
+                                    productsCount: prevProductsCount,
+                                    categoriesCount: nextCategoriesCount,
+                                  });
+                                } catch { void 0; }
                                 setSelectedRowIds(prev => prev.filter(pid => pid !== cat.store_category_id));
                               }}>
                                 <Trash2 className="mr-2 h-4 w-4" />{t('delete') || 'Видалити'}

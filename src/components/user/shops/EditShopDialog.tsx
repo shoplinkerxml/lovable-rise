@@ -60,16 +60,11 @@ export const EditShopDialog = ({ shop, open, onOpenChange, onSuccess }: EditShop
     if (shop?.marketplace) setSelectedMarketplace(String(shop.marketplace));
   }, [shop?.marketplace]);
 
-  // Проверка наличия товаров в магазине (store_products)
   useEffect(() => {
-    const checkProducts = async () => {
-      try {
-        const cnt = await ShopService.getStoreProductsCount(shop.id);
-        setProductsCount(cnt);
-      } catch { setProductsCount(0); }
-    };
-    if (open) checkProducts();
-  }, [shop.id, open]);
+    if (!open) return;
+    const cnt = Math.max(0, Number((shop as any)?.productsCount ?? 0));
+    setProductsCount(cnt);
+  }, [shop, open]);
 
   useEffect(() => {
     const loadCurrencyData = async () => {

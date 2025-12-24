@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { UserAuthService } from "./user-auth-service";
 export interface UserMenuItem {
   id: number;
   user_id: string;
@@ -110,29 +109,6 @@ export class UserMenuService {
    * Get all menu items for a user
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
-    const authMe = await UserAuthService.fetchAuthMe();
-    let items = Array.isArray(authMe.menuItems) ? authMe.menuItems : [];
-    if (activeOnly) items = items.filter(i => i.is_active === true);
-    if (items.length > 0) {
-      return items.map((item: UserMenuItem) => {
-        if ((!item.icon_name || item.icon_name === 'circle' || item.icon_name === 'Circle') &&
-            (item.title.toLowerCase().includes('supplier') ||
-             item.title.toLowerCase().includes('постачальник') ||
-             item.title.toLowerCase().includes('shop') ||
-             item.title.toLowerCase().includes('магазин') ||
-             item.title.toLowerCase().includes('payment') ||
-             item.title.toLowerCase().includes('платеж') ||
-             item.path.toLowerCase().includes('supplier') ||
-             item.path.toLowerCase().includes('постачальник') ||
-             item.path.toLowerCase().includes('shop') ||
-             item.path.toLowerCase().includes('магазин') ||
-             item.path.toLowerCase().includes('payment') ||
-             item.path.toLowerCase().includes('платеж'))) {
-          return { ...item, icon_name: this.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
-        }
-        return item;
-      });
-    }
     const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
       action: "list",
       active_only: !!activeOnly,

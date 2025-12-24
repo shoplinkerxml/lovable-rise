@@ -11,6 +11,7 @@ import { Building2, Globe, Link, Phone, Loader2 } from 'lucide-react';
 import { useI18n } from "@/i18n";
 import { SupplierService, type Supplier, type CreateSupplierData, type UpdateSupplierData } from '@/lib/supplier-service';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SupplierFormProps {
   supplier?: Supplier | null;
@@ -20,6 +21,7 @@ interface SupplierFormProps {
 
 export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProps) => {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     supplier_name: supplier?.supplier_name || '',
@@ -73,7 +75,12 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
           xml_feed_url: formData.xml_feed_url.trim() || null,
           phone: formData.phone.trim() || undefined,
         };
-        await SupplierService.updateSupplier(supplier.id, updateData);
+        const updated = await SupplierService.updateSupplier(supplier.id, updateData);
+        queryClient.setQueryData<Supplier[]>(['suppliers', 'list'], (old) => {
+          const list = Array.isArray(old) ? old : [];
+          const next = list.map((s) => (Number(s.id) === Number(updated.id) ? updated : s));
+          return next.some((s) => Number(s.id) === Number(updated.id)) ? next : [updated, ...next];
+        });
         toast.success(t('supplier_updated'));
       } else {
         // Створення
@@ -83,7 +90,12 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
           xml_feed_url: formData.xml_feed_url.trim() || null,
           phone: formData.phone.trim() || undefined,
         };
-        await SupplierService.createSupplier(createData);
+        const created = await SupplierService.createSupplier(createData);
+        queryClient.setQueryData<Supplier[]>(['suppliers', 'list'], (old) => {
+          const list = Array.isArray(old) ? old : [];
+          const without = list.filter((s) => Number(s.id) !== Number(created.id));
+          return [created, ...without];
+        });
         toast.success(t('supplier_created'));
       }
       onSuccess?.();
