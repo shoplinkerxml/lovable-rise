@@ -46,6 +46,7 @@ export function useProductForm(product?: Product | null, overrides?: Partial<For
     const supplierId = (product as any).supplier_id ?? null;
     const categoryId = product.category_id ?? null;
     const categoryExternalId = (product as any).category_external_id ?? null;
+    const categoryName = (product as any).categoryName ?? (product as any).category_name ?? '';
     setBasicData({
       name: product.name || product.name_ua || '',
       name_ua: product.name_ua || product.name || '',
@@ -59,6 +60,7 @@ export function useProductForm(product?: Product | null, overrides?: Partial<For
       supplier_id: supplierId ? String(supplierId) : '',
       category_id: categoryId ? String(categoryId) : '',
       category_external_id: categoryExternalId ? String(categoryExternalId) : '',
+      category_name: categoryName ? String(categoryName) : '',
       state: product.state || 'new',
       store_id: product.store_id || ''
     });

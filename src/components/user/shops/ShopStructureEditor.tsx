@@ -59,21 +59,22 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
     try {
       setLoading(true);
       
-      const saved = await ShopService.updateShop(shop.id, {
+      await ShopService.updateShop(shop.id, {
         xml_config: xmlStructure as unknown as Json
       });
 
-      const merged: Shop = { ...shop, ...saved, xml_config: xmlStructure as unknown as Json };
-      queryClient.setQueryData<Shop>(["shopStructure", String(shop.id)], merged);
+      const updatedShop = await ShopService.getShop(shop.id);
+      setXmlStructure(updatedShop.xml_config ? (updatedShop.xml_config as unknown as XMLStructure) : undefined);
+
+      queryClient.setQueryData<Shop>(["shopStructure", String(shop.id)], updatedShop);
       queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
         if (!Array.isArray(prev)) return prev;
         const sid = String(shop.id);
-        return prev.map((s) => (String(s.id) === sid ? ({ ...s, xml_config: xmlStructure as unknown as Json } as ShopAggregated) : s));
+        return prev.map((s) => (String(s.id) === sid ? ({ ...s, ...updatedShop } as ShopAggregated) : s));
       });
       
       toast.success('Структуру XML збережено');
       onSuccess?.();
-      onOpenChange(false);
     } catch (error: any) {
       console.error('Save structure error:', error);
       toast.error(error?.message || 'Помилка збереження структури');
@@ -86,7 +87,7 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" noOverlay>
         <div className="sticky top-0 bg-background z-10">
-          <DialogHeader className="p-6 pb-4 pr-14">
+          <DialogHeader className="p-6 pb-4 pr-14 pt-10">
             <DialogTitle>Редагування XML структури - {shop.store_name}</DialogTitle>
             <DialogDescription>
               Це ваша копія шаблону. Зміни не впливають на адмін шаблон.
@@ -108,12 +109,14 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
           )}
         </div>
 
-        <DialogFooter className="mt-auto border-t p-6 pt-4">
-          <Button onClick={handleSave} disabled={loading} className="ml-auto">
-            <Save className="h-4 w-4 mr-2" />
-            {t('save_changes') || 'Зберегти зміни'}
-          </Button>
-        </DialogFooter>
+        <div className="sticky bottom-0 bg-background border-t">
+          <DialogFooter className="p-6 pt-4">
+            <Button onClick={handleSave} disabled={loading} className="ml-auto">
+              <Save className="h-4 w-4 mr-2" />
+              {t('save_changes') || 'Зберегти зміни'}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

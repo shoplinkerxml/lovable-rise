@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 import { ArrowLeft, Package } from 'lucide-react';
@@ -7,7 +7,6 @@ import { useI18n } from '@/i18n';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';
-import { ShopCountsService } from '@/lib/shop-counts';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from 'sonner';
@@ -27,6 +26,31 @@ export const ProductEdit = () => {
   const aggSupplierCategoriesMapRef = useRef<Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>> | undefined>(undefined);
   const preloadedImagesRef = useRef<Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }> | undefined>(undefined);
   const preloadedParamsRef = useRef<Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }> | undefined>(undefined);
+
+  const patchProductsCached = useCallback((productId: string, patch: Partial<ProductAggregated>) => {
+    const pid = String(productId);
+    queryClient.setQueriesData({ queryKey: ["products"], exact: false }, (old: any) => {
+      if (!old) return old;
+      if (Array.isArray(old)) {
+        return (old as any[]).map((p) => (String((p as any)?.id) === pid ? { ...(p as any), ...patch } : p));
+      }
+      if (typeof old === "object" && Array.isArray((old as any).pages)) {
+        const prev = old as any;
+        return {
+          ...prev,
+          pages: prev.pages.map((page: any) => {
+            const products = Array.isArray(page?.products) ? (page.products as any[]) : null;
+            if (!products) return page;
+            return {
+              ...page,
+              products: products.map((p) => (String((p as any)?.id) === pid ? { ...(p as any), ...patch } : p)),
+            };
+          }),
+        };
+      }
+      return old;
+    });
+  }, [queryClient]);
 
   const lookupsQuery = useQuery({
     queryKey: ["user", "lookups"],
@@ -180,12 +204,10 @@ export const ProductEdit = () => {
         category_id: cidNum ?? null,
         category_external_id: formData.category_external_id || null,
       };
-      ProductService.patchProductCaches(String(id), { ...(patch as Partial<ProductAggregated>), categoryName: catName || undefined });
-      queryClient.setQueryData(['products', 'all'], (prev: ProductAggregated[] | undefined) => {
-        const arr = prev || [];
-        return arr.map((p) => String(p.id) === String(id)
-          ? { ...p, ...(patch as Partial<ProductAggregated>), categoryName: catName || p.categoryName }
-          : p);
+      patchProductsCached(String(id), {
+        ...(patch as Partial<ProductAggregated>),
+        currency_code: formData.currency_code || null,
+        categoryName: catName || undefined,
       });
     } catch { void 0; }
 
@@ -193,10 +215,12 @@ export const ProductEdit = () => {
     void ProductService.updateProduct(id, payload)
       .then(() => {
         toast.success(t('product_updated'));
+        queryClient.invalidateQueries({ queryKey: ["products"], exact: false });
       })
       .catch((error) => {
         console.error('Failed to save product:', error);
         toast.error(t('failed_save_product'));
+        queryClient.invalidateQueries({ queryKey: ["products"], exact: false });
       });
   };
 
@@ -243,6 +267,7 @@ export const ProductEdit = () => {
         <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>
           <ProductFormTabs
             product={product || undefined}
+            overrides={categoryName ? { category_name: categoryName } : undefined}
             onSubmit={handleFormSubmit}
             onCancel={handleCancel}
             onImagesLoadingChange={setImagesLoading}

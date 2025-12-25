@@ -86,7 +86,7 @@ export function Toolbar({
   const canEditSelected = selectedCount === 1 && !duplicating;
   const canDeleteSelected = selectedCount >= 1 && !duplicating;
   const createDisabled = (canCreate === false) || !!duplicating;
-
+  const iconButtonCls = "h-8 w-8 hover:bg-transparent";
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
       <div className="flex items-center gap-2 flex-wrap">
@@ -106,15 +106,15 @@ export function Toolbar({
       </div>
 
       <TooltipProvider delayDuration={200}>
-        <div className="flex items-center gap-2 bg-card/70 backdrop-blur-sm border rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm" data-testid="user_products_actions_block">
+        <div className="flex items-center gap-2 h-9" data-testid="user_products_actions_block">
           {storeId ? null : (
             loading ? (
               <Skeleton className="h-8 w-8 rounded-md" />
             ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onCreateNew} aria-label={t("add_product")} disabled={createDisabled} aria-disabled={createDisabled} data-testid="user_products_dataTable_createNew">
-                    <Plus className={`h-4 w-4 ${createDisabled ? "text-muted-foreground" : "text-foreground"}`} />
+                  <Button variant="ghost" size="icon" className={iconButtonCls} onClick={onCreateNew} aria-label={t("add_product")} disabled={createDisabled} aria-disabled={createDisabled} data-testid="user_products_dataTable_createNew">
+                    <Plus className={`h-4 w-4 transition-colors ${createDisabled ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_create">
@@ -133,7 +133,7 @@ export function Toolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className={iconButtonCls}
                     onClick={async () => {
                       if (!selectedRow) return;
                       await handleDuplicate(selectedRow);
@@ -148,7 +148,7 @@ export function Toolbar({
                     {isDupPending ? (
                       <Loader2 className="h-4 w-4 animate-spin text-foreground" />
                     ) : (
-                      <Copy className={`h-4 w-4 ${!canDuplicate ? "text-muted-foreground" : isDupError ? "text-destructive" : "text-foreground"}`} />
+                      <Copy className={`h-4 w-4 transition-colors ${!canDuplicate ? "text-muted-foreground" : isDupError ? "text-destructive" : "text-foreground hover:text-primary"}`} />
                     )}
                   </Button>
                   </TooltipTrigger>
@@ -164,8 +164,8 @@ export function Toolbar({
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => selectedRow && setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })} aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")} disabled={!canDeleteSelected} aria-disabled={!canDeleteSelected} data-testid="user_products_dataTable_clearSelection">
-                  <Trash2 className={`h-4 w-4 ${!canDeleteSelected ? "text-muted-foreground" : "text-foreground"}`} />
+                <Button variant="ghost" size="icon" className={iconButtonCls} onClick={() => selectedRow && setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })} aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")} disabled={!canDeleteSelected} aria-disabled={!canDeleteSelected} data-testid="user_products_dataTable_clearSelection">
+                  <Trash2 className={`h-4 w-4 transition-colors ${!canDeleteSelected ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_delete">
@@ -179,8 +179,8 @@ export function Toolbar({
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => selectedRow && onEdit?.(selectedRow)} aria-label={t("edit")} disabled={!canEditSelected} aria-disabled={!canEditSelected} data-testid="user_products_dataTable_editSelected">
-                  <Edit className={`h-4 w-4 ${!canEditSelected ? "text-muted-foreground" : "text-foreground"}`} />
+                <Button variant="ghost" size="icon" className={iconButtonCls} onClick={() => selectedRow && onEdit?.(selectedRow)} aria-label={t("edit")} disabled={!canEditSelected} aria-disabled={!canEditSelected} data-testid="user_products_dataTable_editSelected">
+                  <Edit className={`h-4 w-4 transition-colors ${!canEditSelected ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_edit">
@@ -193,7 +193,7 @@ export function Toolbar({
             <Skeleton className="h-8 w-24 rounded-md" />
           ) : (
             <React.Suspense fallback={null}>
-              <ViewOptionsMenuLazyTyped table={table} disabled={!!duplicating} />
+                <ViewOptionsMenuLazyTyped table={table} disabled={!!duplicating} />
             </React.Suspense>
           )}
 

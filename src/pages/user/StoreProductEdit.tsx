@@ -11,6 +11,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { ShopService } from "@/lib/shop-service";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 import { ShopCountsService } from "@/lib/shop-counts";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ============================================================================
 // Types
@@ -132,6 +133,7 @@ export const StoreProductEdit = () => {
   const pid = String(productId || "");
   const { t } = useI18n();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Consolidated state
   const [form, setForm] = useState<StoreProductLinkForm>({
@@ -159,6 +161,31 @@ export const StoreProductEdit = () => {
   });
 
   const [lastCategoryId, setLastCategoryId] = useState<string | null>(null);
+
+  const patchStoreProductsCached = useCallback((productId: string, patch: Record<string, unknown>) => {
+    const targetId = String(productId);
+    queryClient.setQueriesData({ queryKey: ["products", storeId], exact: false }, (old: any) => {
+      if (!old) return old;
+      if (Array.isArray(old)) {
+        return (old as any[]).map((p) => (String((p as any)?.id) === targetId ? { ...(p as any), ...patch } : p));
+      }
+      if (typeof old === "object" && Array.isArray((old as any).pages)) {
+        const prev = old as any;
+        return {
+          ...prev,
+          pages: prev.pages.map((page: any) => {
+            const products = Array.isArray(page?.products) ? (page.products as any[]) : null;
+            if (!products) return page;
+            return {
+              ...page,
+              products: products.map((p) => (String((p as any)?.id) === targetId ? { ...(p as any), ...patch } : p)),
+            };
+          }),
+        };
+      }
+      return old;
+    });
+  }, [queryClient, storeId]);
 
   // ============================================================================
   // Data Loading
@@ -305,22 +332,21 @@ export const StoreProductEdit = () => {
         linkPatch: patch,
       });
 
-      // Update cache
-      ProductService.patchProductCaches(pid, {
+      patchStoreProductsCached(pid, {
         price: patch.custom_price,
         price_old: patch.custom_price_old,
         price_promo: patch.custom_price_promo,
         stock_quantity: patch.custom_stock_quantity ?? undefined,
         available: patch.custom_available,
-      }, storeId);
-
-      if (productPayload.category_id != null) {
-        ProductService.patchProductCaches(pid, {
-          category_id: productPayload.category_id,
-          category_external_id: patch.custom_category_id,
-          categoryName: freshName,
-        }, storeId);
-      }
+        ...(productPayload.category_id != null
+          ? {
+              category_id: productPayload.category_id,
+              category_external_id: patch.custom_category_id,
+              categoryName: freshName,
+            }
+          : {}),
+      });
+      queryClient.invalidateQueries({ queryKey: ["products", storeId], exact: false });
 
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}`);
@@ -340,6 +366,8 @@ export const StoreProductEdit = () => {
     storeId,
     t,
     navigate,
+    patchStoreProductsCached,
+    queryClient,
   ]);
 
   // ============================================================================

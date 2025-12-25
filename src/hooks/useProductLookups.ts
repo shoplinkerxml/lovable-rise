@@ -75,22 +75,22 @@ export function useProductLookups(
       return;
     }
     if (categories.length === 0) {
-      setSelectedCategoryName('');
+      setSelectedCategoryName(categoryName || '');
       return;
     }
     const found = categories.find(c => String(c.id) === categoryId);
     if (found?.name) {
       setSelectedCategoryName(found.name);
+      if (categoryName !== found.name) {
+        setBasicRef.current?.((prev: BasicData) => ({
+          ...prev,
+          category_name: found.name || '',
+        }));
+      }
       return;
     }
-    setSelectedCategoryName('');
-    setBasicRef.current?.((prev: BasicData) => ({
-      ...prev,
-      category_id: '',
-      category_external_id: '',
-      category_name: '',
-    }));
-  }, [categoryId, categories]);
+    setSelectedCategoryName(categoryName || '');
+  }, [categoryId, categories, categoryName]);
 
   // ✅ ЕФЕКТ 5: Синхронізація category по external_id
   useEffect(() => {

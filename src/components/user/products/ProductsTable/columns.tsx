@@ -80,7 +80,7 @@ const ProductThumbnail = React.memo(({
 
   return (
     <button type="button" onClick={onClick} className="inline-flex">
-      <Avatar className={`${sizeCls} rounded-md cursor-pointer border border-border bg-white`}>
+      <Avatar className={`${sizeCls} rounded-md cursor-pointer bg-white`}>
         <AvatarImage
           src={src}
           alt={product.name_ua || product.name || ""}
