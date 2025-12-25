@@ -76,12 +76,6 @@ export function useProductLookups(
     }
     if (categories.length === 0) {
       setSelectedCategoryName('');
-      setBasicRef.current?.((prev: BasicData) => ({
-        ...prev,
-        category_id: '',
-        category_external_id: '',
-        category_name: '',
-      }));
       return;
     }
     const found = categories.find(c => String(c.id) === categoryId);

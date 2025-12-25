@@ -113,6 +113,11 @@ export const shopsDictionary: Dictionary = {
   },
   shops_limit: { uk: "Магазини", en: "Shops" },
   shop_currencies: { uk: "Валюти магазину", en: "Store Currencies" },
+  shop_categories_search_placeholder: { uk: "Пошук категорії", en: "Search category" },
+  no_categories_found: { uk: "Категорій не знайдено", en: "No categories found" },
+  category_updated_success: { uk: "Категорію оновлено", en: "Category updated" },
+  shop_deleting_currency: { uk: "Видалення валюти…", en: "Deleting currency…" },
+  shop_deleting_categories: { uk: "Видалення категорій…", en: "Deleting categories…" },
   shops_limit_reached: {
     uk: "Досягнуто ліміту магазинів",
     en: "Shop limit reached",

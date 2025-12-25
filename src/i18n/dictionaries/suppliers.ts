@@ -8,6 +8,7 @@ export const suppliersDictionary: Dictionary = {
     uk: "Керування вашими постачальниками",
     en: "Manage your suppliers",
   },
+  loading_suppliers: { uk: "Завантаження сторінки постачальників…", en: "Loading suppliers page…" },
   create_supplier: { uk: "Додати постачальника", en: "Add Supplier" },
   create_supplier_description: {
     uk: "Створення нового постачальника",

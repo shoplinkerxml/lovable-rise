@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
+  DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Save, X } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { useI18n } from "@/i18n";
-import { ShopService, type Shop } from '@/lib/shop-service';
+import { ShopService, type Shop, type ShopAggregated } from '@/lib/shop-service';
 import { toast } from 'sonner';
 import { InteractiveXmlTree } from '@/components/store-templates/InteractiveXmlTree';
 import type { XMLStructure } from '@/lib/xml-template-service';
 import type { Json } from '@/integrations/supabase/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ShopStructureEditorProps {
   shop: Shop;
@@ -24,10 +26,24 @@ interface ShopStructureEditorProps {
 
 export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: ShopStructureEditorProps) => {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [xmlStructure, setXmlStructure] = useState<XMLStructure | undefined>(
     shop.xml_config ? (shop.xml_config as unknown as XMLStructure) : undefined
   );
+  const lastShopIdRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!open) return;
+    const currentShopId = String(shop.id || '');
+    const next = shop.xml_config ? (shop.xml_config as unknown as XMLStructure) : undefined;
+    setXmlStructure((prev) => {
+      if (lastShopIdRef.current !== currentShopId) return next;
+      if (prev) return prev;
+      return next;
+    });
+    lastShopIdRef.current = currentShopId;
+  }, [open, shop.id, shop.xml_config]);
 
   // Update local state when structure changes in tree
   const handleStructureChange = (newStructure: XMLStructure) => {
@@ -43,8 +59,16 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
     try {
       setLoading(true);
       
-      await ShopService.updateShop(shop.id, {
+      const saved = await ShopService.updateShop(shop.id, {
         xml_config: xmlStructure as unknown as Json
+      });
+
+      const merged: Shop = { ...shop, ...saved, xml_config: xmlStructure as unknown as Json };
+      queryClient.setQueryData<Shop>(["shopStructure", String(shop.id)], merged);
+      queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+        if (!Array.isArray(prev)) return prev;
+        const sid = String(shop.id);
+        return prev.map((s) => (String(s.id) === sid ? ({ ...s, xml_config: xmlStructure as unknown as Json } as ShopAggregated) : s));
       });
       
       toast.success('Структуру XML збережено');
@@ -60,27 +84,13 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" hideClose noOverlay>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" noOverlay>
         <div className="sticky top-0 bg-background z-10">
-          <DialogHeader className="flex-row items-center justify-between space-y-0 p-6 pb-4">
-            <div>
-              <DialogTitle>Редагування XML структури - {shop.store_name}</DialogTitle>
-              <DialogDescription>
-                Це ваша копія шаблону. Зміни не впливають на адмін шаблон.
-              </DialogDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={handleSave}
-                disabled={loading}
-                title="Зберегти зміни"
-                className="hover:bg-accent"
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-            </div>
+          <DialogHeader className="p-6 pb-4 pr-14">
+            <DialogTitle>Редагування XML структури - {shop.store_name}</DialogTitle>
+            <DialogDescription>
+              Це ваша копія шаблону. Зміни не впливають на адмін шаблон.
+            </DialogDescription>
           </DialogHeader>
         </div>
         
@@ -97,6 +107,13 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
             </div>
           )}
         </div>
+
+        <DialogFooter className="mt-auto border-t p-6 pt-4">
+          <Button onClick={handleSave} disabled={loading} className="ml-auto">
+            <Save className="h-4 w-4 mr-2" />
+            {t('save_changes') || 'Зберегти зміни'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

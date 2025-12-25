@@ -312,35 +312,9 @@ export class ShopService {
    */
   private static async getShopsFallback(): Promise<ShopAggregated[]> {
     try {
-      const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userRes?.user) return [];
-      const userId = String(userRes.user.id);
-      if (!userId) return [];
-      
-      const { data: rows, error } = await supabase
-        .from("user_stores")
-        .select("id, user_id, store_name, store_company, store_url, template_id, xml_config, custom_mapping, is_active, created_at, updated_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-      
-      if (error || !Array.isArray(rows)) return [];
-      
-      return (rows as any[]).map((shop) => ({
-        id: String(shop.id),
-        user_id: String(shop.user_id),
-        store_name: String(shop.store_name || ""),
-        store_company: shop.store_company ?? null,
-        store_url: shop.store_url ?? null,
-        template_id: shop.template_id ?? null,
-        xml_config: shop.xml_config ?? null,
-        custom_mapping: shop.custom_mapping ?? null,
-        marketplace: "Не вказано",
-        is_active: Boolean(shop.is_active),
-        created_at: String(shop.created_at || ""),
-        updated_at: String(shop.updated_at || ""),
-        productsCount: 0,
-        categoriesCount: 0,
-      }));
+      const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+      const shops = response.shops || [];
+      return shops as ShopAggregated[];
     } catch {
       return [];
     }

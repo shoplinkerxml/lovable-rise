@@ -2,7 +2,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Copy, Edit, Trash2, Loader2 } from "lucide-react";
+import { Plus, Copy, Edit, Trash2, Loader2, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/lib/product-service";
 import type { QueryClient } from "@tanstack/react-query";
@@ -93,13 +93,15 @@ export function Toolbar({
         {loading ? (
           <Skeleton className="h-9 w-[clamp(12rem,40vw,28rem)] rounded-md" />
         ) : (
-          <Input
-            placeholder={t("products_search_placeholder")}
-            value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
-            className="flex-1 min-w-0 w-[clamp(10rem,40vw,24rem)] sm:w-[clamp(12rem,40vw,28rem)]"
-            data-testid="user_products_dataTable_filter"
-          />
+          <div className="relative flex-1 min-w-0 w-[clamp(10rem,40vw,20rem)] sm:w-[clamp(12rem,40vw,24rem)]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
+              onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
+              className="pl-9"
+              data-testid="user_products_dataTable_filter"
+            />
+          </div>
         )}
       </div>
 

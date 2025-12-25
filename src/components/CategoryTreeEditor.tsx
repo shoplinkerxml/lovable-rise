@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/i18n";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2, RefreshCw } from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2, RefreshCw, Search } from "lucide-react";
 import { runOptimisticOperation, useSyncStatus } from "@/lib/optimistic-mutation";
 type Supplier = {
   id: string;
@@ -58,6 +58,14 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   const [search, setSearch] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<string | null>(null);
+
+  const suppliersSorted = useMemo(() => {
+    const current = String(supplierId || defaultSupplierId || "");
+    if (!current) return suppliers;
+    const idx = (suppliers || []).findIndex((s) => String(s.id) === current);
+    if (idx <= 0) return suppliers;
+    return [suppliers[idx], ...suppliers.slice(0, idx), ...suppliers.slice(idx + 1)];
+  }, [suppliers, supplierId, defaultSupplierId]);
 
   // Keep internal supplierId in sync with parent-provided defaultSupplierId
   // This ensures the categories query runs when the user selects a supplier outside this component
@@ -519,14 +527,17 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
         onSupplierChange?.(val);
       }} className="w-full">
           <TabsList className="items-center flex w-full gap-2 h-9 overflow-x-auto md:overflow-visible whitespace-nowrap md:whitespace-nowrap scroll-smooth snap-x snap-mandatory md:snap-none no-scrollbar md:px-0 bg-transparent p-0 text-foreground rounded-none border-b border-border md:border-0 justify-start" data-testid="categoryTree_supplierTabsList">
-            {suppliers.map(s => <TabsTrigger key={s.id} value={String(s.id)} className="whitespace-nowrap py-1 font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow shrink-0 md:shrink snap-start md:snap-none w-auto truncate text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid={`categoryTree_supplierTab_${s.id}`} aria-label={s.supplier_name}>
+            {suppliersSorted.map(s => <TabsTrigger key={s.id} value={String(s.id)} className="whitespace-nowrap py-1 font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow shrink-0 md:shrink snap-start md:snap-none w-auto truncate text-xs sm:text-sm px-2 sm:px-3 flex items-center gap-2 justify-start md:justify-start rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:border-primary transition-colors" data-testid={`categoryTree_supplierTab_${s.id}`} aria-label={s.supplier_name}>
                 <span className="truncate">{s.supplier_name}</span>
               </TabsTrigger>)}
           </TabsList>
         </Tabs>
 
         <div className="space-y-[0.5rem]">
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("search")} data-testid="categoryTree_searchInput" />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={e => setSearch(e.target.value)} className="pl-9" data-testid="categoryTree_searchInput" />
+          </div>
         </div>
 
         {isLoading || isFetching ? <div className="space-y-[0.5rem]">

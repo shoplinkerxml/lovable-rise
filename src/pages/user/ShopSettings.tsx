@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from "@/components/ui/dialog-no-overlay";
 import { Loader2, Settings as SettingsIcon } from "lucide-react";
-import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Pencil, Tag, Hash, Link, CheckCircle } from "lucide-react";
+import { Columns as ColumnsIcon, ChevronDown, Plus, Trash2, MoreHorizontal, Pencil, Tag, Hash, Link, CheckCircle, Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ShopSettingsAggregated } from "@/lib/shop-service";
@@ -380,10 +380,18 @@ export default function ShopSettings() {
             
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
-                <Input placeholder={t('search_placeholder')} value={search} onChange={e => {
-                  setSearch(e.target.value);
-                  setPageIndex(0);
-                }} className="w-[clamp(12rem,40vw,24rem)]" data-testid="shop_settings_filter" />
+                <div className="relative w-[clamp(12rem,40vw,22rem)]">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={e => {
+                      setSearch(e.target.value);
+                      setPageIndex(0);
+                    }}
+                    className="pl-9"
+                    data-testid="shop_settings_filter"
+                  />
+                </div>
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="icon" className="h-8 w-8" disabled={selectedRowIds.length !== 1} onClick={() => {
                     const cat = rows.find(r => r.store_category_id === selectedRowIds[0]);
@@ -642,7 +650,7 @@ export default function ShopSettings() {
           </DialogContent>
         </Dialog>
         <DialogNoOverlay open={deletingCurrency} onOpenChange={() => void 0} modal={false}>
-          <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(24rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(18rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             <DialogNoOverlayHeader>
               <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
                 <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />
@@ -652,7 +660,7 @@ export default function ShopSettings() {
           </DialogNoOverlayContent>
         </DialogNoOverlay>
         <DialogNoOverlay open={deletingCategories} onOpenChange={() => void 0} modal={false}>
-          <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(24rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogNoOverlayContent position="top-right" variant="info" className="p-4 w-[min(18rem,92vw)]" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             <DialogNoOverlayHeader>
               <DialogNoOverlayTitle className="text-sm flex items-center gap-2">
                 <Loader2 className="h-[1rem] w-[1rem] animate-spin text-emerald-600" />

@@ -14,12 +14,13 @@ type Props = {
   preloadedSupplierCategoriesMap?: Record<string, CategoryOption[]>
   basicData: BasicData
   setBasicData: React.Dispatch<React.SetStateAction<BasicData>>
+  defaultOpen?: boolean
 }
 
-export default function CategoryEditorSection({ t, suppliers, categories, setCategories, preloadedSupplierCategoriesMap, basicData, setBasicData }: Props) {
+export default function CategoryEditorSection({ t, suppliers, categories, setCategories, preloadedSupplierCategoriesMap, basicData, setBasicData, defaultOpen = true }: Props) {
   return (
     <div className="space-y-4 mt-2 w-full px-2 sm:px-3" data-testid="productFormTabs_categoryTreeEditorFullWidth">
-      <Collapsible defaultOpen>
+      <Collapsible defaultOpen={defaultOpen}>
         <div className="flex items-center gap-2 h-9">
           <h3 className="text-sm font-semibold leading-none">{t('category_editor_title')}</h3>
           <Separator className="flex-1" />

@@ -46,8 +46,8 @@ export const productsDictionary: Dictionary = {
     en: "Product removed",
   },
   products_search_placeholder: {
-    uk: "Пошук товарів за назвою або External ID...",
-    en: "Search products by name or External ID...",
+    uk: "Пошук товарів",
+    en: "Search products",
   },
   products_deleted_successfully: {
     uk: "Товари успішно видалено",

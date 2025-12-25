@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from '@/components/ui/sheet-no-overlay';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Sun, Moon, AlignJustify } from 'lucide-react';
+import { Sun, Moon, AlignJustify, Search } from 'lucide-react';
 import { ProfileTrigger } from '@/components/ui/profile-trigger';
 import { ProfileSheetContent } from '@/components/ui/profile-sheet-content';
 import { UserProfile } from '@/components/ui/profile-types';
@@ -80,7 +80,10 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
               <AlignJustify className="h-5 w-5" />
             </Button>
             <div className="hidden md:flex ml-0">
-              <Input placeholder={t("search")} className="w-72" />
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input className="pl-9" />
+              </div>
             </div>
           </div>
           

@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil, Plus, Upload, Download } from "lucide-react";
+import { MoreHorizontal, Columns as ColumnsIcon, ChevronDown, Trash2, Pencil, Plus, Upload, Download, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -367,13 +367,15 @@ export function ParametersDataTable({ data, onEditRow, onDeleteRow, onDeleteSele
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Input
-            placeholder={t("search_placeholder")}
-            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("name")?.setFilterValue(event.target.value)}
-            className="w-[clamp(12rem,40vw,24rem)] hidden sm:block"
-            data-testid="parametersDataTable_filter"
-          />
+          <div className="relative w-[clamp(12rem,40vw,22rem)] hidden sm:block">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+              onChange={(event) => table.getColumn("name")?.setFilterValue(event.target.value)}
+              className="pl-9"
+              data-testid="parametersDataTable_filter"
+            />
+          </div>
         </div>
         <div
           className={`flex items-center gap-2 bg-card/70 backdrop-blur-sm rounded-md h-9 px-[clamp(0.5rem,1vw,0.75rem)] py-1 shadow-sm ${dragActive ? 'ring-2 ring-primary' : ''}`}

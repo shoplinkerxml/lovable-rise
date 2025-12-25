@@ -148,30 +148,21 @@ export const CategoryService = {
     }
 
     const numericIds = ids.map((v) => Number(v)).filter((n) => Number.isFinite(n));
-    const batches = chunk(numericIds, 200);
-    const results = await Promise.all(
-      batches.map(async (batch) => {
-        const { data, error } = await supabase
-          .from('store_categories')
-          .select('id,external_id,name,parent_external_id,supplier_id')
-          .in('supplier_id', batch)
-          .order('supplier_id', { ascending: true });
-        if (error) throw error;
-        return (data || []) as Array<{ id: number; external_id: string; name: string; parent_external_id: string | null; supplier_id: number }>;
-      })
-    );
-    const rows = results.flat();
     const map: Record<string, StoreCategoryFull[]> = {};
-    for (const r of rows) {
-      const sid = String(r.supplier_id);
-      if (!map[sid]) map[sid] = [];
-      map[sid].push({
-        id: String(r.id),
-        external_id: r.external_id,
-        name: r.name,
-        parent_external_id: r.parent_external_id,
-        supplier_id: String(r.supplier_id),
-      });
+    const batches = chunk(numericIds, 20);
+    for (const batch of batches) {
+      const results = await Promise.all(
+        batch.map(async (supplierId) => {
+          const resp = await invokeEdge<{ rows?: StoreCategoryFullRow[] }>("categories", {
+            action: "get_supplier_categories",
+            supplier_id: supplierId,
+          });
+          return { supplierId: String(supplierId), rows: resp.rows ?? [] };
+        }),
+      );
+      for (const r of results) {
+        map[r.supplierId] = r.rows.map(toFull);
+      }
     }
 
     writeCache("rq:supplierCategoriesMap", map, CACHE_TTL.supplierCategoriesMap);

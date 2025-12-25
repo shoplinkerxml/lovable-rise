@@ -56,21 +56,15 @@ const UserMenuContentByPath = () => {
     queryFn: async () => {
       const storeId = String(shopRoute?.storeId || "").trim();
       if (!storeId) return null;
-
-      const cached = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]);
-      const fromCache = Array.isArray(cached)
-        ? cached.find((s) => String(s.id) === storeId)
-        : null;
-      if (fromCache) return fromCache;
-
-      const list = await ShopService.getShopsAggregated();
-      const found = Array.isArray(list) ? list.find((s) => String(s.id) === storeId) : null;
-      if (Array.isArray(list)) {
-        try {
-          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], list);
-        } catch { void 0; }
+      try {
+        return await ShopService.getShop(storeId);
+      } catch {
+        const cached = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]);
+        const fromCache = Array.isArray(cached)
+          ? cached.find((s) => String(s.id) === storeId)
+          : null;
+        return (fromCache as unknown as Shop) ?? null;
       }
-      return found ?? null;
     },
     enabled: !!shopRoute?.storeId && shopRoute.action === "structure",
     staleTime: 900_000,

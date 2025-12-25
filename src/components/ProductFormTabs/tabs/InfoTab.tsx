@@ -51,7 +51,7 @@ export function InfoTab(props: {
     onResetSize: () => void;
     photoBlockRef: React.RefObject<HTMLDivElement>;
   };
-  config: { t: (k: string) => string; readOnly?: boolean; editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity' | 'available'>; isLargeScreen: boolean };
+  config: { t: (k: string) => string; readOnly?: boolean; editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity' | 'available'>; isLargeScreen: boolean; isEditing?: boolean };
 }) {
   const {
     formState,
@@ -61,7 +61,7 @@ export function InfoTab(props: {
     imageHandlers,
     config,
   } = props;
-  const { t, readOnly, editableKeys, isLargeScreen } = config;
+  const { t, readOnly, editableKeys, isLargeScreen, isEditing } = config;
   const { basicData, priceData, stockData } = formState;
   const { updateBasicData, setPriceData, setStockData, setBasicData } = formActions;
   const {
@@ -150,6 +150,7 @@ export function InfoTab(props: {
           preloadedSupplierCategoriesMap={preloadedSupplierCategoriesMap}
           basicData={basicData}
           setBasicData={setBasicData}
+          defaultOpen={!isEditing}
         />
       )}
       <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} priceData={priceData} setPriceData={setPriceData} onChange={onChange} />

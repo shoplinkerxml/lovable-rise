@@ -60,29 +60,26 @@ export const SuppliersList = ({
 
   if (loading) {
     return (
-      <div className="p-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={`supplier-skeleton-${i}`} className="overflow-hidden card-elevated">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-                  <div className="flex gap-1">
-                    <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-                    <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-                  </div>
-                </div>
-                <div className="mt-2 h-5 w-40 rounded bg-muted animate-pulse" />
-                <div className="mt-1 h-4 w-28 rounded bg-muted animate-pulse" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="h-4 w-56 rounded bg-muted animate-pulse" />
-                <div className="h-4 w-48 rounded bg-muted animate-pulse" />
-                <div className="h-4 w-40 rounded bg-muted animate-pulse" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="flex flex-col items-center justify-center py-10">
+        <div className="text-sm text-muted-foreground mb-4">{t('loading_suppliers')}</div>
+        <Card className="w-full max-w-md overflow-hidden card-elevated">
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+              <div className="flex gap-1">
+                <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+                <div className="h-8 w-8 rounded bg-muted animate-pulse" />
+              </div>
+            </div>
+            <div className="mt-2 h-5 w-40 rounded bg-muted animate-pulse" />
+            <div className="mt-1 h-4 w-28 rounded bg-muted animate-pulse" />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="h-4 w-56 rounded bg-muted animate-pulse" />
+            <div className="h-4 w-48 rounded bg-muted animate-pulse" />
+            <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+          </CardContent>
+        </Card>
       </div>
     );
   }

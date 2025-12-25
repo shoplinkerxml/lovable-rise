@@ -282,7 +282,7 @@ export function ProductFormTabs({
                   onResetSize: resetPhotoBlockToDefaultSize,
                   photoBlockRef,
                 }}
-                config={{ t, readOnly, editableKeys, isLargeScreen }}
+                config={{ t, readOnly, editableKeys, isLargeScreen, isEditing: !!product }}
               />
             </TabsContent>
 
