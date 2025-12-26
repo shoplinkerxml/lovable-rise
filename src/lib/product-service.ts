@@ -960,6 +960,9 @@ export class ProductService {
       }>
     >;
   }> {
+    if (!String(productId || "").trim()) {
+      throw new Error("product_id_required");
+    }
     const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const { data, error } = await supabase.functions.invoke<

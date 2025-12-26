@@ -580,7 +580,7 @@ export const productsDictionary: Dictionary = {
   import_export_exported: { uk: "Експорт готовий", en: "Export ready" },
   import_export_meta_key: { uk: "Ключ", en: "Key" },
   import_export_meta_value: { uk: "Значення", en: "Value" },
-  import_export_export_hint: { uk: "Експортуються всі товари поточного магазину.", en: "Exports all products of the current store." },
+  import_export_export_hint: { uk: "Експортуються вибрані товари; якщо не вибрано — всі товари.", en: "Exports selected products; if none selected, exports all." },
   import_export_select_file: { uk: "Вибрати файл", en: "Select file" },
   import_export_preview_rows: { uk: "Попередній перегляд: {count} рядків", en: "Preview: {count} rows" },
   import_export_errors_count: { uk: "Помилок: {count}", en: "Errors: {count}" },

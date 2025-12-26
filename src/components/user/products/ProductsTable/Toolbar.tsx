@@ -13,9 +13,11 @@ import { useSyncStatus } from "@/lib/optimistic-mutation";
 
 const ViewOptionsMenuLazy = React.lazy(() => import("./ViewOptionsMenu").then((m) => ({ default: m.ViewOptionsMenu })));
 const AddToStoresMenuLazy = React.lazy(() => import("./AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
+const ImportExportMenuLazy = React.lazy(() => import("./ImportExportMenu").then((m) => ({ default: m.ImportExportMenu })));
 type TTable = TanTable<ProductRow>;
 const ViewOptionsMenuLazyTyped = ViewOptionsMenuLazy as unknown as React.ComponentType<{ table: TTable; disabled?: boolean }>;
 const AddToStoresMenuLazyTyped = AddToStoresMenuLazy as unknown as React.ComponentType<{ open: boolean; setOpen: (v: boolean) => void; loadStoresForMenu: () => Promise<void>; stores: ShopAggregated[]; setStores: (v: ShopAggregated[]) => void; selectedStoreIds: string[]; setSelectedStoreIds: React.Dispatch<React.SetStateAction<string[]>>; items: ProductRow[]; table: TTable; removingStores: boolean; setRemovingStores: (v: boolean) => void; removingStoreId: string | null; setRemovingStoreId: (v: string | null) => void; queryClient: QueryClient; addingStores: boolean; setAddingStores: (v: boolean) => void; setProductsCached: (updater: (prev: ProductRow[]) => ProductRow[]) => void; setLastSelectedProductIds?: (ids: string[]) => void; disabled?: boolean }>;
+const ImportExportMenuLazyTyped = ImportExportMenuLazy as unknown as React.ComponentType<{ t: (k: string) => string; storeId?: string; queryClient: QueryClient; selectedProducts?: ProductRow[]; disabled?: boolean }>;
 
 export function Toolbar({
   t,
@@ -79,6 +81,7 @@ export function Toolbar({
   const selectedRows = table.getSelectedRowModel().rows;
   const selectedCount = selectedRows.length;
   const selectedRow = selectedRows[0]?.original as ProductRow | undefined;
+  const selectedProducts = selectedRows.map((r) => r.original).filter(Boolean) as ProductRow[];
   const duplicationStatus = useSyncStatus(selectedRow ? `product:duplicate:${selectedRow.id}` : null);
   const isDupPending = duplicationStatus?.status === "pending";
   const isDupError = duplicationStatus?.status === "error";
@@ -194,6 +197,20 @@ export function Toolbar({
           ) : (
             <React.Suspense fallback={null}>
                 <ViewOptionsMenuLazyTyped table={table} disabled={!!duplicating} />
+            </React.Suspense>
+          )}
+
+          {loading ? (
+            <Skeleton className="h-8 w-8 rounded-md" />
+          ) : (
+            <React.Suspense fallback={null}>
+              <ImportExportMenuLazyTyped
+                t={t}
+                storeId={storeId}
+                queryClient={queryClient}
+                selectedProducts={selectedProducts}
+                disabled={!!duplicating}
+              />
             </React.Suspense>
           )}
 

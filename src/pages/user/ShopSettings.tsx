@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProgressiveLoader, FullPageLoader } from "@/components/LoadingSkeletons";
 import { toast } from "sonner";
 import { ShopCountsService } from "@/lib/shop-counts";
+import { supabase } from "@/integrations/supabase/client";
 type StoreCategoryRow = {
   store_category_id: number;
   store_id: string;

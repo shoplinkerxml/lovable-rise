@@ -14,7 +14,7 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 }
 
-type Body = { product_id: string; store_id?: string | null }
+type Body = { product_id?: string; product_ids?: string[]; store_id?: string | null }
 
 type Product = {
   id: string
@@ -138,11 +138,39 @@ async function parseBody(req: Request): Promise<Body> {
   try {
     const raw = await req.json()
     const pid = String((raw as any)?.product_id || '')
+    const idsRaw = (raw as any)?.product_ids
+    const product_ids = Array.isArray(idsRaw) ? idsRaw.map((v: any) => String(v || '')).filter((s: string) => !!s) : undefined
     const sidRaw = (raw as any)?.store_id
     const sid = sidRaw == null ? null : String(sidRaw)
-    return { product_id: pid, store_id: sid }
+    return { product_id: pid, product_ids, store_id: sid }
   } catch {
     return { product_id: '', store_id: null }
+  }
+}
+
+function resolvePublicBase(): string {
+  const host = Deno.env.get('R2_PUBLIC_HOST') || ''
+  if (host) {
+    const h = host.startsWith('http') ? host : `https://${host}`
+    try {
+      const u = new URL(h)
+      return `${u.protocol}//${u.host}`
+    } catch {
+      return h
+    }
+  }
+  const raw =
+    Deno.env.get('R2_PUBLIC_BASE_URL') ||
+    Deno.env.get('IMAGE_BASE_URL') ||
+    'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev'
+  if (!raw) return 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev'
+  try {
+    const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+    const origin = `${u.protocol}//${u.host}`
+    const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/+$/, '')
+    return path ? `${origin}/${path}` : origin
+  } catch {
+    return raw
   }
 }
 
@@ -159,6 +187,111 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const body = await parseBody(req)
 
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global:
+        authHeader && token
+          ? { headers: { Authorization: `Bearer ${token}` } }
+          : {},
+    })
+
+    const rawIds = Array.isArray(body.product_ids) ? body.product_ids : []
+    const uniqueIds = Array.from(new Set((rawIds || []).map((v) => String(v || '').trim()).filter(Boolean))).slice(0, 1000)
+    const storeIdBatch = body.store_id ? String(body.store_id) : null
+    if (uniqueIds.length > 0) {
+      const [
+        { data: productRows, error: productErr },
+        imagesResult,
+        { data: paramRows },
+      ] = await Promise.all([
+        supabase
+          .from('store_products')
+          .select('*')
+          .in('id', uniqueIds),
+        supabase
+          .from('store_product_images')
+          .select('id,product_id,url,order_index,is_main,r2_key_original')
+          .in('product_id', uniqueIds)
+          .order('order_index'),
+        supabase
+          .from('store_product_params')
+          .select('id,product_id,name,value,order_index,paramid,valueid')
+          .in('product_id', uniqueIds)
+          .order('order_index'),
+      ])
+
+      if (productErr) {
+        return new Response(
+          JSON.stringify({ error: 'products_fetch_failed' }),
+          { status: 500, headers: corsHeaders },
+        )
+      }
+
+      const imageRows = imagesResult?.data
+      const imageBase = resolvePublicBase()
+      const imagesByProductId = new Map<string, any[]>()
+      for (const img of (Array.isArray(imageRows) ? imageRows : []) as any[]) {
+        const pid = String(img.product_id || '')
+        if (!pid) continue
+        const r2o = img.r2_key_original ? String(img.r2_key_original) : ''
+        const originalUrl = r2o && imageBase ? `${imageBase}/${r2o}` : null
+        const fallbackUrl = String(img.url || '')
+        const list = imagesByProductId.get(pid) || []
+        list.push({
+          id: img.id != null ? String(img.id) : undefined,
+          product_id: pid,
+          url: originalUrl || fallbackUrl,
+          order_index: typeof img.order_index === 'number' ? img.order_index : list.length,
+          is_main: img.is_main === true,
+          r2_key_original: r2o || null,
+          images: { original: originalUrl },
+        })
+        imagesByProductId.set(pid, list)
+      }
+
+      const paramsByProductId = new Map<string, any[]>()
+      for (const p of (Array.isArray(paramRows) ? paramRows : []) as any[]) {
+        const pid = String(p.product_id || '')
+        if (!pid) continue
+        const list = paramsByProductId.get(pid) || []
+        list.push({
+          id: p.id != null ? String(p.id) : undefined,
+          product_id: pid,
+          name: String(p.name || ''),
+          value: String(p.value || ''),
+          order_index: typeof p.order_index === 'number' ? p.order_index : list.length,
+          paramid: p.paramid ?? null,
+          valueid: p.valueid ?? null,
+        })
+        paramsByProductId.set(pid, list)
+      }
+
+      const productsResolved = (productRows || []) as any[]
+      const productsById = new Map<string, any>()
+      for (const p of productsResolved) {
+        if (!p?.id) continue
+        productsById.set(String(p.id), p)
+      }
+
+      const items = uniqueIds
+        .map((id) => {
+          const product = productsById.get(String(id)) || null
+          if (!product) return null
+          const pid = String(product.id)
+          return {
+            product,
+            images: imagesByProductId.get(pid) || [],
+            params: paramsByProductId.get(pid) || [],
+            store_id: storeIdBatch,
+          }
+        })
+        .filter(Boolean)
+
+      return new Response(JSON.stringify({ items }), {
+        status: 200,
+        headers: corsHeaders,
+      })
+    }
+
     const productId = String(body.product_id || '')
     let storeId = body.store_id ? String(body.store_id) : ''
 
@@ -168,13 +301,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
         { status: 400, headers: corsHeaders },
       )
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global:
-        authHeader && token
-          ? { headers: { Authorization: `Bearer ${token}` } }
-          : {},
-    })
 
     // 1-й этап: параллельно тянем товар + справочники
     const [
@@ -362,28 +488,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    function resolvePublicBase(): string {
-      const host = Deno.env.get('R2_PUBLIC_HOST') || ''
-      if (host) {
-        const h = host.startsWith('http') ? host : `https://${host}`
-        try {
-          const u = new URL(h)
-          return `${u.protocol}//${u.host}`
-        } catch {
-          return h
-        }
-      }
-      const raw = Deno.env.get('R2_PUBLIC_BASE_URL') || Deno.env.get('IMAGE_BASE_URL') || 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev'
-      if (!raw) return 'https://pub-b1876983df974fed81acea10f7cbc1c5.r2.dev'
-      try {
-        const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
-        const origin = `${u.protocol}//${u.host}`
-        const path = (u.pathname || '/').replace(/^\/+/, '').replace(/\/+$/, '')
-        return path ? `${origin}/${path}` : origin
-      } catch {
-        return raw
-      }
-    }
     const imageBase = resolvePublicBase()
 
     const images: (ProductImage & { images?: { original: string | null } })[] = (imageRowsResolved as any[]).map(
