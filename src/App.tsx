@@ -126,7 +126,7 @@ const App = () => {
             { path: "tariff", element: <TariffPage /> },
             { path: "suppliers", element: <Suppliers /> },
             { path: "shops", element: <Shops /> },
-            { path: "shops/:id", element: <ShopDetail /> },
+            { path: "shops/:id/*", element: <ShopDetail /> },
             { path: "shops/:id/settings", element: <ShopSettings /> },
             { path: "shops/:id/products", element: <StoreProducts /> },
             { path: "shops/:id/products/edit/:productId", element: <StoreProductEdit /> },

@@ -1,5 +1,3 @@
-import type { ExportColumn } from "./constants";
-
 export function parseCsvRow(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -27,9 +25,8 @@ function csvCell(v: unknown): string {
   return JSON.stringify(String(v));
 }
 
-export function buildCsvFromRows(rows: Array<Record<string, unknown>>, columns: readonly ExportColumn[]): string {
+export function buildCsvFromRows(rows: Array<Record<string, unknown>>, columns: readonly string[]): string {
   const header = columns.join(",");
   const body = rows.map((r) => columns.map((c) => csvCell(r[c])).join(",")).join("\n");
   return [header, body].filter(Boolean).join("\n");
 }
-

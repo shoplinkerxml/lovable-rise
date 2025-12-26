@@ -85,7 +85,7 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0" noOverlay>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] flex flex-col p-0">
         <div className="sticky top-0 bg-background z-10">
           <DialogHeader className="p-6 pb-4 pr-14 pt-10">
             <DialogTitle>Редагування XML структури - {shop.store_name}</DialogTitle>
@@ -109,9 +109,12 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-background border-t">
-          <DialogFooter className="p-6 pt-4">
-            <Button onClick={handleSave} disabled={loading} className="ml-auto">
+        <div className="sticky bottom-0 bg-background">
+          <DialogFooter className="p-6 pt-2 flex-row justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+              {t('close') || 'Закрити'}
+            </Button>
+            <Button onClick={handleSave} disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
               {t('save_changes') || 'Зберегти зміни'}
             </Button>

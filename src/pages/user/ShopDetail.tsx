@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Edit, Settings, Share2, Package, List, Store as StoreIcon } from 'lucide-react';
@@ -9,6 +9,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
 import { ProductsTable } from '@/components/user/products/ProductsTable';
 import { FullPageLoader } from '@/components/LoadingSkeletons';
+import { ExportDialog } from '@/components/user/shops/ExportDialog';
+import { ShopStructureEditor } from '@/components/user/shops/ShopStructureEditor';
 
 import { useBreadcrumbs } from '@/hooks/useBreadcrumbs';
 import { useI18n } from '@/i18n';
@@ -21,9 +23,25 @@ export const ShopDetail = () => {
   const { id } = useParams<{ id: string }>();
   const shopId = id ? String(id) : "";
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
+
+  const modalAction = useMemo(() => {
+    const p = String(location.pathname || "");
+    if (!shopId) return null;
+    if (p.endsWith(`/user/shops/${shopId}/structure`)) return "structure" as const;
+    if (p.endsWith(`/user/shops/${shopId}/export`)) return "export" as const;
+    if (p.endsWith("/structure")) return "structure" as const;
+    if (p.endsWith("/export")) return "export" as const;
+    return null;
+  }, [location.pathname, shopId]);
+
+  const closeModal = useCallback(() => {
+    if (!shopId) return;
+    navigate(`/user/shops/${shopId}`);
+  }, [navigate, shopId]);
 
   useEffect(() => {
     if (!shopId) navigate('/user/shops');
@@ -133,75 +151,95 @@ export const ShopDetail = () => {
     productsCount === 0 ? 0 : Math.max(0, Number(shop.categoriesCount ?? 0));
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader
-        title={shop.store_name}
-        description={`${t('managing_shop') || 'Управління магазином'} ${shop.store_name}`}
-        breadcrumbItems={shopBreadcrumbs}
-        actions={
-          <div className="flex gap-2 items-center">
-            <div className="flex items-center gap-2 mr-1">
-              <span className="inline-flex items-center gap-1 text-xs border rounded-md px-3 py-1">
-                <Package className="h-3 w-3" />
-                <span>{productsCount}</span>
-              </span>
-              <span className="inline-flex items-center gap-1 text-xs border rounded-md px-3 py-1">
-                <List className="h-3 w-3" />
-                <span>{categoriesCount}</span>
-              </span>
+    <>
+      <div className="p-6 space-y-6">
+        <PageHeader
+          title={shop.store_name}
+          description={`${t('managing_shop') || 'Управління магазином'} ${shop.store_name}`}
+          breadcrumbItems={shopBreadcrumbs}
+          actions={
+            <div className="flex gap-2 items-center">
+              <div className="flex items-center gap-2 mr-1">
+                <span className="inline-flex items-center gap-1 text-xs border rounded-md px-3 py-1">
+                  <Package className="h-3 w-3" />
+                  <span>{productsCount}</span>
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs border rounded-md px-3 py-1">
+                  <List className="h-3 w-3" />
+                  <span>{categoriesCount}</span>
+                </span>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                onClick={() => navigate(`/user/shops/${shopId}/settings`)}
+                title={t('breadcrumb_settings') || 'Налаштування'}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                onClick={() => navigate(`/user/shops/${shopId}/structure`)}
+                title={t('xml_structure') || 'Структура XML'}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                onClick={() => navigate(`/user/shops/${shopId}/export`)}
+                title={t('export_section') || 'Експорт'}
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
             </div>
+          }
+        />
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate(`/user/shops/${shopId}/settings`)}
-              title={t('breadcrumb_settings') || 'Налаштування'}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate(`/user/shops/${shopId}/structure`)}
-              title={t('xml_structure') || 'Структура XML'}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate(`/user/shops/${shopId}/export`)}
-              title={t('export_section') || 'Експорт'}
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="bg-background border rounded-md">
-        {productsCount === 0 ? (
-          <div className="p-6">
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia className="text-primary">
-                  <Package className="h-[1.5rem] w-[1.5rem]" />
-                </EmptyMedia>
-                <EmptyTitle>{t('no_products')}</EmptyTitle>
-                <EmptyDescription>{t('no_products_description')}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          </div>
-        ) : (
-          <ProductsTable
-            storeId={shopId}
-            onEdit={(product: Product) => navigate(`/user/shops/${shopId}/products/edit/${product.id}`)}
-            onDelete={handleDeleteProduct}
-            canCreate={true}
-            hideDuplicate={true}
-          />
-        )}
+        <div className="bg-background border rounded-md">
+          {productsCount === 0 ? (
+            <div className="p-6">
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia className="text-primary">
+                    <Package className="h-[1.5rem] w-[1.5rem]" />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('no_products')}</EmptyTitle>
+                  <EmptyDescription>{t('no_products_description')}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            </div>
+          ) : (
+            <ProductsTable
+              storeId={shopId}
+              onEdit={(product: Product) => navigate(`/user/shops/${shopId}/products/edit/${product.id}`)}
+              onDelete={handleDeleteProduct}
+              canCreate={true}
+              hideDuplicate={true}
+            />
+          )}
+        </div>
       </div>
-    </div>
+
+      <ShopStructureEditor
+        shop={shop}
+        open={modalAction === "structure"}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+      />
+      <ExportDialog
+        storeId={shopId}
+        open={modalAction === "export"}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+      />
+    </>
   );
 };

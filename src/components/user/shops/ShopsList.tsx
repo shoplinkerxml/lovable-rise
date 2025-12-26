@@ -336,7 +336,7 @@ export const ShopsList = ({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive focus-visible:ring-0 focus-visible:ring-offset-0"
                       onClick={() => setDeleteDialog({ open: true, shop })}
                     >
                       <Trash2 className="h-4 w-4" />

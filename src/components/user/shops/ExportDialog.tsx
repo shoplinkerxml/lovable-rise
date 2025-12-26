@@ -47,7 +47,7 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[clamp(24rem,70vw,40rem)] overflow-x-hidden" data-testid="user_shop_export_dialog" noOverlay>
+      <DialogContent className="max-w-[95vw] sm:max-w-[clamp(24rem,70vw,40rem)] overflow-x-hidden" data-testid="user_shop_export_dialog">
         <DialogHeader>
           <DialogTitle>{t('export_section')}</DialogTitle>
         </DialogHeader>
@@ -190,7 +190,11 @@ export const ExportDialog = ({ storeId, open, onOpenChange }: Props) => {
           )}
         </div>
 
-        
+        <DialogFooter className="flex-row justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {t('close') || 'Закрити'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

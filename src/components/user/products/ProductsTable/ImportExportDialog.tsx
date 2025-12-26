@@ -20,7 +20,8 @@ import type { ProductRow } from "./columns";
 import { exportProducts } from "./ImportExport/exporting";
 import { downloadBlob, downloadText } from "./ImportExport/file";
 import { formatTokens } from "./ImportExport/format";
-import { importProducts, readImportFileToRows, type ImportRow, validateImportRows } from "./ImportExport/importing";
+import { PARAMS_SHEET_NAME, PRODUCTS_SHEET_NAME } from "./ImportExport/constants";
+import { importProducts, readImportFile, type ImportRow, validateImportRows } from "./ImportExport/importing";
 
 export function ImportExportDialog({
   open,
@@ -46,18 +47,27 @@ export function ImportExportDialog({
 
   const effectiveStoreId = storeId ? String(storeId) : null;
 
-  const previewRows = useMemo(() => importRows.slice(0, 20), [importRows]);
+  const previewRows = useMemo(() => importRows.filter((r) => String((r.data as any)?.__sheet || "") !== PARAMS_SHEET_NAME).slice(0, 20), [importRows]);
   const errorsCount = useMemo(() => importRows.reduce((acc, r) => acc + (r.ok ? 0 : 1), 0), [importRows]);
 
   const processFile = useCallback(async (file: File) => {
     try {
-      const rows = await readImportFileToRows(file);
-      const validated = validateImportRows(rows, t, effectiveStoreId);
-      setImportRows(validated);
+      const { products, params } = await readImportFile(file);
+      const validated = validateImportRows(products, t).map((r) => ({
+        ...r,
+        data: { ...r.data, __sheet: PRODUCTS_SHEET_NAME },
+      }));
+      const paramsRows: ImportRow[] = (params || []).map((r, idx) => ({
+        index: validated.length + idx,
+        data: { ...r, __sheet: PARAMS_SHEET_NAME },
+        ok: true,
+        errors: [],
+      }));
+      setImportRows([...validated, ...paramsRows]);
     } catch {
       setImportRows([]);
     }
-  }, [t, effectiveStoreId]);
+  }, [t]);
 
   const onPickFile = useCallback(() => {
     fileInputRef.current?.click();
@@ -200,8 +210,12 @@ export function ImportExportDialog({
                           {previewRows.map((r) => (
                             <TableRow key={r.index}>
                               <TableCell className="text-muted-foreground">{r.index + 1}</TableCell>
-                              <TableCell>{String(r.data.external_id || "")}</TableCell>
-                              <TableCell className="truncate max-w-[22rem]">{String(r.data.name || "")}</TableCell>
+                              <TableCell>
+                                {String(r.data["External ID"] || r.data["Зовнішній ID"] || r.data["Внешний ID"] || r.data.external_id || "")}
+                              </TableCell>
+                              <TableCell className="truncate max-w-[22rem]">
+                                {String(r.data["Name"] || r.data["Назва"] || r.data["Название"] || r.data.name || "")}
+                              </TableCell>
                               <TableCell>
                                 {r.ok ? (
                                   <span className="text-emerald-600">{t("import_export_row_ok")}</span>

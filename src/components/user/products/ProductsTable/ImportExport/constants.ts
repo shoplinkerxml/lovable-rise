@@ -1,32 +1,10 @@
-export const EXPORT_COLUMNS = [
-  "product_id",
-  "store_id",
-  "external_id",
-  "name",
-  "name_ua",
-  "vendor",
-  "article",
-  "docket",
-  "docket_ua",
-  "description",
-  "description_ua",
-  "currency_code",
-  "currency_id",
-  "price",
-  "price_old",
-  "price_promo",
-  "stock_quantity",
-  "available",
-  "state",
-  "category_id",
-  "category_external_id",
-  "supplier_id",
-  "is_active",
-  "created_at",
-  "updated_at",
-  "linked_store_ids",
-  "images",
-  "params",
-] as const;
+export const PRODUCTS_SHEET_NAME = "products";
+export const PARAMS_SHEET_NAME = "params";
+export const LOOKUPS_SHEET_NAME = "lookups";
+export const META_SHEET_NAME = "meta";
 
-export type ExportColumn = typeof EXPORT_COLUMNS[number];
+export const PARAMS_TECH_COLUMNS = ["product_id", "external_id", "param_name", "param_value"] as const;
+
+export const LOOKUPS_EXPORT_COLUMNS = ["type", "id", "name", "external_id", "supplier_id"] as const;
+
+export const META_EXPORT_COLUMNS = ["key", "value"] as const;
