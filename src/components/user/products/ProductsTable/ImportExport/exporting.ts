@@ -1,5 +1,4 @@
 import type { Product, ProductAggregated, ProductImage, ProductParam } from "@/lib/product-service";
-import { ProductService } from "@/lib/product-service";
 import { ProductImportExportService } from "@/lib/product-import-export-service";
 import { useI18nStore } from "@/i18n";
 import type { Lang } from "@/i18n/types";
@@ -8,15 +7,12 @@ import {
   LOOKUPS_SHEET_NAME,
   META_EXPORT_COLUMNS,
   META_SHEET_NAME,
-  PARAMS_TECH_COLUMNS,
-  PARAMS_SHEET_NAME,
   PRODUCTS_SHEET_NAME,
 } from "./constants";
 import { buildCsvFromRows } from "./csv";
 import { buildXlsxBlobFromSheets } from "./xlsx";
 
 type ProductExportRow = Record<string, unknown>;
-type ParamsExportRow = Record<(typeof PARAMS_TECH_COLUMNS)[number], unknown>;
 type LookupsExportRow = Record<(typeof LOOKUPS_EXPORT_COLUMNS)[number], unknown>;
 type MetaExportRow = Record<(typeof META_EXPORT_COLUMNS)[number], unknown>;
 
@@ -44,6 +40,7 @@ function buildProductColumns(lang: Lang, maxParams: number): string[] {
   const base =
     lang === "uk"
       ? [
+          "ID",
           "Зовнішній ID",
           "Назва",
           "Бренд",
@@ -62,6 +59,7 @@ function buildProductColumns(lang: Lang, maxParams: number): string[] {
           "Постачальник",
         ]
       : [
+          "ID",
           "External ID",
           "Name",
           "Brand",
@@ -111,6 +109,7 @@ function toProductExportRow(args: {
   const row: ProductExportRow =
     lang === "uk"
       ? {
+          ID: String(p.id || ""),
           "Зовнішній ID": p.external_id,
           "Назва": name,
           "Бренд": p.vendor ?? "",
@@ -129,6 +128,7 @@ function toProductExportRow(args: {
           "Постачальник": args.meta?.supplierName || args.supplierName || "",
         }
       : {
+          ID: String(p.id || ""),
           "External ID": p.external_id,
           "Name": name,
           "Brand": p.vendor ?? "",
@@ -165,7 +165,6 @@ export async function buildFullExportData(args: {
 }): Promise<{
   productRows: ProductExportRow[];
   productsColumns: string[];
-  paramsRows: ParamsExportRow[];
   lookupsRows: LookupsExportRow[];
   metaRows: MetaExportRow[];
 }> {
@@ -183,7 +182,7 @@ export async function buildFullExportData(args: {
   const lang = useI18nStore.getState().lang;
   const t = useI18nStore.getState().t;
 
-  const lookups = await ProductService.getUserLookups();
+  const lookups = await ProductImportExportService.getUserLookups();
   const suppliersById = new Map<string, string>();
   for (const s of lookups?.suppliers || []) {
     const sid = String((s as any)?.id || "").trim();
@@ -219,7 +218,6 @@ export async function buildFullExportData(args: {
 
   const productsColumns = buildProductColumns(lang, maxParams);
   const productRows: ProductExportRow[] = [];
-  const paramsRows: ParamsExportRow[] = [];
   for (const id of ids) {
     const d = byDetailId.get(String(id));
     if (!d) continue;
@@ -238,17 +236,6 @@ export async function buildFullExportData(args: {
         params: d.params || [],
       }),
     );
-    for (const prm of d.params || []) {
-      const pn = String(prm?.name || "").trim();
-      const pv = String(prm?.value || "");
-      if (!pn) continue;
-      paramsRows.push({
-        product_id: String(d.product.id || ""),
-        external_id: String(d.product.external_id || "").trim(),
-        param_name: pn,
-        param_value: pv,
-      });
-    }
   }
 
   const lookupsRows: LookupsExportRow[] = [];
@@ -280,7 +267,7 @@ export async function buildFullExportData(args: {
     { key: "exported_at", value: new Date().toISOString() },
   ];
 
-  return { productRows, productsColumns, paramsRows, lookupsRows, metaRows };
+  return { productRows, productsColumns, lookupsRows, metaRows };
 }
 
 async function fetchAllBaseProducts(storeId: string | null): Promise<ProductAggregated[]> {
@@ -288,7 +275,7 @@ async function fetchAllBaseProducts(storeId: string | null): Promise<ProductAggr
   let offset = 0;
   let all: ProductAggregated[] = [];
   while (true) {
-    const resp = await ProductService.getProductsPage(storeId, limit, offset);
+    const resp = await ProductImportExportService.getProductsPage(storeId, limit, offset);
     const pageProducts = Array.isArray(resp?.products) ? resp.products : [];
     all = [...all, ...pageProducts];
     const nextOffset = resp?.page?.nextOffset ?? null;
@@ -306,7 +293,10 @@ export async function exportProducts(args: {
 }): Promise<{ mime: string; data: string | Blob }> {
   const selected = Array.isArray(args.selectedProducts) ? args.selectedProducts.filter(Boolean) : [];
   const baseProducts = selected.length > 0 ? selected : await fetchAllBaseProducts(args.storeId);
-  const { productRows, productsColumns, paramsRows, lookupsRows, metaRows } = await buildFullExportData({ baseProducts, storeId: args.storeId });
+  const { productRows, productsColumns, lookupsRows, metaRows } = await buildFullExportData({
+    baseProducts,
+    storeId: args.storeId,
+  });
 
   if (args.format === "csv") {
     return { mime: "text/csv;charset=utf-8", data: buildCsvFromRows(productRows, productsColumns) };
@@ -315,7 +305,6 @@ export async function exportProducts(args: {
     mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     data: buildXlsxBlobFromSheets([
       { name: PRODUCTS_SHEET_NAME, rows: productRows, columns: productsColumns },
-      { name: PARAMS_SHEET_NAME, rows: paramsRows, columns: PARAMS_TECH_COLUMNS },
       { name: LOOKUPS_SHEET_NAME, rows: lookupsRows, columns: LOOKUPS_EXPORT_COLUMNS },
       { name: META_SHEET_NAME, rows: metaRows, columns: META_EXPORT_COLUMNS },
     ]),

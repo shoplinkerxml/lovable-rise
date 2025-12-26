@@ -4,23 +4,22 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DialogNoOverlay,
-  DialogNoOverlayContent,
-  DialogNoOverlayDescription,
-  DialogNoOverlayFooter,
-  DialogNoOverlayHeader,
-  DialogNoOverlayTitle,
-} from "@/components/ui/dialog-no-overlay";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { ProductAggregated } from "@/lib/product-service";
 import type { ProductRow } from "./columns";
 import { exportProducts } from "./ImportExport/exporting";
 import { downloadBlob, downloadText } from "./ImportExport/file";
 import { formatTokens } from "./ImportExport/format";
-import { PARAMS_SHEET_NAME, PRODUCTS_SHEET_NAME } from "./ImportExport/constants";
+import { PRODUCTS_SHEET_NAME } from "./ImportExport/constants";
 import { importProducts, readImportFile, type ImportRow, validateImportRows } from "./ImportExport/importing";
 
 export function ImportExportDialog({
@@ -47,23 +46,17 @@ export function ImportExportDialog({
 
   const effectiveStoreId = storeId ? String(storeId) : null;
 
-  const previewRows = useMemo(() => importRows.filter((r) => String((r.data as any)?.__sheet || "") !== PARAMS_SHEET_NAME).slice(0, 20), [importRows]);
+  const previewRows = useMemo(() => importRows.slice(0, 20), [importRows]);
   const errorsCount = useMemo(() => importRows.reduce((acc, r) => acc + (r.ok ? 0 : 1), 0), [importRows]);
 
   const processFile = useCallback(async (file: File) => {
     try {
-      const { products, params } = await readImportFile(file);
+      const { products } = await readImportFile(file);
       const validated = validateImportRows(products, t).map((r) => ({
         ...r,
         data: { ...r.data, __sheet: PRODUCTS_SHEET_NAME },
       }));
-      const paramsRows: ImportRow[] = (params || []).map((r, idx) => ({
-        index: validated.length + idx,
-        data: { ...r, __sheet: PARAMS_SHEET_NAME },
-        ok: true,
-        errors: [],
-      }));
-      setImportRows([...validated, ...paramsRows]);
+      setImportRows(validated);
     } catch {
       setImportRows([]);
     }
@@ -126,24 +119,21 @@ export function ImportExportDialog({
   }, [importing, effectiveStoreId, importRows, errorsCount, t, queryClient, onOpenChange]);
 
   return (
-    <DialogNoOverlay open={open} onOpenChange={onOpenChange} modal={false}>
-      <DialogNoOverlayContent
-        position="center"
-        className="p-6 w-[min(56rem,92vw)]"
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-w-[min(56rem,92vw)] max-h-[90vh] flex flex-col gap-0 p-0"
         data-testid="user_products_import_export_dialog"
       >
-        <DialogNoOverlayHeader>
-          <DialogNoOverlayTitle>{t("import_export_title")}</DialogNoOverlayTitle>
-          <DialogNoOverlayDescription className="text-sm">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle>{t("import_export_title")}</DialogTitle>
+          <DialogDescription className="text-sm">
             {t("import_export_export_hint")}
-          </DialogNoOverlayDescription>
-        </DialogNoOverlayHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex-1 overflow-auto px-6 py-4">
           <Tabs value={tab} onValueChange={(v) => setTab(v === "import" ? "import" : "export")}>
-            <TabsList>
+            <TabsList className="w-fit max-w-full flex flex-wrap sm:flex-nowrap sm:w-auto sm:inline-flex">
               <TabsTrigger value="export">{t("export")}</TabsTrigger>
               <TabsTrigger value="import">{t("import")}</TabsTrigger>
             </TabsList>
@@ -183,12 +173,13 @@ export function ImportExportDialog({
                     aria-disabled={importing}
                     onClick={onPickFile}
                     data-testid="user_products_import_pick_file"
+                    className="flex-shrink-0"
                   >
                     {t("import_export_select_file")}
                   </Button>
                   <input ref={fileInputRef} type="file" className="hidden" accept=".csv,.xlsx" onChange={onFileChange} />
                   {importRows.length > 0 ? (
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-xs sm:text-sm text-muted-foreground break-words">
                       {formatTokens(t("import_export_preview_rows"), { count: importRows.length })} · {formatTokens(t("import_export_errors_count"), { count: errorsCount })}
                     </div>
                   ) : null}
@@ -196,38 +187,44 @@ export function ImportExportDialog({
 
                 {importRows.length > 0 ? (
                   <div className="rounded-md border">
-                    <ScrollArea className="h-[min(18rem,45vh)]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[5rem]">#</TableHead>
-                            <TableHead className="w-[12rem]">{t("external_id")}</TableHead>
-                            <TableHead>{t("table_product")}</TableHead>
-                            <TableHead className="w-[10rem]">{t("import_export_row_status")}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {previewRows.map((r) => (
-                            <TableRow key={r.index}>
-                              <TableCell className="text-muted-foreground">{r.index + 1}</TableCell>
-                              <TableCell>
-                                {String(r.data["External ID"] || r.data["Зовнішній ID"] || r.data["Внешний ID"] || r.data.external_id || "")}
-                              </TableCell>
-                              <TableCell className="truncate max-w-[22rem]">
-                                {String(r.data["Name"] || r.data["Назва"] || r.data["Название"] || r.data.name || "")}
-                              </TableCell>
-                              <TableCell>
-                                {r.ok ? (
-                                  <span className="text-emerald-600">{t("import_export_row_ok")}</span>
-                                ) : (
-                                  <span className="text-destructive">{r.errors.join("; ")}</span>
-                                )}
-                              </TableCell>
+                    <div className="h-[min(18rem,45vh)] overflow-auto">
+                      <div className="min-w-[44rem]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[5rem]">#</TableHead>
+                              <TableHead className="w-[10rem]">ID</TableHead>
+                              <TableHead className="w-[12rem]">{t("external_id")}</TableHead>
+                              <TableHead>{t("table_product")}</TableHead>
+                              <TableHead className="w-[10rem]">{t("import_export_row_status")}</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
+                          </TableHeader>
+                          <TableBody>
+                            {previewRows.map((r) => (
+                              <TableRow key={r.index}>
+                                <TableCell className="text-muted-foreground">{r.index + 1}</TableCell>
+                                <TableCell>
+                                  {String(r.data.ID || r.data["Product ID"] || r.data.product_id || r.data.productId || r.data.id || "")}
+                                </TableCell>
+                                <TableCell>
+                                  {String(r.data["External ID"] || r.data["Зовнішній ID"] || r.data["Внешний ID"] || r.data.external_id || "")}
+                                </TableCell>
+                                <TableCell className="truncate max-w-[22rem]">
+                                  {String(r.data["Name"] || r.data["Назва"] || r.data["Название"] || r.data.name || "")}
+                                </TableCell>
+                                <TableCell>
+                                  {r.ok ? (
+                                    <span className="text-emerald-600">{t("import_export_row_ok")}</span>
+                                  ) : (
+                                    <span className="text-destructive">{r.errors.join("; ")}</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
                     <div className="px-3 py-2 text-xs text-muted-foreground">
                       {t("import_export_preview_limit")}
                     </div>
@@ -242,8 +239,14 @@ export function ImportExportDialog({
           </Tabs>
         </div>
 
-        <DialogNoOverlayFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="user_products_import_export_close">
+        <DialogFooter className="px-6 pb-6 pt-4 border-t gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="user_products_import_export_close"
+            className="w-full sm:w-auto"
+          >
             {t("close")}
           </Button>
           {tab === "import" ? (
@@ -253,12 +256,13 @@ export function ImportExportDialog({
               aria-disabled={importing || importRows.length === 0}
               onClick={() => void runImport()}
               data-testid="user_products_import_run"
+              className="w-full sm:w-auto"
             >
               {t("import")}
             </Button>
           ) : null}
-        </DialogNoOverlayFooter>
-      </DialogNoOverlayContent>
-    </DialogNoOverlay>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

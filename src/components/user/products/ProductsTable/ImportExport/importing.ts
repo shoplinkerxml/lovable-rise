@@ -1,8 +1,8 @@
 import type { CreateProductData, ProductParam, UpdateProductData } from "@/lib/product-service";
-import { ProductService } from "@/lib/product-service";
+import { ProductImportExportService } from "@/lib/product-import-export-service";
 import { parseCsvRow } from "./csv";
 import { readXlsxToSheets } from "./xlsx";
-import { PARAMS_SHEET_NAME, PRODUCTS_SHEET_NAME } from "./constants";
+import { PRODUCTS_SHEET_NAME } from "./constants";
 
 export type ImportRow = {
   index: number;
@@ -228,16 +228,21 @@ function readCell(d: Record<string, string>, keys: string[]): string {
   return "";
 }
 
+function readProductIdCell(d: Record<string, string>): string {
+  return String(readCell(d, ["ID", "Product ID", "product_id", "productId", "id"])).trim();
+}
+
 export function validateImportRows(rows: Array<Record<string, string>>, t: (k: string) => string): ImportRow[] {
   const out: ImportRow[] = [];
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i] || {};
     const errors: string[] = [];
 
+    const productId = readProductIdCell(r);
     const externalId = String(readCell(r, ["Зовнішній ID", "External ID", "Внешний ID", "external_id"])).trim();
     const name = String(readCell(r, ["Name", "Назва", "Название", "name"])).trim();
-    if (!externalId) errors.push(t("import_export_missing_external_id"));
-    if (!name) errors.push(t("import_export_missing_name"));
+    if (!productId && !externalId) errors.push(t("import_export_missing_external_id"));
+    if (!productId && !name) errors.push(t("import_export_missing_name"));
 
     out.push({ index: i, data: r, ok: errors.length === 0, errors });
   }
@@ -272,19 +277,15 @@ export async function readImportFileToRows(file: File): Promise<Array<Record<str
   return [];
 }
 
-export async function readImportFile(file: File): Promise<{
-  products: Array<Record<string, string>>;
-  params: Array<Record<string, string>>;
-}> {
+export async function readImportFile(file: File): Promise<{ products: Array<Record<string, string>> }> {
   const name = String(file.name || "").toLowerCase();
   if (name.endsWith(".xlsx")) {
     const sheets = await readXlsxToSheets(file);
     const products = sheets[PRODUCTS_SHEET_NAME] || [];
-    const params = sheets[PARAMS_SHEET_NAME] || [];
-    return { products, params };
+    return { products };
   }
   const products = await readImportFileToRows(file);
-  return { products, params: [] };
+  return { products };
 }
 
 export function mapProductRowToBase(
@@ -330,44 +331,50 @@ export function mapProductRowToBase(
 
   const base: Record<string, unknown> = {
     ...(effectiveStoreId ? { store_id: effectiveStoreId } : {}),
-    external_id: externalId,
-    name: String(nameValue || nameUaValue || "").trim(),
-    name_ua: nameUaValue ?? undefined,
-    vendor: asNullableString(readCell(d, ["Brand", "Бренд", "vendor"])) ?? undefined,
-    article: asNullableString(readCell(d, ["Article", "Артикул", "article"])) ?? undefined,
-    docket: shortValue ?? shortUaValue ?? undefined,
-    docket_ua: shortUaValue ?? undefined,
-    description: descValue ?? descUaValue ?? undefined,
-    description_ua: descUaValue ?? undefined,
-    currency_code: asNullableString(readCell(d, ["Currency", "Валюта", "currency_code"])) ?? undefined,
-    category_id: categoryId,
-    supplier_id: supplierId != null && Number.isFinite(supplierId) ? supplierId : undefined,
-    price: asNullableNumber(readCell(d, ["Price", "Ціна", "Цена", "price"])) ?? undefined,
-    price_old: asNullableNumber(readCell(d, ["Old Price", "Стара ціна", "Старая цена", "price_old"])) ?? undefined,
-    price_promo: asNullableNumber(readCell(d, ["Promo Price", "Акційна ціна", "Акционная цена", "price_promo"])) ?? undefined,
-    stock_quantity: asNullableNumber(readCell(d, ["Stock", "Залишок", "Остаток", "stock_quantity"])) ?? undefined,
-    available: asNullableBoolean(readCell(d, ["Available", "В наявності", "В наличии", "available"])) ?? undefined,
-    state: stateParsed ?? undefined,
-    is_active: asNullableBoolean(readCell(d, ["Active", "Активний", "Активен", "is_active"])) ?? undefined,
   };
 
-  return { externalId, base };
-}
+  if (externalId) base.external_id = externalId;
+  const resolvedName = String(nameValue || nameUaValue || "").trim();
+  if (resolvedName) base.name = resolvedName;
+  if (nameUaValue != null) base.name_ua = nameUaValue;
 
-export function mapParamsRowsToByExternalId(
-  rows: Array<Record<string, string>>,
-): Record<string, ProductParam[]> {
-  const out: Record<string, ProductParam[]> = {};
-  for (const r of rows || []) {
-    const externalId = String(readCell(r, ["external_id", "External ID", "Зовнішній ID", "Внешний ID"])).trim();
-    if (!externalId) continue;
-    const name = String(readCell(r, ["param_name", "Характеристика", "Characteristic"])).trim();
-    const value = String(readCell(r, ["param_value", "Значення", "Значение", "Value"])).trim();
-    if (!name) continue;
-    if (!out[externalId]) out[externalId] = [];
-    out[externalId].push({ name, value, order_index: out[externalId].length });
-  }
-  return out;
+  const vendorValue = asNullableString(readCell(d, ["Brand", "Бренд", "vendor"])) ?? undefined;
+  if (vendorValue !== undefined) base.vendor = vendorValue;
+  const articleValue = asNullableString(readCell(d, ["Article", "Артикул", "article"])) ?? undefined;
+  if (articleValue !== undefined) base.article = articleValue;
+
+  const docketResolved = shortValue ?? shortUaValue ?? undefined;
+  if (docketResolved !== undefined) base.docket = docketResolved;
+  if (shortUaValue !== undefined) base.docket_ua = shortUaValue;
+
+  const descResolved = descValue ?? descUaValue ?? undefined;
+  if (descResolved !== undefined) base.description = descResolved;
+  if (descUaValue !== undefined) base.description_ua = descUaValue;
+
+  const currencyCode = asNullableString(readCell(d, ["Currency", "Валюта", "currency_code"])) ?? undefined;
+  if (currencyCode !== undefined) base.currency_code = currencyCode;
+
+  if (categoryId !== undefined) base.category_id = categoryId;
+  if (supplierId != null && Number.isFinite(supplierId)) base.supplier_id = supplierId;
+
+  const priceValue = asNullableNumber(readCell(d, ["Price", "Ціна", "Цена", "price"])) ?? undefined;
+  if (priceValue !== undefined) base.price = priceValue;
+  const priceOldValue = asNullableNumber(readCell(d, ["Old Price", "Стара ціна", "Старая цена", "price_old"])) ?? undefined;
+  if (priceOldValue !== undefined) base.price_old = priceOldValue;
+  const pricePromoValue = asNullableNumber(readCell(d, ["Promo Price", "Акційна ціна", "Акционная цена", "price_promo"])) ?? undefined;
+  if (pricePromoValue !== undefined) base.price_promo = pricePromoValue;
+
+  const stockValue = asNullableNumber(readCell(d, ["Stock", "Залишок", "Остаток", "stock_quantity"])) ?? undefined;
+  if (stockValue !== undefined) base.stock_quantity = stockValue;
+  const availableValue = asNullableBoolean(readCell(d, ["Available", "В наявності", "В наличии", "available"])) ?? undefined;
+  if (availableValue !== undefined) base.available = availableValue;
+
+  if (stateParsed !== undefined) base.state = stateParsed;
+
+  const isActiveValue = asNullableBoolean(readCell(d, ["Active", "Активний", "Активен", "is_active"])) ?? undefined;
+  if (isActiveValue !== undefined) base.is_active = isActiveValue;
+
+  return { externalId, base };
 }
 
 async function mapWithConcurrency<T, R>(
@@ -393,59 +400,31 @@ export async function processImportBatch(args: {
   let created = 0;
   let skipped = 0;
 
-  const lookups = await ProductService.getUserLookups();
-  const existingByExternalId = new Map<string, string>();
-  {
-    const limit = 200;
-    let offset = 0;
-    while (true) {
-      const resp = await ProductService.getProductsPage(args.effectiveStoreId, limit, offset);
-      const list = Array.isArray(resp?.products) ? resp.products : [];
-      for (const p of list) {
-        const ex = String((p as any)?.external_id || "").trim();
-        const id = String((p as any)?.id || "").trim();
-        if (ex && id) existingByExternalId.set(ex, id);
-      }
-      const nextOffset = resp?.page?.nextOffset ?? null;
-      const hasMore = !!resp?.page?.hasMore && nextOffset != null;
-      if (!hasMore) break;
-      offset = nextOffset;
-      if (existingByExternalId.size > 5000) break;
-    }
-  }
-
-  const paramsByExternalId = mapParamsRowsToByExternalId(
-    rows
-      .filter((r) => r.data?.__sheet === PARAMS_SHEET_NAME)
-      .map((r) => r.data as Record<string, string>),
-  );
+  const lookups = await ProductImportExportService.getUserLookups();
 
   await mapWithConcurrency(rows, 3, async (r) => {
     const d = r.data || {};
-    if (String((d as any)?.__sheet || "") === PARAMS_SHEET_NAME) return;
+    const productId = readProductIdCell(d);
 
-    const mapped = mapProductRowToBase(d, args.effectiveStoreId, {
+    const mapped = mapProductRowToBase(d, productId ? null : args.effectiveStoreId, {
       suppliers: lookups.suppliers || [],
       supplierCategoriesMap: lookups.supplierCategoriesMap || {},
     });
-    const externalId = mapped.externalId;
-    const existingId = externalId ? existingByExternalId.get(externalId) : undefined;
 
     const fromProductRow = extractParamsFromProductRow(d);
-    const fromParamsSheet = paramsByExternalId[externalId];
-    const params = fromProductRow.hasParamColumns ? fromProductRow.params : fromParamsSheet ?? undefined;
+    const params = fromProductRow.hasParamColumns ? fromProductRow.params : undefined;
 
-    if (!existingId) {
+    if (!productId) {
       const base = mapped.base as unknown as CreateProductData;
       const createPayload: CreateProductData = params ? { ...base, params } : base;
-      await ProductService.createProduct(createPayload);
+      await ProductImportExportService.createProduct(createPayload, { effectiveStoreId: args.effectiveStoreId });
       created += 1;
       return;
     }
 
     const patch = mapped.base as unknown as UpdateProductData;
     const patchWithParams: UpdateProductData = params ? { ...patch, params } : patch;
-    await ProductService.updateProduct(existingId, patchWithParams);
+    await ProductImportExportService.updateProduct(productId, patchWithParams);
     skipped += 1;
   });
 

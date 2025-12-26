@@ -1,10 +1,41 @@
 import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { SessionValidator } from "@/lib/session-validation";
-import type { Product, ProductImage, ProductParam } from "@/lib/product-service";
+import type {
+  CreateProductData,
+  Product,
+  ProductAggregated,
+  ProductImage,
+  ProductParam,
+  UpdateProductData,
+} from "@/lib/product-service";
+
+type ProductListPage = {
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  nextOffset: number | null;
+  total: number;
+};
+
+type ProductListResponseObj = {
+  products?: ProductAggregated[];
+  page?: ProductListPage;
+};
 
 export class ProductImportExportService {
+  private static castNullableNumber(value: unknown): number | null {
+    if (value === undefined || value === null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
   private static async invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
+    const sessionValidation = await SessionValidator.ensureValidSession();
+    if (!sessionValidation.isValid) {
+      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
+    }
+
     const { data: authData } = await supabase.auth.getSession();
     const accessToken: string | null = authData?.session?.access_token || null;
     const { data, error } = await supabase.functions.invoke<T | string>(name, {
@@ -21,15 +52,167 @@ export class ProductImportExportService {
     return typeof data === "string" ? (JSON.parse(data) as T) : (data as T);
   }
 
+  static async getUserLookups(): Promise<{
+    suppliers: Array<{ id: string; supplier_name: string }>;
+    currencies: Array<{ id: number; name: string; code: string; status: boolean }>;
+    supplierCategoriesMap: Record<
+      string,
+      Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>
+    >;
+  }> {
+    const resp = await ProductImportExportService.invokeEdge<{
+      suppliers?: any[];
+      currencies?: any[];
+      supplierCategoriesMap?: Record<string, any[]>;
+    }>("get-user-lookups", {});
+    return {
+      suppliers: Array.isArray(resp.suppliers) ? resp.suppliers : [],
+      currencies: Array.isArray(resp.currencies) ? resp.currencies : [],
+      supplierCategoriesMap: resp.supplierCategoriesMap || {},
+    };
+  }
+
+  static async getProductsPage(
+    storeId: string | null,
+    limit: number,
+    offset: number,
+  ): Promise<{ products: ProductAggregated[]; page: ProductListPage }> {
+    const resp = await ProductImportExportService.invokeEdge<ProductListResponseObj>(
+      storeId ? "store-products-list" : "user-products-list",
+      {
+        ...(storeId ? { store_id: String(storeId) } : {}),
+        limit,
+        offset,
+      },
+    );
+    const products = Array.isArray(resp?.products) ? resp.products : [];
+    const page: ProductListPage = {
+      limit,
+      offset,
+      hasMore: !!resp?.page?.hasMore,
+      nextOffset: resp?.page?.nextOffset ?? null,
+      total: resp?.page?.total ?? products.length,
+    };
+    return { products, page };
+  }
+
+  private static async getDefaultStoreId(): Promise<string> {
+    const resp = await ProductImportExportService.invokeEdge<{ shops?: Array<{ id?: string | number }> }>(
+      "user-shops-list",
+      {},
+    );
+    const shops = Array.isArray(resp?.shops) ? resp.shops : [];
+    const first = shops.map((s) => String(s?.id || "").trim()).find(Boolean);
+    if (!first) {
+      throw new Error("store_id_required");
+    }
+    return first;
+  }
+
+  static async createProduct(productData: CreateProductData, options?: { effectiveStoreId: string | null }): Promise<string> {
+    const storeId = String(options?.effectiveStoreId || productData.store_id || "").trim() || (await ProductImportExportService.getDefaultStoreId());
+    const currencyCode = (productData.currency_code && String(productData.currency_code).trim()) || "UAH";
+
+    const payload: Record<string, unknown> = {
+      store_id: storeId,
+      supplier_id: ProductImportExportService.castNullableNumber(productData.supplier_id),
+      category_id: ProductImportExportService.castNullableNumber(productData.category_id),
+      category_external_id: productData.category_external_id ?? null,
+      currency_code: currencyCode,
+      external_id: productData.external_id ?? null,
+      name: productData.name,
+      name_ua: productData.name_ua ?? null,
+      vendor: productData.vendor ?? null,
+      article: productData.article ?? null,
+      available: productData.available !== undefined ? productData.available : true,
+      stock_quantity: productData.stock_quantity ?? 0,
+      price: productData.price ?? null,
+      price_old: productData.price_old ?? null,
+      price_promo: productData.price_promo ?? null,
+      description: productData.description ?? null,
+      description_ua: productData.description_ua ?? null,
+      docket: productData.docket ?? null,
+      docket_ua: productData.docket_ua ?? null,
+      state: productData.state ?? "new",
+      images: (productData.images || []).map((img, index) => ({
+        key: (img as unknown as { object_key?: string }).object_key || undefined,
+        url: img.url,
+        order_index: typeof img.order_index === "number" ? img.order_index : index,
+        is_main: !!img.is_main,
+      })),
+      params: (productData.params || []).map((p, index) => ({
+        name: p.name,
+        value: p.value,
+        order_index: typeof p.order_index === "number" ? p.order_index : index,
+        paramid: p.paramid ?? null,
+        valueid: p.valueid ?? null,
+      })),
+      links: productData.links || undefined,
+    };
+
+    const respCreate = await ProductImportExportService.invokeEdge<{ product_id?: string }>("create-product", payload);
+    const productId = String(respCreate?.product_id || "").trim();
+    if (!productId) throw new Error("create_failed");
+    return productId;
+  }
+
+  static async updateProduct(id: string, productData: UpdateProductData): Promise<void> {
+    const payload: Record<string, unknown> = {
+      product_id: id,
+    };
+
+    if (productData.supplier_id !== undefined) payload.supplier_id = ProductImportExportService.castNullableNumber(productData.supplier_id);
+    if (productData.category_id !== undefined) payload.category_id = ProductImportExportService.castNullableNumber(productData.category_id);
+    if (productData.category_external_id !== undefined) payload.category_external_id = productData.category_external_id;
+    if (productData.currency_code !== undefined) payload.currency_code = productData.currency_code;
+    if (productData.external_id !== undefined) payload.external_id = productData.external_id;
+    if (productData.name !== undefined) payload.name = productData.name;
+    if (productData.name_ua !== undefined) payload.name_ua = productData.name_ua;
+    if (productData.vendor !== undefined) payload.vendor = productData.vendor;
+    if (productData.article !== undefined) payload.article = productData.article;
+    if (productData.available !== undefined) payload.available = productData.available;
+    if (productData.stock_quantity !== undefined) payload.stock_quantity = productData.stock_quantity;
+    if (productData.price !== undefined) payload.price = productData.price;
+    if (productData.price_old !== undefined) payload.price_old = productData.price_old;
+    if (productData.price_promo !== undefined) payload.price_promo = productData.price_promo;
+    if (productData.description !== undefined) payload.description = productData.description;
+    if (productData.description_ua !== undefined) payload.description_ua = productData.description_ua;
+    if (productData.docket !== undefined) payload.docket = productData.docket;
+    if (productData.docket_ua !== undefined) payload.docket_ua = productData.docket_ua;
+    if (productData.state !== undefined) payload.state = productData.state;
+    if (productData.store_id !== undefined) payload.store_id = productData.store_id;
+
+    if (productData.images !== undefined) {
+      payload.images = (productData.images || []).map((img, index) => ({
+        key: (img as unknown as { object_key?: string }).object_key || undefined,
+        url: img.url,
+        order_index: typeof img.order_index === "number" ? img.order_index : index,
+        is_main: !!img.is_main,
+      }));
+    }
+    if (productData.params !== undefined) {
+      payload.params = (productData.params || []).map((p, index) => ({
+        name: p.name,
+        value: p.value,
+        order_index: typeof p.order_index === "number" ? p.order_index : index,
+        paramid: p.paramid ?? null,
+        valueid: p.valueid ?? null,
+      }));
+    }
+
+    await ProductImportExportService.invokeEdge<{ product_id?: string }>("update-product", payload);
+  }
+
   static async getProductsEditDataBatch(
     productIds: string[],
     storeId?: string,
   ): Promise<Array<{ product: Product; images: ProductImage[]; params: ProductParam[] }>> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
     const ids = Array.from(new Set((productIds || []).map(String).map((s) => s.trim()).filter(Boolean)));
     if (ids.length === 0) return [];
 
