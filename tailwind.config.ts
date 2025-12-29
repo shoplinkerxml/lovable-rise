@@ -195,7 +195,7 @@ export default {
     		},
     		fontFamily: {
     			sans: [
-    				'Open Sans',
+    				'Roboto',
     				'ui-sans-serif',
     				'system-ui',
     				'sans-serif',
