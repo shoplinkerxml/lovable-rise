@@ -176,7 +176,7 @@ export async function buildFullExportData(args: {
   }
   const ids = Array.from(byId.keys());
   if (ids.length === 0) {
-    return { productRows: [], productsColumns: [], paramsRows: [], lookupsRows: [], metaRows: [] };
+    return { productRows: [], productsColumns: [], lookupsRows: [], metaRows: [] };
   }
 
   const lang = useI18nStore.getState().lang;

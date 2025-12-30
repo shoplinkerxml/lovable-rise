@@ -3,6 +3,7 @@ import { R2Storage } from "@/lib/r2-storage";
 import { ApiError } from "./user-service";
 import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
+import { dedupeInFlight } from "./cache-utils";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { CategoryService } from "@/lib/category-service";
 
@@ -167,6 +168,9 @@ export class ProductService {
       categoriesCount: number;
     }>
   > | null = null;
+
+  private static readonly INFLIGHT_LINKS_MAX_SIZE = 200;
+  private static readonly INFLIGHT_RECOMPUTE_MAX_SIZE = 50;
 
   private static inFlightLinksByProduct: Map<string, Promise<string[]>> = new Map();
   private static inFlightRecomputeByStore: Map<string, Promise<void>> = new Map();
@@ -498,19 +502,14 @@ export class ProductService {
 
   static async recomputeStoreCategoryFilterCacheBatch(storeIds: string[]): Promise<void> {
     const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
-    const tasks = unique.map((sid) => {
-      const prev = ProductService.inFlightRecomputeByStore.get(sid);
-      if (prev) return prev;
-      const task = ProductService.recomputeStoreCategoryFilterCache(sid).finally(() => {
-        try {
-          ProductService.inFlightRecomputeByStore.delete(sid);
-        } catch (error) {
-          console.error("ProductService.recomputeStoreCategoryFilterCacheBatch cleanup failed", error);
-        }
-      });
-      ProductService.inFlightRecomputeByStore.set(sid, task);
-      return task;
-    });
+    const tasks = unique.map((sid) =>
+      dedupeInFlight(
+        ProductService.inFlightRecomputeByStore,
+        sid,
+        () => ProductService.recomputeStoreCategoryFilterCache(sid),
+        { maxSize: ProductService.INFLIGHT_RECOMPUTE_MAX_SIZE },
+      ),
+    );
     await Promise.all(tasks);
   }
 
@@ -694,26 +693,18 @@ export class ProductService {
   }
 
   static async getStoreLinksForProduct(productId: string): Promise<string[]> {
-    const existing = ProductService.inFlightLinksByProduct.get(productId);
-    if (existing) return existing;
-
-    const task = (async () => {
-      const payload = await ProductService.invokeEdge<{ store_ids?: string[] }>(
-        "get-store-links-for-product",
-        { product_id: productId },
-      );
-      const ids = Array.isArray(payload.store_ids)
-        ? payload.store_ids.map(String)
-        : [];
-      return ids;
-    })();
-
-    ProductService.inFlightLinksByProduct.set(productId, task);
-    try {
-      return await task;
-    } finally {
-      ProductService.inFlightLinksByProduct.delete(productId);
-    }
+    return dedupeInFlight(
+      ProductService.inFlightLinksByProduct,
+      productId,
+      async () => {
+        const payload = await ProductService.invokeEdge<{ store_ids?: string[] }>(
+          "get-store-links-for-product",
+          { product_id: productId },
+        );
+        return Array.isArray(payload.store_ids) ? payload.store_ids.map(String) : [];
+      },
+      { maxSize: ProductService.INFLIGHT_LINKS_MAX_SIZE },
+    );
   }
 
   static invalidateStoreLinksCache(productId: string) {
