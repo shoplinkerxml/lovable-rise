@@ -72,7 +72,7 @@ export class TariffService {
       // Use simple select without joins as per memory specification for data loading
       let query = supabase
         .from('tariffs')
-        .select('*')
+        .select('id,name,description,old_price,new_price,currency_id,currency_code,duration_days,is_free,is_lifetime,is_active,created_at,updated_at,sort_order,visible,popular')
         .order('sort_order', { ascending: true });
 
       if (!includeInactive) {
@@ -95,14 +95,14 @@ export class TariffService {
       
       // Оптимизация: получаем все данные 3 запросами вместо 3*N
       const tariffIds = data.map(t => t.id);
-      const currencyIds = [...new Set(data.map(t => (t as any).currency_id || (t as any).currency).filter(Boolean))];
+      const currencyIds = [...new Set(data.map(t => t.currency_id).filter((id): id is number => typeof id === 'number'))];
       
       // 1. Получаем все валюты одним запросом
       const currenciesMap = new Map();
       if (currencyIds.length > 0) {
         const { data: currencies } = await supabase
           .from('currencies')
-          .select('*')
+          .select('id,code,name,rate,status,is_base')
           .in('id', currencyIds);
         
         if (currencies) {
@@ -114,7 +114,7 @@ export class TariffService {
       const featuresMap = new Map();
       const { data: allFeatures } = await supabase
         .from('tariff_features')
-        .select('*')
+        .select('id,tariff_id,feature_name,is_active')
         .in('tariff_id', tariffIds)
         .eq('is_active', true)
         .order('feature_name');
@@ -132,7 +132,7 @@ export class TariffService {
       const limitsMap = new Map();
       const { data: allLimits } = await supabase
         .from('tariff_limits')
-        .select('*')
+        .select('id,tariff_id,template_id,code,limit_name,description,path,value,is_active')
         .in('tariff_id', tariffIds)
         .eq('is_active', true)
         .order('limit_name');
@@ -153,7 +153,7 @@ export class TariffService {
         return !(n.includes('демо') || n.includes('demo'));
       });
       const tariffsWithDetails = filtered.map(tariff => {
-        const currencyId = (tariff as any).currency_id || (tariff as any).currency;
+        const currencyId = tariff.currency_id;
         const currencyData = currencyId ? currenciesMap.get(currencyId) : null;
         
         return {
@@ -163,7 +163,7 @@ export class TariffService {
           old_price: tariff.old_price,
           new_price: tariff.new_price,
           currency_id: currencyId,
-          currency_code: currencyData ? (currencyData as any).code : undefined,
+          currency_code: tariff.currency_code,
           duration_days: tariff.duration_days,
           is_free: tariff.is_free,
           is_lifetime: tariff.is_lifetime,
@@ -171,8 +171,8 @@ export class TariffService {
           created_at: tariff.created_at,
           updated_at: tariff.updated_at,
           sort_order: tariff.sort_order,
-          visible: (tariff as any).visible ?? true,
-          popular: (tariff as any).popular ?? false,
+          visible: tariff.visible,
+          popular: tariff.popular,
           currency_data: currencyData,
           features: featuresMap.get(tariff.id) || [],
           limits: limitsMap.get(tariff.id) || []
@@ -192,7 +192,7 @@ export class TariffService {
       // 1. Get basic tariff data
       const { data: tariffData, error: tariffError } = await supabase
         .from('tariffs')
-        .select('*')
+        .select('id,name,description,old_price,new_price,currency_id,currency_code,duration_days,is_free,is_lifetime,is_active,created_at,updated_at,sort_order,visible,popular')
         .eq('id', id)
         .single();
 
@@ -200,11 +200,11 @@ export class TariffService {
       
       // 2. Get currency data separately if valid currency_id field exists (actual database schema)
       let currencyData = null;
-      const currencyId = (tariffData as any).currency_id || (tariffData as any).currency;
-      if (currencyId && typeof currencyId === 'number') {
+      const currencyId = tariffData.currency_id;
+      if (typeof currencyId === 'number') {
         const { data: currency, error: currencyError } = await supabase
           .from('currencies')
-          .select('*')
+          .select('id,code,name,rate,status,is_base')
           .eq('id', currencyId)
           .single();
           
@@ -216,7 +216,7 @@ export class TariffService {
       // 3. Get features separately
       const { data: featuresData } = await supabase
         .from('tariff_features')
-        .select('*')
+        .select('id,tariff_id,feature_name,is_active')
         .eq('tariff_id', id)
         .eq('is_active', true)
         .order('feature_name');
@@ -224,7 +224,7 @@ export class TariffService {
       // 4. Get limits separately
       const { data: limitsData } = await supabase
         .from('tariff_limits')
-        .select('*')
+        .select('id,tariff_id,template_id,code,limit_name,description,path,value,is_active')
         .eq('tariff_id', id)
         .eq('is_active', true)
         .order('limit_name');
@@ -236,14 +236,14 @@ export class TariffService {
         description: tariffData.description,
         old_price: tariffData.old_price,
         new_price: tariffData.new_price,
-        currency_id: ((tariffData as any).currency_id || (tariffData as any).currency),
-        currency_code: currencyData ? (currencyData as any).code : undefined,
+        currency_id: tariffData.currency_id,
+        currency_code: tariffData.currency_code,
         duration_days: tariffData.duration_days,
         is_free: tariffData.is_free,
         is_lifetime: tariffData.is_lifetime,
         is_active: tariffData.is_active,
-        visible: (tariffData as any).visible ?? true,
-        popular: (tariffData as any).popular ?? false,
+        visible: tariffData.visible,
+        popular: tariffData.popular,
         created_at: tariffData.created_at,
         updated_at: tariffData.updated_at,
         sort_order: tariffData.sort_order,
@@ -266,17 +266,17 @@ export class TariffService {
       const { data: createdTariff, error: createError } = await supabase
         .from('tariffs')
         .insert(tariffData)
-        .select('*')
+        .select('id,name,description,old_price,new_price,currency_id,currency_code,duration_days,is_free,is_lifetime,is_active,created_at,updated_at,sort_order,visible,popular')
         .single();
 
       if (createError) throw createError;
 
       // Then fetch the currency data separately - handle both currency and currency_id fields
-      const currencyField = (createdTariff as any).currency_id || (createdTariff as any).currency;
-      if (currencyField && typeof currencyField === 'number') {
+      const currencyField = createdTariff.currency_id;
+      if (typeof currencyField === 'number') {
         const { data: currencyData, error: currencyError } = await supabase
           .from('currencies')
-          .select('*')
+          .select('id,code,name,rate,status,is_base')
           .eq('id', currencyField)
           .single();
 
@@ -312,7 +312,7 @@ export class TariffService {
         .from('tariffs')
         .update(tariffData)
         .eq('id', id)
-        .select('*')
+        .select('id,name,description,old_price,new_price,currency_id,currency_code,duration_days,is_free,is_lifetime,is_active,created_at,updated_at,sort_order,visible,popular')
         .maybeSingle();
 
       if (updateError) {
@@ -326,11 +326,11 @@ export class TariffService {
       }
 
       // Then fetch the currency data separately - handle both currency and currency_id fields
-      const currencyField = (updatedTariff as any).currency_id || (updatedTariff as any).currency;
-      if (currencyField && typeof currencyField === 'number') {
+      const currencyField = updatedTariff.currency_id;
+      if (typeof currencyField === 'number') {
         const { data: currencyData, error: currencyError } = await supabase
           .from('currencies')
-          .select('*')
+          .select('id,code,name,rate,status,is_base')
           .eq('id', currencyField)
           .single();
 
@@ -375,7 +375,7 @@ export class TariffService {
     try {
       const { data, error } = await supabase
         .from('tariff_features')
-        .select('*')
+        .select('id,tariff_id,feature_name,is_active')
         .eq('tariff_id', tariffId)
         .eq('is_active', true)
         .order('feature_name');
@@ -394,7 +394,7 @@ export class TariffService {
       const { data, error } = await supabase
         .from('tariff_features')
         .insert(featureData)
-        .select()
+        .select('id,tariff_id,feature_name,is_active')
         .single();
 
       if (error) throw error;
@@ -413,7 +413,7 @@ export class TariffService {
         .from('tariff_features')
         .update(featureData)
         .eq('id', id)
-        .select()
+        .select('id,tariff_id,feature_name,is_active')
         .single();
 
       if (error) throw error;
@@ -447,7 +447,7 @@ export class TariffService {
     try {
       const { data, error } = await supabase
         .from('tariff_limits')
-        .select('*')
+        .select('id,tariff_id,template_id,code,limit_name,description,path,value,is_active')
         .eq('tariff_id', tariffId)
         .eq('is_active', true)
         .order('limit_name');
@@ -466,7 +466,7 @@ export class TariffService {
       const { data, error } = await supabase
         .from('tariff_limits')
         .insert(limitData)
-        .select()
+        .select('id,tariff_id,template_id,code,limit_name,description,path,value,is_active')
         .single();
 
       if (error) throw error;
@@ -485,7 +485,7 @@ export class TariffService {
         .from('tariff_limits')
         .update(limitData)
         .eq('id', id)
-        .select()
+        .select('id,tariff_id,template_id,code,limit_name,description,path,value,is_active')
         .single();
 
       if (error) throw error;
@@ -519,7 +519,7 @@ export class TariffService {
     try {
       const { data, error } = await supabase
         .from('currencies')
-        .select('*')
+        .select('id,code,name,rate,status,is_base')
         .eq('status', true)
         .order('code');
 

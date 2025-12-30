@@ -306,7 +306,7 @@ export class ShopService {
    */
   private static async getShopsFallback(): Promise<ShopAggregated[]> {
     try {
-      const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+      const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", { includeConfig: false });
       const shops = response.shops || [];
       return shops as ShopAggregated[];
     } catch {
@@ -372,7 +372,7 @@ export class ShopService {
 
     await this.ensureSession();
     
-    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+    const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", { includeConfig: false });
     return response.shops || [];
   }
 
@@ -394,7 +394,7 @@ export class ShopService {
 
     return this.deduplicateRequest(cacheKey, async () => {
       try {
-        const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", {});
+        const response = await this.invokeEdge<ShopsListResponse>("user-shops-list", { includeConfig: false });
         const shops = response.shops || [];
         const limit = Number(response.limit ?? NaN);
         if (Number.isFinite(limit)) {
