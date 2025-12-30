@@ -1,11 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
-import { R2Storage } from "@/lib/r2-storage";
 import { ApiError } from "./user-service";
 import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
 import { dedupeInFlight } from "./cache-utils";
-import type { TablesInsert } from "@/integrations/supabase/types";
 import { CategoryService } from "@/lib/category-service";
+import { ProductCoreService } from "@/lib/product/product-core-service";
 
 export interface Product {
   id: string;
@@ -140,8 +139,6 @@ type ProductListResponseObj = {
   products?: ProductAggregated[];
   page?: ProductListPage;
 };
-
-type ImageInput = ProductImage & { object_key?: string };
 
 export interface StoreProductLink {
   is_active?: boolean;
@@ -861,51 +858,7 @@ export class ProductService {
 
   /** Получение товара по ID: через product-edit-data */
   static async getProductById(id: string): Promise<Product | null> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("store_products")
-        .select(
-          "id,store_id,supplier_id,external_id,name,name_ua,docket,docket_ua,description,description_ua,vendor,article,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at",
-        )
-        .eq("id", String(id))
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return null;
-      return {
-        id: String(data.id),
-        store_id: String(data.store_id || ""),
-        supplier_id: data.supplier_id ?? null,
-        external_id: String(data.external_id || ""),
-        name: String(data.name || ""),
-        name_ua: data.name_ua == null ? null : String(data.name_ua),
-        docket: data.docket == null ? null : String(data.docket),
-        docket_ua: data.docket_ua == null ? null : String(data.docket_ua),
-        description: data.description == null ? null : String(data.description),
-        description_ua: data.description_ua == null ? null : String(data.description_ua),
-        vendor: data.vendor == null ? null : String(data.vendor),
-        article: data.article == null ? null : String(data.article),
-        category_id: data.category_id ?? null,
-        category_external_id: data.category_external_id == null ? null : String(data.category_external_id),
-        currency_id: null,
-        currency_code: data.currency_code == null ? null : String(data.currency_code),
-        price: data.price ?? null,
-        price_old: data.price_old ?? null,
-        price_promo: data.price_promo ?? null,
-        stock_quantity: Number(data.stock_quantity || 0),
-        available: !!data.available,
-        state: data.state == null ? "" : String(data.state),
-        created_at: data.created_at == null ? "" : String(data.created_at),
-        updated_at: data.updated_at == null ? "" : String(data.updated_at),
-      };
-    } catch {
-      const edit = await ProductService.getProductEditData(id);
-      return edit.product || null;
-    }
+    return await ProductCoreService.getProductById(id);
   }
 
   /** Агрегированная загрузка данных для страницы редактирования товара */
@@ -1049,121 +1002,12 @@ export class ProductService {
 
   /** Один продукт по ID */
   static async getProduct(id: string): Promise<Product> {
-    const product = await this.getProductById(id);
-    if (!product) {
-      throw new Error("Товар не найден");
-    }
-    return product;
+    return await ProductCoreService.getProduct(id);
   }
 
   /** Создание нового продукта (через функцию create-product) */
   static async createProduct(productData: CreateProductData): Promise<Product> {
-    let effectiveStoreId = productData.store_id;
-    const allowedStoreIds = await this.getUserStoreIds();
-    if (!effectiveStoreId || effectiveStoreId.trim() === "") {
-      effectiveStoreId = allowedStoreIds[0];
-      if (!effectiveStoreId) {
-        throw new Error("Активний магазин не знайдено");
-      }
-    } else if (!allowedStoreIds.includes(String(effectiveStoreId))) {
-      throw new Error("Store access denied");
-    }
-
-    const currencyCode =
-      (productData.currency_code && String(productData.currency_code).trim()) ||
-      "UAH";
-
-    const payload: Record<string, unknown> = {
-      store_id: effectiveStoreId,
-      supplier_id: this.castNullableNumber(productData.supplier_id),
-      category_id: this.castNullableNumber(productData.category_id),
-      category_external_id: productData.category_external_id ?? null,
-      currency_code: currencyCode,
-      external_id: productData.external_id ?? null,
-      name: productData.name,
-      name_ua: productData.name_ua ?? null,
-      vendor: productData.vendor ?? null,
-      article: productData.article ?? null,
-      available:
-        productData.available !== undefined ? productData.available : true,
-      stock_quantity: productData.stock_quantity ?? 0,
-      price: productData.price ?? null,
-      price_old: productData.price_old ?? null,
-      price_promo: productData.price_promo ?? null,
-      description: productData.description ?? null,
-      description_ua: productData.description_ua ?? null,
-      docket: productData.docket ?? null,
-      docket_ua: productData.docket_ua ?? null,
-      state: productData.state ?? "new",
-      images: (productData.images || []).map((img, index) => {
-        const input = img as ImageInput;
-        return {
-          key: input.object_key || undefined,
-          url: input.url,
-          order_index: typeof input.order_index === "number" ? input.order_index : index,
-          is_main: !!input.is_main,
-        };
-      }),
-      params: (productData.params || []).map((p, index) => ({
-        name: p.name,
-        value: p.value,
-        order_index:
-          typeof p.order_index === "number" ? p.order_index : index,
-        paramid: p.paramid ?? null,
-        valueid: p.valueid ?? null,
-      })),
-      links: productData.links || undefined,
-    };
-
-    const respCreate = await ProductService.invokeEdge<{ product_id?: string }>(
-      "create-product",
-      payload,
-    );
-    const productId = respCreate?.product_id;
-    if (!productId) throw new Error("create_failed");
-    const product = await this.getProductById(productId);
-    if (!product) throw new Error("create_failed");
-
-    const origImages = (productData.images || []).map((img, index) => {
-      const input = img as ImageInput;
-      return {
-        object_key: input.object_key || undefined,
-        url: input.url,
-        order_index: typeof input.order_index === "number" ? input.order_index : index,
-        is_main: !!input.is_main,
-      };
-    });
-    const processed = await Promise.all(
-      origImages.map(async (i) => {
-        const key = i.object_key || undefined;
-        const u = String(i.url || "").trim();
-        if (key) {
-          return { object_key: key, url: u, order_index: i.order_index, is_main: i.is_main };
-        }
-        if (!u) {
-          return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
-        }
-        if (/^(https?:\/\/|data:)/i.test(u)) {
-          try {
-            const res = await R2Storage.uploadProductImageFromUrl(String(productId), u);
-            const nextKey = res.r2KeyOriginal || undefined;
-            const nextUrl = res.originalUrl || u;
-            return { object_key: nextKey, url: nextUrl, order_index: i.order_index, is_main: i.is_main };
-          } catch {
-            return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
-          }
-        }
-        return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
-      })
-    );
-    const needUpdate = processed.some((p, idx) => {
-      const oi = origImages[idx];
-      const changedKey = !!(p as { object_key?: string }).object_key && !oi.object_key;
-      return changedKey;
-    });
-    if (needUpdate) {
-      await ProductService.updateProduct(String(productId), { images: processed as unknown as ProductImage[] });
-    }
+    const product = await ProductCoreService.createProduct(productData);
     try {
       ProductService.clearMasterProductsCaches();
       if (productData.links) {
@@ -1181,14 +1025,7 @@ export class ProductService {
   }
 
   static async duplicateProduct(id: string): Promise<Product> {
-    const respDup = await ProductService.invokeEdge<{ product?: Product }>(
-      "duplicate-product",
-      { productId: id },
-    );
-    const product = respDup?.product as Product | undefined;
-    if (!product) {
-      throw new Error("duplicate_failed");
-    }
+    const product = await ProductCoreService.duplicateProduct(id);
     try {
       ProductService.clearAllFirstPageCaches();
     } catch (error) {
@@ -1199,126 +1036,14 @@ export class ProductService {
 
   /** Обновление товара через функцию update-product */
   static async updateProduct(id: string, productData: UpdateProductData): Promise<void> {
-    await this.ensureCanMutateProducts();
-    const categoryIdValue: number | null | undefined =
-      productData.category_id !== undefined
-        ? this.castNullableNumber(productData.category_id)
-        : undefined;
-
-    const payload: Record<string, unknown> = {
-      product_id: id,
-      supplier_id:
-        productData.supplier_id !== undefined
-          ? this.castNullableNumber(productData.supplier_id)
-          : undefined,
-      category_id:
-        productData.category_id !== undefined ? categoryIdValue : undefined,
-      category_external_id:
-        productData.category_external_id !== undefined
-          ? productData.category_external_id
-          : undefined,
-      currency_code:
-        productData.currency_code !== undefined
-          ? productData.currency_code
-          : undefined,
-      external_id:
-        productData.external_id !== undefined ? productData.external_id : undefined,
-      name: productData.name !== undefined ? productData.name : undefined,
-      name_ua: productData.name_ua !== undefined ? productData.name_ua : undefined,
-      vendor: productData.vendor !== undefined ? productData.vendor : undefined,
-      article: productData.article !== undefined ? productData.article : undefined,
-      available:
-        productData.available !== undefined ? productData.available : undefined,
-      stock_quantity:
-        productData.stock_quantity !== undefined
-          ? productData.stock_quantity
-          : undefined,
-      price: productData.price !== undefined ? productData.price : undefined,
-      price_old:
-        productData.price_old !== undefined ? productData.price_old : undefined,
-      price_promo:
-        productData.price_promo !== undefined ? productData.price_promo : undefined,
-      description:
-        productData.description !== undefined ? productData.description : undefined,
-      description_ua:
-        productData.description_ua !== undefined
-          ? productData.description_ua
-          : undefined,
-      docket: productData.docket !== undefined ? productData.docket : undefined,
-      docket_ua:
-        productData.docket_ua !== undefined ? productData.docket_ua : undefined,
-      state: productData.state !== undefined ? productData.state : undefined,
-      images:
-        productData.images !== undefined
-          ? (productData.images || []).map((img, index) => {
-              const input = img as ImageInput;
-              return {
-                key: input.object_key || undefined,
-                url: input.url,
-                order_index: typeof input.order_index === "number" ? input.order_index : index,
-                is_main: !!input.is_main,
-              };
-            })
-          : undefined,
-      params:
-        productData.params !== undefined
-          ? (productData.params || []).map((p, index) => ({
-              name: p.name,
-              value: p.value,
-              order_index:
-                typeof p.order_index === "number" ? p.order_index : index,
-              paramid: p.paramid ?? null,
-              valueid: p.valueid ?? null,
-            }))
-          : undefined,
-    };
-
-    const respUpdate = await ProductService.invokeEdge<{ product_id?: string }>(
-      "update-product",
-      payload,
-    );
-    const productId = respUpdate?.product_id || id;
-    try {
-      const patch: Partial<ProductAggregated> = {};
-      if (payload.name !== undefined) patch.name = payload.name as string;
-      if (payload.name_ua !== undefined) patch.name_ua = (payload.name_ua as string | null) ?? null;
-      if (payload.price !== undefined) patch.price = (payload.price as number | null) ?? null;
-      if (payload.price_old !== undefined) patch.price_old = (payload.price_old as number | null) ?? null;
-      if (payload.price_promo !== undefined) patch.price_promo = (payload.price_promo as number | null) ?? null;
-      if (payload.available !== undefined) patch.available = !!payload.available;
-      if (payload.stock_quantity !== undefined) patch.stock_quantity = Number(payload.stock_quantity || 0);
-      if (payload.vendor !== undefined) patch.vendor = (payload.vendor as string | null) ?? null;
-      if (payload.article !== undefined) patch.article = (payload.article as string | null) ?? null;
-      if (payload.category_id !== undefined) patch.category_id = (payload.category_id as number | null) ?? null;
-      if (payload.category_external_id !== undefined) patch.category_external_id = (payload.category_external_id as string | null) ?? null;
-      if (payload.state !== undefined) patch.state = payload.state as string;
-      if (Array.isArray(payload.images)) {
-        const images = payload.images as Array<{ url: string; is_main?: boolean }>;
-        const main = images.find((i) => !!i.is_main) || images[0];
-        if (main?.url) patch.mainImageUrl = String(main.url);
-      }
-      ProductService.patchProductCaches(String(productId), patch, null);
-      if (productData.store_id != null && String(productData.store_id).trim() !== "") {
-        ProductService.patchProductCaches(String(productId), patch, String(productData.store_id));
-      }
-    } catch (error) {
-      console.error("ProductService.updateProduct cache update failed", error);
-    }
+    const productId = await ProductCoreService.updateProduct(id, productData);
     void productId;
     return;
   }
 
   /** Удаление товара */
   static async deleteProduct(id: string): Promise<void> {
-    await this.ensureCanMutateProducts();
-    const respDel = await ProductService.invokeEdge<{ success?: boolean }>(
-      "delete-product",
-      { product_ids: [String(id)] },
-    );
-    const ok = respDel?.success === true;
-    if (!ok) {
-      throw new Error("delete_failed");
-    }
+    await ProductCoreService.deleteProduct(id);
     try {
       ProductService.clearMasterProductsCaches();
       ProductService.clearAllProductsCaches();
@@ -1329,15 +1054,7 @@ export class ProductService {
   }
 
   static async bulkDeleteProducts(ids: string[]): Promise<{ deleted: number }> {
-    await this.ensureCanMutateProducts();
-    const validIds = Array.from(new Set(ids.map(String).filter(Boolean)));
-    if (validIds.length === 0) return { deleted: 0 };
-    const respDel2 = await ProductService.invokeEdge<{ success?: boolean }>(
-      "delete-product",
-      { product_ids: validIds },
-    );
-    const ok = respDel2?.success === true;
-    if (!ok) throw new Error("delete_failed");
+    const out = await ProductCoreService.bulkDeleteProducts(ids);
     try {
       ProductService.clearMasterProductsCaches();
       ProductService.clearAllProductsCaches();
@@ -1345,7 +1062,7 @@ export class ProductService {
       console.error("ProductService.bulkDeleteProducts clear caches failed", error);
     }
     ProductService.invalidateProductLimitCache();
-    return { deleted: validIds.length };
+    return out;
   }
 
   static clearAllFirstPageCaches() {
@@ -1384,42 +1101,14 @@ export class ProductService {
 
   /** Батчевое обновление/вставка товаров напрямую через upsert */
   static async bulkUpsertProducts(rows: Array<UpdateProductData & { id: string; store_id?: string }>): Promise<{ upserted: number }>{
-    await this.ensureCanMutateProducts();
-    if (!Array.isArray(rows) || rows.length === 0) return { upserted: 0 };
-    const payload = rows.map((r) => ({
-      id: String(r.id),
-      store_id: r.store_id ?? null,
-      external_id: r.external_id ?? undefined,
-      name: r.name ?? undefined,
-      name_ua: r.name_ua ?? undefined,
-      vendor: r.vendor ?? undefined,
-      article: r.article ?? undefined,
-      available: r.available ?? undefined,
-      stock_quantity: r.stock_quantity ?? undefined,
-      price: r.price ?? undefined,
-      price_old: r.price_old ?? undefined,
-      price_promo: r.price_promo ?? undefined,
-      description: r.description ?? undefined,
-      description_ua: r.description_ua ?? undefined,
-      docket: r.docket ?? undefined,
-      docket_ua: r.docket_ua ?? undefined,
-      state: r.state ?? undefined,
-      category_id: ProductService.castNullableNumber(r.category_id) ?? undefined,
-      category_external_id: r.category_external_id ?? undefined,
-      currency_code: r.currency_code ?? undefined,
-      supplier_id: ProductService.castNullableNumber(r.supplier_id) ?? undefined,
-    })) as unknown as TablesInsert<'store_products'>[];
-    const { error } = await supabase
-      .from("store_products")
-      .upsert(payload);
-    if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_upsert_failed");
+    const out = await ProductCoreService.bulkUpsertProducts(rows);
     try {
       ProductService.clearAllProductsCaches();
     } catch (e) {
       console.error("ProductService.bulkUpsertProducts clearAllProductsCaches failed", e);
     }
     ProductService.invalidateProductLimitCache();
-    return { upserted: payload.length };
+    return out;
   }
   /** Агрегированные справочники для страницы создания товара */
   static async getNewProductLookup(): Promise<{
