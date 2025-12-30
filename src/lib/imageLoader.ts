@@ -1,6 +1,25 @@
 import { R2Storage } from "@/lib/r2-storage";
 
+const IMAGE_CACHE_MAX_SIZE = 300;
 const imageCache = new Map<string, string>();
+
+function cacheGet(key: string): string | undefined {
+  const value = imageCache.get(key);
+  if (value === undefined) return undefined;
+  imageCache.delete(key);
+  imageCache.set(key, value);
+  return value;
+}
+
+function cacheSet(key: string, value: string): void {
+  imageCache.delete(key);
+  imageCache.set(key, value);
+  while (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+    const oldestKey = imageCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    imageCache.delete(oldestKey);
+  }
+}
 
 type QueueItem = {
   key: string;
@@ -27,7 +46,7 @@ async function processQueue() {
           try {
             const url = await R2Storage.getViewUrl(key, 900);
             if (url) {
-              imageCache.set(key, url);
+              cacheSet(key, url);
               resolve(url);
             } else {
               reject(new Error("No URL returned"));
@@ -48,7 +67,7 @@ async function processQueue() {
 }
 
 export async function loadImageUrl(key: string): Promise<string> {
-  const cached = imageCache.get(key);
+  const cached = cacheGet(key);
   if (cached) return cached;
 
   return new Promise((resolve, reject) => {
@@ -60,4 +79,3 @@ export async function loadImageUrl(key: string): Promise<string> {
 export function clearImageCache() {
   imageCache.clear();
 }
-

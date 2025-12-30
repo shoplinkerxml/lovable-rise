@@ -1,4 +1,4 @@
-import { XMLParser, XMLBuilder } from 'fast-xml-parser';
+import type { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 export interface XMLStructure {
   root: string;
@@ -62,50 +62,59 @@ export type XMLParseResult = {
 export class XMLTemplateService {
   private static parser: XMLParser | null = null;
   private static builder: XMLBuilder | null = null;
+  private static initPromise: Promise<void> | null = null;
   private static readonly MAX_DEPTH = 8;
-  private parser: XMLParser;
+  private parser: XMLParser | null = null;
   private detectedFormat?: XMLFormat;
 
   constructor() {
-    if (!XMLTemplateService.parser) {
-      XMLTemplateService.parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@',
-        textNodeName: '_text',
-        parseAttributeValue: true,
-        parseTagValue: true,
-        trimValues: true,
-        processEntities: true,
-        allowBooleanAttributes: true,
-        removeNSPrefix: true,
-        isArray: (name, jpath) => {
-          const p = String(jpath || '');
-          if (
-            p.endsWith('currencies.currency') ||
-            p.endsWith('categories.category') ||
-            p.endsWith('offers.offer') ||
-            p.endsWith('offer.picture') ||
-            p.endsWith('offer.param')
-          ) {
-            return true;
-          }
-          if (p.endsWith('rss.channel.item') || p.endsWith('channel.item')) {
-            return true;
-          }
-          if (p.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
-            return true;
-          }
-          if (p.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
-            return true;
-          }
-          return false;
+  }
+
+  private static async ensureInitialized(): Promise<void> {
+    if (XMLTemplateService.parser && XMLTemplateService.builder) return;
+    if (!XMLTemplateService.initPromise) {
+      XMLTemplateService.initPromise = import('fast-xml-parser').then(({ XMLParser, XMLBuilder }) => {
+        if (!XMLTemplateService.parser) {
+          XMLTemplateService.parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@',
+            textNodeName: '_text',
+            parseAttributeValue: true,
+            parseTagValue: true,
+            trimValues: true,
+            processEntities: true,
+            allowBooleanAttributes: true,
+            removeNSPrefix: true,
+            isArray: (name, jpath) => {
+              const p = String(jpath || '');
+              if (
+                p.endsWith('currencies.currency') ||
+                p.endsWith('categories.category') ||
+                p.endsWith('offers.offer') ||
+                p.endsWith('offer.picture') ||
+                p.endsWith('offer.param')
+              ) {
+                return true;
+              }
+              if (p.endsWith('rss.channel.item') || p.endsWith('channel.item')) {
+                return true;
+              }
+              if (p.match(/\.(items?\.item|products?\.product|goods?\.good)$/)) {
+                return true;
+              }
+              if (p.match(/\.(param|params|image|images|picture|pictures|photo|photos|category|categories|currency|currencies)$/)) {
+                return true;
+              }
+              return false;
+            },
+          });
+        }
+        if (!XMLTemplateService.builder) {
+          XMLTemplateService.builder = new XMLBuilder({ ignoreAttributes: false });
         }
       });
     }
-    if (!XMLTemplateService.builder) {
-      XMLTemplateService.builder = new XMLBuilder({ ignoreAttributes: false });
-    }
-    this.parser = XMLTemplateService.parser as XMLParser;
+    await XMLTemplateService.initPromise;
   }
 
   // Определение типа XML формата
@@ -200,6 +209,8 @@ export class XMLTemplateService {
     paramTag: string;
   }): Promise<XMLParseResult> {
     const startTime = performance.now();
+    await XMLTemplateService.ensureInitialized();
+    this.parser = XMLTemplateService.parser as XMLParser;
     
     let xmlContent: string;
     if (source instanceof File) {
@@ -208,7 +219,7 @@ export class XMLTemplateService {
       xmlContent = await this.fetchXMLFromURL(source);
     }
 
-    const parsed = this.parser.parse(xmlContent);
+    const parsed = (this.parser as XMLParser).parse(xmlContent);
     
     // Используем маппинг пользователя или автоопределение
     if (userMapping) {
