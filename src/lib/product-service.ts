@@ -786,36 +786,15 @@ export class ProductService {
 
     const limit = 50;
     let offset = 0;
-    let all: ProductAggregated[] = [];
-    let hasMore = true;
+    const all: ProductAggregated[] = [];
 
-    while (hasMore) {
-      let products: ProductAggregated[] = [];
-      let page: ProductListPage | null = null;
-      try {
-        const resp = await ProductService.invokeEdge<ProductListResponseObj>("user-products-list", {
-          store_id: null,
-          limit,
-          offset,
-        });
-        products = Array.isArray(resp?.products) ? resp!.products! : [];
-        page = {
-          limit,
-          offset,
-          hasMore: !!resp?.page?.hasMore,
-          nextOffset: resp?.page?.nextOffset ?? null,
-          total: resp?.page?.total ?? products.length,
-        };
-      } catch {
-        const fb = await ProductService.fetchProductsPageFallback(null, limit, offset);
-        products = fb.products;
-        page = fb.page;
-      }
-      all = [...all, ...products];
-      hasMore = !!page?.hasMore;
-      const nextOffset = page?.nextOffset ?? null;
-      if (nextOffset == null) break;
-      offset = nextOffset;
+    while (true) {
+      const { products, page } = await ProductService.getProductsPage(null, limit, offset);
+      all.push(...products);
+      if (!page.hasMore) break;
+      if (page.nextOffset == null) break;
+      if (page.nextOffset <= offset) break;
+      offset = page.nextOffset;
       if (all.length >= 1000) break;
     }
 
@@ -829,8 +808,26 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const edit = await ProductService.getProductEditData(productId);
-    return edit.params || [];
+    try {
+      const { data, error } = await supabase
+        .from("store_product_params")
+        .select("id,name,value,order_index,paramid,valueid")
+        .eq("product_id", String(productId))
+        .order("order_index", { ascending: true });
+      if (error) throw error;
+      return (data || []).map((p) => ({
+        id: String(p.id),
+        product_id: String(productId),
+        name: String(p.name || ""),
+        value: String(p.value || ""),
+        order_index: Number(p.order_index || 0),
+        paramid: p.paramid == null ? undefined : String(p.paramid),
+        valueid: p.valueid == null ? undefined : String(p.valueid),
+      }));
+    } catch {
+      const edit = await ProductService.getProductEditData(productId);
+      return edit.params || [];
+    }
   }
 
   /** Изображения товара: через product-edit-data */
@@ -840,8 +837,26 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const edit = await ProductService.getProductEditData(productId);
-    return edit.images || [];
+    try {
+      const { data, error } = await supabase
+        .from("store_product_images")
+        .select("id,url,order_index,is_main,r2_key_original")
+        .eq("product_id", String(productId))
+        .order("order_index", { ascending: true });
+      if (error) throw error;
+      return (data || [])
+        .map((img) => ({
+          id: String(img.id),
+          product_id: String(productId),
+          url: String(img.url || ""),
+          order_index: Number(img.order_index || 0),
+          is_main: !!img.is_main,
+        }))
+        .filter((img) => img.url.trim() !== "");
+    } catch {
+      const edit = await ProductService.getProductEditData(productId);
+      return edit.images || [];
+    }
   }
 
   /** Получение товара по ID: через product-edit-data */
@@ -851,8 +866,46 @@ export class ProductService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
 
-    const edit = await ProductService.getProductEditData(id);
-    return edit.product || null;
+    try {
+      const { data, error } = await supabase
+        .from("store_products")
+        .select(
+          "id,store_id,supplier_id,external_id,name,name_ua,docket,docket_ua,description,description_ua,vendor,article,category_id,category_external_id,currency_code,price,price_old,price_promo,stock_quantity,available,state,created_at,updated_at",
+        )
+        .eq("id", String(id))
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        id: String(data.id),
+        store_id: String(data.store_id || ""),
+        supplier_id: data.supplier_id ?? null,
+        external_id: String(data.external_id || ""),
+        name: String(data.name || ""),
+        name_ua: data.name_ua == null ? null : String(data.name_ua),
+        docket: data.docket == null ? null : String(data.docket),
+        docket_ua: data.docket_ua == null ? null : String(data.docket_ua),
+        description: data.description == null ? null : String(data.description),
+        description_ua: data.description_ua == null ? null : String(data.description_ua),
+        vendor: data.vendor == null ? null : String(data.vendor),
+        article: data.article == null ? null : String(data.article),
+        category_id: data.category_id ?? null,
+        category_external_id: data.category_external_id == null ? null : String(data.category_external_id),
+        currency_id: null,
+        currency_code: data.currency_code == null ? null : String(data.currency_code),
+        price: data.price ?? null,
+        price_old: data.price_old ?? null,
+        price_promo: data.price_promo ?? null,
+        stock_quantity: Number(data.stock_quantity || 0),
+        available: !!data.available,
+        state: data.state == null ? "" : String(data.state),
+        created_at: data.created_at == null ? "" : String(data.created_at),
+        updated_at: data.updated_at == null ? "" : String(data.updated_at),
+      };
+    } catch {
+      const edit = await ProductService.getProductEditData(id);
+      return edit.product || null;
+    }
   }
 
   /** Агрегированная загрузка данных для страницы редактирования товара */
