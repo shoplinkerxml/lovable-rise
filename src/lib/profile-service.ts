@@ -169,25 +169,35 @@ export class ProfileService {
       
       // Process emails in batches to avoid overwhelming the database
       const batchSize = 10;
-      const batches = [];
+      const batches: string[][] = [];
       
       for (let i = 0; i < emails.length; i += batchSize) {
         batches.push(emails.slice(i, i + batchSize));
       }
       
-      for (const batch of batches) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('email')
-          .in('email', batch.map(email => email.toLowerCase()));
-        
+      const settled = await Promise.allSettled(
+        batches.map(async (batch) => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('email')
+            .in('email', batch.map(email => email.toLowerCase()));
+          return { batch, data, error };
+        })
+      );
+
+      for (const item of settled) {
+        if (item.status === "rejected") {
+          console.error('Error checking multiple users existence:', item.reason);
+          continue;
+        }
+
+        const { batch, data, error } = item.value;
         if (error) {
           console.error('Error checking multiple users existence:', error);
-          // Mark all as potentially existing on error to be safe
           batch.forEach(email => results.set(email, true));
           continue;
         }
-        
+
         const existingEmails = new Set((data || []).map(profile => profile.email));
         batch.forEach(email => {
           results.set(email, existingEmails.has(email.toLowerCase()));

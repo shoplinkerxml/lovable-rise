@@ -65,6 +65,62 @@ export class ProfileOperationError extends Error {
   }
 }
 
+export type ServiceErrorCode =
+  | 'auth_error'
+  | 'validation_error'
+  | 'not_found'
+  | 'conflict'
+  | 'rate_limited'
+  | 'network_error'
+  | 'unknown_error';
+
+export class ServiceError extends Error {
+  code: ServiceErrorCode;
+  status?: number;
+  traceId?: string;
+  originalError?: unknown;
+
+  constructor(code: ServiceErrorCode, message: string, opts?: { status?: number; traceId?: string; originalError?: unknown }) {
+    super(message);
+    this.name = 'ServiceError';
+    this.code = code;
+    this.status = opts?.status;
+    this.traceId = opts?.traceId;
+    this.originalError = opts?.originalError;
+  }
+}
+
+export function toServiceError(error: unknown, fallbackCode: ServiceErrorCode = 'unknown_error'): ServiceError {
+  if (error instanceof ServiceError) return error;
+
+  const e = error as { status?: number; statusCode?: number; message?: string; code?: string | number } | null;
+  const status = (e?.status ?? e?.statusCode) as number | undefined;
+  const message = typeof e?.message === 'string' && e.message.trim() ? e.message : 'Unexpected error';
+
+  if (status === 401 || status === 403) {
+    return new ServiceError('auth_error', message, { status, originalError: error });
+  }
+  if (status === 404) {
+    return new ServiceError('not_found', message, { status, originalError: error });
+  }
+  if (status === 409) {
+    return new ServiceError('conflict', message, { status, originalError: error });
+  }
+  if (status === 422) {
+    return new ServiceError('validation_error', message, { status, originalError: error });
+  }
+  if (status === 429) {
+    return new ServiceError('rate_limited', message, { status, originalError: error });
+  }
+
+  const msgLower = message.toLowerCase();
+  if (msgLower.includes('failed to fetch') || msgLower.includes('network') || msgLower.includes('timeout')) {
+    return new ServiceError('network_error', message, { status, originalError: error });
+  }
+
+  return new ServiceError(fallbackCode, message, { status, originalError: error });
+}
+
 import { 
   UserAuthError, 
   AuthorizationError, 
@@ -338,10 +394,13 @@ class ProfileCache {
   private static cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
   private static DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
   private static EXISTENCE_TTL = 2 * 60 * 1000; // 2 minutes for existence checks
+  private static MAX_SIZE = 500;
   
   static get(key: string): unknown | null {
     const cached = this.cache.get(key);
     if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      this.cache.delete(key);
+      this.cache.set(key, cached);
       return cached.data;
     }
     this.cache.delete(key);
@@ -353,11 +412,21 @@ class ProfileCache {
       ? this.EXISTENCE_TTL 
       : this.DEFAULT_TTL);
     
+    this.cache.delete(key);
     this.cache.set(key, { 
       data, 
       timestamp: Date.now(),
       ttl 
     });
+
+    if (this.cache.size > this.MAX_SIZE) {
+      this.cleanup();
+      while (this.cache.size > this.MAX_SIZE) {
+        const oldestKey = this.cache.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        this.cache.delete(oldestKey);
+      }
+    }
   }
   
   static clear(): void {

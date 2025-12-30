@@ -1,6 +1,7 @@
 // File: src/services/UserService.ts (клиентская часть)
 import { SUPABASE_URL } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
+import { ServiceError, toServiceError } from "./error-handler";
 
 /**
  * Helper function to get the appropriate authentication headers
@@ -307,6 +308,15 @@ export class ApiError extends Error {
 /** Обработка ошибок */
 export function handleApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
+
+  if (error instanceof ServiceError) {
+    return new ApiError(error.message, error.status ?? 500, error.code);
+  }
+
+  const asService = toServiceError(error);
+  if (asService) {
+    return new ApiError(asService.message, asService.status ?? 500, asService.code);
+  }
 
   if (error && typeof error === "object") {
     if ("message" in error && typeof error.message === "string") {

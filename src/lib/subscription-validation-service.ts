@@ -29,6 +29,7 @@ export class SubscriptionValidationService {
       isDemo: boolean;
     };
   }> = new Map();
+  private static readonly CACHE_MAX_SIZE = 200;
 
   // Track in-flight validations to dedupe concurrent calls
   private static inFlight: Map<string, Promise<{
@@ -39,6 +40,24 @@ export class SubscriptionValidationService {
 
   // Cache TTL (ms) for subscription status
   private static readonly TTL_MS = 15000;
+
+  private static cacheGet(userId: string) {
+    const v = this.cache.get(userId);
+    if (!v) return null;
+    this.cache.delete(userId);
+    this.cache.set(userId, v);
+    return v;
+  }
+
+  private static cacheSet(userId: string, value: { timestamp: number; result: { hasValidSubscription: boolean; subscription: any | null; isDemo: boolean } }) {
+    this.cache.delete(userId);
+    this.cache.set(userId, value);
+    while (this.cache.size > this.CACHE_MAX_SIZE) {
+      const oldestKey = this.cache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      this.cache.delete(oldestKey);
+    }
+  }
   
   /**
    * Check if a subscription is expired based on end_date
@@ -169,7 +188,7 @@ export class SubscriptionValidationService {
       const forceRefresh = options?.forceRefresh === true;
 
       // Serve from cache if fresh and no force refresh requested
-      const cached = this.cache.get(userId);
+      const cached = this.cacheGet(userId);
       const now = Date.now();
       if (!forceRefresh && cached && (now - cached.timestamp) < this.TTL_MS) {
         return cached.result;
@@ -187,7 +206,7 @@ export class SubscriptionValidationService {
                     (validation.subscription.tariffs?.visible === false)
           };
           // Cache successful result
-          this.cache.set(userId, { timestamp: Date.now(), result });
+          this.cacheSet(userId, { timestamp: Date.now(), result });
           return result;
         }
 
@@ -198,7 +217,7 @@ export class SubscriptionValidationService {
           subscription: null,
           isDemo: false
         };
-        this.cache.set(userId, { timestamp: Date.now(), result });
+        this.cacheSet(userId, { timestamp: Date.now(), result });
         return result;
 
       };

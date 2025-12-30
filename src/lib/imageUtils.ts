@@ -1,16 +1,35 @@
 import { R2Storage } from "@/lib/r2-storage";
 
+const IMAGE_URL_CACHE_MAX_SIZE = 500;
 const imageUrlCache = new Map<string, string>();
+
+function cacheGet(key: string): string | undefined {
+  const v = imageUrlCache.get(key);
+  if (v === undefined) return undefined;
+  imageUrlCache.delete(key);
+  imageUrlCache.set(key, v);
+  return v;
+}
+
+function cacheSet(key: string, value: string): void {
+  imageUrlCache.delete(key);
+  imageUrlCache.set(key, value);
+  while (imageUrlCache.size > IMAGE_URL_CACHE_MAX_SIZE) {
+    const oldestKey = imageUrlCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    imageUrlCache.delete(oldestKey);
+  }
+}
 
 export function getImageUrl(originalUrl: string | null | undefined, _width?: number): string {
   const raw = originalUrl || "";
   if (raw === "" || raw === "#processing" || raw === "#failed") return "";
   const key = `${raw}|${_width ?? 0}`;
-  const cached = imageUrlCache.get(key);
+  const cached = cacheGet(key);
   if (cached !== undefined) return cached;
   const isAbsolute = /^https?:\/\//i.test(raw);
   const resolved = isAbsolute ? raw : R2Storage.makePublicUrl(raw);
-  imageUrlCache.set(key, resolved);
+  cacheSet(key, resolved);
   return resolved;
 }
 
