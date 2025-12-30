@@ -12,6 +12,8 @@ const CACHE_TTL = {
   PRODUCTS: 15 * 60 * 1000,
   CATEGORIES: 30 * 60 * 1000,
 }
+const MAX_PRODUCTS_CACHE_ENTRIES = 200
+const MAX_CATEGORIES_CACHE_ENTRIES = 200
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -30,24 +32,56 @@ class Cache {
     return Date.now() - entry.timestamp > ttl
   }
 
+  private pruneMap<T>(map: Map<string, CacheEntry<T>>, ttl: number, maxEntries: number) {
+    const now = Date.now()
+    for (const [k, v] of map) {
+      if (!v || now - v.timestamp > ttl) map.delete(k)
+    }
+    while (map.size > maxEntries) {
+      const firstKey = map.keys().next().value as string | undefined
+      if (!firstKey) break
+      map.delete(firstKey)
+    }
+  }
+
   getProducts(key: string) {
     const entry = this.products.get(key)
-    if (!entry || this.isExpired(entry, CACHE_TTL.PRODUCTS)) return null
+    if (!entry) return null
+    if (this.isExpired(entry, CACHE_TTL.PRODUCTS)) {
+      this.products.delete(key)
+      return null
+    }
     return entry.data
   }
 
   setProducts(key: string, data: any) {
+    this.pruneMap(this.products, CACHE_TTL.PRODUCTS, MAX_PRODUCTS_CACHE_ENTRIES)
     this.products.set(key, { data, timestamp: Date.now() })
+    while (this.products.size > MAX_PRODUCTS_CACHE_ENTRIES) {
+      const firstKey = this.products.keys().next().value as string | undefined
+      if (!firstKey) break
+      this.products.delete(firstKey)
+    }
   }
 
   getCategories(key: string) {
     const entry = this.categories.get(key)
-    if (!entry || this.isExpired(entry, CACHE_TTL.CATEGORIES)) return null
+    if (!entry) return null
+    if (this.isExpired(entry, CACHE_TTL.CATEGORIES)) {
+      this.categories.delete(key)
+      return null
+    }
     return entry.data
   }
 
   setCategories(key: string, data: Record<string, string>) {
+    this.pruneMap(this.categories, CACHE_TTL.CATEGORIES, MAX_CATEGORIES_CACHE_ENTRIES)
     this.categories.set(key, { data, timestamp: Date.now() })
+    while (this.categories.size > MAX_CATEGORIES_CACHE_ENTRIES) {
+      const firstKey = this.categories.keys().next().value as string | undefined
+      if (!firstKey) break
+      this.categories.delete(firstKey)
+    }
   }
 }
 

@@ -18,24 +18,44 @@ type SupplierRow = { id: string; supplier_name: string }
 type CurrencyRow = { id: number; name: string; code: string; status: boolean | null }
 type CategoryRow = { id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }
 
+type CacheEntry<T> = { data: T; timestamp: number }
+
 const LOOKUP_TTL = 120_000
+const MAX_SUPPLIERS_CACHE_USERS = 200
 
 const lookupCache: {
-  suppliers?: SupplierRow[]
-  suppliersTs: number
-  currencies?: CurrencyRow[]
-  currenciesTs: number
-} = (globalThis as any).__newProductLookupCache || { suppliersTs: 0, currenciesTs: 0 }
+  suppliersByUser: Map<string, CacheEntry<SupplierRow[]>>
+  currencies?: CacheEntry<CurrencyRow[]>
+} = (globalThis as any).__newProductLookupCache || { suppliersByUser: new Map() }
 
 ;(globalThis as any).__newProductLookupCache = lookupCache
 
-async function getSuppliersCached(supabase: any): Promise<SupplierRow[]> {
-  const fresh = lookupCache.suppliers && Date.now() - lookupCache.suppliersTs < LOOKUP_TTL
-  if (fresh) return lookupCache.suppliers as SupplierRow[]
+function getCached<T>(entry: CacheEntry<T> | undefined): T | null {
+  if (!entry) return null
+  if (Date.now() - entry.timestamp >= LOOKUP_TTL) return null
+  return entry.data
+}
+
+function pruneSuppliersByUser(): void {
+  const now = Date.now()
+  for (const [k, v] of lookupCache.suppliersByUser) {
+    if (!v || now - v.timestamp >= LOOKUP_TTL) lookupCache.suppliersByUser.delete(k)
+  }
+  while (lookupCache.suppliersByUser.size > MAX_SUPPLIERS_CACHE_USERS) {
+    const firstKey = lookupCache.suppliersByUser.keys().next().value as string | undefined
+    if (!firstKey) break
+    lookupCache.suppliersByUser.delete(firstKey)
+  }
+}
+
+async function getSuppliersCached(supabase: any, userId: string): Promise<SupplierRow[]> {
+  const cached = getCached(lookupCache.suppliersByUser.get(userId))
+  if (cached) return cached
 
   const { data } = await supabase
     .from('user_suppliers')
     .select('id,supplier_name')
+    .eq('user_id', userId)
     .order('supplier_name')
 
   const rows: SupplierRow[] = (data || []).map((s: any) => ({
@@ -43,14 +63,14 @@ async function getSuppliersCached(supabase: any): Promise<SupplierRow[]> {
     supplier_name: String(s.supplier_name || ''),
   }))
 
-  lookupCache.suppliers = rows
-  lookupCache.suppliersTs = Date.now()
+  pruneSuppliersByUser()
+  lookupCache.suppliersByUser.set(userId, { data: rows, timestamp: Date.now() })
   return rows
 }
 
 async function getCurrenciesCached(supabase: any): Promise<CurrencyRow[]> {
-  const fresh = lookupCache.currencies && Date.now() - lookupCache.currenciesTs < LOOKUP_TTL
-  if (fresh) return lookupCache.currencies as CurrencyRow[]
+  const cached = getCached(lookupCache.currencies)
+  if (cached) return cached
 
   const { data } = await supabase
     .from('currencies')
@@ -65,8 +85,7 @@ async function getCurrenciesCached(supabase: any): Promise<CurrencyRow[]> {
     status: c.status ?? null,
   }))
 
-  lookupCache.currencies = rows
-  lookupCache.currenciesTs = Date.now()
+  lookupCache.currencies = { data: rows, timestamp: Date.now() }
   return rows
 }
 
@@ -77,17 +96,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   try {
     const authHeader = req.headers.get('Authorization') || ''
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.slice('Bearer '.length).trim()
-      : ''
+    if (!authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders })
+    }
+    const token = authHeader.slice('Bearer '.length).trim()
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: authHeader && token ? { headers: { Authorization: `Bearer ${token}` } } : {},
+      global: token ? { headers: { Authorization: `Bearer ${token}` } } : {},
     })
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders })
+    }
 
     // 1. Справочники: постачальники + валюти
     const [suppliers, currencies] = await Promise.all([
-      getSuppliersCached(supabase),
+      getSuppliersCached(supabase, user.id),
       getCurrenciesCached(supabase),
     ])
 
@@ -134,4 +159,3 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: corsHeaders })
   }
 })
-

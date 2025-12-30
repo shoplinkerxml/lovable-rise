@@ -12,6 +12,7 @@ const MAX_LIMIT = 50
 const CACHE_TTL = {
   PRODUCTS: 15 * 60 * 1000,
 }
+const MAX_PRODUCTS_CACHE_ENTRIES = 200
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -30,14 +31,36 @@ class Cache {
     return Date.now() - entry.timestamp > ttl
   }
 
+  private prune() {
+    const now = Date.now()
+    for (const [k, v] of this.products) {
+      if (!v || now - v.timestamp > CACHE_TTL.PRODUCTS) this.products.delete(k)
+    }
+    while (this.products.size > MAX_PRODUCTS_CACHE_ENTRIES) {
+      const firstKey = this.products.keys().next().value as string | undefined
+      if (!firstKey) break
+      this.products.delete(firstKey)
+    }
+  }
+
   getProducts(key: string) {
     const entry = this.products.get(key)
-    if (!entry || this.isExpired(entry, CACHE_TTL.PRODUCTS)) return null
+    if (!entry) return null
+    if (this.isExpired(entry, CACHE_TTL.PRODUCTS)) {
+      this.products.delete(key)
+      return null
+    }
     return entry.data
   }
 
   setProducts(key: string, data: any) {
+    this.prune()
     this.products.set(key, { data, timestamp: Date.now() })
+    while (this.products.size > MAX_PRODUCTS_CACHE_ENTRIES) {
+      const firstKey = this.products.keys().next().value as string | undefined
+      if (!firstKey) break
+      this.products.delete(firstKey)
+    }
   }
 }
 

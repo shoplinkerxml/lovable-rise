@@ -16,6 +16,19 @@ const jsonResponse = (body: unknown, status = 200) =>
 type CacheEntry<T> = { data: T; timestamp: number }
 const cache = new Map<string, CacheEntry<any>>()
 const CACHE_TTL = 30 * 60 * 1000
+const MAX_CACHE_KEYS = 200
+
+function pruneCache(): void {
+  const now = Date.now()
+  for (const [k, v] of cache) {
+    if (!v || now - v.timestamp > CACHE_TTL) cache.delete(k)
+  }
+  while (cache.size > MAX_CACHE_KEYS) {
+    const firstKey = cache.keys().next().value as string | undefined
+    if (!firstKey) break
+    cache.delete(firstKey)
+  }
+}
 
 function getCached<T>(key: string): T | null {
   const entry = cache.get(key)
@@ -27,7 +40,13 @@ function getCached<T>(key: string): T | null {
 }
 
 function setCache<T>(key: string, data: T): void {
+  pruneCache()
   cache.set(key, { data, timestamp: Date.now() })
+  while (cache.size > MAX_CACHE_KEYS) {
+    const firstKey = cache.keys().next().value as string | undefined
+    if (!firstKey) break
+    cache.delete(firstKey)
+  }
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
