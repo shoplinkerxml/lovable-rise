@@ -1,6 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
-import { SessionValidator } from "@/lib/session-validation";
+import { invokeEdgeWithAuth } from "@/lib/session-validation";
 import type {
   CreateProductData,
   Product,
@@ -30,28 +29,6 @@ export class ProductImportExportService {
     return Number.isFinite(n) ? n : null;
   }
 
-  private static async invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<T | string>(name, {
-      body,
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) {
-      const msg =
-        (error as unknown as { message?: string } | null)?.message ||
-        (error as unknown as { name?: string } | null)?.name ||
-        "edge_invoke_failed";
-      throw new Error(msg);
-    }
-    return typeof data === "string" ? (JSON.parse(data) as T) : (data as T);
-  }
-
   static async getUserLookups(): Promise<{
     suppliers: Array<{ id: string; supplier_name: string }>;
     currencies: Array<{ id: number; name: string; code: string; status: boolean }>;
@@ -66,7 +43,7 @@ export class ProductImportExportService {
       }>
     >;
   }> {
-    const resp = await ProductImportExportService.invokeEdge<{
+    const resp = await invokeEdgeWithAuth<{
       suppliers?: any[];
       currencies?: any[];
       supplierCategoriesMap?: Record<string, any[]>;
@@ -83,7 +60,7 @@ export class ProductImportExportService {
     limit: number,
     offset: number,
   ): Promise<{ products: ProductAggregated[]; page: ProductListPage }> {
-    const resp = await ProductImportExportService.invokeEdge<ProductListResponseObj>(
+    const resp = await invokeEdgeWithAuth<ProductListResponseObj>(
       storeId ? "store-products-list" : "user-products-list",
       {
         ...(storeId ? { store_id: String(storeId) } : {}),
@@ -103,7 +80,7 @@ export class ProductImportExportService {
   }
 
   private static async getDefaultStoreId(): Promise<string> {
-    const resp = await ProductImportExportService.invokeEdge<{ shops?: Array<{ id?: string | number }> }>(
+    const resp = await invokeEdgeWithAuth<{ shops?: Array<{ id?: string | number }> }>(
       "user-shops-list",
       {},
     );
@@ -156,7 +133,7 @@ export class ProductImportExportService {
       links: productData.links || undefined,
     };
 
-    const respCreate = await ProductImportExportService.invokeEdge<{ product_id?: string }>("create-product", payload);
+    const respCreate = await invokeEdgeWithAuth<{ product_id?: string }>("create-product", payload);
     const productId = String(respCreate?.product_id || "").trim();
     if (!productId) throw new Error("create_failed");
     return productId;
@@ -206,7 +183,7 @@ export class ProductImportExportService {
       }));
     }
 
-    await ProductImportExportService.invokeEdge<{ product_id?: string }>("update-product", payload);
+    await invokeEdgeWithAuth<{ product_id?: string }>("update-product", payload);
   }
 
   static async getProductsEditDataBatch(
@@ -234,7 +211,7 @@ export class ProductImportExportService {
         const part = parts[currentIndex];
         if (!part) return;
 
-        const resp = await ProductImportExportService.invokeEdge<{
+        const resp = await invokeEdgeWithAuth<{
           items?: Array<{ product: Product; images?: unknown[]; params?: unknown[] }>;
         }>("product-export-data", { product_ids: part, store_id: storeId ?? null });
 

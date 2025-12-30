@@ -382,7 +382,7 @@ export const R2Storage = {
     const authorizationInBody = token ? `Bearer ${token}` : (syncToken ? `Bearer ${syncToken}` : undefined);
 
     // Dev-диагностика: выводим удаляемый ключ
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env?.DEV) {
       console.debug('[R2Storage] deleteFile invoke', { objectKey });
     }
 
@@ -429,7 +429,7 @@ export const R2Storage = {
       };
 
       // В Dev-режиме выводим небольшой лог для отладки
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.debug('[R2Storage] keepalive delete init', { objectKey, hasToken: !!token });
       }
 

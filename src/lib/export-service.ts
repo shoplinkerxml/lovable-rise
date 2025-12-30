@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProductService, type Product } from "@/lib/product-service";
 import { R2Storage } from "@/lib/r2-storage";
 import { SessionValidator, type SessionValidationResult } from "./session-validation";
-import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
+import { dedupeInFlight, readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
 
 export type ExportLink = {
   id: string;
@@ -44,9 +44,7 @@ export const ExportService = {
     const cached = readCache<ExportLink[]>(key, false);
     if (cached?.data && Array.isArray(cached.data)) return cached.data;
     const inflightKey = `${storeId}:${session.user?.id || "current"}`;
-    const pending = ExportService.inFlightList.get(inflightKey);
-    if (pending) return await pending;
-    const task = (async () => {
+    return await dedupeInFlight(ExportService.inFlightList, inflightKey, async () => {
       const { data, error } = await supabase
         .from("store_export_links")
         .select("id,store_id,format,token,object_key,is_active,auto_generate,last_generated_at,created_at,updated_at")
@@ -57,13 +55,7 @@ export const ExportService = {
       const rows = data ?? [];
       writeCache(key, rows, CACHE_TTL.productLinks);
       return rows;
-    })();
-    ExportService.inFlightList.set(inflightKey, task);
-    try {
-      return await task;
-    } finally {
-      ExportService.inFlightList.delete(inflightKey);
-    }
+    });
   },
 
   async createLink(storeId: string, format: 'xml' | 'csv'): Promise<ExportLink | null> {
@@ -91,9 +83,7 @@ export const ExportService = {
   async regenerate(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     const session = await ExportService.ensureSession();
     const key = `${storeId}:${format}`;
-    const pending = ExportService.inFlightGenerate.get(key);
-    if (pending) return await pending;
-    const task = (async () => {
+    return await dedupeInFlight(ExportService.inFlightGenerate, key, async () => {
       try {
         const { data, error } = await supabase.functions.invoke("export-generate", {
           body: { store_id: storeId, format },
@@ -104,13 +94,7 @@ export const ExportService = {
       } catch {
         return false;
       }
-    })();
-    ExportService.inFlightGenerate.set(key, task);
-    try {
-      return await task;
-    } finally {
-      ExportService.inFlightGenerate.delete(key);
-    }
+    });
   },
 
   async updateAutoGenerate(linkId: string, auto: boolean): Promise<boolean> {
@@ -135,22 +119,14 @@ export const ExportService = {
       return await ExportService.generateLocalAndUpload(storeId, format);
     }
     const key = `${storeId}:${format}`;
-    const pending = ExportService.inFlightGenerate.get(key);
-    if (pending) return await pending;
-    const task = (async () => {
+    return await dedupeInFlight(ExportService.inFlightGenerate, key, async () => {
       const { data, error } = await supabase.functions.invoke("export-generate", {
         body: { store_id: storeId, format },
       });
       if (error) return false;
       ExportService.invalidateLinksCache(storeId, session.user?.id);
       return !!(data?.success);
-    })();
-    ExportService.inFlightGenerate.set(key, task);
-    try {
-      return await task;
-    } finally {
-      ExportService.inFlightGenerate.delete(key);
-    }
+    });
   },
 
   buildPublicUrl(origin: string, format: 'xml' | 'csv', token: string): string {
@@ -210,9 +186,7 @@ export const ExportService = {
   async generateLocalAndUpload(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     const session = await ExportService.ensureSession();
     const key = `${storeId}:${format}:local:${session.user?.id || "current"}`;
-    const pending = ExportService.inFlightLocalGenerate.get(key);
-    if (pending) return await pending;
-    const task = (async () => {
+    return await dedupeInFlight(ExportService.inFlightLocalGenerate, key, async () => {
       const productsAgg = await ProductService.getProductsAggregated(storeId);
       const products = productsAgg as Product[];
       const content = format === 'xml' ? ExportService.buildXml(products) : ExportService.buildCsv(products);
@@ -222,12 +196,6 @@ export const ExportService = {
       const ok = !!res?.success;
       if (ok) ExportService.invalidateLinksCache(storeId, session.user?.id);
       return ok;
-    })();
-    ExportService.inFlightLocalGenerate.set(key, task);
-    try {
-      return await task;
-    } finally {
-      ExportService.inFlightLocalGenerate.delete(key);
-    }
+    });
   },
 };

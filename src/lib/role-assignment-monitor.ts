@@ -261,8 +261,8 @@ export class RoleAssignmentMonitor {
 
 // Utility function for scheduled monitoring
 export async function scheduleRoleMonitoring() {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.error('Supabase credentials not configured for monitoring');

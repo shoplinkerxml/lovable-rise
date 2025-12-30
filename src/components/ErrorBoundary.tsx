@@ -67,7 +67,7 @@ const DefaultErrorFallback = ({ error, resetError }: { error?: Error; resetError
             </AlertDescription>
           </Alert>
 
-          {error && process.env.NODE_ENV === 'development' && (
+          {error && import.meta.env?.DEV && (
             <details className="mt-4">
               <summary className="cursor-pointer font-medium">Technical Details (Development)</summary>
               <pre className="mt-2 bg-muted p-3 rounded text-xs overflow-auto">

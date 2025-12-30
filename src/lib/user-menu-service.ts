@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeWithAuth } from "@/lib/session-validation";
 export interface UserMenuItem {
   id: number;
   user_id: string;
@@ -51,21 +52,6 @@ export interface MenuReorderItem {
 }
 
 export class UserMenuService {
-  private static async getAccessToken(): Promise<string | null> {
-    const { data } = await supabase.auth.getSession();
-    return data?.session?.access_token || null;
-  }
-
-  private static async invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
-    const token = await UserMenuService.getAccessToken();
-    const { data, error } = await supabase.functions.invoke<T | string>(name, {
-      body,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (error) throw error;
-    return (typeof data === "string" ? (JSON.parse(data as string) as T) : (data as T));
-  }
-  
   /**
    * Auto-assign icon based on menu item properties
    * Used as fallback when no explicit icon is set
@@ -109,7 +95,7 @@ export class UserMenuService {
    * Get all menu items for a user
    */
   static async getUserMenuItems(userId: string, activeOnly: boolean = true): Promise<UserMenuItem[]> {
-    const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
+    const resp = await invokeEdgeWithAuth<{ items?: UserMenuItem[] }>("user-menu-items", {
       action: "list",
       active_only: !!activeOnly,
     });
@@ -193,7 +179,7 @@ export class UserMenuService {
    */
   static async createMenuItem(userId: string, menuData: CreateUserMenuItem): Promise<UserMenuItem> {
     try {
-      const respUnique = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+      const respUnique = await invokeEdgeWithAuth<{ item?: UserMenuItem | null }>("user-menu-items", {
         action: "get_by_path",
         path: menuData.path,
       });
@@ -283,7 +269,7 @@ export class UserMenuService {
         }
       }
 
-      const resp = await UserMenuService.invokeEdge<{ item: UserMenuItem }>("user-menu-items", {
+      const resp = await invokeEdgeWithAuth<{ item: UserMenuItem }>("user-menu-items", {
         action: "create",
         data: {
           ...menuData,
@@ -306,7 +292,7 @@ export class UserMenuService {
   static async updateMenuItem(itemId: number, userId: string, menuData: UpdateUserMenuItem): Promise<UserMenuItem> {
     try {
       if (menuData.path) {
-        const check = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+        const check = await invokeEdgeWithAuth<{ item?: UserMenuItem | null }>("user-menu-items", {
           action: "get_by_path",
           path: menuData.path,
         });
@@ -343,7 +329,7 @@ export class UserMenuService {
         ...(icon_name !== undefined && { icon_name }) // Only include icon_name if it's defined
       };
 
-      const resp = await UserMenuService.invokeEdge<{ item: UserMenuItem }>("user-menu-items", {
+      const resp = await invokeEdgeWithAuth<{ item: UserMenuItem }>("user-menu-items", {
         action: "update",
         id: itemId,
         data: updateData,
@@ -360,7 +346,7 @@ export class UserMenuService {
    */
   static async deleteMenuItem(itemId: number, userId: string): Promise<void> {
     try {
-      await UserMenuService.invokeEdge<{ ok: boolean }>("user-menu-items", { action: "delete", id: itemId });
+      await invokeEdgeWithAuth<{ ok: boolean }>("user-menu-items", { action: "delete", id: itemId });
     } catch (error) {
       console.error('Error in deleteMenuItem:', error);
       throw error;
@@ -384,7 +370,7 @@ export class UserMenuService {
    */
   static async reorderMenuItems(userId: string, reorderedItems: MenuReorderItem[]): Promise<void> {
     try {
-      await UserMenuService.invokeEdge<{ ok: boolean }>("user-menu-items", {
+      await invokeEdgeWithAuth<{ ok: boolean }>("user-menu-items", {
         action: "reorder",
         items: reorderedItems,
       });
@@ -400,7 +386,7 @@ export class UserMenuService {
    */
   static async getMenuItem(itemId: number, userId: string): Promise<UserMenuItem | null> {
     try {
-      const resp = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+      const resp = await invokeEdgeWithAuth<{ item?: UserMenuItem | null }>("user-menu-items", {
         action: "get",
         id: itemId,
       });
@@ -438,7 +424,7 @@ export class UserMenuService {
    */
   static async getMenuItemByPath(path: string, userId: string): Promise<UserMenuItem | null> {
     try {
-      const resp = await UserMenuService.invokeEdge<{ item?: UserMenuItem | null }>("user-menu-items", {
+      const resp = await invokeEdgeWithAuth<{ item?: UserMenuItem | null }>("user-menu-items", {
         action: "get_by_path",
         path,
       });
@@ -473,7 +459,7 @@ export class UserMenuService {
    */
   static async getChildMenuItems(userId: string, parentId?: number): Promise<UserMenuItem[]> {
     try {
-      const resp = await UserMenuService.invokeEdge<{ items?: UserMenuItem[] }>("user-menu-items", {
+      const resp = await invokeEdgeWithAuth<{ items?: UserMenuItem[] }>("user-menu-items", {
         action: "get_children",
         parent_id: parentId ?? null,
       });

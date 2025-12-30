@@ -1,5 +1,5 @@
 // File: src/services/UserService.ts (клиентская часть)
-import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL } from "@/integrations/supabase/client";
 import { SessionValidator } from "./session-validation";
 
 /**
@@ -99,7 +99,6 @@ export class UserService {
     if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
 
     // Send direct HTTP GET request to Edge Function
-    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
     const response = await fetch(`${SUPABASE_URL}/functions/v1/users?${params.toString()}`, {
       method: 'GET',
       headers
@@ -139,7 +138,6 @@ export class UserService {
     const headers = await getAuthHeaders();
     
     // Send direct HTTP POST request to Edge Function
-    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
     const response = await fetch(`${SUPABASE_URL}/functions/v1/users`, {
       method: 'POST',
       headers,
@@ -191,7 +189,6 @@ export class UserService {
     const headers = await getAuthHeaders();
     
     // Send direct HTTP PATCH request to Edge Function
-    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
     const response = await fetch(`${SUPABASE_URL}/functions/v1/users/${id}`, {
       method: 'PATCH',
       headers,
@@ -228,7 +225,6 @@ export class UserService {
     const headers = await getAuthHeaders();
     
     // Send direct HTTP GET request to Edge Function
-    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
     const response = await fetch(`${SUPABASE_URL}/functions/v1/users/${id}`, {
       method: 'GET',
       headers
@@ -264,7 +260,6 @@ export class UserService {
     const headers = await getAuthHeaders();
     
     // Send direct HTTP DELETE request to Edge Function
-    const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
     const response = await fetch(`${SUPABASE_URL}/functions/v1/users/${id}`, {
       method: 'DELETE',
       headers

@@ -94,7 +94,7 @@ export class RLSMonitor {
       return this.lastHealthCheck;
     }
     const startTime = now;
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env?.DEV) {
       console.debug('[RLSMonitor] Starting comprehensive health check...');
     }
     this.inFlight = (async () => {
@@ -128,7 +128,7 @@ export class RLSMonitor {
       this.lastRunAt = Date.now();
       
       const executionTime = Date.now() - startTime;
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.debug(`[RLSMonitor] Health check completed in ${executionTime}ms`, {
           healthy: overall.healthy,
           score: overall.score,
@@ -138,7 +138,7 @@ export class RLSMonitor {
       
       return report;
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.error('[RLSMonitor] Health check failed:', error);
       }
       
@@ -326,7 +326,7 @@ export class RLSMonitor {
       const executionTime = Date.now() - startTime;
       this.performanceMetrics.failedQueries++;
       
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.error(`[RLSMonitor] RLS test '${testName}' failed:`, error);
       }
       
@@ -432,39 +432,37 @@ export class RLSMonitor {
    */
   static startMonitoring(intervalMs: number = 60000): () => void {
     if (this.monitoringInterval) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.warn('[RLSMonitor] Monitoring already started');
       }
       return () => this.stopMonitoring();
     }
-    
-    if (process.env.NODE_ENV !== 'production') {
+
+    if (import.meta.env?.DEV) {
       console.debug(`[RLSMonitor] Starting continuous monitoring (interval: ${intervalMs}ms)`);
     }
-    
+
     this.monitoringInterval = setInterval(async () => {
       try {
         const report = await this.performHealthCheck();
-        
+
         if (!report.overall.healthy) {
-          if (process.env.NODE_ENV !== 'production') {
+          if (import.meta.env?.DEV) {
             console.warn('[RLSMonitor] Health check detected issues:', {
               score: report.overall.score,
               issues: report.overall.issues
             });
           }
-          
-          // Could trigger alerts, automatic recovery, etc.
+
           this.handleHealthIssues(report);
         }
       } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
+        if (import.meta.env?.DEV) {
           console.error('[RLSMonitor] Monitoring error:', error);
         }
       }
     }, intervalMs);
-    
-    // Return cleanup function
+
     return () => this.stopMonitoring();
   }
   
@@ -472,12 +470,11 @@ export class RLSMonitor {
    * Stop continuous monitoring
    */
   static stopMonitoring(): void {
-    if (this.monitoringInterval) {
-      clearInterval(this.monitoringInterval);
-      this.monitoringInterval = null;
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('[RLSMonitor] Monitoring stopped');
-      }
+    if (!this.monitoringInterval) return;
+    clearInterval(this.monitoringInterval);
+    this.monitoringInterval = null;
+    if (import.meta.env?.DEV) {
+      console.debug('[RLSMonitor] Monitoring stopped');
     }
   }
   
@@ -485,28 +482,26 @@ export class RLSMonitor {
    * Handle detected health issues
    */
   private static async handleHealthIssues(report: RLSMonitoringReport): Promise<void> {
-    // Auto-recovery attempts
     if (!report.session.isValid && report.session.session?.refresh_token) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.debug('[RLSMonitor] Attempting automatic session refresh...');
       }
       try {
         await supabase.auth.refreshSession({
           refresh_token: report.session.session.refresh_token
         });
-        if (process.env.NODE_ENV !== 'production') {
+        if (import.meta.env?.DEV) {
           console.debug('[RLSMonitor] Session refresh successful');
         }
       } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
+        if (import.meta.env?.DEV) {
           console.error('[RLSMonitor] Session refresh failed:', error);
         }
       }
     }
-    
-    // Log detailed diagnostics for severe issues
+
     if (report.overall.score < 50) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env?.DEV) {
         console.error('[RLSMonitor] Severe health issues detected:', {
           report,
           timestamp: new Date().toISOString()
@@ -537,7 +532,7 @@ export class RLSMonitor {
       lastResetTime: Date.now()
     };
     this.consecutiveFailures = 0;
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env?.DEV) {
       console.debug('[RLSMonitor] Performance metrics reset');
     }
   }
@@ -599,17 +594,17 @@ ${report.rlsTests.map(test =>
  * Quick utility function to run a health check and log results
  */
 export async function quickHealthCheck(): Promise<void> {
-  if (process.env.NODE_ENV !== 'production') {
+  if (import.meta.env?.DEV) {
     console.debug('[RLSMonitor] Running quick health check...');
   }
   const report = await RLSMonitor.performHealthCheck();
   
   if (report.overall.healthy) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env?.DEV) {
       console.debug('✅ System healthy - Score:', report.overall.score);
     }
   } else {
-    if (process.env.NODE_ENV !== 'production') {
+    if (import.meta.env?.DEV) {
       console.warn('❌ System issues detected - Score:', report.overall.score);
       console.warn('Issues:', report.overall.issues);
     }

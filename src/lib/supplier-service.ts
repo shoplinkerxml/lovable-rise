@@ -1,5 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
-import { SessionValidator } from "./session-validation";
+import { SessionValidator, invokeEdgeWithAuth } from "./session-validation";
 import { readCache, writeCache, CACHE_TTL } from "./cache-utils";
 
 export interface Supplier {
@@ -56,15 +55,13 @@ export class SupplierService {
     return { rows: cached.data, expiresAt };
   }
 
-  private static async fetchSuppliersFromApi(accessToken: string | null): Promise<Supplier[]> {
-    const { data, error } = await supabase.functions.invoke<{ suppliers?: Supplier[] }>("suppliers-list", {
-      body: {},
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) return [];
-    const payload: { suppliers?: Supplier[] } = typeof data === "string" ? JSON.parse(data as string) : (data as any);
-    const rows = Array.isArray(payload?.suppliers) ? payload!.suppliers! : [];
-    return rows;
+  private static async fetchSuppliersFromApi(): Promise<Supplier[]> {
+    try {
+      const payload = await invokeEdgeWithAuth<{ suppliers?: Supplier[] }>("suppliers-list", {});
+      return Array.isArray(payload?.suppliers) ? payload.suppliers! : [];
+    } catch {
+      return [];
+    }
   }
 
   static clearSuppliersCache(): void {
@@ -109,24 +106,7 @@ export class SupplierService {
 
   /** Получение только максимального лимита поставщиков (без подсчета текущих) */
   static async getSupplierLimitOnly(): Promise<number> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const { data: auth } = await supabase.auth.getSession();
-    const accessToken: string | null = auth?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{ value?: number }>("suppliers-limit", {
-      body: {},
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) return 0;
-    const payload = typeof data === "string" ? (JSON.parse(data) as { value?: number }) : (data as { value?: number });
+    const payload = await invokeEdgeWithAuth<{ value?: number }>("suppliers-limit", {});
     return Number(payload?.value || 0);
   }
 
@@ -166,9 +146,7 @@ export class SupplierService {
         if (timeLeft < SupplierService.SOFT_REFRESH_THRESHOLD_MS) {
           void (async () => {
             try {
-              const { data: auth } = await supabase.auth.getSession();
-              const accessToken: string | null = auth?.session?.access_token || null;
-              const rows = await SupplierService.fetchSuppliersFromApi(accessToken);
+              const rows = await SupplierService.fetchSuppliersFromApi();
               SupplierService.setSuppliersCache(userId, rows);
             } catch {
               void 0;
@@ -184,9 +162,7 @@ export class SupplierService {
     }
 
     SupplierService.inFlightSuppliersPromise = (async () => {
-      const { data: auth } = await supabase.auth.getSession();
-      const accessToken: string | null = auth?.session?.access_token || null;
-      const rows = await SupplierService.fetchSuppliersFromApi(accessToken);
+      const rows = await SupplierService.fetchSuppliersFromApi();
       if (userId) {
         SupplierService.setSuppliersCache(userId, rows);
       }
@@ -230,26 +206,14 @@ export class SupplierService {
     }
     const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
     const xmlUrl = supplierData.xml_feed_url ? supplierData.xml_feed_url.trim() : '';
 
-    const { data: auth } = await supabase.auth.getSession();
-    const accessToken: string | null = auth?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{ supplier?: Supplier }>('suppliers-create', {
-      body: {
-        supplier_name: supplierData.supplier_name.trim(),
-        website_url: supplierData.website_url?.trim() || null,
-        xml_feed_url: xmlUrl ? xmlUrl : null,
-        phone: supplierData.phone?.trim() || null,
-      },
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+    const payload = await invokeEdgeWithAuth<{ supplier?: Supplier }>('suppliers-create', {
+      supplier_name: supplierData.supplier_name.trim(),
+      website_url: supplierData.website_url?.trim() || null,
+      xml_feed_url: xmlUrl ? xmlUrl : null,
+      phone: supplierData.phone?.trim() || null,
     });
-    if (error) throw new Error(error.message ?? 'Create failed');
-    const payload: { supplier?: Supplier } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
     const row = payload?.supplier as Supplier | undefined;
     if (!row) throw new Error('Create failed');
     if (userId) {
@@ -295,14 +259,7 @@ export class SupplierService {
 
     cleanData.updated_at = new Date().toISOString();
 
-    const { data: auth } = await supabase.auth.getSession();
-    const accessToken: string | null = auth?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{ supplier?: Supplier }>('suppliers-update', {
-      body: { id, ...cleanData },
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) throw new Error(error.message ?? 'Update failed');
-    const payload: { supplier?: Supplier } = typeof data === 'string' ? JSON.parse(data as string) : (data as any);
+    const payload = await invokeEdgeWithAuth<{ supplier?: Supplier }>('suppliers-update', { id, ...cleanData });
     const row = payload?.supplier as Supplier | undefined;
     if (!row) throw new Error('Update failed');
     if (userId) {
@@ -324,14 +281,7 @@ export class SupplierService {
       throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
     }
     const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
-
-    const { data: auth } = await supabase.auth.getSession();
-    const accessToken: string | null = auth?.session?.access_token || null;
-    const { error } = await supabase.functions.invoke<{ ok?: boolean }>('suppliers-delete', {
-      body: { id },
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-    });
-    if (error) throw new Error(error.message ?? 'Delete failed');
+    await invokeEdgeWithAuth<{ ok?: boolean }>('suppliers-delete', { id });
     if (userId) {
       const cached = SupplierService.getCachedSuppliers(userId);
       const prev = cached?.rows || [];

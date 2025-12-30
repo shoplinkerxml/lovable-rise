@@ -16,6 +16,63 @@ export type CacheEnvelope<T> = { data: T; expiresAt: number };
 const CACHE_VERSION_PREFIX = "v1:";
 const memoryCache = new Map<string, string>();
 
+export function dedupeInFlight<T>(
+  cache: Map<string, Promise<T>>,
+  key: string,
+  fn: () => Promise<T>,
+  options?: { maxSize?: number },
+): Promise<T> {
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const promise = fn().finally(() => {
+    const cur = cache.get(key);
+    if (cur === promise) cache.delete(key);
+  });
+  const maxSize = options?.maxSize;
+  if (typeof maxSize === "number" && maxSize > 0 && cache.size >= maxSize) {
+    while (cache.size >= maxSize) {
+      const oldestKey = cache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, promise);
+  return promise;
+}
+
+export type InFlightTtlEntry<T> = { promise: Promise<T>; expiresAt: number };
+
+export function dedupeInFlightTtl<T>(
+  cache: Map<string, InFlightTtlEntry<T>>,
+  key: string,
+  fn: () => Promise<T>,
+  options: { ttlMs: number; maxSize?: number; pruneWhenSizeOver?: number },
+): Promise<T> {
+  const now = Date.now();
+  const pruneWhenSizeOver = options.pruneWhenSizeOver ?? 50;
+  if (cache.size > pruneWhenSizeOver) {
+    for (const [k, v] of cache) {
+      if (v.expiresAt <= now) cache.delete(k);
+    }
+  }
+  const existing = cache.get(key);
+  if (existing && existing.expiresAt > now) return existing.promise;
+  const promise = fn().finally(() => {
+    const cur = cache.get(key);
+    if (cur?.promise === promise) cache.delete(key);
+  });
+  const maxSize = options.maxSize;
+  if (typeof maxSize === "number" && maxSize > 0 && cache.size >= maxSize) {
+    while (cache.size >= maxSize) {
+      const oldestKey = cache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, { promise, expiresAt: now + options.ttlMs });
+  return promise;
+}
+
 function getStorage(): Storage | null {
   try {
     if (typeof window === "undefined") return null;

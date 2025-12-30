@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { SessionValidator } from "./session-validation";
+import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
+import { dedupeInFlight } from "./cache-utils";
 
 // ============================================================================
 // ТИПЫ И ИНТЕРФЕЙСЫ
@@ -119,9 +120,11 @@ interface CategoryRow {
 export class ShopService {
   // Дедупликация запросов
   private static requestCache = new Map<string, Promise<any>>();
+  private static readonly REQUEST_CACHE_MAX_SIZE = 200;
   
   // Кэш данных (простой in-memory)
   private static dataCache = new Map<string, { data: any; timestamp: number }>();
+  private static readonly DATA_CACHE_MAX_SIZE = 300;
   private static readonly CACHE_TTL = 30000; // 30 секунд
   private static lastUserId: string | null = null;
 
@@ -138,18 +141,6 @@ export class ShopService {
     if (!validation.isValid) {
       throw new Error(`Session invalid: ${validation.error || "Session expired"}`);
     }
-  }
-
-  private static async getAccessToken(): Promise<string> {
-    await this.ensureSession();
-    
-    const { data: authData, error } = await supabase.auth.getSession();
-    if (error) throw new Error(`Failed to get session: ${error.message}`);
-    
-    const token = authData?.session?.access_token;
-    if (!token) throw new Error("No access token available");
-    
-    return token;
   }
 
   private static handleEdgeError(error: unknown, functionName: string): never {
@@ -177,6 +168,11 @@ export class ShopService {
       } catch (parseError) {
         console.warn("Could not parse error details:", parseError);
       }
+
+      if (status === undefined) {
+        const directStatus = err.status ?? err.statusCode;
+        status = typeof directStatus === "number" ? directStatus : undefined;
+      }
     }
 
     // Добавляем статус код к сообщению
@@ -200,17 +196,11 @@ export class ShopService {
     functionName: string,
     body: Record<string, unknown> = {}
   ): Promise<T> {
-    const token = await this.getAccessToken();
-    
-    const { data, error } = await supabase.functions.invoke<T>(functionName, {
-      body,
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (error) this.handleEdgeError(error, functionName);
-    if (!data) throw new Error(`${functionName} returned no data`);
-
-    return typeof data === "string" ? JSON.parse(data) : data;
+    try {
+      return await invokeEdgeWithAuth<T>(functionName, body);
+    } catch (error) {
+      this.handleEdgeError(error, functionName);
+    }
   }
 
   /**
@@ -220,15 +210,9 @@ export class ShopService {
     key: string,
     request: () => Promise<T>
   ): Promise<T> {
-    const existing = this.requestCache.get(key);
-    if (existing) return existing;
-
-    const promise = request().finally(() => {
-      this.requestCache.delete(key);
+    return await dedupeInFlight(this.requestCache, key, request, {
+      maxSize: this.REQUEST_CACHE_MAX_SIZE,
     });
-
-    this.requestCache.set(key, promise);
-    return promise;
   }
 
   /**
@@ -242,12 +226,22 @@ export class ShopService {
       this.dataCache.delete(key);
       return null;
     }
-    
+
+    this.dataCache.delete(key);
+    this.dataCache.set(key, cached);
     return cached.data;
   }
 
   private static setCache(key: string, data: any): void {
+    this.dataCache.delete(key);
     this.dataCache.set(key, { data, timestamp: Date.now() });
+    if (this.dataCache.size > this.DATA_CACHE_MAX_SIZE) {
+      while (this.dataCache.size > this.DATA_CACHE_MAX_SIZE) {
+        const oldestKey = this.dataCache.keys().next().value as string | undefined;
+        if (!oldestKey) break;
+        this.dataCache.delete(oldestKey);
+      }
+    }
   }
 
   private static clearCache(pattern?: string): void {

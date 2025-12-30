@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { dedupeInFlight } from './cache-utils';
 // Dev-only logging toggle and transient abort detector
 const __DEV__ = import.meta.env?.DEV ?? false;
 function isTransientAbortError(err: unknown): boolean {
@@ -173,14 +174,7 @@ export class SubscriptionValidationService {
       if (!forceRefresh && cached && (now - cached.timestamp) < this.TTL_MS) {
         return cached.result;
       }
-
-      // Dedupe concurrent validations for same user
-      const existingFlight = this.inFlight.get(userId);
-      if (!forceRefresh && existingFlight) {
-        return await existingFlight;
-      }
-
-      const flight = (async () => {
+      const run = async () => {
         // Validate existing subscription and deactivate if expired
         const validation = await this.validateUserSubscription(userId);
 
@@ -207,13 +201,13 @@ export class SubscriptionValidationService {
         this.cache.set(userId, { timestamp: Date.now(), result });
         return result;
 
-      })();
+      };
 
-      // Store in-flight promise and await
-      this.inFlight.set(userId, flight);
-      const res = await flight;
-      this.inFlight.delete(userId);
-      return res;
+      if (forceRefresh) {
+        return await run();
+      }
+
+      return await dedupeInFlight(this.inFlight, userId, run);
 
     } catch (error) {
       if (isTransientAbortError(error)) {

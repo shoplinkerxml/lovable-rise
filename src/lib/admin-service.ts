@@ -1,7 +1,8 @@
 // src/lib/admin-service.ts
 import { supabase } from "@/integrations/supabase/client";
-import { SessionValidator } from "./session-validation";
+import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
 import type { TariffInsert, TariffUpdate, TariffFeatureInsert, TariffFeatureUpdate, TariffLimitInsert, TariffLimitUpdate } from "./tariff-service";
+import { dedupeInFlightTtl } from "./cache-utils";
 
 type AdminErrorCode = 'unauthorized' | 'validation_failed' | 'db_error' | 'rpc_error' | 'not_found';
 type AdminResult<T> = { success: boolean; data?: T; errorCode?: AdminErrorCode; message?: string };
@@ -37,13 +38,8 @@ function logAdminError(context: string, e: unknown, traceId: string): void {
 async function invokeAdminEdge<T>(fn: string, body: unknown): Promise<AdminResult<T>> {
   try {
     const token = await ensureAccessToken();
-    const { data, error } = await supabase.functions.invoke(fn, { body, headers: { Authorization: `Bearer ${token}` } });
-    if (error) {
-      const tid = createTraceId();
-      logAdminError(`edge:${fn}`, error, tid);
-      return { success: false, errorCode: 'rpc_error', message: (error as { message?: string })?.message || 'rpc_failed' };
-    }
-    const payload = typeof data === 'string' ? (JSON.parse(data as string) as T) : (data as T);
+    void token;
+    const payload = await invokeEdgeWithAuth<T>(fn, body);
     return { success: true, data: payload };
   } catch (e) {
     const tid = createTraceId();
@@ -71,15 +67,13 @@ export class AdminService {
   // ==================== TARIFF OPERATIONS ====================
   private static inflight = new Map<string, { promise: Promise<unknown>; expiresAt: number }>();
   private static INFLIGHT_TTL_MS = 30_000;
+  private static INFLIGHT_MAX_SIZE = 200;
   private static dedupe<T>(key: string, fn: () => Promise<AdminResult<T>>): Promise<AdminResult<T>> {
-    const existing = this.inflight.get(key);
-    if (existing && existing.expiresAt > Date.now()) return existing.promise as Promise<AdminResult<T>>;
-    const p = fn().finally(() => {
-      const cur = this.inflight.get(key);
-      if (cur && cur.promise === p) this.inflight.delete(key);
+    return dedupeInFlightTtl(this.inflight as Map<string, { promise: Promise<AdminResult<T>>; expiresAt: number }>, key, fn, {
+      ttlMs: this.INFLIGHT_TTL_MS,
+      maxSize: this.INFLIGHT_MAX_SIZE,
+      pruneWhenSizeOver: 50,
     });
-    this.inflight.set(key, { promise: p, expiresAt: Date.now() + this.INFLIGHT_TTL_MS });
-    return p;
   }
   
   static async createTariff(data: TariffInsert): Promise<AdminResult<unknown>> {

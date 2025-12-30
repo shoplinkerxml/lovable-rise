@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { getTariffsListCached, invalidateTariffsCache } from './tariff-cache';
+import { invokeEdgeWithAuth } from './session-validation';
 
 export type Tariff = Database['public']['Tables']['tariffs']['Row'];
 export type TariffInsert = Database['public']['Tables']['tariffs']['Insert'];
@@ -41,19 +42,9 @@ export interface TariffWithDetails {
 export class TariffService {
   private static tariffsRefreshInFlight = false;
   private static tariffsLastRefreshAt = 0;
-  private static async getAccessToken(): Promise<string | null> {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || null;
-  }
-  private static async invokeEdge<T>(name: string, body: unknown): Promise<T> {
-    const token = await TariffService.getAccessToken();
-    const { data, error } = await supabase.functions.invoke(name, { body, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
-    if (error) throw error;
-    return (typeof data === 'string' ? JSON.parse(data) : data) as T;
-  }
 
   static async activateMyTariff(tariffId: number): Promise<{ success: boolean; subscription?: unknown }> {
-    return await TariffService.invokeEdge<{ success: boolean; subscription?: unknown }>(
+    return await invokeEdgeWithAuth<{ success: boolean; subscription?: unknown }>(
       'user-activate-tariff',
       { tariffId },
     );
@@ -61,7 +52,7 @@ export class TariffService {
   static async getTariffsAggregated(includeInactive = false, includeDemo = false): Promise<TariffWithDetails[]> {
     const rows = await getTariffsListCached<TariffWithDetails>(async () => {
       try {
-        const payload = await TariffService.invokeEdge<{ tariffs: TariffWithDetails[] }>('tariffs-list', { includeInactive, includeDemo });
+        const payload = await invokeEdgeWithAuth<{ tariffs: TariffWithDetails[] }>('tariffs-list', { includeInactive, includeDemo });
         const edgeRows = Array.isArray(payload.tariffs) ? payload.tariffs : [];
         if (edgeRows.length) return edgeRows;
         const fb = await TariffService.getAllTariffs(includeInactive, includeDemo);

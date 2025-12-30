@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import { ApiError } from "./user-service";
-import { SessionValidator } from "./session-validation";
+import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { CategoryService } from "@/lib/category-service";
@@ -189,25 +189,13 @@ export class ProductService {
     throw new ApiError(message || fallbackKey, status || 500);
   }
 
-  private static async getAccessToken(): Promise<string | null> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = (authData?.session?.access_token as string | null) || null;
-    return accessToken;
-  }
-
   private static async invokeEdge<T>(name: string, body: Record<string, unknown>): Promise<T> {
-    const token = await ProductService.getAccessToken();
-    const { data, error } = await supabase.functions.invoke<T | string>(name, {
-      body,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (error) ProductService.edgeError(error, name);
-    const resp = typeof data === "string" ? (JSON.parse(data as unknown as string) as T) : (data as T);
-    return resp;
+    try {
+      return await invokeEdgeWithAuth<T>(name, body);
+    } catch (error) {
+      ProductService.edgeError(error as any, name);
+      throw new ApiError(name, 500);
+    }
   }
 
   static async getUserLookups(): Promise<{
@@ -560,22 +548,18 @@ export class ProductService {
     storeId: string,
     patch: Partial<StoreProductLinkPatchInput>,
   ): Promise<StoreProductLink | null> {
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{ link?: StoreProductLink | null } | string>(
-      "update-store-product-link",
-      {
-        body: { product_id: productId, store_id: storeId, patch },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      },
-    );
-    if (error) {
-      const code = (error as { context?: { status?: number } } | null)?.context?.status;
-      if (code === 403) throw new Error("Недостатньо прав");
-      throw new Error((error as { message?: string } | null)?.message || "update_failed");
+    try {
+      const resp = await invokeEdgeWithAuth<{ link?: StoreProductLink | null }>(
+        "update-store-product-link",
+        { product_id: productId, store_id: storeId, patch },
+      );
+      return resp?.link ?? null;
+    } catch (error) {
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 403) throw new Error("Недостатньо прав");
+      const msg = (error as { message?: string } | null)?.message || "update_failed";
+      throw new Error(msg);
     }
-    const resp = typeof data === "string" ? (JSON.parse(data) as { link?: StoreProductLink | null }) : (data as { link?: StoreProductLink | null });
-    return resp?.link ?? null;
   }
 
   static async saveStoreProductEdit(
@@ -606,23 +590,10 @@ export class ProductService {
       linkPatch?: StoreProductLinkPatchInput;
     },
   ): Promise<{ product_id: string; link?: StoreProductLink | null } | null> {
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{
-      product_id?: string;
-      link?: StoreProductLink | null;
-    } | string>(
+    const out = await ProductService.invokeEdge<{ product_id?: string; link?: StoreProductLink | null }>(
       "save-store-product-edit",
-      {
-        body: { product_id: productId, store_id: storeId, ...payload },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      },
+      { product_id: productId, store_id: storeId, ...payload },
     );
-    if (error) this.edgeError(error, "failed_save_product");
-    const out =
-      (typeof data === "string"
-        ? (JSON.parse(data) as { product_id?: string; link?: StoreProductLink | null })
-        : (data as { product_id?: string; link?: StoreProductLink | null }));
     const pid = out?.product_id ? String(out.product_id) : null;
     if (pid) {
       try {
@@ -652,16 +623,15 @@ export class ProductService {
     productId: string,
     storeId: string,
   ): Promise<void> {
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { error } = await supabase.functions.invoke<unknown>(
-      "bulk-remove-store-product-links",
-      {
-        body: { product_ids: [productId], store_ids: [storeId] },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      },
-    );
-    if (error) throw new Error((error as { message?: string } | null)?.message || "delete_failed");
+    try {
+      await invokeEdgeWithAuth<unknown>(
+        "bulk-remove-store-product-links",
+        { product_ids: [productId], store_ids: [storeId] },
+      );
+    } catch (error) {
+      const msg = (error as { message?: string } | null)?.message || "delete_failed";
+      throw new Error(msg);
+    }
     try {
       ProductService.clearStoreProductsCaches(String(storeId));
     } catch (e) {
@@ -673,24 +643,13 @@ export class ProductService {
     productIds: string[],
     storeIds: string[],
   ): Promise<{ deleted: number; deletedByStore: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }> {
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{
-      deleted?: number;
-      deletedByStore?: Record<string, number>;
-      categoryNamesByStore?: Record<string, string[]>;
-    } | string>(
-      "bulk-remove-store-product-links",
-      {
-        body: { product_ids: productIds, store_ids: storeIds },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      },
-    );
-    if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_delete_failed");
-    const out =
-      (typeof data === "string"
-        ? (JSON.parse(data) as { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> })
-        : (data as { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }));
+    let out: { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> };
+    try {
+      out = await invokeEdgeWithAuth("bulk-remove-store-product-links", { product_ids: productIds, store_ids: storeIds });
+    } catch (error) {
+      const msg = (error as { message?: string } | null)?.message || "bulk_delete_failed";
+      throw new Error(msg);
+    }
     try {
       const { ShopService } = await import("@/lib/shop-service");
       const catsByStore = out.categoryNamesByStore || {};
@@ -714,24 +673,13 @@ export class ProductService {
     custom_stock_quantity?: number | null;
     custom_available?: boolean | null;
   }>): Promise<{ inserted: number; addedByStore: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }> {
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<{
-      inserted?: number;
-      addedByStore?: Record<string, number>;
-      categoryNamesByStore?: Record<string, string[]>;
-    } | string>(
-      "bulk-add-store-product-links",
-      {
-        body: { links: payload },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      },
-    );
-    if (error) throw new Error((error as { message?: string } | null)?.message || "bulk_insert_failed");
-    const out =
-      (typeof data === "string"
-        ? (JSON.parse(data) as { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> })
-        : (data as { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }));
+    let out: { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> };
+    try {
+      out = await invokeEdgeWithAuth("bulk-add-store-product-links", { links: payload });
+    } catch (error) {
+      const msg = (error as { message?: string } | null)?.message || "bulk_insert_failed";
+      throw new Error(msg);
+    }
     try {
       const { ShopService } = await import("@/lib/shop-service");
       const catsByStore = out.categoryNamesByStore || {};
@@ -963,115 +911,49 @@ export class ProductService {
     if (!String(productId || "").trim()) {
       throw new Error("product_id_required");
     }
-    const { data: authData } = await supabase.auth.getSession();
-    const accessToken: string | null = authData?.session?.access_token || null;
-    const { data, error } = await supabase.functions.invoke<
-      | {
-          product?: Product | null;
-          link?: StoreProductLink | null;
-          images?: ProductImage[];
-          params?: ProductParam[];
-          supplier?: { id: number; supplier_name: string } | null;
-          categoryName?: string | null;
-          shop?: { id: string; store_name: string } | null;
-          storeCategories?: Array<{
-            store_category_id: number;
-            category_id: number;
-            name: string;
-            store_external_id: string | null;
-            is_active: boolean;
-          }>;
-          suppliers?: Array<{ id: string; supplier_name: string }>;
-          currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
-          categories?: Array<{
-            id: string;
-            name: string;
-            external_id: string;
-            supplier_id: string;
-            parent_external_id: string | null;
-          }>;
-          supplierCategoriesMap?: Record<string, Array<{
-            id: string;
-            name: string;
-            external_id: string;
-            supplier_id: string;
-            parent_external_id: string | null;
-          }>>;
-        }
-      | string
-    >(
-      "product-edit-data",
-      {
-        body: storeId
+    let resp: {
+      product?: Product | null;
+      link?: StoreProductLink | null;
+      images?: ProductImage[];
+      params?: ProductParam[];
+      supplier?: { id: number; supplier_name: string } | null;
+      categoryName?: string | null;
+      shop?: { id: string; store_name: string } | null;
+      storeCategories?: Array<{
+        store_category_id: number;
+        category_id: number;
+        name: string;
+        store_external_id: string | null;
+        is_active: boolean;
+      }>;
+      suppliers?: Array<{ id: string; supplier_name: string }>;
+      currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+      categories?: Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>;
+      supplierCategoriesMap?: Record<string, Array<{
+        id: string;
+        name: string;
+        external_id: string;
+        supplier_id: string;
+        parent_external_id: string | null;
+      }>>;
+    };
+    try {
+      resp = await invokeEdgeWithAuth(
+        "product-edit-data",
+        storeId
           ? { product_id: String(productId), store_id: String(storeId) }
           : { product_id: String(productId) },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      },
-    );
-    if (error) this.edgeError(error, "failed_load_product_edit");
-    const resp = typeof data === "string" ? (JSON.parse(data) as {
-      product?: Product | null;
-      link?: StoreProductLink | null;
-      images?: ProductImage[];
-      params?: ProductParam[];
-      supplier?: { id: number; supplier_name: string } | null;
-      categoryName?: string | null;
-      shop?: { id: string; store_name: string } | null;
-      storeCategories?: Array<{
-        store_category_id: number;
-        category_id: number;
-        name: string;
-        store_external_id: string | null;
-        is_active: boolean;
-      }>;
-      suppliers?: Array<{ id: string; supplier_name: string }>;
-      currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
-      categories?: Array<{
-        id: string;
-        name: string;
-        external_id: string;
-        supplier_id: string;
-        parent_external_id: string | null;
-      }>;
-      supplierCategoriesMap?: Record<string, Array<{
-        id: string;
-        name: string;
-        external_id: string;
-        supplier_id: string;
-        parent_external_id: string | null;
-      }>>;
-    }) : (data as {
-      product?: Product | null;
-      link?: StoreProductLink | null;
-      images?: ProductImage[];
-      params?: ProductParam[];
-      supplier?: { id: number; supplier_name: string } | null;
-      categoryName?: string | null;
-      shop?: { id: string; store_name: string } | null;
-      storeCategories?: Array<{
-        store_category_id: number;
-        category_id: number;
-        name: string;
-        store_external_id: string | null;
-        is_active: boolean;
-      }>;
-      suppliers?: Array<{ id: string; supplier_name: string }>;
-      currencies?: Array<{ id: number; name: string; code: string; status: boolean | null }>;
-      categories?: Array<{
-        id: string;
-        name: string;
-        external_id: string;
-        supplier_id: string;
-        parent_external_id: string | null;
-      }>;
-      supplierCategoriesMap?: Record<string, Array<{
-        id: string;
-        name: string;
-        external_id: string;
-        supplier_id: string;
-        parent_external_id: string | null;
-      }>>;
-    });
+      );
+    } catch (error) {
+      this.edgeError(error as any, "failed_load_product_edit");
+      throw new ApiError("failed_load_product_edit", 500);
+    }
     return {
       product: (resp?.product || null) as Product | null,
       link: (resp?.link || null) as StoreProductLink | null,

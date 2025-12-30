@@ -13,8 +13,8 @@ import {
   SessionContext
 } from "./user-auth-schemas";
 import { AuthorizationErrorHandler } from "./error-handler";
-import { SessionValidator, isAuthenticationError } from "./session-validation";
-import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
+import { invokeEdgeWithAuth, SessionValidator, isAuthenticationError } from "./session-validation";
+import { dedupeInFlight, readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
 
 /**
  * Configuration options for registration with session management
@@ -626,66 +626,35 @@ export class UserAuthService {
     }
     const cacheKey = this.getAuthMeCacheKey(validation.user.id);
     const sessionKey = `${validation.user.id}:${validation.expiresAt ?? 0}`;
-    const inFlight = this.authMeInFlightBySession.get(sessionKey);
-    if (inFlight) {
-      return inFlight;
-    }
     const cached = readCache<AuthMeData>(cacheKey);
     if (cached?.data) {
       return cached.data;
     }
-    const promise = (async () => {
+    return await dedupeInFlight(this.authMeInFlightBySession, sessionKey, async () => {
       try {
-        const accessToken = validation.accessToken || await this.getCurrentAccessToken();
-        const { data, error } = await supabase.functions.invoke('auth-me', {
-          body: {},
-          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-        });
-        if (error) {
-          this.authMeInFlightBySession.delete(sessionKey);
-          const cachedFallback = readCache<AuthMeData>(cacheKey, true);
-          return cachedFallback?.data || { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
-        }
-        const resp: {
+        const resp = await invokeEdgeWithAuth<{
           user?: UserProfile | null;
           subscription?: unknown | null;
           tariffLimits?: Array<{ limit_name: string; value: number }>;
           menuItems?: UserMenuItem[];
           userStores?: UserStoreLite[];
-        } =
-          typeof data === 'string'
-            ? (JSON.parse(data) as {
-                user?: UserProfile | null;
-                subscription?: unknown | null;
-                tariffLimits?: Array<{ limit_name: string; value: number }>;
-                menuItems?: UserMenuItem[];
-                userStores?: UserStoreLite[];
-              })
-            : (data as {
-                user?: UserProfile | null;
-                subscription?: unknown | null;
-                tariffLimits?: Array<{ limit_name: string; value: number }>;
-                menuItems?: UserMenuItem[];
-                userStores?: UserStoreLite[];
-              });
+        }>("auth-me", {});
         const result = {
           user: (resp?.user ?? null) as UserProfile | null,
           subscription: resp?.subscription ?? null,
-          tariffLimits: Array.isArray(resp?.tariffLimits) ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>) : [],
+          tariffLimits: Array.isArray(resp?.tariffLimits)
+            ? (resp.tariffLimits as Array<{ limit_name: string; value: number }>)
+            : [],
           menuItems: Array.isArray(resp?.menuItems) ? (resp.menuItems as UserMenuItem[]) : [],
           userStores: Array.isArray(resp?.userStores) ? (resp.userStores as UserStoreLite[]) : [],
         };
         writeCache(cacheKey, result, CACHE_TTL.authMe);
-        this.authMeInFlightBySession.delete(sessionKey);
         return result;
       } catch {
-        this.authMeInFlightBySession.delete(sessionKey);
         const cachedFallback = readCache<AuthMeData>(cacheKey, true);
         return cachedFallback?.data || { user: null, subscription: null, tariffLimits: [], menuItems: [], userStores: [] };
       }
-    })();
-    this.authMeInFlightBySession.set(sessionKey, promise);
-    return promise;
+    });
   }
 
   static clearAuthMeCache(): void {

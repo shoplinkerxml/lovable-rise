@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useI18n } from "@/i18n";
+import { SUPABASE_URL } from "@/integrations/supabase/client";
 
 interface ApiEndpoint {
   name: string;
@@ -1005,7 +1006,7 @@ if (typeof r.value === 'number') { pm.collectionVariables.set("product_limit", S
   };
 
   const generateCurlCommand = (endpoint: ApiEndpoint) => {
-    const baseUrl = 'https://ehznqzaumsnjkrntaiox.supabase.co';
+    const baseUrl = SUPABASE_URL;
     const fullUrl = `${baseUrl}${endpoint.endpoint}`;
     
     let curlCmd = `curl -X ${endpoint.method} "${fullUrl}"`;
@@ -1040,7 +1041,7 @@ if (typeof r.value === 'number') { pm.collectionVariables.set("product_limit", S
   };
 
   const generatePostmanCollection = () => {
-    const baseUrl = 'https://ehznqzaumsnjkrntaiox.supabase.co';
+    const baseUrl = SUPABASE_URL;
     
     const collection = {
       info: {
@@ -1150,7 +1151,7 @@ if (typeof r.value === 'number') { pm.collectionVariables.set("product_limit", S
             </p>
             <div className="flex flex-wrap justify-center gap-4 mb-8">
               <Badge variant="outline" className="text-sm px-3 py-1">
-                Base URL: https://ehznqzaumsnjkrntaiox.supabase.co
+                Base URL: {SUPABASE_URL}
               </Badge>
               <Badge variant="outline" className="text-sm px-3 py-1">
                 Authentication: JWT Bearer Token

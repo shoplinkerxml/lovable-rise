@@ -11,7 +11,7 @@
  * - Monitors token validity for database operations
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 
 export interface SessionValidationResult {
@@ -43,9 +43,11 @@ export interface TokenDebugInfo {
 export class SessionValidator {
   private static readonly REFRESH_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly SESSION_CHECK_INTERVAL = 30 * 1000; // 30 seconds
-  private static readonly CACHE_TTL_MS = 20 * 1000; // 20 seconds
-  private static cache: { result: SessionValidationResult; timestamp: number } | null = null;
+  private static readonly VALID_CACHE_TTL_MS = 60 * 1000;
+  private static readonly INVALID_CACHE_TTL_MS = 2 * 1000;
+  private static cache: { result: SessionValidationResult; timestamp: number; ttlMs: number } | null = null;
   private static inFlight: Promise<SessionValidationResult> | null = null;
+  private static refreshInFlight: Promise<SessionValidationResult> | null = null;
   
   /**
    * Validate current session and access token
@@ -54,7 +56,7 @@ export class SessionValidator {
   static async validateSession(): Promise<SessionValidationResult> {
     try {
       const now = Date.now();
-      if (this.cache && now - this.cache.timestamp < this.CACHE_TTL_MS) {
+      if (this.cache && now - this.cache.timestamp < this.cache.ttlMs) {
         return this.cache.result;
       }
       if (this.inFlight) {
@@ -65,7 +67,7 @@ export class SessionValidator {
         
         if (error) {
           console.error('[SessionValidator] Session fetch error:', error);
-          return {
+          const result: SessionValidationResult = {
             isValid: false,
             session: null,
             user: null,
@@ -76,10 +78,12 @@ export class SessionValidator {
             needsRefresh: false,
             error: error.message
           };
+          this.cache = { result, timestamp: Date.now(), ttlMs: this.INVALID_CACHE_TTL_MS };
+          return result;
         }
         
         if (!session) {
-          return {
+          const result: SessionValidationResult = {
             isValid: false,
             session: null,
             user: null,
@@ -90,6 +94,8 @@ export class SessionValidator {
             needsRefresh: false,
             error: 'No active session'
           };
+          this.cache = { result, timestamp: Date.now(), ttlMs: this.INVALID_CACHE_TTL_MS };
+          return result;
         }
         
         const now = Date.now();
@@ -109,7 +115,11 @@ export class SessionValidator {
           needsRefresh,
           error: isExpired ? 'Session expired' : undefined
         };
-        this.cache = { result, timestamp: Date.now() };
+        this.cache = {
+          result,
+          timestamp: Date.now(),
+          ttlMs: result.isValid ? this.VALID_CACHE_TTL_MS : this.INVALID_CACHE_TTL_MS,
+        };
         return result;
       })();
       this.inFlight = flight;
@@ -139,29 +149,37 @@ export class SessionValidator {
   static async ensureValidSession(): Promise<SessionValidationResult> {
     const validation = await this.validateSession();
     
-    if (!validation.isValid && validation.session?.refresh_token) {
+    if ((validation.needsRefresh || !validation.isValid) && validation.session?.refresh_token) {
+      if (this.refreshInFlight) return await this.refreshInFlight;
       console.log('[SessionValidator] Session invalid, attempting refresh...');
       
       try {
-        const { data: { session }, error } = await supabase.auth.refreshSession({
-          refresh_token: validation.session.refresh_token
-        });
+        const flight = (async () => {
+          const { data: { session }, error } = await supabase.auth.refreshSession({
+            refresh_token: validation.session!.refresh_token
+          });
         
-        if (error) {
-          console.error('[SessionValidator] Session refresh failed:', error);
-          return {
-            ...validation,
-            error: `Refresh failed: ${error.message}`
-          };
-        }
+          if (error) {
+            console.error('[SessionValidator] Session refresh failed:', error);
+            return {
+              ...validation,
+              error: `Refresh failed: ${error.message}`
+            };
+          }
         
-        if (session) {
-          console.log('[SessionValidator] Session refreshed successfully');
-          // bust cache and re-validate
-          this.cache = null;
-          return this.validateSession();
-        }
+          if (session) {
+            console.log('[SessionValidator] Session refreshed successfully');
+            this.cache = null;
+            return this.validateSession();
+          }
+          return validation;
+        })();
+        this.refreshInFlight = flight;
+        const res = await flight;
+        this.refreshInFlight = null;
+        return res;
       } catch (error) {
+        this.refreshInFlight = null;
         console.error('[SessionValidator] Refresh error:', error);
         return {
           ...validation,
@@ -375,9 +393,6 @@ export async function createAuthenticatedClient(accessToken?: string) {
     throw new Error('No access token available for authenticated client');
   }
   
-  const SUPABASE_URL = "https://ehznqzaumsnjkrntaiox.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVoem5xemF1bXNuamtybnRhaW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTM2MjMsImV4cCI6MjA3MjI4OTYyM30.cwynTMjqTpDbXRlyMsbp6lfLLAOqE00X-ybeLU0pzE0";
-  
   return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: false },
     global: {
@@ -388,4 +403,35 @@ export async function createAuthenticatedClient(accessToken?: string) {
       }
     }
   });
+}
+
+export class EdgeInvokeError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "EdgeInvokeError";
+    this.status = status;
+  }
+}
+
+export async function invokeEdgeWithAuth<T>(name: string, body: unknown): Promise<T> {
+  const v = await SessionValidator.ensureValidSession();
+  if (!v.isValid || !v.accessToken) {
+    throw new Error(v.error || "Session expired");
+  }
+  const { data, error } = await supabase.functions.invoke<T | string>(name, {
+    body,
+    headers: { Authorization: `Bearer ${v.accessToken}` },
+  });
+  if (error) {
+    const status = (error as { context?: { status?: number }; status?: number; statusCode?: number } | null)?.context?.status ??
+      (error as { status?: number } | null)?.status ??
+      (error as { statusCode?: number } | null)?.statusCode;
+    const msg =
+      (error as unknown as { message?: string } | null)?.message ||
+      (error as unknown as { name?: string } | null)?.name ||
+      "edge_invoke_failed";
+    throw new EdgeInvokeError(msg, typeof status === "number" ? status : undefined);
+  }
+  return typeof data === "string" ? (JSON.parse(data) as T) : (data as T);
 }
