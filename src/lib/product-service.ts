@@ -2,11 +2,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { ApiError } from "./user-service";
 import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
 import { SubscriptionValidationService } from "./subscription-validation-service";
-import { dedupeInFlight } from "./cache-utils";
 import { CategoryService } from "@/lib/category-service";
 import { ProductCoreService } from "@/lib/product/product-core-service";
 import { ProductLinkService } from "@/lib/product/product-link-service";
 import { ProductImageService } from "@/lib/product/product-image-service";
+import { ProductCategoryService } from "@/lib/product/product-category-service";
 
 export interface Product {
   id: string;
@@ -167,10 +167,6 @@ export class ProductService {
       categoriesCount: number;
     }>
   > | null = null;
-
-  private static readonly INFLIGHT_RECOMPUTE_MAX_SIZE = 50;
-
-  private static inFlightRecomputeByStore: Map<string, Promise<void>> = new Map();
 
   private static castNullableNumber(value: unknown): number | null {
     if (value === undefined || value === null || value === "") return null;
@@ -490,44 +486,19 @@ export class ProductService {
   }
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
-    try {
-      await ProductService.getStoreCategoryFilterOptions(storeId);
-    } catch (error) {
-      console.error("ProductService.recomputeStoreCategoryFilterCache failed", error);
-    }
+    await ProductCategoryService.recomputeStoreCategoryFilterCache(storeId);
   }
 
   static async recomputeStoreCategoryFilterCacheBatch(storeIds: string[]): Promise<void> {
-    const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
-    const tasks = unique.map((sid) =>
-      dedupeInFlight(
-        ProductService.inFlightRecomputeByStore,
-        sid,
-        () => ProductService.recomputeStoreCategoryFilterCache(sid),
-        { maxSize: ProductService.INFLIGHT_RECOMPUTE_MAX_SIZE },
-      ),
-    );
-    await Promise.all(tasks);
+    await ProductCategoryService.recomputeStoreCategoryFilterCacheBatch(storeIds);
   }
 
   static async getStoreCategoryFilterOptions(storeId: string): Promise<string[]> {
-    const resp = await ProductService.invokeEdge<{ names?: string[] }>(
-      "store-category-filter-options",
-      { store_id: storeId },
-    );
-    const names = (resp?.names || []).filter((v) => typeof v === "string");
-    return names;
+    return await ProductCategoryService.getStoreCategoryFilterOptions(storeId);
   }
 
   static async refreshStoreCategoryFilterOptions(storeIds: string[]): Promise<Record<string, string[]>> {
-    const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
-    if (unique.length === 0) return {};
-    const resp = await ProductService.invokeEdge<{ results?: Record<string, string[]>; names?: string[] }>(
-      "store-category-filter-options",
-      { store_ids: unique },
-    );
-    const results: Record<string, string[]> = resp?.results || {};
-    return results;
+    return await ProductCategoryService.refreshStoreCategoryFilterOptions(storeIds);
   }
 
   /** Получить и обновить переопределения для пары (product_id, store_id) через product-edit-data */
