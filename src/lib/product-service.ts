@@ -8,6 +8,7 @@ import { ProductLinkService } from "@/lib/product/product-link-service";
 import { ProductImageService } from "@/lib/product/product-image-service";
 import { ProductCategoryService } from "@/lib/product/product-category-service";
 import { ProductLimitService } from "@/lib/product/product-limit-service";
+import { ProductCacheManager } from "@/lib/product/product-cache-manager";
 
 export interface Product {
   id: string;
@@ -472,8 +473,7 @@ export class ProductService {
     storeId: string | null,
     mutate: (items: unknown[]) => unknown[],
   ) {
-    void storeId;
-    void mutate;
+    ProductCacheManager.updateFirstPageCaches(storeId, mutate);
   }
 
   static patchProductCaches(
@@ -481,9 +481,7 @@ export class ProductService {
     patch: Partial<ProductAggregated>,
     storeId?: string | null,
   ) {
-    void productId;
-    void patch;
-    void storeId;
+    ProductCacheManager.patchProductCaches(productId, patch, storeId);
   }
 
   static async recomputeStoreCategoryFilterCache(storeId: string): Promise<void> {
@@ -906,19 +904,19 @@ export class ProductService {
   }
 
   static clearAllFirstPageCaches() {
-    void 0;
+    ProductCacheManager.clearAllFirstPageCaches();
   }
 
   static clearMasterProductsCaches(): void {
-    void 0;
+    ProductCacheManager.clearMasterProductsCaches();
   }
 
   static clearStoreProductsCaches(storeId: string): void {
-    void storeId;
+    ProductCacheManager.clearStoreProductsCaches(storeId);
   }
 
   static clearAllProductsCaches(): void {
-    ProductService.clearAllFirstPageCaches();
+    ProductCacheManager.clearAllProductsCaches();
   }
 
   /** Проверка только валидности сессии (без дополнительных запросов) */
