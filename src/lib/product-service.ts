@@ -7,6 +7,7 @@ import { ProductCoreService } from "@/lib/product/product-core-service";
 import { ProductLinkService } from "@/lib/product/product-link-service";
 import { ProductImageService } from "@/lib/product/product-image-service";
 import { ProductCategoryService } from "@/lib/product/product-category-service";
+import { ProductLimitService } from "@/lib/product/product-limit-service";
 
 export interface Product {
   id: string;
@@ -616,64 +617,25 @@ export class ProductService {
 
   /** Максимальный лимит продуктов: через отдельную функцию get-product-limit-only */
   static async getProductLimitOnly(): Promise<number> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-    try {
-      const resp = await ProductService.invokeEdge<{ value?: number }>("get-product-limit-only", {});
-      const v = Number(resp?.value ?? 0) || 0;
-      return v;
-    } catch (e) {
-      return 0;
-    }
+    return await ProductLimitService.getProductLimitOnly();
   }
 
   /** Лимит продуктов для текущего пользователя */
   static async getProductLimit(): Promise<ProductLimitInfo> {
-    const maxProducts = await this.getProductLimitOnly();
-    const currentCount = await this.getProductsCount();
-
-    return {
-      current: currentCount,
-      max: maxProducts,
-      canCreate: currentCount < maxProducts,
-    };
+    return await ProductLimitService.getProductLimit();
   }
 
   static invalidateProductLimitCache() {
-    void 0;
+    ProductLimitService.invalidateProductLimitCache();
   }
 
   /** Количество продуктов текущего пользователя: только функция user-products-list */
   static async getProductsCount(): Promise<number> {
-    try {
-      const sessionValidation = await SessionValidator.ensureValidSession();
-      if (!sessionValidation.isValid) {
-        throw new Error(
-          "Invalid session: " + (sessionValidation.error || "Session expired"),
-        );
-      }
-      const resp = await ProductService.invokeEdge<ProductListResponseObj>(
-        "user-products-list",
-        { store_id: null, limit: 1, offset: 0 },
-      );
-      const page = (resp?.page || {}) as { total?: number };
-      const total =
-        typeof page.total === "number"
-          ? page.total
-          : Array.isArray(resp?.products)
-          ? resp.products.length
-          : 0;
-      return total || 0;
-    } catch (error) {
-      console.error("Get products count error:", error);
-      return 0;
-    }
+    return await ProductLimitService.getProductsCount();
   }
 
   static async getProductsCountCached(): Promise<number> {
-    return await ProductService.getProductsCount();
+    return await ProductLimitService.getProductsCountCached();
   }
 
   /** Полный список продуктов текущего пользователя (по функциям с пагинацией + кэш) */
