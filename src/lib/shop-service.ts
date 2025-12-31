@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
-import { dedupeInFlight } from "./cache-utils";
+import { dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
 
 // ============================================================================
 // ТИПЫ И ИНТЕРФЕЙСЫ
@@ -122,10 +122,11 @@ export class ShopService {
   private static requestCache = new Map<string, Promise<any>>();
   private static readonly REQUEST_CACHE_MAX_SIZE = 200;
   
-  // Кэш данных (простой in-memory)
-  private static dataCache = new Map<string, { data: any; timestamp: number }>();
-  private static readonly DATA_CACHE_MAX_SIZE = 300;
-  private static readonly CACHE_TTL = 30000; // 30 секунд
+  private static cache = UnifiedCacheManager.create("shop-service", {
+    mode: "memory",
+    defaultTtlMs: 30_000,
+    maxSize: 300,
+  });
   private static lastUserId: string | null = null;
 
   // ============================================================================
@@ -219,42 +220,20 @@ export class ShopService {
    * Простое кэширование данных
    */
   private static getCached<T>(key: string): T | null {
-    const cached = this.dataCache.get(key);
-    if (!cached) return null;
-    
-    if (Date.now() - cached.timestamp > this.CACHE_TTL) {
-      this.dataCache.delete(key);
-      return null;
-    }
-
-    this.dataCache.delete(key);
-    this.dataCache.set(key, cached);
-    return cached.data;
+    return this.cache.get<T>(key);
   }
 
   private static setCache(key: string, data: any): void {
-    this.dataCache.delete(key);
-    this.dataCache.set(key, { data, timestamp: Date.now() });
-    if (this.dataCache.size > this.DATA_CACHE_MAX_SIZE) {
-      while (this.dataCache.size > this.DATA_CACHE_MAX_SIZE) {
-        const oldestKey = this.dataCache.keys().next().value as string | undefined;
-        if (!oldestKey) break;
-        this.dataCache.delete(oldestKey);
-      }
-    }
+    this.cache.set(key, data);
   }
 
   private static clearCache(pattern?: string): void {
     if (!pattern) {
-      this.dataCache.clear();
+      this.cache.clearAll();
       return;
     }
     
-    for (const key of this.dataCache.keys()) {
-      if (key.includes(pattern)) {
-        this.dataCache.delete(key);
-      }
-    }
+    this.cache.clearWhere((k) => k.includes(pattern));
   }
 
   private static async getSessionUserId(): Promise<string | null> {

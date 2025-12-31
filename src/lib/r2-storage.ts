@@ -1,4 +1,5 @@
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { withRetryResult } from "@/lib/request-handler";
 
 export type UploadResponse = {
   success: boolean;
@@ -32,38 +33,22 @@ async function invokeWithRetry<T>(fnName: string, init: { body?: unknown; header
   const maxRetries = Math.max(0, opts?.maxRetries ?? 2);
   const timeoutMs = Math.max(2500, opts?.timeoutMs ?? 5000);
   const baseDelay = Math.max(250, opts?.retryDelayMs ?? 500);
-  let attempt = 0;
-  while (true) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
+  return await withRetryResult(
+    async ({ signal }) => {
       const { data, error } = await supabase.functions.invoke<T>(fnName, {
         body: init.body,
         headers: init.headers,
-        signal: controller.signal as AbortSignal,
+        signal: signal as AbortSignal,
       } as any);
-      clearTimeout(timer);
       if (error) {
         const status = (error as EdgeErrorLike)?.context?.status ?? 0;
         const isTransient = status >= 500 || status === 0;
-        if (isTransient && attempt < maxRetries) {
-          attempt += 1;
-          await new Promise((r) => setTimeout(r, baseDelay * attempt));
-          continue;
-        }
-        return { data: data as T, error };
+        return { value: { data: data as T, error }, retry: isTransient };
       }
-      return { data: data as T, error: null };
-    } catch (e) {
-      clearTimeout(timer);
-      if (attempt < maxRetries) {
-        attempt += 1;
-        await new Promise((r) => setTimeout(r, baseDelay * attempt));
-        continue;
-      }
-      throw e;
-    }
-  }
+      return { value: { data: data as T, error: null }, retry: false };
+    },
+    { maxRetries, timeoutMs, retryDelayMs: baseDelay, backoff: "linear" },
+  );
 }
 
 function parseEdgeError(err: unknown, fallbackMessage: string): Error {

@@ -1,5 +1,5 @@
 import { SessionValidator, invokeEdgeWithAuth } from "./session-validation";
-import { readCache, writeCache, CACHE_TTL } from "./cache-utils";
+import { readCache, writeCache, CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
 
 export interface Supplier {
   id: number;
@@ -66,42 +66,7 @@ export class SupplierService {
 
   static clearSuppliersCache(): void {
     SupplierService.inFlightSuppliersPromise = null;
-    try {
-      if (typeof window === "undefined") return;
-      const storages: Storage[] = [];
-      try {
-        storages.push(window.localStorage);
-      } catch {
-        void 0;
-      }
-      try {
-        storages.push(window.sessionStorage);
-      } catch {
-        void 0;
-      }
-      for (const s of storages) {
-        const keys: string[] = [];
-        for (let i = 0; i < s.length; i++) {
-          const k = s.key(i);
-          if (!k) continue;
-          if (
-            k.startsWith("rq:suppliers:list:") ||
-            k.startsWith("v1:rq:suppliers:list:")
-          ) {
-            keys.push(k);
-          }
-        }
-        for (const k of keys) {
-          try {
-            s.removeItem(k);
-          } catch {
-            void 0;
-          }
-        }
-      }
-    } catch {
-      void 0;
-    }
+    UnifiedCacheManager.invalidatePattern(/^rq:suppliers:list:/);
   }
 
   /** Получение только максимального лимита поставщиков (без подсчета текущих) */
