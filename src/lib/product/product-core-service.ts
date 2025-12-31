@@ -1,11 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
-import { R2Storage } from "@/lib/r2-storage";
 import { invokeEdgeWithAuth, SessionValidator } from "@/lib/session-validation";
 import { ApiError } from "@/lib/user-service";
 import type { CreateProductData, Product, ProductImage, UpdateProductData } from "@/lib/product-service";
-
-type ImageInput = ProductImage & { object_key?: string };
+import { ProductImageService } from "@/lib/product/product-image-service";
 
 export class ProductCoreService {
   private static castNullableNumber(value: unknown): number | null {
@@ -177,15 +175,7 @@ export class ProductCoreService {
       docket: productData.docket ?? null,
       docket_ua: productData.docket_ua ?? null,
       state: productData.state ?? "new",
-      images: (productData.images || []).map((img, index) => {
-        const input = img as ImageInput;
-        return {
-          key: input.object_key || undefined,
-          url: input.url,
-          order_index: typeof input.order_index === "number" ? input.order_index : index,
-          is_main: !!input.is_main,
-        };
-      }),
+      images: ProductImageService.mapImagesForEdge((productData.images || []) as any),
       params: (productData.params || []).map((p, index) => ({
         name: p.name,
         value: p.value,
@@ -205,40 +195,11 @@ export class ProductCoreService {
     const product = await ProductCoreService.getProductById(productId);
     if (!product) throw new Error("create_failed");
 
-    const origImages = (productData.images || []).map((img, index) => {
-      const input = img as ImageInput;
-      return {
-        object_key: input.object_key || undefined,
-        url: input.url,
-        order_index: typeof input.order_index === "number" ? input.order_index : index,
-        is_main: !!input.is_main,
-      };
-    });
-    const processed = await Promise.all(
-      origImages.map(async (i) => {
-        const key = i.object_key || undefined;
-        const u = String(i.url || "").trim();
-        if (key) return { object_key: key, url: u, order_index: i.order_index, is_main: i.is_main };
-        if (!u) return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
-        if (/^(https?:\/\/|data:)/i.test(u)) {
-          try {
-            const res = await R2Storage.uploadProductImageFromUrl(String(productId), u);
-            const nextKey = res.r2KeyOriginal || undefined;
-            const nextUrl = res.originalUrl || u;
-            return { object_key: nextKey, url: nextUrl, order_index: i.order_index, is_main: i.is_main };
-          } catch {
-            return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
-          }
-        }
-        return { object_key: undefined, url: u, order_index: i.order_index, is_main: i.is_main };
-      }),
+    const { processed, changed } = await ProductImageService.uploadMissingObjectKeysFromUrls(
+      String(productId),
+      (productData.images || []) as any,
     );
-    const needUpdate = processed.some((p, idx) => {
-      const oi = origImages[idx];
-      const changedKey = !!(p as { object_key?: string }).object_key && !oi.object_key;
-      return changedKey;
-    });
-    if (needUpdate) {
+    if (changed) {
       await ProductCoreService.updateProduct(String(productId), { images: processed as unknown as ProductImage[] });
     }
 
@@ -280,15 +241,7 @@ export class ProductCoreService {
       state: productData.state !== undefined ? productData.state : undefined,
       images:
         productData.images !== undefined
-          ? (productData.images || []).map((img, index) => {
-              const input = img as ImageInput;
-              return {
-                key: input.object_key || undefined,
-                url: input.url,
-                order_index: typeof input.order_index === "number" ? input.order_index : index,
-                is_main: !!input.is_main,
-              };
-            })
+          ? ProductImageService.mapImagesForEdge((productData.images || []) as any)
           : undefined,
       params:
         productData.params !== undefined
@@ -376,4 +329,3 @@ export class ProductCoreService {
     return { upserted: payload.length };
   }
 }
-

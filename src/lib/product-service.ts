@@ -5,6 +5,8 @@ import { SubscriptionValidationService } from "./subscription-validation-service
 import { dedupeInFlight } from "./cache-utils";
 import { CategoryService } from "@/lib/category-service";
 import { ProductCoreService } from "@/lib/product/product-core-service";
+import { ProductLinkService } from "@/lib/product/product-link-service";
+import { ProductImageService } from "@/lib/product/product-image-service";
 
 export interface Product {
   id: string;
@@ -166,10 +168,8 @@ export class ProductService {
     }>
   > | null = null;
 
-  private static readonly INFLIGHT_LINKS_MAX_SIZE = 200;
   private static readonly INFLIGHT_RECOMPUTE_MAX_SIZE = 50;
 
-  private static inFlightLinksByProduct: Map<string, Promise<string[]>> = new Map();
   private static inFlightRecomputeByStore: Map<string, Promise<void>> = new Map();
 
   private static castNullableNumber(value: unknown): number | null {
@@ -535,8 +535,7 @@ export class ProductService {
     productId: string,
     storeId: string,
   ): Promise<StoreProductLink | null> {
-    const edit = await ProductService.getProductEditData(productId, storeId);
-    return edit.link || null;
+    return await ProductLinkService.getStoreProductLink(productId, storeId);
   }
 
   static async updateStoreProductLink(
@@ -544,18 +543,7 @@ export class ProductService {
     storeId: string,
     patch: Partial<StoreProductLinkPatchInput>,
   ): Promise<StoreProductLink | null> {
-    try {
-      const resp = await invokeEdgeWithAuth<{ link?: StoreProductLink | null }>(
-        "update-store-product-link",
-        { product_id: productId, store_id: storeId, patch },
-      );
-      return resp?.link ?? null;
-    } catch (error) {
-      const status = (error as { status?: number } | null)?.status;
-      if (status === 403) throw new Error("Недостатньо прав");
-      const msg = (error as { message?: string } | null)?.message || "update_failed";
-      throw new Error(msg);
-    }
+    return await ProductLinkService.updateStoreProductLink(productId, storeId, patch);
   }
 
   static async saveStoreProductEdit(
@@ -619,15 +607,7 @@ export class ProductService {
     productId: string,
     storeId: string,
   ): Promise<void> {
-    try {
-      await invokeEdgeWithAuth<unknown>(
-        "bulk-remove-store-product-links",
-        { product_ids: [productId], store_ids: [storeId] },
-      );
-    } catch (error) {
-      const msg = (error as { message?: string } | null)?.message || "delete_failed";
-      throw new Error(msg);
-    }
+    await ProductLinkService.removeStoreProductLink(productId, storeId);
     try {
       ProductService.clearStoreProductsCaches(String(storeId));
     } catch (e) {
@@ -639,24 +619,7 @@ export class ProductService {
     productIds: string[],
     storeIds: string[],
   ): Promise<{ deleted: number; deletedByStore: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }> {
-    let out: { deleted?: number; deletedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> };
-    try {
-      out = await invokeEdgeWithAuth("bulk-remove-store-product-links", { product_ids: productIds, store_ids: storeIds });
-    } catch (error) {
-      const msg = (error as { message?: string } | null)?.message || "bulk_delete_failed";
-      throw new Error(msg);
-    }
-    try {
-      const { ShopService } = await import("@/lib/shop-service");
-      const catsByStore = out.categoryNamesByStore || {};
-      for (const sid of Object.keys(catsByStore)) {
-        const cnt = Array.isArray(catsByStore[sid]) ? catsByStore[sid].length : 0;
-        ShopService.setCategoriesCountInCache(String(sid), cnt);
-      }
-    } catch (error) {
-      console.error("ProductService.bulkRemoveStoreProductLinks ShopService sync failed", error);
-    }
-    return { deleted: out.deleted ?? 0, deletedByStore: out.deletedByStore ?? {}, categoryNamesByStore: out.categoryNamesByStore || {} };
+    return await ProductLinkService.bulkRemoveStoreProductLinks(productIds, storeIds);
   }
 
   static async bulkAddStoreProductLinks(payload: Array<{
@@ -669,47 +632,15 @@ export class ProductService {
     custom_stock_quantity?: number | null;
     custom_available?: boolean | null;
   }>): Promise<{ inserted: number; addedByStore: Record<string, number>; categoryNamesByStore?: Record<string, string[]> }> {
-    let out: { inserted?: number; addedByStore?: Record<string, number>; categoryNamesByStore?: Record<string, string[]> };
-    try {
-      out = await invokeEdgeWithAuth("bulk-add-store-product-links", { links: payload });
-    } catch (error) {
-      const msg = (error as { message?: string } | null)?.message || "bulk_insert_failed";
-      throw new Error(msg);
-    }
-    try {
-      const { ShopService } = await import("@/lib/shop-service");
-      const catsByStore = out.categoryNamesByStore || {};
-      for (const sid of Object.keys(catsByStore)) {
-        const cnt = Array.isArray(catsByStore[sid]) ? catsByStore[sid].length : 0;
-        ShopService.setCategoriesCountInCache(String(sid), cnt);
-      }
-    } catch (error) {
-      console.error("ProductService.bulkAddStoreProductLinks ShopService sync failed", error);
-    }
-    return { inserted: out.inserted ?? 0, addedByStore: out.addedByStore ?? {}, categoryNamesByStore: out.categoryNamesByStore || {} };
+    return await ProductLinkService.bulkAddStoreProductLinks(payload);
   }
 
   static async getStoreLinksForProduct(productId: string): Promise<string[]> {
-    return dedupeInFlight(
-      ProductService.inFlightLinksByProduct,
-      productId,
-      async () => {
-        const payload = await ProductService.invokeEdge<{ store_ids?: string[] }>(
-          "get-store-links-for-product",
-          { product_id: productId },
-        );
-        return Array.isArray(payload.store_ids) ? payload.store_ids.map(String) : [];
-      },
-      { maxSize: ProductService.INFLIGHT_LINKS_MAX_SIZE },
-    );
+    return await ProductLinkService.getStoreLinksForProduct(productId);
   }
 
   static invalidateStoreLinksCache(productId: string) {
-    try {
-      ProductService.inFlightLinksByProduct.delete(productId);
-    } catch (error) {
-      console.error("ProductService.invalidateStoreLinksCache failed", error);
-    }
+    ProductLinkService.invalidateStoreLinksCache(productId);
   }
 
   /** Максимальный лимит продуктов: через отдельную функцию get-product-limit-only */
@@ -829,31 +760,7 @@ export class ProductService {
 
   /** Изображения товара: через product-edit-data */
   static async getProductImages(productId: string): Promise<ProductImage[]> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("store_product_images")
-        .select("id,url,order_index,is_main,r2_key_original")
-        .eq("product_id", String(productId))
-        .order("order_index", { ascending: true });
-      if (error) throw error;
-      return (data || [])
-        .map((img) => ({
-          id: String(img.id),
-          product_id: String(productId),
-          url: String(img.url || ""),
-          order_index: Number(img.order_index || 0),
-          is_main: !!img.is_main,
-        }))
-        .filter((img) => img.url.trim() !== "");
-    } catch {
-      const edit = await ProductService.getProductEditData(productId);
-      return edit.images || [];
-    }
+    return await ProductImageService.getProductImages(productId);
   }
 
   /** Получение товара по ID: через product-edit-data */
