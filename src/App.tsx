@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, Suspense, lazy } from "react";
 import { R2Storage } from "@/lib/r2-storage";
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate, Outlet, useParams } from "react-router-dom";
 import { I18nProvider } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { removeCache } from "@/lib/cache-utils";
@@ -49,6 +49,13 @@ const ProductEdit = lazy(() => import("./pages/user/ProductEdit").then(m => ({ d
 const StoreProducts = lazy(() => import("./pages/user/StoreProducts").then(m => ({ default: m.StoreProducts })));
 const ShopSettings = lazy(() => import("./pages/user/ShopSettings"));
 import { StoreProductEdit } from "./pages/user/StoreProductEdit";
+
+const LegacyUserShopsRedirect = () => {
+  const params = useParams();
+  const rest = params["*"];
+  const to = rest ? `/user/shops/${rest}` : "/user/shops";
+  return <Navigate to={to} replace />;
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -125,11 +132,12 @@ const App = () => {
             { path: ":path/*", element: <UserMenuContentByPath /> },
             { path: "tariff", element: <TariffPage /> },
             { path: "suppliers", element: <Suppliers /> },
-            { path: "shops", element: <Shops /> },
-            { path: "shops/:id/*", element: <ShopDetail /> },
-            { path: "shops/:id/settings", element: <ShopSettings /> },
-            { path: "shops/:id/products", element: <StoreProducts /> },
-            { path: "shops/:id/products/edit/:productId", element: <StoreProductEdit /> },
+            { path: "Shops/*", caseSensitive: true, element: <LegacyUserShopsRedirect /> },
+            { path: "shops", caseSensitive: true, element: <Shops /> },
+            { path: "shops/:id/*", caseSensitive: true, element: <ShopDetail /> },
+            { path: "shops/:id/settings", caseSensitive: true, element: <ShopSettings /> },
+            { path: "shops/:id/products", caseSensitive: true, element: <StoreProducts /> },
+            { path: "shops/:id/products/edit/:productId", caseSensitive: true, element: <StoreProductEdit /> },
             { path: "products", element: <Products /> },
             { path: "products/new-product", element: <ProductCreate /> },
             { path: "products/edit/:id", element: <ProductEdit /> },
