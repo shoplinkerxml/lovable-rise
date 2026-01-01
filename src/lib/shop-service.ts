@@ -252,6 +252,24 @@ export class ShopService {
     }
   }
 
+  static clearAllCaches(): void {
+    try {
+      this.requestCache.clear();
+    } catch {
+      void 0;
+    }
+    try {
+      this.lastUserId = null;
+    } catch {
+      void 0;
+    }
+    try {
+      this.clearCache();
+    } catch {
+      void 0;
+    }
+  }
+
   /**
    * Обновление счетчиков в кэше
    */

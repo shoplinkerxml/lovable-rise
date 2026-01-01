@@ -15,6 +15,7 @@ import { useI18n } from "@/i18n";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
 import { ImageHelpers } from "@/utils/imageHelpers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOutletContext } from "react-router-dom";
 
 interface ProductFormProps {
   product?: any | null;
@@ -39,6 +40,8 @@ interface ProductImage {
 export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Основна інформація
@@ -84,7 +87,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
   // Debug logging (removed stores logging)
 
   const productLimitQuery = useQuery({
-    queryKey: ['products', 'limit'],
+    queryKey: ['user', uid, 'products', 'limit'],
     queryFn: async () => {
       return await ProductService.getProductLimit();
     },
@@ -382,7 +385,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       // Check product limit before creating new product
       if (!product) {
         const limitInfo = productLimitQuery.data ?? await queryClient.fetchQuery({
-          queryKey: ['products', 'limit'],
+          queryKey: ['user', uid, 'products', 'limit'],
           queryFn: async () => {
             return await ProductService.getProductLimit();
           },
@@ -423,7 +426,7 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
         toast.success('Товар успішно оновлено');
       } else {
         savedProduct = await ProductService.createProduct(productData);
-        queryClient.setQueryData(['products', 'limit'], (old: any) => {
+        queryClient.setQueryData(['user', uid, 'products', 'limit'], (old: any) => {
           if (!old) return old;
           const nextCurrent = Math.max(0, Number(old.current ?? 0) + 1);
           const max = Math.max(0, Number(old.max ?? 0));

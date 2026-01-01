@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useOutletContext } from "react-router-dom";
 import { ProductService, type Product, type ProductParam } from "@/lib/product-service";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -134,6 +134,8 @@ export const StoreProductEdit = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
 
   // Consolidated state
   const [form, setForm] = useState<StoreProductLinkForm>({
@@ -164,7 +166,7 @@ export const StoreProductEdit = () => {
 
   const patchStoreProductsCached = useCallback((productId: string, patch: Record<string, unknown>) => {
     const targetId = String(productId);
-    queryClient.setQueriesData({ queryKey: ["products", storeId], exact: false }, (old: any) => {
+    queryClient.setQueriesData({ queryKey: ["user", uid, "products", storeId], exact: false }, (old: any) => {
       if (!old) return old;
       if (Array.isArray(old)) {
         return (old as any[]).map((p) => (String((p as any)?.id) === targetId ? { ...(p as any), ...patch } : p));
@@ -185,7 +187,7 @@ export const StoreProductEdit = () => {
       }
       return old;
     });
-  }, [queryClient, storeId]);
+  }, [queryClient, storeId, uid]);
 
   // ============================================================================
   // Data Loading
@@ -346,7 +348,7 @@ export const StoreProductEdit = () => {
             }
           : {}),
       });
-      queryClient.invalidateQueries({ queryKey: ["products", storeId], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "products", storeId], exact: false });
 
       toast.success(t("product_updated"));
       navigate(`/user/shops/${storeId}`);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useOutletContext } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,8 @@ interface ShopStructureEditorProps {
 export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: ShopStructureEditorProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [loading, setLoading] = useState(false);
   const [loadingStructure, setLoadingStructure] = useState(false);
   const [xmlStructure, setXmlStructure] = useState<XMLStructure | undefined>(
@@ -59,8 +62,8 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
         if (cancelled) return;
         const next = fullShop.xml_config ? (fullShop.xml_config as unknown as XMLStructure) : undefined;
         setXmlStructure((prev) => prev ?? next);
-        queryClient.setQueryData<Shop>(["shopStructure", sid], fullShop);
-        queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+        queryClient.setQueryData<Shop>(["user", uid, "shopStructure", sid], fullShop);
+        queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
           if (!Array.isArray(prev)) return prev;
           return prev.map((s) => (String(s.id) === sid ? ({ ...s, ...fullShop } as ShopAggregated) : s));
         });
@@ -78,7 +81,7 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
     return () => {
       cancelled = true;
     };
-  }, [open, shop.id, queryClient]);
+  }, [open, shop.id, queryClient, uid]);
 
   // Update local state when structure changes in tree
   const handleStructureChange = (newStructure: XMLStructure) => {
@@ -101,8 +104,8 @@ export const ShopStructureEditor = ({ shop, open, onOpenChange, onSuccess }: Sho
       const updatedShop = await ShopService.getShop(shop.id);
       setXmlStructure(updatedShop.xml_config ? (updatedShop.xml_config as unknown as XMLStructure) : undefined);
 
-      queryClient.setQueryData<Shop>(["shopStructure", String(shop.id)], updatedShop);
-      queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+      queryClient.setQueryData<Shop>(["user", uid, "shopStructure", String(shop.id)], updatedShop);
+      queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
         if (!Array.isArray(prev)) return prev;
         const sid = String(shop.id);
         return prev.map((s) => (String(s.id) === sid ? ({ ...s, ...updatedShop } as ShopAggregated) : s));

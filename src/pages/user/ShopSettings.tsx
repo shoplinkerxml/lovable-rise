@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 import { useI18n } from "@/i18n";
@@ -46,6 +46,8 @@ export default function ShopSettings() {
   }>();
   const navigate = useNavigate();
   const breadcrumbs = useBreadcrumbs();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [shopName, setShopName] = useState<string>("");
   const [storeCompany, setStoreCompany] = useState<string>("");
   const [storeUrl, setStoreUrl] = useState<string>("");
@@ -75,7 +77,7 @@ export default function ShopSettings() {
   const [editRzIdValue, setEditRzIdValue] = useState<string>("");
   const [editActive, setEditActive] = useState<boolean>(true);
   const { data: aggData, isLoading: aggLoading } = useQuery<ShopSettingsAggregated | null>({
-    queryKey: ['shopSettingsAgg', id!],
+    queryKey: ["user", uid, "shopSettingsAgg", id!],
     queryFn: async () => {
       if (!id) return null;
       const payload = await ShopService.getShopSettingsAggregated(id!);
@@ -146,7 +148,7 @@ export default function ShopSettings() {
         id: rowId,
         ...patch
       });
-      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
       toast.success(t('category_updated_success'));
     } catch (e) {
       console.error('Failed to update category field', e);
@@ -176,24 +178,24 @@ export default function ShopSettings() {
       const defaultRate = sys?.rate != null ? Number(sys.rate) : 1;
       await ShopService.addStoreCurrency(id!, addCurrencyCode, defaultRate);
       setAddCurrencyCode('');
-      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
     } finally {
       setIsAddingCurrency(false);
     }
   };
   const handleUpdateRate = async (code: string, rate: number) => {
     await ShopService.updateStoreCurrencyRate(id!, code, rate);
-    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
   };
   const handleSetBase = async (code: string) => {
     await ShopService.setBaseStoreCurrency(id!, code);
-    queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+    queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
   };
   const handleDeleteCurrency = async (code: string) => {
     setDeletingCurrency(true);
     try {
       await ShopService.deleteStoreCurrency(id!, code);
-      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
     } finally {
       setDeletingCurrency(false);
     }
@@ -415,7 +417,7 @@ export default function ShopSettings() {
                           await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
                         }
                       }
-                      queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+                      queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
                       setSelectedRowIds([]);
                     } finally {
                       setDeletingCategories(false);
@@ -506,16 +508,16 @@ export default function ShopSettings() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={async () => {
                                 await ShopService.deleteStoreCategoryWithProducts(id!, cat.category_id);
-                                queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+                                queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
                                 try {
                                   const sid = String(id!);
-                                  const list = queryClient.getQueryData<any[]>(['shopsList']) || [];
+                                  const list = queryClient.getQueryData<any[]>(["user", uid, "shops"]) || [];
                                   const current = Array.isArray(list) ? list.find((s: any) => String(s?.id) === sid) : null;
                                   const prevProductsCount = Math.max(0, Number(current?.productsCount ?? 0));
                                   const prevCategoriesCount = Math.max(0, Number(current?.categoriesCount ?? 0));
                                   const nextCategoriesCount =
                                     prevProductsCount === 0 ? 0 : Math.max(0, prevCategoriesCount - 1);
-                                  ShopCountsService.set(queryClient, sid, {
+                                  ShopCountsService.set(queryClient, uid, sid, {
                                     productsCount: prevProductsCount,
                                     categoriesCount: nextCategoriesCount,
                                   });
@@ -586,7 +588,7 @@ export default function ShopSettings() {
                             rz_id_value: editRzIdValue || null,
                             is_active: editActive
                           });
-                          queryClient.invalidateQueries({ queryKey: ['shopSettingsAgg', id] });
+                          queryClient.invalidateQueries({ queryKey: ["user", uid, "shopSettingsAgg", id] });
                           toast.success(t('category_updated_success'));
                           setEditOpen(false);
                           setEditRow(null);

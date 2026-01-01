@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n';
 import { ProductFormTabs } from '@/components/ProductFormTabs';
 import { ProductService, type Product, type ProductParam, type ProductAggregated } from '@/lib/product-service';
 import { CategoryService } from '@/lib/category-service';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from 'sonner';
 
@@ -16,6 +16,8 @@ export const ProductEdit = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryName, setCategoryName] = useState<string>('');
@@ -29,7 +31,7 @@ export const ProductEdit = () => {
 
   const patchProductsCached = useCallback((productId: string, patch: Partial<ProductAggregated>) => {
     const pid = String(productId);
-    queryClient.setQueriesData({ queryKey: ["products"], exact: false }, (old: any) => {
+    queryClient.setQueriesData({ queryKey: ["user", uid, "products"], exact: false }, (old: any) => {
       if (!old) return old;
       if (Array.isArray(old)) {
         return (old as any[]).map((p) => (String((p as any)?.id) === pid ? { ...(p as any), ...patch } : p));
@@ -50,10 +52,10 @@ export const ProductEdit = () => {
       }
       return old;
     });
-  }, [queryClient]);
+  }, [queryClient, uid]);
 
   const lookupsQuery = useQuery({
-    queryKey: ["user", "lookups"],
+    queryKey: ["user", uid, "lookups"],
     queryFn: async () => {
       return await ProductService.getUserLookups();
     },
@@ -215,12 +217,12 @@ export const ProductEdit = () => {
     void ProductService.updateProduct(id, payload)
       .then(() => {
         toast.success(t('product_updated'));
-        queryClient.invalidateQueries({ queryKey: ["products"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["user", uid, "products"], exact: false });
       })
       .catch((error) => {
         console.error('Failed to save product:', error);
         toast.error(t('failed_save_product'));
-        queryClient.invalidateQueries({ queryKey: ["products"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["user", uid, "products"], exact: false });
       });
   };
 

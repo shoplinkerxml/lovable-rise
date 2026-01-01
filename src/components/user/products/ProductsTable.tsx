@@ -48,6 +48,7 @@ import { Toolbar } from "./ProductsTable/Toolbar";
 import { useProductColumns } from "./ProductsTable/columns";
 import type { ShopAggregated } from "@/lib/shop-service";
 import type { ProductRow } from "./ProductsTable/columns";
+import { useOutletContext } from "react-router-dom";
 
  
 
@@ -88,6 +89,8 @@ export const ProductsTable = ({
 }: ProductsTableProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; product: Product | null }>({
     open: false,
     product: null,
@@ -123,9 +126,10 @@ export const ProductsTable = ({
     } catch { void 0; }
     return { pageIndex: 0, pageSize: 10 };
   });
+  const productsBaseKey = useMemo(() => ["user", uid, "products", storeId ?? "all"] as const, [uid, storeId]);
   const productsQueryKey = useMemo(
-    () => ["products", storeId ?? "all", "pageSize", pagination.pageSize] as const,
-    [storeId, pagination.pageSize],
+    () => [...productsBaseKey, "pageSize", pagination.pageSize] as const,
+    [productsBaseKey, pagination.pageSize],
   );
   const productsQuery = useInfiniteQuery<ResponseData, Error, InfiniteData<ResponseData, number>, typeof productsQueryKey, number>({
     queryKey: productsQueryKey,
@@ -149,7 +153,7 @@ export const ProductsTable = ({
   }, [productsQuery.data]);
   const loading = productsQuery.isPending || (productsQuery.isFetching && items.length === 0);
   const setProductsCached = useCallback((updater: (prev: ProductRow[]) => ProductRow[]) => {
-    queryClient.setQueriesData({ queryKey: ["products", storeId ?? "all"], exact: false }, (old: any) => {
+    queryClient.setQueriesData({ queryKey: productsBaseKey, exact: false }, (old: any) => {
       if (!old) return old;
       if (Array.isArray(old)) return updater(old as ProductRow[]);
       if (typeof old === "object" && Array.isArray((old as any).pages)) {
@@ -164,7 +168,7 @@ export const ProductsTable = ({
       }
       return old;
     });
-  }, [queryClient, storeId]);
+  }, [queryClient, productsBaseKey]);
   const [categoryFilterOptions, setCategoryFilterOptions] = useState<string[]>([]);
   const [, setLastSelectedProductIds] = useState<string[]>([]);
 
@@ -192,8 +196,8 @@ export const ProductsTable = ({
       return;
     }
     if (refreshTrigger == null) return;
-    queryClient.invalidateQueries({ queryKey: ["products", storeId ?? "all"], exact: false });
-  }, [refreshTrigger, queryClient, storeId]);
+    queryClient.invalidateQueries({ queryKey: productsBaseKey, exact: false });
+  }, [refreshTrigger, queryClient, productsBaseKey]);
   useEffect(() => {
     try {
       writeCache('user_products_pagination', { pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }, CACHE_TTL.uiPrefs);
@@ -230,7 +234,7 @@ export const ProductsTable = ({
     const total = pageInfo?.total ?? products.length;
     onProductsLoadedRef.current?.(total);
   }, [products.length, pageInfo]);
-  useProductsRealtime(storeId, queryClient);
+  useProductsRealtime(storeId, uid, queryClient);
 
   
 
@@ -248,7 +252,7 @@ export const ProductsTable = ({
         entityKey: `product:duplicate:${product.id}`,
         run: async () => {
           await ProductService.duplicateProduct(product.id);
-          await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false });
+          await queryClient.refetchQueries({ queryKey: productsBaseKey, exact: false });
         },
       });
     } catch (error) {
@@ -359,15 +363,15 @@ export const ProductsTable = ({
   
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
   const loadStoresForMenu = useCallback(async () => {
-    const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);
+    const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]);
     if (Array.isArray(cachedAgg) && cachedAgg.length > 0) {
       setStores(cachedAgg);
       return;
     }
     const data = await ShopService.getShopsAggregated();
     setStores((data || []) as ShopAggregated[]);
-    try { queryClient.setQueryData<ShopAggregated[]>(['shopsList'], (data || []) as ShopAggregated[]); } catch { void 0; }
-  }, [queryClient]);
+    try { queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (data || []) as ShopAggregated[]); } catch { void 0; }
+  }, [queryClient, uid]);
   const [addingStores, setAddingStores] = useState(false);
   const [removingStores, setRemovingStores] = useState(false);
   const [removingStoreId, setRemovingStoreId] = useState<string | null>(null);
@@ -376,10 +380,10 @@ export const ProductsTable = ({
     setProductsCached((prev) => prev.map((p) => p.id === productId ? { ...p, linkedStoreIds: ids } : p));
     try { setSelectedStoreIds(ids.map(String)); } catch { void 0; }
     try {
-      const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+      const updated = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
       setStores(updated);
     } catch { void 0; }
-  }, [setProductsCached, queryClient]);
+  }, [setProductsCached, queryClient, uid]);
 
   const handleRemoveStoreLink = useCallback(async (productId: string, storeIdToRemove: string) => {
     const pid = String(productId);
@@ -390,22 +394,22 @@ export const ProductsTable = ({
       const { deletedByStore, categoryNamesByStore } = await ProductService.bulkRemoveStoreProductLinks([pid], [sid]);
       const deleted = Math.max(0, Number(deletedByStore?.[sid] ?? 1) || 0);
       if (deleted > 0) {
-        ShopCountsService.bumpProducts(queryClient, sid, -deleted);
+        ShopCountsService.bumpProducts(queryClient, uid, sid, -deleted);
       }
       const cats = categoryNamesByStore?.[sid];
       if (Array.isArray(cats)) {
         const cnt = cats.length;
-        queryClient.setQueryData(ShopCountsService.key(sid), (old: any) => {
+        queryClient.setQueryData(ShopCountsService.key(uid, sid), (old: any) => {
           const prevProducts = Number(old?.productsCount ?? 0) || 0;
           return { productsCount: prevProducts, categoriesCount: cnt };
         });
-        queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+        queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
           if (!Array.isArray(prev)) return prev;
           return prev.map((s) => (String(s.id) === sid ? { ...s, categoriesCount: cnt } : s));
         });
       }
       try {
-        const updated = queryClient.getQueryData<ShopAggregated[]>(['shopsList']) || [];
+        const updated = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
         setStores(updated);
       } catch { /* ignore */ }
       try { setSelectedStoreIds((prev) => prev.filter((id) => String(id) !== String(sid))); } catch { void 0; }
@@ -419,12 +423,12 @@ export const ProductsTable = ({
   }, [setProductsCached, queryClient, t]);
   useEffect(() => {
     try {
-      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(['shopsList']);
+      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]);
       if (Array.isArray(cachedAgg) && cachedAgg.length > 0) {
         setStores(cachedAgg);
       }
     } catch { void 0; }
-  }, [queryClient]);
+  }, [queryClient, uid]);
 
   useEffect(() => {
     if (storeId) return;
@@ -704,7 +708,7 @@ export const ProductsTable = ({
             if (productToDelete) {
               await onDelete?.(productToDelete);
               setProductsCached((prev) => prev.filter((p) => String(p.id) !== String(productToDelete.id)));
-              try { await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false }); } catch { void 0; }
+              try { await queryClient.refetchQueries({ queryKey: productsBaseKey, exact: false }); } catch { void 0; }
             } else {
               const selected = table.getSelectedRowModel().rows.map((r) => r.original) as ProductRow[];
               if (storeId) {
@@ -724,27 +728,27 @@ export const ProductsTable = ({
                   );
                   try {
                     if (removedCount > 0) {
-                      ShopCountsService.bumpProducts(queryClient, sid, -removedCount);
+                      ShopCountsService.bumpProducts(queryClient, uid, sid, -removedCount);
                     }
                     const cats = categoryNamesByStore?.[sid];
                     if (Array.isArray(cats)) {
                       const cnt = cats.length;
-                      queryClient.setQueryData(ShopCountsService.key(sid), (old: any) => {
+                      queryClient.setQueryData(ShopCountsService.key(uid, sid), (old: any) => {
                         const prevProducts = Number(old?.productsCount ?? 0) || 0;
                         return { productsCount: prevProducts, categoriesCount: cnt };
                       });
-                      queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                      queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                         if (!Array.isArray(prev)) return prev;
                         return prev.map((s) => (String(s.id) === sid ? { ...s, categoriesCount: cnt } : s));
                       });
-                      queryClient.setQueryData<ShopAggregated | null>(["shopDetail", sid], (prev) => {
+                      queryClient.setQueryData<ShopAggregated | null>(["user", uid, "shopDetail", sid], (prev) => {
                         if (!prev) return prev;
                         return { ...prev, categoriesCount: cnt };
                       });
                     }
                   } catch { void 0; }
                   toast.success(t('product_removed_from_store'));
-                  try { await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false }); } catch { void 0; }
+                  try { await queryClient.refetchQueries({ queryKey: productsBaseKey, exact: false }); } catch { void 0; }
                 } catch (_) {
                   toast.error(t('failed_remove_from_store'));
                 } finally { setDeleteProgress({ open: false }); }
@@ -760,7 +764,7 @@ export const ProductsTable = ({
                     setProductsCached((prev) => prev.filter((p) => !ids.includes(String(p.id))));
                     didBatch = true;
                     toast.success(t('products_deleted_successfully'));
-                    try { await queryClient.refetchQueries({ queryKey: ["products", storeId ?? "all"], exact: false }); } catch { void 0; }
+                    try { await queryClient.refetchQueries({ queryKey: productsBaseKey, exact: false }); } catch { void 0; }
                   } catch (_) {
                     toast.error(t('failed_delete_product'));
                   } finally { setDeleteProgress({ open: false }); }
@@ -769,7 +773,7 @@ export const ProductsTable = ({
               }
             }
             if (didBatch || typeof refreshTrigger === 'undefined') {
-              queryClient.invalidateQueries({ queryKey: ["products", storeId ?? "all"], exact: false });
+              queryClient.invalidateQueries({ queryKey: productsBaseKey, exact: false });
             }
           } catch (error) {
             console.error("Delete error:", error);

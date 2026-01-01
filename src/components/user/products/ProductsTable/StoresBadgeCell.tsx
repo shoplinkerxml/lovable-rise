@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ShopService, type ShopAggregated } from "@/lib/shop-service";
 import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
+import { useOutletContext } from "react-router-dom";
 
 type ProductRow = Product & { linkedStoreIds?: string[] };
 
@@ -25,6 +26,8 @@ type Props = {
 export function StoresBadgeCell({ product, storeNames, storesList, prefetchStores, onRemove, onStoresUpdate }: Props) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const storeIds = product.linkedStoreIds || [];
   const [open, setOpen] = useState(false);
   const [stores, setStores] = useState<ShopAggregated[]>([]);
@@ -35,17 +38,17 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
   const truncate = (s: string) => (s.length > 12 ? `${s.slice(0, 12)}...` : s);
 
   const loadStoresAndLinks = useCallback(async () => {
-    let shops: ShopAggregated[] = [];
-    try {
-      try { await prefetchStores?.(); } catch { void 0; }
-      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+      let shops: ShopAggregated[] = [];
+      try {
+        try { await prefetchStores?.(); } catch { void 0; }
+      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
       if (cachedAgg.length > 0) {
         shops = cachedAgg;
       } else {
         setLoadingStores(true);
         const data = await ShopService.getShopsAggregated();
         shops = data || [];
-        try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], shops); } catch { void 0; }
+        try { queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], shops); } catch { void 0; }
       }
     } catch {
       shops = Array.isArray(storesList) && storesList.length > 0 ? storesList : Object.entries(storeNames).map(([id, name]) => ({ id: String(id), store_name: name })) as ShopAggregated[];
@@ -138,15 +141,15 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               {
                                 const idStr = String(id);
                                 const added = Math.max(0, Number(addedByStore?.[idStr] ?? 1) || 0);
-                                if (added > 0) ShopCountsService.bumpProducts(queryClient, idStr, added);
+                                if (added > 0) ShopCountsService.bumpProducts(queryClient, uid, idStr, added);
                                 const cats = categoryNamesByStore?.[idStr];
                                 if (Array.isArray(cats)) {
                                   const cnt = cats.length;
-                                  queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                  queryClient.setQueryData(ShopCountsService.key(uid, idStr), (old: any) => {
                                     const prevProducts = Number(old?.productsCount ?? 0) || 0;
                                     return { productsCount: prevProducts, categoriesCount: cnt };
                                   });
-                                  queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                  queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                                     if (!Array.isArray(prev)) return prev;
                                     return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
                                   });
@@ -160,15 +163,15 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                               {
                                 const idStr = String(id);
                                 const deleted = Math.max(0, Number(deletedByStore?.[idStr] ?? 1) || 0);
-                                if (deleted > 0) ShopCountsService.bumpProducts(queryClient, idStr, -deleted);
+                                if (deleted > 0) ShopCountsService.bumpProducts(queryClient, uid, idStr, -deleted);
                                 const cats = categoryNamesByStore?.[idStr];
                                 if (Array.isArray(cats)) {
                                   const cnt = cats.length;
-                                  queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                  queryClient.setQueryData(ShopCountsService.key(uid, idStr), (old: any) => {
                                     const prevProducts = Number(old?.productsCount ?? 0) || 0;
                                     return { productsCount: prevProducts, categoriesCount: cnt };
                                   });
-                                  queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                  queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                                     if (!Array.isArray(prev)) return prev;
                                     return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
                                   });
@@ -283,15 +286,15 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       {
                                         const sidStr = String(sid);
                                         const added = Math.max(0, Number(addedByStore?.[sidStr] ?? 1) || 0);
-                                        if (added > 0) ShopCountsService.bumpProducts(queryClient, sidStr, added);
+                                        if (added > 0) ShopCountsService.bumpProducts(queryClient, uid, sidStr, added);
                                         const cats = categoryNamesByStore?.[sidStr];
                                         if (Array.isArray(cats)) {
                                           const cnt = cats.length;
-                                          queryClient.setQueryData(ShopCountsService.key(sidStr), (old: any) => {
+                                          queryClient.setQueryData(ShopCountsService.key(uid, sidStr), (old: any) => {
                                             const prevProducts = Number(old?.productsCount ?? 0) || 0;
                                             return { productsCount: prevProducts, categoriesCount: cnt };
                                           });
-                                          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                          queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                                             if (!Array.isArray(prev)) return prev;
                                             return prev.map((s) => (String(s.id) === sidStr ? { ...s, categoriesCount: cnt } : s));
                                           });
@@ -305,15 +308,15 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
                                       {
                                         const sidStr = String(sid);
                                         const deleted = Math.max(0, Number(deletedByStore?.[sidStr] ?? 1) || 0);
-                                        if (deleted > 0) ShopCountsService.bumpProducts(queryClient, sidStr, -deleted);
+                                        if (deleted > 0) ShopCountsService.bumpProducts(queryClient, uid, sidStr, -deleted);
                                         const cats = categoryNamesByStore?.[sidStr];
                                         if (Array.isArray(cats)) {
                                           const cnt = cats.length;
-                                          queryClient.setQueryData(ShopCountsService.key(sidStr), (old: any) => {
+                                          queryClient.setQueryData(ShopCountsService.key(uid, sidStr), (old: any) => {
                                             const prevProducts = Number(old?.productsCount ?? 0) || 0;
                                             return { productsCount: prevProducts, categoriesCount: cnt };
                                           });
-                                          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                          queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                                             if (!Array.isArray(prev)) return prev;
                                             return prev.map((s) => (String(s.id) === sidStr ? { ...s, categoriesCount: cnt } : s));
                                           });

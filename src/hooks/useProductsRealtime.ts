@@ -2,7 +2,11 @@ import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useProductsRealtime(storeId: string | undefined, queryClient: QueryClient) {
+export function useProductsRealtime(
+  storeId: string | undefined,
+  userId: string | null | undefined,
+  queryClient: QueryClient,
+) {
   useEffect(() => {
     let scheduled = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -11,7 +15,8 @@ export function useProductsRealtime(storeId: string | undefined, queryClient: Qu
       scheduled = true;
       timeoutId = setTimeout(() => {
         scheduled = false;
-        queryClient.invalidateQueries({ queryKey: ["products", storeId ?? "all"] });
+        const uid = userId ? String(userId) : "current";
+        queryClient.invalidateQueries({ queryKey: ["user", uid, "products", storeId ?? "all"], exact: false });
       }, 300);
     };
     type RealtimeChannelApi = { on: (...args: unknown[]) => RealtimeChannelApi; subscribe: () => unknown };
@@ -29,5 +34,5 @@ export function useProductsRealtime(storeId: string | undefined, queryClient: Qu
       try { sb.removeChannel(channel); } catch { void 0; }
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [queryClient, storeId]);
+  }, [queryClient, storeId, userId]);
 }

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
+import { useOutletContext } from "react-router-dom";
 
 type ProductRow = Product & { linkedStoreIds?: string[] };
 type StoreAgg = { 
@@ -55,6 +56,7 @@ function hasLinkedProducts(products: ProductRow[], storeIds: string[]): boolean 
 
 async function updateStoreCounts(
   queryClient: QueryClient,
+  userId: string,
   storeIds: string[],
   productDelta: Record<string, number>,
   setStores: (stores: StoreAgg[]) => void,
@@ -68,7 +70,7 @@ async function updateStoreCounts(
     for (const sid of uniqueIds) {
       const delta = Number(deltas[String(sid)] ?? 0) || 0;
       if (delta !== 0) {
-        ShopCountsService.bumpProducts(queryClient, String(sid), delta);
+        ShopCountsService.bumpProducts(queryClient, userId, String(sid), delta);
       }
     }
 
@@ -77,13 +79,13 @@ async function updateStoreCounts(
     if (categoryStoreIds.length > 0) {
       for (const sid of categoryStoreIds) {
         const cnt = Array.isArray(categoriesByStore[sid]) ? categoriesByStore[sid].length : 0;
-        queryClient.setQueryData(ShopCountsService.key(String(sid)), (old: any) => {
+        queryClient.setQueryData(ShopCountsService.key(userId, String(sid)), (old: any) => {
           const prevProducts = Number(old?.productsCount ?? 0) || 0;
           return { productsCount: prevProducts, categoriesCount: cnt };
         });
       }
 
-      queryClient.setQueryData<StoreAgg[]>(["shopsList"], (prev) => {
+      queryClient.setQueryData<StoreAgg[]>(["user", userId ? String(userId) : "current", "shops"], (prev) => {
         if (!Array.isArray(prev)) return prev;
         return prev.map((s) => {
           const sid = String((s as any).id);
@@ -95,7 +97,7 @@ async function updateStoreCounts(
     }
 
     try {
-      const updated = queryClient.getQueryData<StoreAgg[]>(["shopsList"]) || [];
+      const updated = queryClient.getQueryData<StoreAgg[]>(["user", userId ? String(userId) : "current", "shops"]) || [];
       if (Array.isArray(updated) && updated.length > 0) {
         setStores(updated as StoreAgg[]);
         return;
@@ -165,6 +167,8 @@ export function AddToStoresMenu({
   const { t } = useI18n();
   const qc = useQueryClient();
   const q = queryClient || qc;
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
 
   const selectedProducts = table.getSelectedRowModel().rows
     .map(r => r.original)
@@ -230,7 +234,7 @@ export function AddToStoresMenu({
       }));
 
       // Обновляем счетчики магазинов
-      await updateStoreCounts(q, selectedStoreIds, addedByStore, setStores, stores, categoryNamesByStore, items);
+      await updateStoreCounts(q, uid, selectedStoreIds, addedByStore, setStores, stores, categoryNamesByStore, items);
 
     } catch (error) {
       console.error('Failed to add products to stores:', error);
@@ -278,7 +282,7 @@ export function AddToStoresMenu({
         Object.entries(countsByStore).map(([sid, count]) => [sid, -count])
       );
 
-      await updateStoreCounts(q, storeIds, negativeDeltas, setStores, stores, categoryNamesByStore, items);
+      await updateStoreCounts(q, uid, storeIds, negativeDeltas, setStores, stores, categoryNamesByStore, items);
 
     } catch (error) {
       console.error('Failed to remove products from stores:', error);
@@ -312,7 +316,7 @@ export function AddToStoresMenu({
       }));
 
       const delta = deletedByStore?.[storeId] || productsInStore.length;
-      await updateStoreCounts(q, [storeId], { [storeId]: -delta }, setStores, stores, categoryNamesByStore, items);
+      await updateStoreCounts(q, uid, [storeId], { [storeId]: -delta }, setStores, stores, categoryNamesByStore, items);
 
       const remainingCount = countProductsInStore(items, storeId) - delta;
       if (remainingCount === 0) {

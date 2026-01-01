@@ -5,18 +5,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const useUserRole = () => {
   const queryClient = useQueryClient();
-  const { data: role, isLoading: loading } = useQuery({
-    queryKey: ['userRole'],
-    queryFn: async () => {
-      const resp = await UserAuthService.fetchAuthMe();
-      return resp?.user?.role ?? null;
-    },
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: async () => UserAuthService.fetchAuthMe(),
     staleTime: 60_000,
   });
+  const role = data?.user?.role ?? null;
 
   useEffect(() => {
     const { data: subscription } = supabase.auth.onAuthStateChange(() => {
-      queryClient.invalidateQueries({ queryKey: ['userRole'] });
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     });
     return () => subscription?.subscription?.unsubscribe();
   }, [queryClient]);

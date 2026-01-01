@@ -8,7 +8,7 @@ import { R2Storage } from "@/lib/r2-storage";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet, useParams } from "react-router-dom";
 import { I18nProvider } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
-import { removeCache } from "@/lib/cache-utils";
+import { removeCache, UnifiedCacheManager } from "@/lib/cache-utils";
 // Dev diagnostics removed per request
 
 const Index = lazy(() => import("./pages/Index"));
@@ -68,6 +68,8 @@ const queryClient = new QueryClient({
   },
 });
 
+let lastAuthUserId: string | null = null;
+
 const App = () => {
   // Clean up orphan temporary uploads for the current user on app start
   useEffect(() => {
@@ -75,7 +77,44 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange(() => {
+    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUserId = session?.user?.id ? String(session.user.id) : null;
+      const userChanged = currentUserId !== lastAuthUserId;
+      const shouldClear =
+        event === "SIGNED_OUT" ||
+        (event === "SIGNED_IN" && userChanged) ||
+        (event === "USER_UPDATED" && userChanged);
+      if (shouldClear) {
+        try {
+          queryClient.clear();
+        } catch {
+          void 0;
+        }
+        try {
+          UnifiedCacheManager.invalidatePattern(/^rq:/);
+        } catch {
+          void 0;
+        }
+        try {
+          const { SupplierService } = await import("@/lib/supplier-service");
+          SupplierService.clearSuppliersCache();
+        } catch {
+          void 0;
+        }
+        try {
+          const { ShopService } = await import("@/lib/shop-service");
+          ShopService.clearAllCaches();
+        } catch {
+          void 0;
+        }
+        try {
+          const { ProductService } = await import("@/lib/product-service");
+          (ProductService as unknown as { clearAllProductsCaches?: () => void }).clearAllProductsCaches?.();
+        } catch {
+          void 0;
+        }
+      }
+      lastAuthUserId = currentUserId;
       try {
         queryClient.removeQueries({ queryKey: ["auth", "me"], exact: true });
         queryClient.removeQueries({ queryKey: ["auth", "session"], exact: true });

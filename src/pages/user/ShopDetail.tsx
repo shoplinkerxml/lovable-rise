@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Edit, Settings, Share2, Package, List, Store as StoreIcon } from 'lucide-react';
@@ -25,6 +25,8 @@ export const ShopDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
 
@@ -48,7 +50,7 @@ export const ShopDetail = () => {
   }, [shopId, navigate]);
 
   const { data: shopsList, isLoading, isError } = useQuery<ShopAggregated[]>({
-    queryKey: ['shopsList'],
+    queryKey: ["user", uid, "shops"],
     queryFn: async () => await ShopService.getShopsAggregated(),
     enabled: true,
     retry: false,
@@ -66,6 +68,7 @@ export const ShopDetail = () => {
 
   useShopRealtimeSync({ 
     shopId: shopId, 
+    userId: uid,
     enabled: !!shopId
   });
 
@@ -85,7 +88,7 @@ export const ShopDetail = () => {
           [shopId]
         );
 
-        const list = queryClient.getQueryData<ShopAggregated[]>(['shopsList']) || [];
+        const list = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
         const current = (list || []).find((s) => String(s.id) === String(shopId)) ?? null;
         const baseProductsCount = Math.max(0, Number(current?.productsCount ?? 0));
         const baseCategoriesCount = Math.max(0, Number(current?.categoriesCount ?? 0));
@@ -99,7 +102,7 @@ export const ShopDetail = () => {
               ? cats.length
               : baseCategoriesCount;
 
-        ShopCountsService.set(queryClient, shopId, {
+        ShopCountsService.set(queryClient, uid, shopId, {
           productsCount: nextProductsCount,
           categoriesCount: nextCategoriesCount,
         });

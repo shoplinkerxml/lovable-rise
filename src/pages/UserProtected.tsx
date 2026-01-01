@@ -163,9 +163,10 @@ const UserProtected = () => {
         );
       }
       if (shouldPrefetchSuppliers) {
+        const uid = user?.id ? String(user.id) : "current";
         tasks.push(
           queryClient.prefetchQuery({
-            queryKey: ["suppliers", "list"],
+            queryKey: ["user", uid, "suppliers", "list"],
             queryFn: async () => {
               const { SupplierService } = await import("@/lib/supplier-service");
               const suppliers = await SupplierService.getSuppliers();

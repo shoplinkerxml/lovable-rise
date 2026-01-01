@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { useOutletContext } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,6 +23,8 @@ export function ImportExportMenu({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const onClick = useCallback(() => setOpen(true), []);
   return (
     <>
@@ -52,6 +55,7 @@ export function ImportExportMenu({
         onOpenChange={setOpen}
         t={t}
         storeId={storeId}
+        userId={uid}
         queryClient={queryClient}
         selectedProducts={selectedProducts}
       />

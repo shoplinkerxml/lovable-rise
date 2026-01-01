@@ -11,6 +11,7 @@ import { ShopCountsService } from "@/lib/shop-counts";
 import { ProductService, type Product } from "@/lib/product-service";
 import type { ShopAggregated } from "@/lib/shop-service";
 import { useSyncStatus } from "@/lib/optimistic-mutation";
+import { useOutletContext } from "react-router-dom";
 
 type ProductRow = Product & {
   linkedStoreIds?: string[];
@@ -23,6 +24,8 @@ type ProductRow = Product & {
 export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate, onTrigger, canCreate, hideDuplicate, storeId, onStoresUpdate, storesList, prefetchStores, storeNames, duplicating }: { product: ProductRow; onEdit: () => void; onDelete: () => void; onDuplicate?: () => void; onTrigger?: () => void; canCreate?: boolean; hideDuplicate?: boolean; storeId?: string; onStoresUpdate?: (productId: string, ids: string[], opts?: { storeIdChanged?: string; added?: boolean; categoryKey?: string | null }) => void; storesList?: ShopAggregated[]; prefetchStores?: () => Promise<void>; storeNames?: Record<string, string>; duplicating?: boolean; }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [stores, setStores] = useState<ShopAggregated[]>([]);
   const [linkedStoreIds, setLinkedStoreIds] = useState<string[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -37,7 +40,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
 
     try {
       try { await prefetchStores?.(); } catch { void 0; }
-      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+      const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
       if (cachedAgg.length > 0) {
         setStores(cachedAgg);
       } else {
@@ -46,7 +49,7 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
           const data = await ShopService.getShopsAggregated();
           const arr = data || [];
           setStores(arr);
-          try { queryClient.setQueryData<ShopAggregated[]>(["shopsList"], arr); } catch { void 0; }
+          try { queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], arr); } catch { void 0; }
         } finally {
           setLoadingStores(false);
         }
@@ -168,21 +171,21 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                       {
                                         const idStr = String(id);
                                         const added = Math.max(0, Number(addedByStore?.[idStr] ?? 1) || 0);
-                                        if (added > 0) ShopCountsService.bumpProducts(queryClient, idStr, added);
+                                        if (added > 0) ShopCountsService.bumpProducts(queryClient, uid, idStr, added);
                                         const cats = categoryNamesByStore?.[idStr];
                                         if (Array.isArray(cats)) {
                                           const cnt = cats.length;
-                                          queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                          queryClient.setQueryData(ShopCountsService.key(uid, idStr), (old: any) => {
                                             const prevProducts = Number(old?.productsCount ?? 0) || 0;
                                             return { productsCount: prevProducts, categoriesCount: cnt };
                                           });
-                                          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                          queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                                             if (!Array.isArray(prev)) return prev;
                                             return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
                                           });
                                         }
                                         try {
-                                          const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                          const updated = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
                                           setStores(updated || []);
                                         } catch { /* ignore */ }
                                       }
@@ -195,21 +198,21 @@ export function ProductActionsDropdown({ product, onEdit, onDelete, onDuplicate,
                                       {
                                         const idStr = String(id);
                                         const deleted = Math.max(0, Number(deletedByStore?.[idStr] ?? 1) || 0);
-                                        if (deleted > 0) ShopCountsService.bumpProducts(queryClient, idStr, -deleted);
+                                        if (deleted > 0) ShopCountsService.bumpProducts(queryClient, uid, idStr, -deleted);
                                         const cats = categoryNamesByStore?.[idStr];
                                         if (Array.isArray(cats)) {
                                           const cnt = cats.length;
-                                          queryClient.setQueryData(ShopCountsService.key(idStr), (old: any) => {
+                                          queryClient.setQueryData(ShopCountsService.key(uid, idStr), (old: any) => {
                                             const prevProducts = Number(old?.productsCount ?? 0) || 0;
                                             return { productsCount: prevProducts, categoriesCount: cnt };
                                           });
-                                          queryClient.setQueryData<ShopAggregated[]>(["shopsList"], (prev) => {
+                                          queryClient.setQueryData<ShopAggregated[]>(["user", uid, "shops"], (prev) => {
                                             if (!Array.isArray(prev)) return prev;
                                             return prev.map((s) => (String(s.id) === idStr ? { ...s, categoriesCount: cnt } : s));
                                           });
                                         }
                                         try {
-                                          const updated = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]) || [];
+                                          const updated = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]) || [];
                                           setStores(updated || []);
                                         } catch { /* ignore */ }
                                       }

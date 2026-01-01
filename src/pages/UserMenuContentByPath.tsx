@@ -27,6 +27,7 @@ const UserMenuContentByPath = () => {
   const { user, menuItems, onMenuUpdate } = useOutletContext<UserDashboardContextType>();
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const uid = user?.id ? String(user.id) : "current";
   const [menuItem, setMenuItem] = useState<UserMenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,14 +53,14 @@ const UserMenuContentByPath = () => {
     data: shopForStructure,
     isLoading: shopForStructureLoading,
   } = useQuery<Shop | null>({
-    queryKey: ["shopStructure", shopRoute?.storeId || ""],
+    queryKey: ["user", uid, "shopStructure", shopRoute?.storeId || ""],
     queryFn: async () => {
       const storeId = String(shopRoute?.storeId || "").trim();
       if (!storeId) return null;
       try {
         return await ShopService.getShop(storeId);
       } catch {
-        const cached = queryClient.getQueryData<ShopAggregated[]>(["shopsList"]);
+        const cached = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]);
         const fromCache = Array.isArray(cached)
           ? cached.find((s) => String(s.id) === storeId)
           : null;

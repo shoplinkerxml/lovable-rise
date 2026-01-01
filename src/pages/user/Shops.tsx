@@ -23,7 +23,8 @@ export const Shops = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [limitInfo, setLimitInfo] = useState<ShopLimitInfo>({ current: 0, max: 0, canCreate: false });
   const queryClient = useQueryClient();
-  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
+  const { tariffLimits, user } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }>; user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
 
   const handleShopsLoaded = (count: number, info?: ShopLimitInfo | null) => {
     setShopsCount(count);
@@ -52,13 +53,13 @@ export const Shops = () => {
         const channel = supabase
           .channel(`shop_limit_${userId}`)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'user_subscriptions', filter: `user_id=eq.${userId}` }, () => {
-            queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+            queryClient.invalidateQueries({ queryKey: ["user", uid, "shops"] });
           })
           .subscribe();
         return () => { try { supabase.removeChannel(channel); } catch { void 0; } };
       } catch { /* noop */ }
     })();
-  }, [queryClient]);
+  }, [queryClient, uid]);
 
   // No forced refresh on mount; React Query in ShopsList handles initial fetch
   const handleCreateNew = () => {

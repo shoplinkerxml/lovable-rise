@@ -6,23 +6,25 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface UseShopRealtimeSyncOptions {
   shopId: string;
+  userId?: string | null;
   enabled?: boolean;
 }
 
-export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeSyncOptions) => {
+export const useShopRealtimeSync = ({ shopId, userId, enabled = true }: UseShopRealtimeSyncOptions) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!enabled || !shopId) return;
+    const uid = userId ? String(userId) : "current";
 
     const handleInsert = (payload: any) => {
       const { store_id, is_active } = payload.new;
-      if (String(store_id) === shopId && is_active !== false) ShopCountsService.bumpProducts(queryClient, shopId, +1);
+      if (String(store_id) === shopId && is_active !== false) ShopCountsService.bumpProducts(queryClient, uid, shopId, +1);
     };
 
     const handleDelete = (payload: any) => {
       const { store_id, is_active } = payload.old;
-      if (String(store_id) === shopId && is_active !== false) ShopCountsService.bumpProducts(queryClient, shopId, -1);
+      if (String(store_id) === shopId && is_active !== false) ShopCountsService.bumpProducts(queryClient, uid, shopId, -1);
     };
 
     const handleUpdate = (payload: any) => {
@@ -35,13 +37,13 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
 
       if (sidOld === sidNew && sidNew === shopId) {
         if (wasActive !== isActive) {
-          ShopCountsService.bumpProducts(queryClient, shopId, isActive ? +1 : -1);
+          ShopCountsService.bumpProducts(queryClient, uid, shopId, isActive ? +1 : -1);
         }
         return;
       }
 
-      if (sidOld === shopId && wasActive) ShopCountsService.bumpProducts(queryClient, shopId, -1);
-      if (sidNew === shopId && isActive) ShopCountsService.bumpProducts(queryClient, shopId, +1);
+      if (sidOld === shopId && wasActive) ShopCountsService.bumpProducts(queryClient, uid, shopId, -1);
+      if (sidNew === shopId && isActive) ShopCountsService.bumpProducts(queryClient, uid, shopId, +1);
     };
 
     const client = supabase as SupabaseClient;
@@ -56,5 +58,5 @@ export const useShopRealtimeSync = ({ shopId, enabled = true }: UseShopRealtimeS
     return () => {
       client.removeChannel(channel).catch(() => void 0);
     };
-  }, [shopId, enabled, queryClient]);
+  }, [shopId, enabled, queryClient, userId]);
 };

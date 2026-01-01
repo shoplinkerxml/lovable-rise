@@ -12,6 +12,7 @@ import { useI18n } from "@/i18n";
 import { SupplierService, type Supplier, type CreateSupplierData, type UpdateSupplierData } from '@/lib/supplier-service';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useOutletContext } from 'react-router-dom';
 
 interface SupplierFormProps {
   supplier?: Supplier | null;
@@ -22,6 +23,8 @@ interface SupplierFormProps {
 export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProps) => {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     supplier_name: supplier?.supplier_name || '',
@@ -76,7 +79,7 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
           phone: formData.phone.trim() || undefined,
         };
         const updated = await SupplierService.updateSupplier(supplier.id, updateData);
-        queryClient.setQueryData<Supplier[]>(['suppliers', 'list'], (old) => {
+        queryClient.setQueryData<Supplier[]>(['user', uid, 'suppliers', 'list'], (old) => {
           const list = Array.isArray(old) ? old : [];
           const next = list.map((s) => (Number(s.id) === Number(updated.id) ? updated : s));
           return next.some((s) => Number(s.id) === Number(updated.id)) ? next : [updated, ...next];
@@ -91,7 +94,7 @@ export const SupplierForm = ({ supplier, onSuccess, onCancel }: SupplierFormProp
           phone: formData.phone.trim() || undefined,
         };
         const created = await SupplierService.createSupplier(createData);
-        queryClient.setQueryData<Supplier[]>(['suppliers', 'list'], (old) => {
+        queryClient.setQueryData<Supplier[]>(['user', uid, 'suppliers', 'list'], (old) => {
           const list = Array.isArray(old) ? old : [];
           const without = list.filter((s) => Number(s.id) !== Number(created.id));
           return [created, ...without];

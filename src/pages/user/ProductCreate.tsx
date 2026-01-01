@@ -19,7 +19,8 @@ export const ProductCreate = () => {
   const breadcrumbs = useBreadcrumbs();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
+  const { tariffLimits, user } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }>; user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const productLimit = useMemo(() => {
     return (
       (tariffLimits || [])
@@ -31,14 +32,15 @@ export const ProductCreate = () => {
   }, [tariffLimits]);
 
   const productsCountQuery = useQuery<number>({
-    queryKey: ["products", "count"],
+    queryKey: ["user", uid, "products", "count"],
     queryFn: async () => {
-      const cached = queryClient.getQueryData<InfiniteData<{ products: ProductRow[]; page: { total: number } }>>([
-        "products",
-        "all",
-      ]);
-      const firstTotal = cached?.pages?.[0]?.page?.total;
-      if (typeof firstTotal === "number") return firstTotal;
+      const baseKey = ["user", uid, "products", "all"] as const;
+      const cachedAll = queryClient.getQueriesData({ queryKey: baseKey, exact: false });
+      for (const [, data] of cachedAll) {
+        const cached = data as InfiniteData<{ products: ProductRow[]; page: { total: number } }> | undefined;
+        const firstTotal = cached?.pages?.[0]?.page?.total;
+        if (typeof firstTotal === "number") return firstTotal;
+      }
       return await ProductService.getProductsCount();
     },
     staleTime: 60_000,
@@ -47,7 +49,7 @@ export const ProductCreate = () => {
   });
 
   const lookupsQuery = useQuery({
-    queryKey: ["user", "lookups"],
+    queryKey: ["user", uid, "lookups"],
     queryFn: async () => {
       return await ProductService.getUserLookups();
     },
@@ -148,7 +150,7 @@ export const ProductCreate = () => {
           is_main: !!img.is_main
         }))
       });
-      queryClient.setQueryData(["products", "count"], (prev: number | undefined) => {
+      queryClient.setQueryData(["user", uid, "products", "count"], (prev: number | undefined) => {
         const v = typeof prev === "number" ? prev : current;
         return Math.max(0, v + 1);
       });

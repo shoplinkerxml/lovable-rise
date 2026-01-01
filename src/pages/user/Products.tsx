@@ -22,7 +22,8 @@ export const Products = () => {
   const [limitInfo, setLimitInfo] = useState<ProductLimitInfo>({ current: 0, max: 0, canCreate: false });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
-  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
+  const { tariffLimits, user } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }>; user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
 
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -52,23 +53,40 @@ export const Products = () => {
   };
 
   const handleDelete = async (product: Product) => {
-    const key = ['products', 'all'] as const;
+    const baseKey = ["user", uid, "products"] as const;
+    const prevQueries = queryClient.getQueriesData({ queryKey: baseKey, exact: false });
     try {
       const nameForUi = product.name_ua || product.name || product.external_id || product.id;
       setDeletingName(nameForUi);
       setIsDeleteOpen(true);
 
-      const prev = (queryClient.getQueryData<Product[]>(key) ?? []);
-      queryClient.setQueryData<Product[]>(key, (old) => (old ?? []).filter((p) => String(p?.id) !== String(product.id)));
+      queryClient.setQueriesData({ queryKey: baseKey, exact: false }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return (old as any[]).filter((p) => String((p as any)?.id) !== String(product.id));
+        }
+        if (typeof old === "object" && Array.isArray((old as any).pages)) {
+          const prevInf = old as any;
+          return {
+            ...prevInf,
+            pages: prevInf.pages.map((page: any) => {
+              const products = Array.isArray(page?.products) ? (page.products as any[]) : null;
+              if (!products) return page;
+              return { ...page, products: products.filter((p) => String((p as any)?.id) !== String(product.id)) };
+            }),
+          };
+        }
+        return old;
+      });
 
       await ProductService.deleteProduct(product.id);
       toast.success(t('product_deleted'));
       // Optional background revalidation to sync with server, does not block UI
-      queryClient.invalidateQueries({ queryKey: key });
+      queryClient.invalidateQueries({ queryKey: baseKey, exact: false });
     } catch (error: unknown) {
-      const prev = (queryClient.getQueryData<Product[]>(['products', 'all']) ?? []);
-      // Rollback UI if deletion failed
-      queryClient.setQueryData<Product[]>(['products', 'all'], prev);
+      for (const [k, v] of prevQueries) {
+        queryClient.setQueryData(k, v);
+      }
       console.error('Delete error:', error);
       const msg = typeof (error as { message?: unknown })?.message === 'string' ? (error as { message?: string }).message : t('failed_delete_product');
       toast.error(msg);

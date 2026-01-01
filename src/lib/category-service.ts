@@ -1,6 +1,6 @@
 import type { Database } from "@/integrations/supabase/types";
-import { readCache, writeCache, removeCache, CACHE_TTL } from "@/lib/cache-utils";
-import { invokeEdgeWithAuth } from "@/lib/session-validation";
+import { readCache, writeCache, CACHE_TTL, UnifiedCacheManager } from "@/lib/cache-utils";
+import { invokeEdgeWithAuth, SessionValidator } from "@/lib/session-validation";
 
 // Minimal DTO shape aligned with UI needs
 export type StoreCategory = {
@@ -58,7 +58,7 @@ function toBase(row: StoreCategoryBase): StoreCategory {
 }
 
 function invalidateCategoriesCache(): void {
-  try { removeCache("rq:supplierCategoriesMap"); } catch {}
+  try { UnifiedCacheManager.invalidatePattern(/^rq:supplierCategoriesMap(?::|$)/); } catch {}
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -142,7 +142,11 @@ export const CategoryService = {
   async getCategoriesMapForSuppliers(supplierIds: Array<string | number>): Promise<Record<string, StoreCategoryFull[]>> {
     const ids = Array.from(new Set((supplierIds || []).map(String).filter(Boolean)));
     if (ids.length === 0) return {};
-    const env = readCache<Record<string, StoreCategoryFull[]>>("rq:supplierCategoriesMap", false);
+    const uid = await SessionValidator.validateSession()
+      .then((v) => (v?.user?.id ? String(v.user.id) : "current"))
+      .catch(() => "current");
+    const cacheKey = `rq:supplierCategoriesMap:${uid || "current"}`;
+    const env = readCache<Record<string, StoreCategoryFull[]>>(cacheKey, false);
     if (env?.data && typeof env.data === "object") {
       return env.data;
     }
@@ -165,7 +169,7 @@ export const CategoryService = {
       }
     }
 
-    writeCache("rq:supplierCategoriesMap", map, CACHE_TTL.supplierCategoriesMap);
+    writeCache(cacheKey, map, CACHE_TTL.supplierCategoriesMap);
     return map;
   },
 

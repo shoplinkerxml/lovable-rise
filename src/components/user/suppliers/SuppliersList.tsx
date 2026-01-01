@@ -17,6 +17,7 @@ import { useI18n } from "@/i18n";
 import { SupplierService, type Supplier } from '@/lib/supplier-service';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import { useOutletContext } from 'react-router-dom';
 
 interface SuppliersListProps {
   onEdit?: (supplier: Supplier) => void;
@@ -30,8 +31,10 @@ export const SuppliersList = ({
   onCreateNew
 }: SuppliersListProps) => {
   const { t } = useI18n();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const { data: suppliersData, isLoading: loading } = useQuery<Supplier[]>({
-    queryKey: ['suppliers', 'list'],
+    queryKey: ['user', uid, 'suppliers', 'list'],
     queryFn: async () => {
       return await SupplierService.getSuppliers();
     },

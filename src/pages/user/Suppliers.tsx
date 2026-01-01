@@ -21,7 +21,9 @@ export const Suppliers = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const queryClient = useQueryClient();
 
-  const { tariffLimits } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }> }>();
+  const { tariffLimits, user } = useOutletContext<{ tariffLimits: Array<{ limit_name: string; value: number }>; user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
+  const suppliersQueryKey = useMemo(() => ["user", uid, "suppliers", "list"] as const, [uid]);
   const supplierLimit = useMemo(() => {
     return (
       (tariffLimits || []).find((l) => {
@@ -32,7 +34,7 @@ export const Suppliers = () => {
   }, [tariffLimits]);
 
   const { data: suppliersData } = useQuery<Supplier[]>({
-    queryKey: ['suppliers', 'list'],
+    queryKey: suppliersQueryKey,
     queryFn: async () => {
       return await SupplierService.getSuppliers();
     },
@@ -66,9 +68,8 @@ export const Suppliers = () => {
   };
 
   const handleDelete = async (id: number) => {
-    const queryKey = ['suppliers', 'list'] as const;
-    const previous = queryClient.getQueryData<Supplier[]>(queryKey);
-    queryClient.setQueryData<Supplier[]>(queryKey, (old) => {
+    const previous = queryClient.getQueryData<Supplier[]>(suppliersQueryKey);
+    queryClient.setQueryData<Supplier[]>(suppliersQueryKey, (old) => {
       const list = Array.isArray(old) ? old : [];
       return list.filter((s) => Number(s.id) !== Number(id));
     });
@@ -76,7 +77,7 @@ export const Suppliers = () => {
       await SupplierService.deleteSupplier(id);
       toast.success(t('supplier_deleted'));
     } catch (error: unknown) {
-      queryClient.setQueryData(queryKey, previous);
+      queryClient.setQueryData(suppliersQueryKey, previous);
       const message = error instanceof Error ? error.message : '';
       toast.error(message || t('failed_delete_supplier'));
     }
@@ -114,7 +115,7 @@ export const Suppliers = () => {
                   title={t('refresh') || 'Оновити'}
                   onClick={() => {
                     SupplierService.clearSuppliersCache();
-                    queryClient.invalidateQueries({ queryKey: ['suppliers', 'list'] });
+                    queryClient.invalidateQueries({ queryKey: suppliersQueryKey, exact: true });
                   }}
                 >
                   <RefreshCw className="h-4 w-4" />

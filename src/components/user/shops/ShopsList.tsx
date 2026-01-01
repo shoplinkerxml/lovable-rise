@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +42,8 @@ export const ShopsList = ({
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useOutletContext<{ user: { id?: string } | null }>();
+  const uid = user?.id ? String(user.id) : "current";
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; shop: ShopWithMarketplace | null }>({
     open: false,
     shop: null
@@ -52,7 +54,7 @@ export const ShopsList = ({
   // React Query - єдине джерело правди
   // ============================================================================
   const { data: shopsData, isLoading, isFetching } = useQuery<ShopWithMarketplace[]>({
-    queryKey: ['shopsList'],
+    queryKey: ["user", uid, "shops"],
     queryFn: async () => {
       const rows = await ShopService.getShopsAggregated();
       return rows as ShopWithMarketplace[];
@@ -96,7 +98,7 @@ export const ShopsList = ({
   // Нормализация счетчиков: если товаров 0 — категории 0
   useEffect(() => {
     try {
-      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+      queryClient.setQueryData<ShopWithMarketplace[]>(["user", uid, "shops"], (prev) => {
         const arr = Array.isArray(prev) ? prev : shops;
         return (arr || []).map((s) => {
           const products = Math.max(0, Number(s.productsCount ?? 0));
@@ -105,14 +107,14 @@ export const ShopsList = ({
         });
       });
     } catch { void 0; }
-  }, [shops, queryClient]);
+  }, [shops, queryClient, uid]);
 
   // Інвалідація при зміні refreshTrigger
   useEffect(() => {
     if ((refreshTrigger ?? 0) > 0) {
-      queryClient.invalidateQueries({ queryKey: ['shopsList'] });
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "shops"] });
     }
-  }, [refreshTrigger, queryClient]);
+  }, [refreshTrigger, queryClient, uid]);
 
   // ============================================================================
   // Realtime синхронізація (оптимістичні оновлення)
@@ -122,14 +124,14 @@ export const ShopsList = ({
     const updateProductsCount = (storeId: string, delta: number) => {
       const sid = String(storeId || "").trim();
       if (!sid) return;
-      ShopCountsService.bumpProducts(queryClient, sid, delta);
+      ShopCountsService.bumpProducts(queryClient, uid, sid, delta);
     };
 
     const upsertShopFromRow = (row: any) => {
       if (!row) return;
       const sid = String(row.id || "").trim();
       if (!sid) return;
-      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+      queryClient.setQueryData<ShopWithMarketplace[]>(["user", uid, "shops"], (prev) => {
         const list = Array.isArray(prev) ? [...prev] : [];
         const idx = list.findIndex((s) => String(s.id) === sid);
         const existing = idx >= 0 ? list[idx] : null;
@@ -168,7 +170,7 @@ export const ShopsList = ({
     const removeShopFromCache = (row: any) => {
       const sid = String(row?.id || '').trim();
       if (!sid) return;
-      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+      queryClient.setQueryData<ShopWithMarketplace[]>(["user", uid, "shops"], (prev) => {
         if (!Array.isArray(prev)) return prev;
         return prev.filter((s) => String(s.id) !== sid);
       });
@@ -262,7 +264,7 @@ export const ShopsList = ({
         void 0; 
       } 
     };
-  }, [queryClient]);
+  }, [queryClient, uid]);
 
   // ============================================================================
   // Handlers
@@ -274,7 +276,7 @@ export const ShopsList = ({
       const id = String(deleteDialog.shop.id);
       await onDelete?.(id);
       setDeleteDialog({ open: false, shop: null });
-      queryClient.setQueryData<ShopWithMarketplace[]>(['shopsList'], (prev) => {
+      queryClient.setQueryData<ShopWithMarketplace[]>(["user", uid, "shops"], (prev) => {
         if (!Array.isArray(prev)) return prev;
         return prev.filter((s) => String(s.id) !== id);
       });

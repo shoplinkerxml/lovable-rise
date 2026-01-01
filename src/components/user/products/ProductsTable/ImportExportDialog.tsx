@@ -27,6 +27,7 @@ export function ImportExportDialog({
   onOpenChange,
   t,
   storeId,
+  userId,
   queryClient,
   selectedProducts,
 }: {
@@ -34,6 +35,7 @@ export function ImportExportDialog({
   onOpenChange: (open: boolean) => void;
   t: (k: string) => string;
   storeId?: string;
+  userId?: string | null;
   queryClient: QueryClient;
   selectedProducts?: ProductRow[];
 }) {
@@ -105,18 +107,20 @@ export function ImportExportDialog({
     setImporting(true);
     try {
       const { created, skipped } = await importProducts({ rows: importRows, effectiveStoreId });
-      queryClient.invalidateQueries({ queryKey: ["products"], exact: false });
+      const uid = userId ? String(userId) : "current";
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "products"], exact: false });
       const msg = formatTokens(t("import_export_import_done"), { created, skipped });
       toast.success(msg);
       setImportRows([]);
       onOpenChange(false);
     } catch {
       toast.error(t("operation_failed"));
-      queryClient.invalidateQueries({ queryKey: ["products"], exact: false });
+      const uid = userId ? String(userId) : "current";
+      queryClient.invalidateQueries({ queryKey: ["user", uid, "products"], exact: false });
     } finally {
       setImporting(false);
     }
-  }, [importing, effectiveStoreId, importRows, errorsCount, t, queryClient, onOpenChange]);
+  }, [importing, effectiveStoreId, importRows, errorsCount, t, queryClient, onOpenChange, userId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
