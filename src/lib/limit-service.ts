@@ -181,16 +181,15 @@ export class LimitService {
   /** Оновлення порядку лімітів */
   static async updateLimitsOrder(limits: { id: number; order_index: number }[]): Promise<void> {
     if (!Array.isArray(limits) || limits.length === 0) return;
-    for (const l of limits) {
-      const idx = l.order_index < 0 ? 0 : l.order_index;
-      const { error } = await supabase
-        .from('limit_templates')
-        .update({ order_index: idx })
-        .eq('id', l.id);
-      if (error) {
-        throw new Error('Failed to update limits order');
-      }
-    }
+    const results = await Promise.all(
+      limits.map(async (l) => {
+        const idx = l.order_index < 0 ? 0 : l.order_index;
+        const { error } = await supabase.from('limit_templates').update({ order_index: idx }).eq('id', l.id);
+        return { id: l.id, error };
+      }),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw new Error('Failed to update limits order');
     LimitService.invalidateCache();
   }
 }

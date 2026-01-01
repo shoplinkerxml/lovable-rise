@@ -291,14 +291,21 @@ export const R2Storage = {
     if (!list.length) return;
     const toDelete = [...list];
     const remaining: string[] = [];
-    for (const key of toDelete) {
-      try {
-        const res = await R2Storage.deleteFile(key);
-        if (!res?.success) remaining.push(key);
-      } catch {
-        remaining.push(key);
+    const queue = [...toDelete];
+    const concurrency = Math.min(5, queue.length);
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (queue.length) {
+        const key = queue.shift();
+        if (!key) continue;
+        try {
+          const res = await R2Storage.deleteFile(key);
+          if (!res?.success) remaining.push(key);
+        } catch {
+          remaining.push(key);
+        }
       }
-    }
+    });
+    await Promise.all(workers);
     writePendingUploads(userId, remaining);
   },
   /**

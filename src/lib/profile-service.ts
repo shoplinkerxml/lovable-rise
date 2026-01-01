@@ -15,6 +15,7 @@ import {
   ProfileCache 
 } from "./error-handler";
 import { SessionValidator, isAuthenticationError, createAuthenticatedClient } from "./session-validation";
+import { BatchProcessor } from "./cache-utils";
 
 export interface UserProfile {
   id: string;
@@ -58,40 +59,46 @@ export enum ProfileError {
 }
 
 export class ProfileService {
+  private static profileByEmailBatch = new BatchProcessor<string, UserProfile | null>(async (emails) => {
+    const normalized = (emails || []).map((e) => String(e).toLowerCase());
+    const unique = Array.from(new Set(normalized.filter(Boolean)));
+    if (unique.length === 0) return normalized.map(() => null);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('email', unique);
+
+    if (error) throw error;
+
+    const byEmail = new Map<string, UserProfile>();
+    for (const row of (data || []) as any[]) {
+      const email = typeof row?.email === 'string' ? row.email.toLowerCase() : '';
+      if (!email) continue;
+      byEmail.set(email, row as UserProfile);
+      ProfileCache.set(`profile_email_${email}`, row);
+      if (row?.id) ProfileCache.set(`profile_${String(row.id)}`, row);
+    }
+
+    return normalized.map((email) => byEmail.get(email) ?? null);
+  }, 20);
+
   /**
    * Get user profile by email address
    * Returns null if profile doesn't exist instead of throwing PGRST116 error
    */
   static async getProfileByEmail(email: string): Promise<UserProfile | null> {
     try {
+      const normalizedEmail = String(email).toLowerCase();
+
       // Check cache first
-      const cached = ProfileCache.get(`profile_email_${email.toLowerCase()}`);
+      const cached = ProfileCache.get(`profile_email_${normalizedEmail}`);
       if (cached) {
         this.logProfileOperation('getProfileByEmail (cached)', email, cached);
         return cached as UserProfile;
       }
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', email.toLowerCase())
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching user profile by email:', error);
-        const result = handlePostgRESTError(error);
-        if (result === null) {
-          throw new ProfileOperationError(ProfileErrorCode.PROFILE_NOT_FOUND, error);
-        }
-        throw new ProfileOperationError(ProfileErrorCode.NETWORK_ERROR, error);
-      }
-      
-      // Cache the result if it exists
-      if (data) {
-        ProfileCache.set(`profile_email_${email.toLowerCase()}`, data);
-        ProfileCache.set(`profile_${data.id}`, data); // Also cache by ID
-      }
-      
+      const data = await this.profileByEmailBatch.load(normalizedEmail);
       this.logProfileOperation('getProfileByEmail', email, data);
       return data as UserProfile | null;
     } catch (error) {
@@ -99,6 +106,11 @@ export class ProfileService {
         throw error;
       }
       console.error('Error in getProfileByEmail:', error);
+      const asAny = error as any;
+      const maybeNull = handlePostgRESTError(asAny);
+      if (maybeNull === null) {
+        throw new ProfileOperationError(ProfileErrorCode.PROFILE_NOT_FOUND, error);
+      }
       throw new ProfileOperationError(ProfileErrorCode.NETWORK_ERROR, error);
     }
   }

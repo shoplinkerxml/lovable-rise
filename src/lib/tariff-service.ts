@@ -406,6 +406,22 @@ export class TariffService {
     }
   }
 
+  static async addTariffFeatures(features: TariffFeatureInsert[]) {
+    try {
+      if (!Array.isArray(features) || features.length === 0) return [] as TariffFeature[];
+      const { data, error } = await supabase
+        .from('tariff_features')
+        .insert(features)
+        .select('id,tariff_id,feature_name,is_active');
+      if (error) throw error;
+      invalidateTariffsCache();
+      return (data || []) as TariffFeature[];
+    } catch (error) {
+      console.error('Error adding tariff features:', error);
+      throw error;
+    }
+  }
+
   // Update a tariff feature
   static async updateTariffFeature(id: number, featureData: TariffFeatureUpdate) {
     try {
@@ -474,6 +490,22 @@ export class TariffService {
       return data as TariffLimit;
     } catch (error) {
       console.error('Error adding tariff limit:', error);
+      throw error;
+    }
+  }
+
+  static async addTariffLimits(limits: TariffLimitInsert[]) {
+    try {
+      if (!Array.isArray(limits) || limits.length === 0) return [] as TariffLimit[];
+      const { data, error } = await supabase
+        .from('tariff_limits')
+        .insert(limits)
+        .select('id,tariff_id,template_id,code,limit_name,description,path,value,is_active');
+      if (error) throw error;
+      invalidateTariffsCache();
+      return (data || []) as TariffLimit[];
+    } catch (error) {
+      console.error('Error adding tariff limits:', error);
       throw error;
     }
   }
@@ -593,63 +625,29 @@ export class TariffService {
       }
       
       // Add sample features and limits
+      const features: TariffFeatureInsert[] = [];
+      const limits: TariffLimitInsert[] = [];
       for (const tariff of createdTariffs) {
         if (tariff.is_free) {
-          // Free plan features
-          await this.addTariffFeature({
-            tariff_id: tariff.id,
-            feature_name: 'До 3 проектів',
-            is_active: true
-          });
-          await this.addTariffLimit({
-            tariff_id: tariff.id,
-            limit_name: 'Сховище (ГБ)',
-            value: 5,
-            is_active: true
-          });
-        } else if (tariff.new_price && tariff.new_price < 20) {
-          // Basic plan features
-          await this.addTariffFeature({
-            tariff_id: tariff.id,
-            feature_name: 'До 10 проектів',
-            is_active: true
-          });
-          await this.addTariffFeature({
-            tariff_id: tariff.id,
-            feature_name: 'Базова аналітика',
-            is_active: true
-          });
-          await this.addTariffLimit({
-            tariff_id: tariff.id,
-            limit_name: 'Сховище (ГБ)',
-            value: 50,
-            is_active: true
-          });
-        } else {
-          // Pro plan features
-          await this.addTariffFeature({
-            tariff_id: tariff.id,
-            feature_name: 'Необмежені проекти',
-            is_active: true
-          });
-          await this.addTariffFeature({
-            tariff_id: tariff.id,
-            feature_name: 'Розширена аналітика',
-            is_active: true
-          });
-          await this.addTariffFeature({
-            tariff_id: tariff.id,
-            feature_name: 'Пріоритетна підтримка',
-            is_active: true
-          });
-          await this.addTariffLimit({
-            tariff_id: tariff.id,
-            limit_name: 'Сховище (ГБ)',
-            value: 500,
-            is_active: true
-          });
+          features.push({ tariff_id: tariff.id, feature_name: 'До 3 проектів', is_active: true });
+          limits.push({ tariff_id: tariff.id, limit_name: 'Сховище (ГБ)', value: 5, is_active: true });
+          continue;
         }
+
+        if (tariff.new_price && tariff.new_price < 20) {
+          features.push({ tariff_id: tariff.id, feature_name: 'До 10 проектів', is_active: true });
+          features.push({ tariff_id: tariff.id, feature_name: 'Базова аналітика', is_active: true });
+          limits.push({ tariff_id: tariff.id, limit_name: 'Сховище (ГБ)', value: 50, is_active: true });
+          continue;
+        }
+
+        features.push({ tariff_id: tariff.id, feature_name: 'Необмежені проекти', is_active: true });
+        features.push({ tariff_id: tariff.id, feature_name: 'Розширена аналітика', is_active: true });
+        features.push({ tariff_id: tariff.id, feature_name: 'Пріоритетна підтримка', is_active: true });
+        limits.push({ tariff_id: tariff.id, limit_name: 'Сховище (ГБ)', value: 500, is_active: true });
       }
+
+      await Promise.all([this.addTariffFeatures(features), this.addTariffLimits(limits)]);
       
       console.log('Sample data created successfully!');
       return true;
@@ -706,29 +704,25 @@ export class TariffService {
       
       // 5. Duplicate all features
       if (originalTariff.features && originalTariff.features.length > 0) {
-        for (const feature of originalTariff.features) {
-          const newFeatureData: TariffFeatureInsert = {
-            tariff_id: newTariff.id,
-            feature_name: feature.feature_name,
-            is_active: feature.is_active
-          };
-          await this.addTariffFeature(newFeatureData);
-          console.log('Duplicated feature:', feature.feature_name);
-        }
+        const features = originalTariff.features.map((feature) => ({
+          tariff_id: newTariff.id,
+          feature_name: feature.feature_name,
+          is_active: feature.is_active,
+        })) as TariffFeatureInsert[];
+        await this.addTariffFeatures(features);
+        console.log('Duplicated features:', features.length);
       }
       
       // 6. Duplicate all limits
       if (originalTariff.limits && originalTariff.limits.length > 0) {
-        for (const limit of originalTariff.limits) {
-          const newLimitData: TariffLimitInsert = {
-            tariff_id: newTariff.id,
-            limit_name: limit.limit_name,
-            value: limit.value,
-            is_active: limit.is_active
-          };
-          await this.addTariffLimit(newLimitData);
-          console.log('Duplicated limit:', limit.limit_name);
-        }
+        const limits = originalTariff.limits.map((limit) => ({
+          tariff_id: newTariff.id,
+          limit_name: limit.limit_name,
+          value: limit.value,
+          is_active: limit.is_active,
+        })) as TariffLimitInsert[];
+        await this.addTariffLimits(limits);
+        console.log('Duplicated limits:', limits.length);
       }
       
       console.log('Tariff duplication completed successfully');

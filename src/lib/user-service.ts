@@ -305,6 +305,8 @@ export class ApiError extends Error {
   }
 }
 
+export type ApiResponse<T> = { success: true; data: T } | { success: false; error: ApiError };
+
 /** Обработка ошибок */
 export function handleApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;

@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { invokeEdgeWithAuth, requireValidSession } from "./session-validation";
 import { dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
+import type { RequireAtLeastOne } from "./request-handler";
 
 // ============================================================================
 // ТИПЫ И ИНТЕРФЕЙСЫ
@@ -32,7 +33,7 @@ export interface CreateShopData {
   marketplace?: string | null;
 }
 
-export interface UpdateShopData {
+export type UpdateShopData = RequireAtLeastOne<{
   store_name?: string;
   store_company?: string | null;
   store_url?: string | null;
@@ -40,7 +41,7 @@ export interface UpdateShopData {
   xml_config?: Json | null;
   custom_mapping?: Json | null;
   is_active?: boolean;
-}
+}>;
 
 export interface ShopLimitInfo {
   current: number;
@@ -74,12 +75,6 @@ export interface StoreCategory {
   store_external_id: string | null;
   store_rz_id_value: string | null;
   is_active: boolean;
-}
-
-// Типизированные ответы API
-interface EdgeResponse<T> {
-  data?: T;
-  error?: string;
 }
 
 interface ShopsListResponse {

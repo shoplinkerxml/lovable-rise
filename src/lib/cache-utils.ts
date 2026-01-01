@@ -70,6 +70,60 @@ export function dedupeInFlightTtl<T>(
   return promise;
 }
 
+export class BatchProcessor<K, V> {
+  private queue: Array<{ key: K; resolve: (value: V) => void; reject: (error: unknown) => void }> = [];
+  private scheduled = false;
+
+  constructor(
+    private readonly loadBatch: (keys: K[]) => Promise<V[]>,
+    private readonly maxBatchSize: number = 100,
+  ) {}
+
+  load(key: K): Promise<V> {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ key, resolve, reject });
+      if (this.queue.length >= this.maxBatchSize) {
+        void this.flush();
+        return;
+      }
+      if (!this.scheduled) {
+        this.scheduled = true;
+        queueMicrotask(() => void this.flush());
+      }
+    });
+  }
+
+  private async flush(): Promise<void> {
+    if (this.queue.length === 0) {
+      this.scheduled = false;
+      return;
+    }
+
+    const batch = this.queue.splice(0, this.maxBatchSize);
+    this.scheduled = false;
+    const keys = batch.map((b) => b.key);
+
+    try {
+      const values = await this.loadBatch(keys);
+      if (!Array.isArray(values) || values.length !== batch.length) {
+        throw new Error("BatchProcessor.loadBatch returned invalid result");
+      }
+      for (let i = 0; i < batch.length; i++) {
+        batch[i].resolve(values[i]);
+      }
+    } catch (error) {
+      for (const item of batch) {
+        item.reject(error);
+      }
+    }
+
+    if (this.queue.length > 0) {
+      this.scheduled = true;
+      queueMicrotask(() => void this.flush());
+    }
+  }
+}
+
 function getStorage(): Storage | null {
   try {
     if (typeof window === "undefined") return null;

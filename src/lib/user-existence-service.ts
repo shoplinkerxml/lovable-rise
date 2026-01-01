@@ -161,29 +161,8 @@ export class UserExistenceService {
    * Useful for admin operations or bulk validation
    */
   static async checkMultipleUsersExist(emails: string[]): Promise<Map<string, boolean>> {
-    const results = new Map<string, boolean>();
-    
-    // Process emails in batches to avoid overwhelming the database
-    const batchSize = 10;
-    const batches = [];
-    
-    for (let i = 0; i < emails.length; i += batchSize) {
-      batches.push(emails.slice(i, i + batchSize));
-    }
-    
-    for (const batch of batches) {
-      const batchPromises = batch.map(async (email) => {
-        const check = await this.checkUserExists(email);
-        return [email, check.exists] as [string, boolean];
-      });
-      
-      const batchResults = await Promise.all(batchPromises);
-      batchResults.forEach(([email, exists]) => {
-        results.set(email, exists);
-      });
-    }
-    
-    return results;
+    if (!Array.isArray(emails) || emails.length === 0) return new Map<string, boolean>();
+    return await ProfileService.checkMultipleUsersExist(emails);
   }
 
   /**
