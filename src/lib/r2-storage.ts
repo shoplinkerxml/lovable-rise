@@ -1,5 +1,7 @@
-import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
-import { withRetryResult } from "@/lib/request-handler";
+import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
+import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
+
+const supabaseInvoke = supabase.functions.invoke.bind(supabase.functions) as any;
 
 export type UploadResponse = {
   success: boolean;
@@ -28,28 +30,6 @@ type UploadProductImageResponse = {
 
 type EdgeErrorContext = { status?: number; body?: unknown };
 type EdgeErrorLike = { message?: string; context?: EdgeErrorContext };
-
-async function invokeWithRetry<T>(fnName: string, init: { body?: unknown; headers?: Record<string, string> }, opts?: { maxRetries?: number; timeoutMs?: number; retryDelayMs?: number }): Promise<{ data: T; error: any | null }> {
-  const maxRetries = Math.max(0, opts?.maxRetries ?? 2);
-  const timeoutMs = Math.max(2500, opts?.timeoutMs ?? 5000);
-  const baseDelay = Math.max(250, opts?.retryDelayMs ?? 500);
-  return await withRetryResult(
-    async ({ signal }) => {
-      const { data, error } = await supabase.functions.invoke<T>(fnName, {
-        body: init.body,
-        headers: init.headers,
-        signal: signal as AbortSignal,
-      } as any);
-      if (error) {
-        const status = (error as EdgeErrorLike)?.context?.status ?? 0;
-        const isTransient = status >= 500 || status === 0;
-        return { value: { data: data as T, error }, retry: isTransient };
-      }
-      return { value: { data: data as T, error: null }, retry: false };
-    },
-    { maxRetries, timeoutMs, retryDelayMs: baseDelay, backoff: "linear" },
-  );
-}
 
 function parseEdgeError(err: unknown, fallbackMessage: string): Error {
   const anyErr = err as EdgeErrorLike | undefined;
@@ -196,10 +176,11 @@ export const R2Storage = {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    const { data, error } = await invokeWithRetry<UploadResponse>("r2-upload", {
-      body: { fileName: file.name, fileType: file.type, fileSize: file.size, fileData: base64File, productId },
-      headers,
-    });
+    const { data, error } = await invokeSupabaseFunctionWithRetry<UploadResponse>(
+      supabaseInvoke,
+      "r2-upload",
+      { body: { fileName: file.name, fileType: file.type, fileSize: file.size, fileData: base64File, productId }, headers },
+    );
     if (error) throw parseEdgeError(error, "Failed to upload file to R2");
     const resp = data as UploadResponse;
     const { data: { session } } = await supabase.auth.getSession();
@@ -255,10 +236,11 @@ export const R2Storage = {
       reader.readAsDataURL(normalizedFile);
     });
 
-    const { data, error } = await invokeWithRetry<UploadProductImageResponse>('upload-product-image', {
-      body: { productId, fileData: base64File, fileName: normalizedFile.name, fileType: normalizedFile.type },
-      headers,
-    });
+    const { data, error } = await invokeSupabaseFunctionWithRetry<UploadProductImageResponse>(
+      supabaseInvoke,
+      "upload-product-image",
+      { body: { productId, fileData: base64File, fileName: normalizedFile.name, fileType: normalizedFile.type }, headers },
+    );
 
     if (error) throw parseEdgeError(error, 'upload_failed');
     
@@ -280,10 +262,11 @@ export const R2Storage = {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
 
-    const { data, error } = await invokeWithRetry<UploadProductImageResponse>('upload-product-image', {
-      body: { productId, url },
-      headers,
-    });
+    const { data, error } = await invokeSupabaseFunctionWithRetry<UploadProductImageResponse>(
+      supabaseInvoke,
+      "upload-product-image",
+      { body: { productId, url }, headers },
+    );
 
     if (error) throw parseEdgeError(error, 'upload_failed');
     
@@ -325,10 +308,11 @@ export const R2Storage = {
     const token = await getAccessToken();
     const headers = token ? buildAuthHeaders(token) : undefined;
 
-    const { data, error } = await invokeWithRetry<{ viewUrl: string }>("r2-view", {
-      body: { objectKey, expiresIn: expiresInSeconds },
-      headers,
-    });
+    const { data, error } = await invokeSupabaseFunctionWithRetry<{ viewUrl: string }>(
+      supabaseInvoke,
+      "r2-view",
+      { body: { objectKey, expiresIn: expiresInSeconds }, headers },
+    );
 
     if (error) throw parseEdgeError(error, 'Failed to get view URL from R2');
 
@@ -366,15 +350,11 @@ export const R2Storage = {
     const syncToken = getAccessTokenSync();
     const authorizationInBody = token ? `Bearer ${token}` : (syncToken ? `Bearer ${syncToken}` : undefined);
 
-    // Dev-диагностика: выводим удаляемый ключ
-    if (import.meta.env?.DEV) {
-      console.debug('[R2Storage] deleteFile invoke', { objectKey });
-    }
-
-    const { data, error } = await invokeWithRetry<{ success: boolean }>("r2-delete", {
-      body: { objectKey, authorization: authorizationInBody },
-      headers,
-    });
+    const { data, error } = await invokeSupabaseFunctionWithRetry<{ success: boolean }>(
+      supabaseInvoke,
+      "r2-delete",
+      { body: { objectKey, authorization: authorizationInBody }, headers },
+    );
 
     if (error) throw parseEdgeError(error, 'Failed to delete file from R2');
 
@@ -413,11 +393,6 @@ export const R2Storage = {
         keepalive: true,
       };
 
-      // В Dev-режиме выводим небольшой лог для отладки
-      if (import.meta.env?.DEV) {
-        console.debug('[R2Storage] keepalive delete init', { objectKey, hasToken: !!token });
-      }
-
       // Выполняем один fetch с keepalive, чтобы запрос был виден в Network (Fetch/XHR)
       // Возвращаем успешность доставки ответа (res.ok)
       try {
@@ -446,10 +421,11 @@ export const R2Storage = {
    * @deprecated Используйте uploadFile вместо этого метода
    */
   async getUploadUrl(fileName: string, contentType: string, productId?: string): Promise<unknown> {
-    console.warn("getUploadUrl is deprecated, use uploadFile instead");
-    const { data, error } = await supabase.functions.invoke("r2-presign", {
-      body: { fileName, contentType, productId },
-    });
+    const { data, error } = await invokeSupabaseFunctionWithRetry<unknown>(
+      supabaseInvoke,
+      "r2-presign",
+      { body: { fileName, contentType, productId } },
+    );
     if (error) throw new Error(error.message ?? "Failed to presign R2 upload");
     return data;
   },

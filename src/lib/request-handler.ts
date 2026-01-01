@@ -9,6 +9,17 @@ export type RetryOptions = {
   onRetry?: (attempt: number, error: unknown) => void;
 };
 
+export type SupabaseFunctionInvokeArgs = {
+  body?: unknown;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+};
+
+export type SupabaseFunctionInvoke = <T = unknown>(
+  name: string,
+  args?: SupabaseFunctionInvokeArgs,
+) => Promise<{ data: T; error: any }>;
+
 export async function withRetryResult<T>(
   operation: (ctx: { attempt: number; signal: AbortSignal }) => Promise<{ value: T; retry: boolean }>,
   opts?: RetryOptions,
@@ -48,4 +59,28 @@ export async function withRetryResult<T>(
       throw error;
     }
   }
+}
+
+export async function invokeSupabaseFunctionWithRetry<T>(
+  invoke: SupabaseFunctionInvoke,
+  fnName: string,
+  init: { body?: unknown; headers?: Record<string, string> },
+  opts?: RetryOptions,
+): Promise<{ data: T; error: any | null }> {
+  return await withRetryResult(
+    async ({ signal }) => {
+      const { data, error } = await invoke<T>(fnName, {
+        body: init.body,
+        headers: init.headers,
+        signal,
+      });
+      if (error) {
+        const status = (error as any)?.context?.status ?? 0;
+        const isTransient = status === 0 || status === 408 || status === 429 || status >= 500;
+        return { value: { data: data as T, error }, retry: isTransient };
+      }
+      return { value: { data: data as T, error: null }, retry: false };
+    },
+    opts,
+  );
 }

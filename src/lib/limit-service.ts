@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
+import { CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
 
 export interface LimitTemplate {
   id: number;
@@ -27,7 +27,10 @@ export interface UpdateLimitData {
 
 export class LimitService {
   private static codeRegex = /^[a-z][a-z0-9_]*$/;
-  private static CACHE_KEY = "rq:limitTemplates:list";
+  private static cache = UnifiedCacheManager.create("rq:limitTemplates", {
+    mode: "auto",
+    defaultTtlMs: CACHE_TTL.limits,
+  });
   private static ensureName(name?: string): string {
     const v = (name ?? '').trim();
     if (!v) throw new Error("Назва обмеження обов'язкова");
@@ -43,12 +46,12 @@ export class LimitService {
   }
   private static trimOrNull(v?: string): string | null { return (v?.trim() || '') || null; }
   private static invalidateCache() {
-    removeCache(LimitService.CACHE_KEY);
+    LimitService.cache.remove("list");
   }
 
   static async getLimits(): Promise<LimitTemplate[]> {
-    const cached = readCache<LimitTemplate[]>(LimitService.CACHE_KEY);
-    if (cached?.data && Array.isArray(cached.data)) return cached.data;
+    const cached = LimitService.cache.get<LimitTemplate[]>("list");
+    if (cached && Array.isArray(cached)) return cached;
     const { data, error } = await supabase
       .from('limit_templates')
       .select('id,code,name,path,description,order_index')
@@ -60,7 +63,7 @@ export class LimitService {
     }
 
     const rows = (data || []) as LimitTemplate[];
-    writeCache(LimitService.CACHE_KEY, rows, CACHE_TTL.limits);
+    LimitService.cache.set("list", rows);
     return rows;
   }
 

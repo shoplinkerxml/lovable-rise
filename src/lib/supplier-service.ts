@@ -1,5 +1,5 @@
 import { SessionValidator, invokeEdgeWithAuth } from "./session-validation";
-import { readCache, writeCache, CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
+import { CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
 
 export interface Supplier {
   id: number;
@@ -38,18 +38,21 @@ export class SupplierService {
   private static inFlightSuppliersPromise: Promise<Supplier[]> | null = null;
   private static readonly SOFT_REFRESH_THRESHOLD_MS = 120_000;
 
+  private static cache = UnifiedCacheManager.create("rq:suppliers", {
+    mode: "auto",
+    defaultTtlMs: CACHE_TTL.suppliersList,
+  });
+
   private static getSuppliersCacheKey(userId: string): string {
-    return `rq:suppliers:list:${userId}`;
+    return `list:${userId}`;
   }
 
   private static setSuppliersCache(userId: string, rows: Supplier[]): void {
-    const key = SupplierService.getSuppliersCacheKey(userId);
-    writeCache(key, rows, CACHE_TTL.suppliersList);
+    SupplierService.cache.set(SupplierService.getSuppliersCacheKey(userId), rows);
   }
 
   private static getCachedSuppliers(userId: string): { rows: Supplier[]; expiresAt: number } | null {
-    const key = SupplierService.getSuppliersCacheKey(userId);
-    const cached = readCache<Supplier[]>(key);
+    const cached = SupplierService.cache.getEnvelope<Supplier[]>(SupplierService.getSuppliersCacheKey(userId));
     if (!cached || !Array.isArray(cached.data)) return null;
     const expiresAt = typeof cached.expiresAt === "number" ? cached.expiresAt : 0;
     return { rows: cached.data, expiresAt };
@@ -66,7 +69,7 @@ export class SupplierService {
 
   static clearSuppliersCache(): void {
     SupplierService.inFlightSuppliersPromise = null;
-    UnifiedCacheManager.invalidatePattern(/^rq:suppliers:list:/);
+    SupplierService.cache.clearAll();
   }
 
   /** Получение только максимального лимита поставщиков (без подсчета текущих) */

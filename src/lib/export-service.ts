@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ProductService, type Product } from "@/lib/product-service";
 import { R2Storage } from "@/lib/r2-storage";
+import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
 import { SessionValidator, type SessionValidationResult } from "./session-validation";
-import { dedupeInFlight, readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
+import { CACHE_TTL, dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
 
 export type ExportLink = {
   id: string;
@@ -18,7 +19,10 @@ export type ExportLink = {
 };
 
 export const ExportService = {
-  LINKS_CACHE_PREFIX: "rq:exportLinks:",
+  cache: UnifiedCacheManager.create("rq:exportLinks", {
+    mode: "auto",
+    defaultTtlMs: CACHE_TTL.productLinks,
+  }),
   inFlightList: new Map<string, Promise<ExportLink[]>>(),
   inFlightGenerate: new Map<string, Promise<boolean>>(),
   inFlightLocalGenerate: new Map<string, Promise<boolean>>(),
@@ -31,18 +35,18 @@ export const ExportService = {
 
   makeLinksCacheKey(storeId: string, userId?: string | null): string {
     const suffix = userId ? `:${userId}` : "";
-    return `${ExportService.LINKS_CACHE_PREFIX}${storeId}${suffix}`;
+    return `${storeId}${suffix}`;
   },
 
   invalidateLinksCache(storeId: string, userId?: string | null): void {
-    removeCache(ExportService.makeLinksCacheKey(storeId, userId));
+    ExportService.cache.remove(ExportService.makeLinksCacheKey(storeId, userId));
   },
 
   async listForStore(storeId: string): Promise<ExportLink[]> {
     const session = await ExportService.ensureSession();
     const key = ExportService.makeLinksCacheKey(storeId, session.user?.id || null);
-    const cached = readCache<ExportLink[]>(key, false);
-    if (cached?.data && Array.isArray(cached.data)) return cached.data;
+    const cached = ExportService.cache.get<ExportLink[]>(key, false);
+    if (cached && Array.isArray(cached)) return cached;
     const inflightKey = `${storeId}:${session.user?.id || "current"}`;
     return await dedupeInFlight(ExportService.inFlightList, inflightKey, async () => {
       const { data, error } = await supabase
@@ -53,7 +57,7 @@ export const ExportService = {
         .returns<ExportLink[]>();
       if (error) return [];
       const rows = data ?? [];
-      writeCache(key, rows, CACHE_TTL.productLinks);
+      ExportService.cache.set(key, rows);
       return rows;
     });
   },
@@ -85,9 +89,11 @@ export const ExportService = {
     const key = `${storeId}:${format}`;
     return await dedupeInFlight(ExportService.inFlightGenerate, key, async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("export-generate", {
-          body: { store_id: storeId, format },
-        });
+        const { data, error } = await invokeSupabaseFunctionWithRetry<{ success?: boolean }>(
+          supabase.functions.invoke.bind(supabase.functions) as any,
+          "export-generate",
+          { body: { store_id: storeId, format } },
+        );
         if (error) return false;
         ExportService.invalidateLinksCache(storeId, session.user?.id);
         return !!(data?.success);
@@ -120,12 +126,18 @@ export const ExportService = {
     }
     const key = `${storeId}:${format}`;
     return await dedupeInFlight(ExportService.inFlightGenerate, key, async () => {
-      const { data, error } = await supabase.functions.invoke("export-generate", {
-        body: { store_id: storeId, format },
-      });
-      if (error) return false;
-      ExportService.invalidateLinksCache(storeId, session.user?.id);
-      return !!(data?.success);
+      try {
+        const { data, error } = await invokeSupabaseFunctionWithRetry<{ success?: boolean }>(
+          supabase.functions.invoke.bind(supabase.functions) as any,
+          "export-generate",
+          { body: { store_id: storeId, format } },
+        );
+        if (error) return false;
+        ExportService.invalidateLinksCache(storeId, session.user?.id);
+        return !!(data?.success);
+      } catch {
+        return false;
+      }
     });
   },
 
