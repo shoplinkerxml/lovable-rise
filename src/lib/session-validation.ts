@@ -13,6 +13,7 @@
 
 import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
+import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
 
 export interface SessionValidationResult {
   isValid: boolean;
@@ -414,24 +415,42 @@ export class EdgeInvokeError extends Error {
   }
 }
 
-export async function invokeEdgeWithAuth<T>(name: string, body: unknown): Promise<T> {
+export async function requireValidSession(options?: { requireAccessToken?: boolean }): Promise<SessionValidationResult> {
   const v = await SessionValidator.ensureValidSession();
-  if (!v.isValid || !v.accessToken) {
+  if (!v.isValid) {
     throw new Error(v.error || "Session expired");
   }
-  const { data, error } = await supabase.functions.invoke<T | string>(name, {
-    body,
-    headers: { Authorization: `Bearer ${v.accessToken}` },
-  });
-  if (error) {
-    const status = (error as { context?: { status?: number }; status?: number; statusCode?: number } | null)?.context?.status ??
-      (error as { status?: number } | null)?.status ??
-      (error as { statusCode?: number } | null)?.statusCode;
-    const msg =
-      (error as unknown as { message?: string } | null)?.message ||
-      (error as unknown as { name?: string } | null)?.name ||
-      "edge_invoke_failed";
-    throw new EdgeInvokeError(msg, typeof status === "number" ? status : undefined);
+  if (options?.requireAccessToken && !v.accessToken) {
+    throw new Error(v.error || "No access token");
   }
-  return typeof data === "string" ? (JSON.parse(data) as T) : (data as T);
+  return v;
+}
+
+export async function withValidSession<T>(
+  fn: (ctx: { session: Session; user: User; accessToken: string }) => Promise<T>,
+): Promise<T> {
+  const v = await requireValidSession({ requireAccessToken: true });
+  return await fn({ session: v.session as Session, user: v.user as User, accessToken: v.accessToken as string });
+}
+
+export async function invokeEdgeWithAuth<T>(name: string, body: unknown): Promise<T> {
+  return await withValidSession(async ({ accessToken }) => {
+    const { data, error } = await invokeSupabaseFunctionWithRetry<T | string>(
+      supabase.functions.invoke.bind(supabase.functions) as any,
+      name,
+      { body, headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (error) {
+      const status =
+        (error as { context?: { status?: number }; status?: number; statusCode?: number } | null)?.context?.status ??
+        (error as { status?: number } | null)?.status ??
+        (error as { statusCode?: number } | null)?.statusCode;
+      const msg =
+        (error as unknown as { message?: string } | null)?.message ||
+        (error as unknown as { name?: string } | null)?.name ||
+        "edge_invoke_failed";
+      throw new EdgeInvokeError(msg, typeof status === "number" ? status : undefined);
+    }
+    return typeof data === "string" ? (JSON.parse(data) as T) : (data as T);
+  });
 }

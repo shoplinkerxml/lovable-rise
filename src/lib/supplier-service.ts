@@ -1,4 +1,4 @@
-import { SessionValidator, invokeEdgeWithAuth } from "./session-validation";
+import { requireValidSession, invokeEdgeWithAuth } from "./session-validation";
 import { CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
 
 export interface Supplier {
@@ -102,10 +102,7 @@ export class SupplierService {
 
   /** Отримання списку постачальників поточного користувача */
   static async getSuppliers(): Promise<Supplier[]> {
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    const sessionValidation = await requireValidSession({ requireAccessToken: false });
     const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
     const cached = userId ? SupplierService.getCachedSuppliers(userId) : null;
     if (cached) {
@@ -149,10 +146,7 @@ export class SupplierService {
   static async getSupplier(id: number): Promise<Supplier> {
     if (!id) throw new Error("Supplier ID is required");
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    await requireValidSession({ requireAccessToken: false });
 
     const list = await SupplierService.getSuppliers();
     const found = list.find((s) => Number(s.id) === Number(id));
@@ -168,10 +162,7 @@ export class SupplierService {
 
     // xml_feed_url є НЕобов'язковим
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    const sessionValidation = await requireValidSession({ requireAccessToken: false });
     const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
 
     const xmlUrl = supplierData.xml_feed_url ? supplierData.xml_feed_url.trim() : '';
@@ -196,10 +187,7 @@ export class SupplierService {
   static async updateSupplier(id: number, supplierData: UpdateSupplierData): Promise<Supplier> {
     if (!id) throw new Error("Supplier ID is required");
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    const sessionValidation = await requireValidSession({ requireAccessToken: false });
     const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
 
     const cleanData: Partial<Pick<Supplier, 'supplier_name' | 'website_url' | 'xml_feed_url' | 'phone'>> & { updated_at?: string } = {};
@@ -244,10 +232,7 @@ export class SupplierService {
   static async deleteSupplier(id: number): Promise<void> {
     if (!id) throw new Error("Supplier ID is required");
 
-    const sessionValidation = await SessionValidator.ensureValidSession();
-    if (!sessionValidation.isValid) {
-      throw new Error("Invalid session: " + (sessionValidation.error || "Session expired"));
-    }
+    const sessionValidation = await requireValidSession({ requireAccessToken: false });
     const userId = sessionValidation.user?.id ? String(sessionValidation.user.id) : "";
     await invokeEdgeWithAuth<{ ok?: boolean }>('suppliers-delete', { id });
     if (userId) {

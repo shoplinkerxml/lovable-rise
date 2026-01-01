@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProductService, type Product } from "@/lib/product-service";
 import { R2Storage } from "@/lib/r2-storage";
 import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
-import { SessionValidator, type SessionValidationResult } from "./session-validation";
+import { requireValidSession, type SessionValidationResult } from "./session-validation";
 import { CACHE_TTL, dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
 
 export type ExportLink = {
@@ -28,7 +28,7 @@ export const ExportService = {
   inFlightLocalGenerate: new Map<string, Promise<boolean>>(),
 
   async ensureSession(): Promise<SessionValidationResult> {
-    const v = await SessionValidator.ensureValidSession();
+    const v = await requireValidSession({ requireAccessToken: false });
     if (!v.isValid || !v.user?.id) throw new Error("Invalid session");
     return v;
   },

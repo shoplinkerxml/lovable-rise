@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
+import { invokeEdgeWithAuth, requireValidSession } from "./session-validation";
 import { dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
 
 // ============================================================================
@@ -138,10 +138,7 @@ export class ShopService {
   }
 
   private static async ensureSession(): Promise<void> {
-    const validation = await SessionValidator.ensureValidSession();
-    if (!validation.isValid) {
-      throw new Error(`Session invalid: ${validation.error || "Session expired"}`);
-    }
+    await requireValidSession({ requireAccessToken: false });
   }
 
   private static handleEdgeError(error: unknown, functionName: string): never {
