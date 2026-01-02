@@ -13,10 +13,11 @@ import {
 } from "./user-auth-schemas";
 import { AuthorizationErrorHandler } from "./error-handler";
 import { invokeEdgeWithAuth, SessionValidator, isAuthenticationError } from "./session-validation";
-import { dedupeInFlight, readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
+import { readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
 import { registerUser, type RegistrationOptions } from "./user-auth-register";
 import { signInWithFacebook, signInWithGoogle, handleOAuthCallback } from "./user-auth-oauth";
 import { loginUser, logout, resetPassword, updatePassword } from "./user-auth-login";
+import { RequestDeduplicatorFactory } from "./request-deduplicator";
 
 type UserStoreLite = { id: string; store_name: string };
 
@@ -29,8 +30,13 @@ type AuthMeData = {
 };
 
 export class UserAuthService {
-  private static authMeInFlightBySession: Map<string, Promise<AuthMeData>> =
-    new Map();
+  private static authMeDeduplicator = RequestDeduplicatorFactory.create<AuthMeData>("user-auth-service:authMe", {
+    ttl: 30_000,
+    maxSize: 200,
+    enableMetrics: true,
+    errorStrategy: "remove",
+    maxRetries: 0,
+  });
 
   private static getAuthMeCacheKey(userId: string): string {
     return `auth-me:${userId}`;
@@ -120,7 +126,7 @@ export class UserAuthService {
     if (cached?.data) {
       return cached.data;
     }
-    return await dedupeInFlight(this.authMeInFlightBySession, sessionKey, async () => {
+    return await this.authMeDeduplicator.dedupe(sessionKey, async () => {
       try {
         const resp = await invokeEdgeWithAuth<{
           user?: UserProfile | null;
@@ -148,7 +154,7 @@ export class UserAuthService {
   }
 
   static clearAuthMeCache(): void {
-    this.authMeInFlightBySession.clear();
+    this.authMeDeduplicator.clear();
     removeCache("auth-me");
     try {
       if (typeof window === "undefined") return;

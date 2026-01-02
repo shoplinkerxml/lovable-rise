@@ -3,7 +3,8 @@ import { ProductService, type Product } from "@/lib/product-service";
 import { R2Storage } from "@/lib/r2-storage";
 import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
 import { requireValidSession, type SessionValidationResult } from "./session-validation";
-import { CACHE_TTL, dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
+import { CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
+import { RequestDeduplicatorFactory } from "./request-deduplicator";
 
 const INFLIGHT_LIST_MAX_SIZE = 200;
 const INFLIGHT_GENERATE_MAX_SIZE = 100;
@@ -27,9 +28,24 @@ export const ExportService = {
     mode: "auto",
     defaultTtlMs: CACHE_TTL.productLinks,
   }),
-  inFlightList: new Map<string, Promise<ExportLink[]>>(),
-  inFlightGenerate: new Map<string, Promise<boolean>>(),
-  inFlightLocalGenerate: new Map<string, Promise<boolean>>(),
+  dedupeList: RequestDeduplicatorFactory.create<ExportLink[]>("export-service:list", {
+    ttl: 30_000,
+    maxSize: INFLIGHT_LIST_MAX_SIZE,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  }),
+  dedupeGenerate: RequestDeduplicatorFactory.create<boolean>("export-service:generate", {
+    ttl: 30_000,
+    maxSize: INFLIGHT_GENERATE_MAX_SIZE,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  }),
+  dedupeLocalGenerate: RequestDeduplicatorFactory.create<boolean>("export-service:localGenerate", {
+    ttl: 30_000,
+    maxSize: INFLIGHT_LOCAL_GENERATE_MAX_SIZE,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  }),
 
   async ensureSession(): Promise<SessionValidationResult> {
     const v = await requireValidSession({ requireAccessToken: false });
@@ -52,7 +68,7 @@ export const ExportService = {
     const cached = ExportService.cache.get<ExportLink[]>(key, false);
     if (cached && Array.isArray(cached)) return cached;
     const inflightKey = `${storeId}:${session.user?.id || "current"}`;
-    return await dedupeInFlight(ExportService.inFlightList, inflightKey, async () => {
+    return await ExportService.dedupeList.dedupe(inflightKey, async () => {
       const { data, error } = await supabase
         .from("store_export_links")
         .select("id,store_id,format,token,object_key,is_active,auto_generate,last_generated_at,created_at,updated_at")
@@ -63,7 +79,7 @@ export const ExportService = {
       const rows = data ?? [];
       ExportService.cache.set(key, rows);
       return rows;
-    }, { maxSize: INFLIGHT_LIST_MAX_SIZE });
+    });
   },
 
   async createLink(storeId: string, format: 'xml' | 'csv'): Promise<ExportLink | null> {
@@ -91,7 +107,7 @@ export const ExportService = {
   async regenerate(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     const session = await ExportService.ensureSession();
     const key = `${storeId}:${format}`;
-    return await dedupeInFlight(ExportService.inFlightGenerate, key, async () => {
+    return await ExportService.dedupeGenerate.dedupe(key, async () => {
       try {
         const { data, error } = await invokeSupabaseFunctionWithRetry<{ success?: boolean }>(
           supabase.functions.invoke.bind(supabase.functions) as any,
@@ -104,7 +120,7 @@ export const ExportService = {
       } catch {
         return false;
       }
-    }, { maxSize: INFLIGHT_GENERATE_MAX_SIZE });
+    });
   },
 
   async updateAutoGenerate(linkId: string, auto: boolean): Promise<boolean> {
@@ -129,7 +145,7 @@ export const ExportService = {
       return await ExportService.generateLocalAndUpload(storeId, format);
     }
     const key = `${storeId}:${format}`;
-    return await dedupeInFlight(ExportService.inFlightGenerate, key, async () => {
+    return await ExportService.dedupeGenerate.dedupe(key, async () => {
       try {
         const { data, error } = await invokeSupabaseFunctionWithRetry<{ success?: boolean }>(
           supabase.functions.invoke.bind(supabase.functions) as any,
@@ -142,7 +158,7 @@ export const ExportService = {
       } catch {
         return false;
       }
-    }, { maxSize: INFLIGHT_GENERATE_MAX_SIZE });
+    });
   },
 
   buildPublicUrl(origin: string, format: 'xml' | 'csv', token: string): string {
@@ -202,7 +218,7 @@ export const ExportService = {
   async generateLocalAndUpload(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     const session = await ExportService.ensureSession();
     const key = `${storeId}:${format}:local:${session.user?.id || "current"}`;
-    return await dedupeInFlight(ExportService.inFlightLocalGenerate, key, async () => {
+    return await ExportService.dedupeLocalGenerate.dedupe(key, async () => {
       const productsAgg = await ProductService.getProductsAggregated(storeId);
       const products = productsAgg as Product[];
       const content = format === 'xml' ? ExportService.buildXml(products) : ExportService.buildCsv(products);
@@ -212,6 +228,6 @@ export const ExportService = {
       const ok = !!res?.success;
       if (ok) ExportService.invalidateLinksCache(storeId, session.user?.id);
       return ok;
-    }, { maxSize: INFLIGHT_LOCAL_GENERATE_MAX_SIZE });
+    });
   },
 };

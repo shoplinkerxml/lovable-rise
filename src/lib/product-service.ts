@@ -9,7 +9,7 @@ import { ProductImageService } from "@/lib/product/product-image-service";
 import { ProductCategoryService } from "@/lib/product/product-category-service";
 import { ProductLimitService } from "@/lib/product/product-limit-service";
 import { ProductCacheManager } from "@/lib/product/product-cache-manager";
-import { dedupeInFlight } from "./cache-utils";
+import { RequestDeduplicatorFactory } from "./request-deduplicator";
 
 export interface Product {
   id: string;
@@ -160,20 +160,21 @@ export interface StoreProductLink {
 export type StoreProductLinkPatchInput = Partial<StoreProductLink>;
 
 export class ProductService {
-  private static inFlightUserStores: Map<
-    string,
-    Promise<
-      Array<{
-        id: string;
-        store_name: string;
-        store_url: string | null;
-        is_active: boolean;
-        productsCount: number;
-        categoriesCount: number;
-      }>
-    >
-  > = new Map();
-  private static readonly INFLIGHT_USER_STORES_MAX_SIZE = 20;
+  private static userStoresDeduplicator = RequestDeduplicatorFactory.create<
+    Array<{
+      id: string;
+      store_name: string;
+      store_url: string | null;
+      is_active: boolean;
+      productsCount: number;
+      categoriesCount: number;
+    }>
+  >("product-service:userStores", {
+    ttl: 30_000,
+    maxSize: 20,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  });
 
   private static castNullableNumber(value: unknown): number | null {
     if (value === undefined || value === null || value === "") return null;
@@ -250,41 +251,36 @@ export class ProductService {
       .then((v) => (v?.user?.id ? String(v.user.id) : "current"))
       .catch(() => "current");
     const inflightKey = `userStores:${uid}`;
-    return await dedupeInFlight(
-      ProductService.inFlightUserStores,
-      inflightKey,
-      async () => {
-        try {
-          const { UserAuthService } = await import("@/lib/user-auth-service");
-          const authMe = await UserAuthService.fetchAuthMe();
-          if (Array.isArray((authMe as any)?.userStores)) {
-            return (authMe.userStores || []).map((s: any) => ({
-              id: String(s.id),
-              store_name: String(s.store_name || ""),
-              store_url: null,
-              is_active: true,
-              productsCount: 0,
-              categoriesCount: 0,
-            }));
-          }
-        } catch {
-          void 0;
+    return await ProductService.userStoresDeduplicator.dedupe(inflightKey, async () => {
+      try {
+        const { UserAuthService } = await import("@/lib/user-auth-service");
+        const authMe = await UserAuthService.fetchAuthMe();
+        if (Array.isArray((authMe as any)?.userStores)) {
+          return (authMe.userStores || []).map((s: any) => ({
+            id: String(s.id),
+            store_name: String(s.store_name || ""),
+            store_url: null,
+            is_active: true,
+            productsCount: 0,
+            categoriesCount: 0,
+          }));
         }
+      } catch {
+        void 0;
+      }
 
-        const { ShopService } = await import("@/lib/shop-service");
-        const shops = await ShopService.getShopsAggregated();
-        const mapped = (shops || []).map((s) => ({
-          id: String(s.id),
-          store_name: String(s.store_name || ""),
-          store_url: s.store_url ? String(s.store_url) : null,
-          is_active: !!s.is_active,
-          productsCount: Number(s.productsCount ?? 0),
-          categoriesCount: Number(s.categoriesCount ?? 0),
-        }));
-        return mapped;
-      },
-      { maxSize: ProductService.INFLIGHT_USER_STORES_MAX_SIZE },
-    );
+      const { ShopService } = await import("@/lib/shop-service");
+      const shops = await ShopService.getShopsAggregated();
+      const mapped = (shops || []).map((s) => ({
+        id: String(s.id),
+        store_name: String(s.store_name || ""),
+        store_url: s.store_url ? String(s.store_url) : null,
+        is_active: !!s.is_active,
+        productsCount: Number(s.productsCount ?? 0),
+        categoriesCount: Number(s.categoriesCount ?? 0),
+      }));
+      return mapped;
+    });
   }
 
   static async getUserMasterProducts(): Promise<ProductAggregated[]> {

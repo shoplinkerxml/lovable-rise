@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { dedupeInFlight } from './cache-utils';
+import { RequestDeduplicatorFactory } from './request-deduplicator';
 // Dev-only logging toggle and transient abort detector
 const __DEV__ = import.meta.env?.DEV ?? false;
 function isTransientAbortError(err: unknown): boolean {
@@ -31,12 +31,16 @@ export class SubscriptionValidationService {
   }> = new Map();
   private static readonly CACHE_MAX_SIZE = 200;
 
-  // Track in-flight validations to dedupe concurrent calls
-  private static inFlight: Map<string, Promise<{
+  private static deduplicator = RequestDeduplicatorFactory.create<{
     hasValidSubscription: boolean;
     subscription: any | null;
     isDemo: boolean;
-  }>> = new Map();
+  }>("subscription-validation-service", {
+    ttl: 15_000,
+    maxSize: 200,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  });
 
   // Cache TTL (ms) for subscription status
   private static readonly TTL_MS = 15000;
@@ -226,7 +230,7 @@ export class SubscriptionValidationService {
         return await run();
       }
 
-      return await dedupeInFlight(this.inFlight, userId, run);
+      return await this.deduplicator.dedupe(userId, run);
 
     } catch (error) {
       if (isTransientAbortError(error)) {

@@ -1,12 +1,16 @@
-import { dedupeInFlight } from "@/lib/cache-utils";
 import type { StoreProductLink, StoreProductLinkPatchInput } from "@/lib/product-service";
 import { invokeEdgeWithAuth, SessionValidator } from "@/lib/session-validation";
 import { ApiError } from "@/lib/user-service";
+import { RequestDeduplicatorFactory } from "@/lib/request-deduplicator";
 
 export class ProductLinkService {
   private static readonly INFLIGHT_LINKS_MAX_SIZE = 200;
-
-  private static inFlightLinksByProduct: Map<string, Promise<string[]>> = new Map();
+  private static linksByProductDeduplicator = RequestDeduplicatorFactory.create<string[]>("product-link-service:linksByProduct", {
+    ttl: 30_000,
+    maxSize: ProductLinkService.INFLIGHT_LINKS_MAX_SIZE,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  });
 
   private static edgeError(
     error: { context?: { status?: number }; status?: number; statusCode?: number; message?: string } | null,
@@ -152,26 +156,20 @@ export class ProductLinkService {
   }
 
   static async getStoreLinksForProduct(productId: string): Promise<string[]> {
-    return dedupeInFlight(
-      ProductLinkService.inFlightLinksByProduct,
-      productId,
-      async () => {
-        await ProductLinkService.ensureValidSession();
-        const payload = await ProductLinkService.invokeEdge<{ store_ids?: string[] }>("get-store-links-for-product", {
-          product_id: productId,
-        });
-        return Array.isArray(payload.store_ids) ? payload.store_ids.map(String) : [];
-      },
-      { maxSize: ProductLinkService.INFLIGHT_LINKS_MAX_SIZE },
-    );
+    return await ProductLinkService.linksByProductDeduplicator.dedupe(productId, async () => {
+      await ProductLinkService.ensureValidSession();
+      const payload = await ProductLinkService.invokeEdge<{ store_ids?: string[] }>("get-store-links-for-product", {
+        product_id: productId,
+      });
+      return Array.isArray(payload.store_ids) ? payload.store_ids.map(String) : [];
+    });
   }
 
   static invalidateStoreLinksCache(productId: string) {
     try {
-      ProductLinkService.inFlightLinksByProduct.delete(productId);
+      ProductLinkService.linksByProductDeduplicator.remove(productId);
     } catch (error) {
       console.error("ProductLinkService.invalidateStoreLinksCache failed", error);
     }
   }
 }
-

@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { invokeEdgeWithAuth, requireValidSession } from "./session-validation";
-import { dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
+import { UnifiedCacheManager } from "./cache-utils";
 import type { RequireAtLeastOne } from "./request-handler";
+import { RequestDeduplicatorFactory } from "./request-deduplicator";
 
 // ============================================================================
 // ТИПЫ И ИНТЕРФЕЙСЫ
@@ -114,8 +115,12 @@ interface CategoryRow {
 
 export class ShopService {
   // Дедупликация запросов
-  private static requestCache = new Map<string, Promise<any>>();
-  private static readonly REQUEST_CACHE_MAX_SIZE = 200;
+  private static deduplicator = RequestDeduplicatorFactory.create("shop-service", {
+    ttl: 30_000,
+    maxSize: 200,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  });
   
   private static cache = UnifiedCacheManager.create("shop-service", {
     mode: "memory",
@@ -203,9 +208,7 @@ export class ShopService {
     key: string,
     request: () => Promise<T>
   ): Promise<T> {
-    return await dedupeInFlight(this.requestCache, key, request, {
-      maxSize: this.REQUEST_CACHE_MAX_SIZE,
-    });
+    return await this.deduplicator.dedupe(key, request);
   }
 
   /**
@@ -254,7 +257,7 @@ export class ShopService {
 
   static clearAllCaches(): void {
     try {
-      this.requestCache.clear();
+      this.deduplicator.clear();
     } catch {
       void 0;
     }

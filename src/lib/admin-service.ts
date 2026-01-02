@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeWithAuth, SessionValidator } from "./session-validation";
 import type { TariffInsert, TariffUpdate, TariffFeatureInsert, TariffFeatureUpdate, TariffLimitInsert, TariffLimitUpdate } from "./tariff-service";
-import { dedupeInFlightTtl } from "./cache-utils";
+import { RequestDeduplicatorFactory } from "./request-deduplicator";
 
 type AdminErrorCode = 'unauthorized' | 'validation_failed' | 'db_error' | 'rpc_error' | 'not_found';
 type AdminResult<T> = { success: boolean; data?: T; errorCode?: AdminErrorCode; message?: string };
@@ -65,15 +65,15 @@ async function runDb<T>(op: () => Promise<T>): Promise<AdminResult<T>> {
 
 export class AdminService {
   // ==================== TARIFF OPERATIONS ====================
-  private static inflight = new Map<string, { promise: Promise<unknown>; expiresAt: number }>();
-  private static INFLIGHT_TTL_MS = 30_000;
-  private static INFLIGHT_MAX_SIZE = 200;
+  private static deduplicator = RequestDeduplicatorFactory.create<AdminResult<unknown>>("admin-service", {
+    ttl: 30_000,
+    maxSize: 200,
+    enableMetrics: true,
+    errorStrategy: "remove",
+    maxRetries: 0,
+  });
   private static dedupe<T>(key: string, fn: () => Promise<AdminResult<T>>): Promise<AdminResult<T>> {
-    return dedupeInFlightTtl(this.inflight as Map<string, { promise: Promise<AdminResult<T>>; expiresAt: number }>, key, fn, {
-      ttlMs: this.INFLIGHT_TTL_MS,
-      maxSize: this.INFLIGHT_MAX_SIZE,
-      pruneWhenSizeOver: 50,
-    });
+    return this.deduplicator.dedupe<AdminResult<T>>(key, fn);
   }
   
   static async createTariff(data: TariffInsert): Promise<AdminResult<unknown>> {

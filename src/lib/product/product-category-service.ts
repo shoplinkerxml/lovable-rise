@@ -1,11 +1,14 @@
-import { dedupeInFlight } from "@/lib/cache-utils";
 import { invokeEdgeWithAuth, SessionValidator } from "@/lib/session-validation";
 import { ApiError } from "@/lib/user-service";
+import { RequestDeduplicatorFactory } from "@/lib/request-deduplicator";
 
 export class ProductCategoryService {
-  private static readonly INFLIGHT_RECOMPUTE_MAX_SIZE = 50;
-
-  private static inFlightRecomputeByStore: Map<string, Promise<void>> = new Map();
+  private static recomputeDeduplicator = RequestDeduplicatorFactory.create<void>("product-category-service:recompute", {
+    ttl: 30_000,
+    maxSize: 50,
+    enableMetrics: true,
+    errorStrategy: "remove",
+  });
 
   private static edgeError(
     error: { context?: { status?: number }; status?: number; statusCode?: number; message?: string } | null,
@@ -46,12 +49,7 @@ export class ProductCategoryService {
   static async recomputeStoreCategoryFilterCacheBatch(storeIds: string[]): Promise<void> {
     const unique = Array.from(new Set((storeIds || []).map(String).filter(Boolean)));
     const tasks = unique.map((sid) =>
-      dedupeInFlight(
-        ProductCategoryService.inFlightRecomputeByStore,
-        sid,
-        () => ProductCategoryService.recomputeStoreCategoryFilterCache(sid),
-        { maxSize: ProductCategoryService.INFLIGHT_RECOMPUTE_MAX_SIZE },
-      ),
+      ProductCategoryService.recomputeDeduplicator.dedupe(sid, () => ProductCategoryService.recomputeStoreCategoryFilterCache(sid)),
     );
     await Promise.all(tasks);
   }
@@ -77,4 +75,3 @@ export class ProductCategoryService {
     return results;
   }
 }
-
