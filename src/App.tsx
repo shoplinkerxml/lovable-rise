@@ -9,6 +9,7 @@ import { createBrowserRouter, RouterProvider, Navigate, Outlet, useParams } from
 import { I18nProvider } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { removeCache, UnifiedCacheManager } from "@/lib/cache-utils";
+import { DeduplicationMonitor } from "@/lib/request-deduplicator";
 import { SessionValidator } from "@/lib/session-validation";
 // Dev diagnostics removed per request
 
@@ -75,6 +76,24 @@ const App = () => {
   // Clean up orphan temporary uploads for the current user on app start
   useEffect(() => {
     R2Storage.cleanupPendingUploads().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const stop = DeduplicationMonitor.startMonitoring(60_000);
+    try {
+      (window as any).__dedup = DeduplicationMonitor;
+    } catch {
+      void 0;
+    }
+    return () => {
+      stop();
+      try {
+        delete (window as any).__dedup;
+      } catch {
+        void 0;
+      }
+    };
   }, []);
 
   useEffect(() => {

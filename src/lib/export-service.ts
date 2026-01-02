@@ -4,11 +4,7 @@ import { R2Storage } from "@/lib/r2-storage";
 import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
 import { requireValidSession, type SessionValidationResult } from "./session-validation";
 import { CACHE_TTL, UnifiedCacheManager } from "./cache-utils";
-import { RequestDeduplicatorFactory } from "./request-deduplicator";
-
-const INFLIGHT_LIST_MAX_SIZE = 200;
-const INFLIGHT_GENERATE_MAX_SIZE = 100;
-const INFLIGHT_LOCAL_GENERATE_MAX_SIZE = 50;
+import { DedupeKeyBuilder, RequestDeduplicatorFactory } from "./request-deduplicator";
 
 export type ExportLink = {
   id: string;
@@ -28,21 +24,9 @@ export const ExportService = {
     mode: "auto",
     defaultTtlMs: CACHE_TTL.productLinks,
   }),
-  dedupeList: RequestDeduplicatorFactory.create<ExportLink[]>("export-service:list", {
+  deduplicator: RequestDeduplicatorFactory.create<unknown>("export-service", {
     ttl: 30_000,
-    maxSize: INFLIGHT_LIST_MAX_SIZE,
-    enableMetrics: true,
-    errorStrategy: "remove",
-  }),
-  dedupeGenerate: RequestDeduplicatorFactory.create<boolean>("export-service:generate", {
-    ttl: 30_000,
-    maxSize: INFLIGHT_GENERATE_MAX_SIZE,
-    enableMetrics: true,
-    errorStrategy: "remove",
-  }),
-  dedupeLocalGenerate: RequestDeduplicatorFactory.create<boolean>("export-service:localGenerate", {
-    ttl: 30_000,
-    maxSize: INFLIGHT_LOCAL_GENERATE_MAX_SIZE,
+    maxSize: 200,
     enableMetrics: true,
     errorStrategy: "remove",
   }),
@@ -67,8 +51,8 @@ export const ExportService = {
     const key = ExportService.makeLinksCacheKey(storeId, session.user?.id || null);
     const cached = ExportService.cache.get<ExportLink[]>(key, false);
     if (cached && Array.isArray(cached)) return cached;
-    const inflightKey = `${storeId}:${session.user?.id || "current"}`;
-    return await ExportService.dedupeList.dedupe(inflightKey, async () => {
+    const inflightKey = DedupeKeyBuilder.simple(["list", storeId, session.user?.id || "current"]);
+    return await ExportService.deduplicator.dedupe(inflightKey, async () => {
       const { data, error } = await supabase
         .from("store_export_links")
         .select("id,store_id,format,token,object_key,is_active,auto_generate,last_generated_at,created_at,updated_at")
@@ -106,8 +90,8 @@ export const ExportService = {
 
   async regenerate(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     const session = await ExportService.ensureSession();
-    const key = `${storeId}:${format}`;
-    return await ExportService.dedupeGenerate.dedupe(key, async () => {
+    const inflightKey = DedupeKeyBuilder.simple(["generate", storeId, format]);
+    return await ExportService.deduplicator.dedupe(inflightKey, async () => {
       try {
         const { data, error } = await invokeSupabaseFunctionWithRetry<{ success?: boolean }>(
           supabase.functions.invoke.bind(supabase.functions) as any,
@@ -144,8 +128,8 @@ export const ExportService = {
     if (options?.local) {
       return await ExportService.generateLocalAndUpload(storeId, format);
     }
-    const key = `${storeId}:${format}`;
-    return await ExportService.dedupeGenerate.dedupe(key, async () => {
+    const inflightKey = DedupeKeyBuilder.simple(["generate", storeId, format]);
+    return await ExportService.deduplicator.dedupe(inflightKey, async () => {
       try {
         const { data, error } = await invokeSupabaseFunctionWithRetry<{ success?: boolean }>(
           supabase.functions.invoke.bind(supabase.functions) as any,
@@ -217,8 +201,8 @@ export const ExportService = {
 
   async generateLocalAndUpload(storeId: string, format: 'xml' | 'csv'): Promise<boolean> {
     const session = await ExportService.ensureSession();
-    const key = `${storeId}:${format}:local:${session.user?.id || "current"}`;
-    return await ExportService.dedupeLocalGenerate.dedupe(key, async () => {
+    const inflightKey = DedupeKeyBuilder.simple(["localGenerate", storeId, format, session.user?.id || "current"]);
+    return await ExportService.deduplicator.dedupe(inflightKey, async () => {
       const productsAgg = await ProductService.getProductsAggregated(storeId);
       const products = productsAgg as Product[];
       const content = format === 'xml' ? ExportService.buildXml(products) : ExportService.buildCsv(products);
