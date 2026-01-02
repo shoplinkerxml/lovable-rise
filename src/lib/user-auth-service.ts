@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ProfileService } from "./profile-service";
 import type { UserMenuItem } from "./user-menu-service";
-import { UserExistenceService, UserExistenceCheck } from "./user-existence-service";
 import { 
   RegistrationData, 
   LoginData, 
@@ -15,163 +14,9 @@ import {
 import { AuthorizationErrorHandler } from "./error-handler";
 import { invokeEdgeWithAuth, SessionValidator, isAuthenticationError } from "./session-validation";
 import { dedupeInFlight, readCache, writeCache, removeCache, CACHE_TTL } from "./cache-utils";
-
-/**
- * Configuration options for registration with session management
- */
-interface RegistrationOptions {
-  maxRetries: number;
-  sessionTimeout: number;
-  profileCreationDelay: number;
-  retryDelay: number;
-}
-
-
-
-/**
- * Registration performance and monitoring metrics
- */
-interface RegistrationMetrics {
-  startTime: number;
-  steps: { [key: string]: { startTime: number; endTime?: number; duration?: number; success?: boolean; error?: any } };
-  totalDuration?: number;
-  success: boolean;
-  finalError?: any;
-}
-
-/**
- * Enhanced logging service for registration flow monitoring
- */
-class RegistrationLogger {
-  private static metrics: Map<string, RegistrationMetrics> = new Map();
-  
-  static startRegistration(email: string): RegistrationMetrics {
-    const metrics: RegistrationMetrics = {
-      startTime: Date.now(),
-      steps: {},
-      success: false
-    };
-    
-    this.metrics.set(email, metrics);
-    console.log(`🚀 Registration started for ${email}`, {
-      timestamp: new Date().toISOString(),
-      email
-    });
-    
-    return metrics;
-  }
-  
-  static logStep(email: string, stepName: string, data?: any): void {
-    const metrics = this.metrics.get(email);
-    if (!metrics) return;
-    
-    if (!metrics.steps[stepName]) {
-      metrics.steps[stepName] = { startTime: Date.now() };
-      console.log(`📝 Registration step started: ${stepName}`, {
-        email,
-        step: stepName,
-        timestamp: new Date().toISOString(),
-        data
-      });
-    } else {
-      metrics.steps[stepName].endTime = Date.now();
-      metrics.steps[stepName].duration = metrics.steps[stepName].endTime! - metrics.steps[stepName].startTime;
-      metrics.steps[stepName].success = !data?.error;
-      if (data?.error) {
-        metrics.steps[stepName].error = data.error;
-      }
-      
-      console.log(`✅ Registration step completed: ${stepName}`, {
-        email,
-        step: stepName,
-        duration: metrics.steps[stepName].duration,
-        success: metrics.steps[stepName].success,
-        timestamp: new Date().toISOString(),
-        data
-      });
-    }
-  }
-  
-  static finishRegistration(email: string, success: boolean, error?: any): void {
-    const metrics = this.metrics.get(email);
-    if (!metrics) return;
-    
-    metrics.totalDuration = Date.now() - metrics.startTime;
-    metrics.success = success;
-    if (error) {
-      metrics.finalError = error;
-    }
-    
-    console.log(`🏁 Registration completed for ${email}`, {
-      email,
-      success,
-      totalDuration: metrics.totalDuration,
-      steps: Object.keys(metrics.steps).length,
-      timestamp: new Date().toISOString(),
-      summary: this.generateSummary(metrics)
-    });
-    
-    // Keep metrics for analysis
-    setTimeout(() => this.metrics.delete(email), 300000); // Clean up after 5 minutes
-  }
-  
-  static logError(email: string, stepName: string, error: any, context?: any): void {
-    console.error(`❌ Registration error in ${stepName}`, {
-      email,
-      step: stepName,
-      error: {
-        message: error.message,
-        code: error.code,
-        status: error.status || error.statusCode,
-        stack: error.stack
-      },
-      context,
-      timestamp: new Date().toISOString()
-    });
-    
-    this.logStep(email, stepName, { error });
-  }
-  
-  static logWarning(email: string, stepName: string, message: string, data?: any): void {
-    console.warn(`⚠️ Registration warning in ${stepName}`, {
-      email,
-      step: stepName,
-      message,
-      data,
-      timestamp: new Date().toISOString()
-    });
-  }
-  
-  private static generateSummary(metrics: RegistrationMetrics): any {
-    const stepSummary = Object.entries(metrics.steps).map(([name, step]) => ({
-      name,
-      duration: step.duration || 0,
-      success: step.success !== false
-    }));
-    
-    return {
-      totalSteps: stepSummary.length,
-      successfulSteps: stepSummary.filter(s => s.success).length,
-      longestStep: stepSummary.reduce((prev, current) => 
-        (prev.duration > current.duration) ? prev : current, { name: '', duration: 0 }
-      )
-    };
-  }
-  
-  static getMetrics(email: string): RegistrationMetrics | undefined {
-    return this.metrics.get(email);
-  }
-}
-
-/**
- * Default configuration for registration process
- */
-const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptions = {
-  maxRetries: 3,
-  sessionTimeout: 10000, // 10 seconds
-  profileCreationDelay: 1000, // 1 second
-  retryDelay: 500 // 0.5 seconds
-};
+import { registerUser, type RegistrationOptions } from "./user-auth-register";
+import { signInWithFacebook, signInWithGoogle, handleOAuthCallback } from "./user-auth-oauth";
+import { loginUser, logout, resetPassword, updatePassword } from "./user-auth-login";
 
 type UserStoreLite = { id: string; store_name: string };
 
@@ -198,221 +43,28 @@ export class UserAuthService {
    * 3. After confirmation, user can login to get access token
    */
   static async register(data: RegistrationData, options: Partial<RegistrationOptions> = {}): Promise<AuthResponse> {
-    const config = { ...DEFAULT_REGISTRATION_OPTIONS, ...options };
-    const metrics = RegistrationLogger.startRegistration(data.email);
-    
-    try {
-      RegistrationLogger.logStep(data.email, 'validation');
-      console.log('Starting user registration for:', data.email);
-      RegistrationLogger.logStep(data.email, 'validation', { completed: true });
-      
-      // Step 1: Check user existence through profile (more reliable)
-      RegistrationLogger.logStep(data.email, 'existence_check');
-      const existingProfile = await ProfileService.getProfileByEmail(data.email);
-      
-      if (existingProfile) {
-        RegistrationLogger.logStep(data.email, 'existence_check', { exists: true, profile: existingProfile.id });
-        RegistrationLogger.finishRegistration(data.email, false, UserAuthError.EMAIL_EXISTS);
-        console.log('User profile already exists:', data.email);
-        return {
-          user: null,
-          session: null,
-          error: UserAuthError.EMAIL_EXISTS
-        };
-      }
-      
-      RegistrationLogger.logStep(data.email, 'existence_check', { exists: false });
-      console.log('User does not exist, proceeding with registration');
-      
-      // Step 2: Supabase Auth signup - this creates user but NO session/token until email confirmed
-      RegistrationLogger.logStep(data.email, 'auth_signup');
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            name: data.name,
-            full_name: data.name  // Alternative field for redundancy
-          }
-        }
-      });
-
-      if (signUpError || !authData.user) {
-        RegistrationLogger.logError(data.email, 'auth_signup', signUpError || 'No user data returned');
-        RegistrationLogger.finishRegistration(data.email, false, signUpError);
-        console.error('Registration signup error:', signUpError);
-        return {
-          user: null,
-          session: null,
-          error: UserAuthService.mapSupabaseError(signUpError)
-        };
-      }
-
-      RegistrationLogger.logStep(data.email, 'auth_signup', { 
-        userId: authData.user.id, 
-        hasSession: !!authData.session,
-        emailConfirmed: authData.user.email_confirmed_at !== null
-      });
-      console.log('User created in auth:', {
-        userId: authData.user.id,
-        emailConfirmed: authData.user.email_confirmed_at !== null,
-        hasSession: !!authData.session
-      });
-      
-      // Step 3: According to Supabase flow - no session/token until email is confirmed
-      // We should NOT create profile here if email requires confirmation
-      if (!authData.session && !authData.user.email_confirmed_at) {
-        RegistrationLogger.finishRegistration(data.email, true, 'Email confirmation required');
-        console.log('Registration successful, email confirmation required before login');
-        
-        // Clear existence cache for correct subsequent checks
-        UserExistenceService.clearExistenceCache(data.email);
-        
-        return {
-          user: null,
-          session: null,
-          error: UserAuthError.EMAIL_CONFIRMATION_REQUIRED
-        };
-      }
-      
-      // If we somehow got a session immediately (email confirmation disabled in settings)
-      if (authData.session) {
-        RegistrationLogger.logStep(data.email, 'profile_creation_immediate');
-        
-        // Create profile since user is immediately authenticated
-        let profile: UserProfile;
-        try {
-          profile = await ProfileService.createProfileWithAuth({
-            id: authData.user.id,
-            email: data.email,
-            name: data.name
-          }, authData.session.access_token);
-
-          
-          RegistrationLogger.logStep(data.email, 'profile_creation_immediate', {
-            profileId: profile.id
-          });
-          console.log('Profile created immediately (email confirmation disabled)');
-        } catch (profileError) {
-          console.error('Profile creation failed:', profileError);
-          RegistrationLogger.finishRegistration(data.email, false, profileError);
-          return {
-            user: null,
-            session: null,
-            error: UserAuthError.PROFILE_CREATION_FAILED
-          };
-        }
-        
-        UserExistenceService.clearExistenceCache(data.email);
-        RegistrationLogger.finishRegistration(data.email, true);
-        
-        return {
-          user: profile,
-          session: authData.session,
-          error: null
-        };
-      }
-      
-      // For email confirmation flow, we don't attempt to create profile immediately
-      // Profile will be created when user confirms email and logs in
-      UserExistenceService.clearExistenceCache(data.email);
-      RegistrationLogger.finishRegistration(data.email, true);
-      
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.EMAIL_CONFIRMATION_REQUIRED
-      };
-      
-    } catch (error) {
-      RegistrationLogger.logError(data.email, 'general', error);
-      RegistrationLogger.finishRegistration(data.email, false, error);
-      console.error('Registration error:', error);
-      
-      // Enhanced error handling for authorization issues
-      if (this.isAuthorizationError(error)) {
-        return {
-          user: null,
-          session: null,
-          error: UserAuthError.INSUFFICIENT_PERMISSIONS
-        };
-      }
-      
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.REGISTRATION_FAILED
-      };
-    }
+    return await registerUser(data, options, {
+      mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error),
+      isAuthorizationError: (error) => UserAuthService.isAuthorizationError(error),
+    });
   }
 
   /**
    * Sign in with Google OAuth
    */
   static async signInWithGoogle(): Promise<AuthResponse> {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        }
-      });
-
-      if (error) {
-        return {
-          user: null,
-          session: null,
-          error: UserAuthService.mapSupabaseError(error)
-        };
-      }
-
-      // OAuth redirect, no immediate response
-      return { user: null, session: null, error: null };
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await signInWithGoogle({
+      mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error),
+    });
   }
 
   /**
    * Sign in with Facebook OAuth
    */
   static async signInWithFacebook(): Promise<AuthResponse> {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      });
-
-      if (error) {
-        return {
-          user: null,
-          session: null,
-          error: UserAuthService.mapSupabaseError(error)
-        };
-      }
-
-      // OAuth redirect, no immediate response
-      return { user: null, session: null, error: null };
-    } catch (error) {
-      console.error('Facebook sign-in error:', error);
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await signInWithFacebook({
+      mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error),
+    });
   }
 
   /**
@@ -420,69 +72,7 @@ export class UserAuthService {
    * Also handles email confirmation callback
    */
   static async handleOAuthCallback(): Promise<AuthResponse> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user) {
-        return {
-          user: null,
-          session: null,
-          error: 'oauth_callback_failed'
-        };
-      }
-
-      // Check if profile exists, if not create it (for OAuth users or email confirmed users)
-      let profile = await ProfileService.getProfile(session.user.id);
-      
-      if (!profile) {
-        console.log('Creating profile for authenticated user:', session.user.id);
-        // Enhanced name extraction with fallbacks
-        const userName = session.user.user_metadata?.name || 
-                        session.user.user_metadata?.full_name ||
-                        session.user.email?.split('@')[0] || 
-                        'User';
-        
-        // Create profile if it doesn't exist
-        try {
-          profile = await ProfileService.createProfileWithAuth({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: userName
-          }, session.access_token);
-          
-          console.log('Profile created successfully for authenticated user');
-        } catch (profileError) {
-          console.error('Profile creation in callback failed:', profileError);
-          return {
-            user: null,
-            session: null,
-            error: UserAuthError.PROFILE_CREATION_FAILED
-          };
-        }
-      }
-
-      // Check role and redirect appropriately
-      if (profile && profile.role !== 'user') {
-        return {
-          user: null,
-          session: session,
-          error: 'redirect_to_admin'
-        };
-      }
-
-      return {
-        user: profile,
-        session: session,
-        error: null
-      };
-    } catch (error) {
-      console.error('OAuth callback error:', error);
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await handleOAuthCallback();
   }
 
   /**
@@ -490,132 +80,32 @@ export class UserAuthService {
    * Properly handles email confirmation flow
    */
   static async login(data: LoginData): Promise<AuthResponse> {
-    try {
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password
-      });
-
-      if (signInError) {
-        console.error('Login error:', signInError);
-        return {
-          user: null,
-          session: null,
-          error: UserAuthService.mapSupabaseError(signInError)
-        };
-      }
-
-      if (authData.user && authData.session) {
-        this.clearAuthMeCache();
-        // Use edge function as single source of truth and avoid extra profiles query
-        const authMe = await UserAuthService.fetchAuthMe();
-        if (!authMe.user) {
-          return { user: null, session: authData.session, error: UserAuthError.LOGIN_FAILED };
-        }
-        if (authMe.user.role && authMe.user.role !== 'user') {
-          return { user: null, session: authData.session, error: 'redirect_to_admin' };
-        }
-        return { user: authMe.user, session: authData.session, error: null };
-      }
-
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.LOGIN_FAILED
-      };
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        user: null,
-        session: null,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await loginUser(data, {
+      mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error),
+      clearAuthMeCache: () => UserAuthService.clearAuthMeCache(),
+      fetchAuthMe: () => UserAuthService.fetchAuthMe(),
+    });
   }
 
   /**
    * Initiate password reset
    */
   static async resetPassword(data: ResetPasswordData): Promise<{ success: boolean; error: string | null }> {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/user-reset-password`
-      });
-
-      if (error) {
-        return {
-          success: false,
-          error: UserAuthService.mapSupabaseError(error)
-        };
-      }
-
-      return {
-        success: true,
-        error: null
-      };
-    } catch (error) {
-      console.error('Password reset error:', error);
-      return {
-        success: false,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await resetPassword(data, { mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error) });
   }
 
   /**
    * Update password with reset token
    */
   static async updatePassword(password: string): Promise<{ success: boolean; error: string | null }> {
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
-
-      if (error) {
-        return {
-          success: false,
-          error: UserAuthService.mapSupabaseError(error)
-        };
-      }
-
-      return {
-        success: true,
-        error: null
-      };
-    } catch (error) {
-      console.error('Password update error:', error);
-      return {
-        success: false,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await updatePassword(password, { mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error) });
   }
 
   /**
    * Logout user
    */
   static async logout(): Promise<{ success: boolean; error: string | null }> {
-    try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        return {
-          success: false,
-          error: UserAuthService.mapSupabaseError(error)
-        };
-      }
-
-      return {
-        success: true,
-        error: null
-      };
-    } catch (error) {
-      console.error('Logout error:', error);
-      return {
-        success: false,
-        error: UserAuthError.NETWORK_ERROR
-      };
-    }
+    return await logout({ mapSupabaseError: (error) => UserAuthService.mapSupabaseError(error) });
   }
 
   static async fetchAuthMe(): Promise<AuthMeData> {
