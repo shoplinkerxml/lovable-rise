@@ -1,24 +1,20 @@
 import { R2Storage } from "@/lib/r2-storage";
+import { CACHE_TTL, UnifiedCacheManager } from "@/lib/cache-utils";
 
 const IMAGE_URL_CACHE_MAX_SIZE = 500;
-const imageUrlCache = new Map<string, string>();
+const imageUrlCache = UnifiedCacheManager.create("imageUtils:url", {
+  mode: "memory",
+  defaultTtlMs: CACHE_TTL.uiPrefs,
+  maxSize: IMAGE_URL_CACHE_MAX_SIZE,
+});
 
 function cacheGet(key: string): string | undefined {
-  const v = imageUrlCache.get(key);
-  if (v === undefined) return undefined;
-  imageUrlCache.delete(key);
-  imageUrlCache.set(key, v);
-  return v;
+  const v = imageUrlCache.get<string>(key, false);
+  return v === null ? undefined : v;
 }
 
 function cacheSet(key: string, value: string): void {
-  imageUrlCache.delete(key);
-  imageUrlCache.set(key, value);
-  while (imageUrlCache.size > IMAGE_URL_CACHE_MAX_SIZE) {
-    const oldestKey = imageUrlCache.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    imageUrlCache.delete(oldestKey);
-  }
+  imageUrlCache.set(key, value, CACHE_TTL.uiPrefs);
 }
 
 export function getImageUrl(originalUrl: string | null | undefined, _width?: number): string {

@@ -1,24 +1,20 @@
 import { R2Storage } from "@/lib/r2-storage";
+import { UnifiedCacheManager } from "@/lib/cache-utils";
 
 const IMAGE_CACHE_MAX_SIZE = 300;
-const imageCache = new Map<string, string>();
+const imageCache = UnifiedCacheManager.create("imageLoader:signedUrl", {
+  mode: "memory",
+  defaultTtlMs: 840_000,
+  maxSize: IMAGE_CACHE_MAX_SIZE,
+});
 
 function cacheGet(key: string): string | undefined {
-  const value = imageCache.get(key);
-  if (value === undefined) return undefined;
-  imageCache.delete(key);
-  imageCache.set(key, value);
-  return value;
+  const value = imageCache.get<string>(key, false);
+  return value === null ? undefined : value;
 }
 
 function cacheSet(key: string, value: string): void {
-  imageCache.delete(key);
   imageCache.set(key, value);
-  while (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-    const oldestKey = imageCache.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    imageCache.delete(oldestKey);
-  }
 }
 
 type QueueItem = {
@@ -77,5 +73,5 @@ export async function loadImageUrl(key: string): Promise<string> {
 }
 
 export function clearImageCache() {
-  imageCache.clear();
+  imageCache.clearAll();
 }

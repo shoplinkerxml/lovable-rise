@@ -5,6 +5,10 @@ import { invokeSupabaseFunctionWithRetry } from "@/lib/request-handler";
 import { requireValidSession, type SessionValidationResult } from "./session-validation";
 import { CACHE_TTL, dedupeInFlight, UnifiedCacheManager } from "./cache-utils";
 
+const INFLIGHT_LIST_MAX_SIZE = 200;
+const INFLIGHT_GENERATE_MAX_SIZE = 100;
+const INFLIGHT_LOCAL_GENERATE_MAX_SIZE = 50;
+
 export type ExportLink = {
   id: string;
   store_id: string;
@@ -59,7 +63,7 @@ export const ExportService = {
       const rows = data ?? [];
       ExportService.cache.set(key, rows);
       return rows;
-    });
+    }, { maxSize: INFLIGHT_LIST_MAX_SIZE });
   },
 
   async createLink(storeId: string, format: 'xml' | 'csv'): Promise<ExportLink | null> {
@@ -100,7 +104,7 @@ export const ExportService = {
       } catch {
         return false;
       }
-    });
+    }, { maxSize: INFLIGHT_GENERATE_MAX_SIZE });
   },
 
   async updateAutoGenerate(linkId: string, auto: boolean): Promise<boolean> {
@@ -138,7 +142,7 @@ export const ExportService = {
       } catch {
         return false;
       }
-    });
+    }, { maxSize: INFLIGHT_GENERATE_MAX_SIZE });
   },
 
   buildPublicUrl(origin: string, format: 'xml' | 'csv', token: string): string {
@@ -208,6 +212,6 @@ export const ExportService = {
       const ok = !!res?.success;
       if (ok) ExportService.invalidateLinksCache(storeId, session.user?.id);
       return ok;
-    });
+    }, { maxSize: INFLIGHT_LOCAL_GENERATE_MAX_SIZE });
   },
 };
