@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { AdminSidebar } from './AdminSidebar';
@@ -32,6 +32,9 @@ export const ResponsiveAdminSidebar: React.FC<ResponsiveAdminSidebarProps> = ({
     return (
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-64 overflow-y-auto">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Sidebar</SheetTitle>
+          </SheetHeader>
           <div className="h-full flex flex-col">
             <AdminSidebar 
               collapsed={false} 

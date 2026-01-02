@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { persistQueryClient } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { useEffect, useMemo, Suspense, lazy } from "react";
 import { R2Storage } from "@/lib/r2-storage";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet, useParams } from "react-router-dom";
@@ -70,12 +72,42 @@ const queryClient = new QueryClient({
   },
 });
 
+const queryPersister =
+  typeof window !== "undefined"
+    ? createSyncStoragePersister({
+        storage: window.localStorage,
+        key: "rq:cache",
+      })
+    : null;
+
 let lastAuthUserId: string | null = null;
 
 const App = () => {
   // Clean up orphan temporary uploads for the current user on app start
   useEffect(() => {
     R2Storage.cleanupPendingUploads().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!queryPersister) return;
+    const [unsubscribe] = persistQueryClient({
+      queryClient,
+      persister: queryPersister,
+      maxAge: 1000 * 60 * 60 * 24,
+      dehydrateOptions: {
+        shouldDehydrateQuery: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) ? key[0] !== "auth" : true;
+        },
+      },
+    });
+    return () => {
+      try {
+        unsubscribe();
+      } catch {
+        void 0;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -107,6 +139,11 @@ const App = () => {
       if (shouldClear) {
         try {
           SessionValidator.clearCache();
+        } catch {
+          void 0;
+        }
+        try {
+          queryPersister?.removeClient?.();
         } catch {
           void 0;
         }
@@ -150,6 +187,17 @@ const App = () => {
           void 0;
         }
         try {
+          queryClient.removeQueries({ queryKey: ["auth", "me"], exact: true });
+          queryClient.removeQueries({ queryKey: ["auth", "session"], exact: true });
+        } catch {
+          void 0;
+        }
+        try {
+          removeCache("rq:auth:me");
+        } catch {
+          void 0;
+        }
+        try {
           if (typeof window !== "undefined") {
             const storages: Storage[] = [];
             try {
@@ -185,17 +233,6 @@ const App = () => {
         }
       }
       lastAuthUserId = currentUserId;
-      try {
-        queryClient.removeQueries({ queryKey: ["auth", "me"], exact: true });
-        queryClient.removeQueries({ queryKey: ["auth", "session"], exact: true });
-      } catch {
-        void 0;
-      }
-      try {
-        removeCache("rq:auth:me");
-      } catch {
-        void 0;
-      }
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -205,7 +242,7 @@ const App = () => {
     { path: "/docs", element: <ApiDocs /> },
     { path: "/export/:format/:token", element: <ExportPublic /> },
     { path: "/admin-auth", element: <AdminAuth /> },
-    { path: "/admin-*", element: <NotFound /> },
+    { path: "/admin-/*", element: <NotFound /> },
     {
       path: "/admin",
       element: <AdminRoute><AdminProtected /></AdminRoute>,
@@ -256,14 +293,14 @@ const App = () => {
     },
     { path: "*", element: <NotFound /> },
   ], {
-    future: {
+    future: ({
       v7_relativeSplatPath: true,
       // Optional flags available in current router types
       v7_fetcherPersist: true,
       v7_normalizeFormMethod: true,
       v7_partialHydration: false,
       v7_skipActionErrorRevalidation: true,
-    },
+    } as any),
   }), []);
 
   return (
@@ -279,7 +316,7 @@ const App = () => {
           <Sonner />
           <I18nProvider>
             <Suspense fallback={<div data-testid="router_skeleton" className="min-h-screen flex items-center justify-center text-muted-foreground">Завантаження...</div>}>
-              <RouterProvider router={router} />
+              <RouterProvider router={router} future={{ v7_startTransition: true } as any} />
             </Suspense>
           </I18nProvider>
         </TooltipProvider>

@@ -36,12 +36,24 @@ export type SupabaseFunctionInvoke = <T = unknown>(
   args?: SupabaseFunctionInvokeArgs,
 ) => Promise<{ data: T; error: any }>;
 
+function isAbortLikeError(err: unknown): boolean {
+  const e = err as { name?: string; message?: string } | null;
+  const name = e?.name || "";
+  const message = e?.message || "";
+  return (
+    name === "AbortError" ||
+    message.includes("AbortError") ||
+    message.includes("The user aborted a request") ||
+    message.includes("net::ERR_ABORTED")
+  );
+}
+
 export async function withRetryResult<T>(
   operation: (ctx: { attempt: number; signal: AbortSignal }) => Promise<{ value: T; retry: boolean }>,
   opts?: RetryOptions,
 ): Promise<T> {
-  const maxRetries = Math.max(0, opts?.maxRetries ?? 2);
-  const timeoutMs = Math.max(2500, opts?.timeoutMs ?? 5000);
+  const maxRetries = Math.max(0, opts?.maxRetries ?? 0);
+  const timeoutMs = Math.max(0, opts?.timeoutMs ?? 0);
   const baseDelay = Math.max(250, opts?.retryDelayMs ?? 500);
   const backoff = opts?.backoff ?? "linear";
   const shouldRetryError = opts?.shouldRetryError ?? (() => true);
@@ -49,10 +61,10 @@ export async function withRetryResult<T>(
   let attempt = 0;
   while (true) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
     try {
       const out = await operation({ attempt, signal: controller.signal });
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       if (out.retry && attempt < maxRetries) {
         attempt += 1;
         opts?.onRetry?.(attempt, out.value);
@@ -63,7 +75,7 @@ export async function withRetryResult<T>(
       }
       return out.value;
     } catch (error) {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       if (attempt < maxRetries && shouldRetryError(error, attempt)) {
         attempt += 1;
         opts?.onRetry?.(attempt, error);
@@ -83,6 +95,11 @@ export async function invokeSupabaseFunctionWithRetry<T>(
   init: { body?: unknown; headers?: Record<string, string> },
   opts?: RetryOptions,
 ): Promise<EdgeFunctionResponse<T>> {
+  const effectiveOpts: RetryOptions = {
+    timeoutMs: 20_000,
+    maxRetries: 0,
+    ...opts,
+  };
   return await withRetryResult(
     async ({ signal }) => {
       const { data, error } = await invoke<T>(fnName, {
@@ -92,11 +109,11 @@ export async function invokeSupabaseFunctionWithRetry<T>(
       });
       if (error) {
         const status = (error as EdgeFunctionError | null)?.context?.status ?? 0;
-        const isTransient = status === 0 || status === 408 || status === 429 || status >= 500;
+        const isTransient = !isAbortLikeError(error) && (status === 0 || status === 408 || status === 429 || status >= 500);
         return { value: { data: data as T, error: error as EdgeFunctionError }, retry: isTransient };
       }
       return { value: { data: data as T, error: null }, retry: false };
     },
-    opts,
+    effectiveOpts,
   );
 }

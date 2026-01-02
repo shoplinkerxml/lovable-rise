@@ -42,17 +42,6 @@ interface ProductImage {
   object_key?: string;
 }
 
-// Тип строки из store_product_images с R2-ключами
-type StoreProductImageRow = {
-  id: number;
-  product_id: string;
-  url: string;
-  order_index: number;
-  is_main?: boolean;
-  alt_text?: string | null;
-  r2_key_original?: string | null;
-}
-
 export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTabsProps) => {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
@@ -213,34 +202,19 @@ export const ProductFormTabs = ({ product, onSuccess, onCancel }: ProductFormTab
           })));
         }
 
-        // Загружаем изображения товара
-        const { data: productImagesRaw } = await supabase
-          .from('store_product_images')
-          .select('*')
-          .eq('product_id', product.id)
-          .order('order_index');
-
-        if (productImagesRaw) {
-          const rows = (productImagesRaw || []) as StoreProductImageRow[];
-          const resolved = await Promise.all(rows.map(async (img) => {
-            const originalFull = (typeof img.url === 'string' && /^https?:\/\//.test(img.url))
-              ? String(img.url)
-              : (img.r2_key_original
-                  ? R2Storage.makePublicUrl(String(img.r2_key_original))
-                  : (img.url
-                      ? R2Storage.makePublicUrl(String(img.url))
-                      : ''));
-            const objectKey = originalFull ? (ImageHelpers.extractObjectKeyFromUrl(originalFull) || undefined) : undefined;
-            const objectKeyFixed = objectKey ? String(objectKey).replace(/\.web$/, '.webp') : undefined;
-            return {
-              url: originalFull || '',
-              order_index: img.order_index,
-              is_main: img.order_index === 0,
-              object_key: objectKeyFixed || undefined,
-            } as ProductImage;
-          }));
-          setImages(resolved);
-        }
+        const productImages = await ProductService.getProductImages(String(product.id));
+        const resolved = (productImages || []).map((img: any, idx: number) => {
+          const originalFull = String(img?.url || "").trim();
+          const objectKey = originalFull ? (ImageHelpers.extractObjectKeyFromUrl(originalFull) || undefined) : undefined;
+          const objectKeyFixed = objectKey ? String(objectKey).replace(/\.web$/, ".webp") : undefined;
+          return {
+            url: originalFull,
+            order_index: typeof img?.order_index === "number" ? img.order_index : idx,
+            is_main: !!img?.is_main || (typeof img?.order_index === "number" ? img.order_index === 0 : idx === 0),
+            object_key: objectKeyFixed || undefined,
+          } as ProductImage;
+        });
+        setImages(resolved);
       }
     } catch (error) {
       console.error('Load product data error:', error);

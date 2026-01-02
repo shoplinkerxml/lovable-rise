@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserMenuService, UserMenuItem } from "@/lib/user-menu-service";
+import { UserMenuItem } from "@/lib/user-menu-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { useI18n } from "@/i18n";
 import { DynamicIcon } from "@/components/ui/dynamic-icon";
@@ -18,13 +18,12 @@ import { ExportDialog } from "@/components/user/shops/ExportDialog";
 interface UserDashboardContextType {
   user: UserProfile;
   menuItems: UserMenuItem[];
-  onMenuUpdate: () => void;
 }
 
 const UserMenuContentByPath = () => {
   const { path } = useParams();
   const navigate = useNavigate();
-  const { user, menuItems, onMenuUpdate } = useOutletContext<UserDashboardContextType>();
+  const { user, menuItems } = useOutletContext<UserDashboardContextType>();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const uid = user?.id ? String(user.id) : "current";
@@ -34,6 +33,7 @@ const UserMenuContentByPath = () => {
   
   // Get the full path including any nested routes
   const location = useLocation();
+  const initialPathRef = useRef<string>(location.pathname);
   const fullPath = location.pathname.replace('/user/', '');
   const shopRoute = useMemo(() => {
     const raw = String(fullPath || path || "");
@@ -43,11 +43,27 @@ const UserMenuContentByPath = () => {
     return { storeId: String(match[1] || ""), action: match[2] as "structure" | "export" };
   }, [fullPath, path]);
   const [shopDialogOpen, setShopDialogOpen] = useState(false);
+  const isReload = useMemo(() => {
+    try {
+      const entries = typeof performance !== "undefined" ? (performance.getEntriesByType("navigation") as PerformanceNavigationTiming[]) : [];
+      const navType = entries?.[0]?.type;
+      if (navType === "reload") return true;
+      const legacy = (performance as unknown as { navigation?: { type?: number } })?.navigation?.type;
+      return legacy === 1;
+    } catch {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     if (!shopRoute) return;
+    if (isReload && location.pathname === initialPathRef.current) {
+      setShopDialogOpen(false);
+      navigate(`/user/shops/${shopRoute.storeId}`, { replace: true });
+      return;
+    }
     setShopDialogOpen(true);
-  }, [shopRoute]);
+  }, [isReload, location.pathname, navigate, shopRoute]);
 
   const {
     data: shopForStructure,
@@ -113,14 +129,6 @@ const UserMenuContentByPath = () => {
         
         if (foundItem) {
           setMenuItem(foundItem);
-          setLoading(false);
-          return;
-        }
-
-        // If not found in context, try to get it from the database by path
-        const dbItem = await UserMenuService.getMenuItemByPath(normalizedPath, user.id);
-        if (dbItem) {
-          setMenuItem(dbItem);
           setLoading(false);
           return;
         }

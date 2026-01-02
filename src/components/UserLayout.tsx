@@ -1,10 +1,10 @@
 import { useState, useEffect, createContext, useContext, useMemo, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SheetNoOverlay, SheetNoOverlayContent, SheetNoOverlayHeader, SheetNoOverlayTitle, SheetNoOverlayTrigger } from "@/components/ui/sheet-no-overlay";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sun, Moon, AlignJustify, LogOut, MoreHorizontal } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -94,63 +94,63 @@ const UserMenuProvider: React.FC<{
   children: React.ReactNode;
   userId: string;
   hasAccess: boolean;
+  menuItems: UserMenuItem[];
 }> = ({
   children,
   userId,
-  hasAccess
+  hasAccess,
+  menuItems: menuItemsFromAuthMe
 }) => {
   const queryClient = useQueryClient();
   const [activeMenuItem, setActiveMenuItemState] = useState<UserMenuItem | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { data: menuItemsData, isLoading: menuLoading } = useQuery<UserMenuItem[]>({
-    queryKey: ['userMenu', userId],
-    queryFn: async () => {
-      const auth = queryClient.getQueryData<any>(["auth", "me"]);
-      let items = Array.isArray(auth?.menuItems) ? (auth.menuItems as UserMenuItem[]) : [];
-      items = items.filter((i) => i && typeof i === "object");
-      items = items.map((i) => ({ ...i })) as UserMenuItem[];
-      items = items.filter((i) => i.user_id ? String(i.user_id) === String(userId) : true);
-      items = items.filter((i) => i && typeof i.title === "string" && typeof i.path === "string");
-      items = items.filter((i) => i && typeof i.is_active === "boolean" ? i.is_active === true : true);
-      items = items.map((item: UserMenuItem) => {
-        const title = String(item.title || "").toLowerCase();
-        const path = String(item.path || "").toLowerCase();
-        if (
-          (!item.icon_name || item.icon_name === "circle" || item.icon_name === "Circle") &&
-          (title.includes("supplier") ||
-            title.includes("постачальник") ||
-            title.includes("shop") ||
-            title.includes("магазин") ||
-            title.includes("payment") ||
-            title.includes("платеж") ||
-            path.includes("supplier") ||
-            path.includes("постачальник") ||
-            path.includes("shop") ||
-            path.includes("магазин") ||
-            path.includes("payment") ||
-            path.includes("платеж"))
-        ) {
-          return { ...item, icon_name: UserMenuService.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
-        }
-        return item;
-      });
-      if (items.length > 0) return items;
-      return await UserMenuService.getUserMenuItems(userId, true);
-    },
-    enabled: !!userId,
-    staleTime: 900_000,
-    gcTime: 86_400_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    placeholderData: (prev) => prev as UserMenuItem[] | undefined,
-  });
-  const menuItems: UserMenuItem[] = useMemo(() => menuItemsData ?? [], [menuItemsData]);
+  const [menuItemsRaw, setMenuItemsRaw] = useState<UserMenuItem[]>(
+    Array.isArray(menuItemsFromAuthMe) ? menuItemsFromAuthMe : [],
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(menuItemsFromAuthMe)) return;
+    setMenuItemsRaw(menuItemsFromAuthMe);
+  }, [menuItemsFromAuthMe]);
+
+  const menuLoading = false;
+
+  const menuItems: UserMenuItem[] = useMemo(() => {
+    let items = Array.isArray(menuItemsRaw) ? menuItemsRaw : [];
+    items = items.filter((i) => i && typeof i === "object");
+    items = items.map((i) => ({ ...i })) as UserMenuItem[];
+    items = items.filter((i) => (i.user_id ? String(i.user_id) === String(userId) : true));
+    items = items.filter((i) => i && typeof i.title === "string" && typeof i.path === "string");
+    items = items.filter((i) => (i && typeof i.is_active === "boolean" ? i.is_active === true : true));
+    items = items.map((item: UserMenuItem) => {
+      const title = String(item.title || "").toLowerCase();
+      const path = String(item.path || "").toLowerCase();
+      if (
+        (!item.icon_name || item.icon_name === "circle" || item.icon_name === "Circle") &&
+        (title.includes("supplier") ||
+          title.includes("постачальник") ||
+          title.includes("shop") ||
+          title.includes("магазин") ||
+          title.includes("payment") ||
+          title.includes("платеж") ||
+          path.includes("supplier") ||
+          path.includes("постачальник") ||
+          path.includes("shop") ||
+          path.includes("магазин") ||
+          path.includes("payment") ||
+          path.includes("платеж"))
+      ) {
+        return { ...item, icon_name: UserMenuService.getAutoIconForMenuItem({ title: item.title, path: item.path }) };
+      }
+      return item;
+    });
+    return items;
+  }, [menuItemsRaw, userId]);
   const refreshMenuItems = useCallback(async () => {
-    queryClient.invalidateQueries({ queryKey: ['userMenu', userId] });
-  }, [queryClient, userId]);
+    await queryClient.refetchQueries({ queryKey: ["auth", "me"], exact: true });
+  }, [queryClient]);
 
   // Find active menu item based on current path with static route fallback
   const findActiveMenuItem = useCallback((currentPath: string, items: UserMenuItem[]) => {
@@ -258,7 +258,7 @@ const UserLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
-  const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile, subscription, tariffLimits, refresh } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; refresh: () => Promise<void> }>();
+  const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile, subscription, tariffLimits, menuItems: ctxMenuItems, refresh } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; menuItems: UserMenuItem[]; refresh: () => Promise<void> }>();
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate("/user-auth", { replace: true });
@@ -283,7 +283,7 @@ const UserLayout = () => {
         </div>
       </div>;
   }
-  return <UserMenuProvider userId={ctxUser.id} hasAccess={hasAccess}>
+  return <UserMenuProvider userId={ctxUser.id} hasAccess={hasAccess} menuItems={ctxMenuItems}>
       <UserLayoutContent user={ctxUser} uiUserProfile={ctxUiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
     </UserMenuProvider>;
 };
@@ -348,7 +348,8 @@ const UserLayoutContent = ({
       path === "/user/dashboard" ||
       path === "/user" ||
       path === "/user/";
-    if (!hasValid && !isTariffPage && !isDashboardPage) {
+    const isShopsPage = path.startsWith("/user/shops");
+    if (!hasValid && !isTariffPage && !isDashboardPage && !isShopsPage) {
       navigate("/user/tariff", { replace: true });
     }
   }, [guardSubscription?.hasValidSubscription, location.pathname, navigate]);
@@ -419,6 +420,9 @@ const UserLayoutContent = ({
       {/* Mobile Menu Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-64 flex flex-col h-full">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Menu</SheetTitle>
+          </SheetHeader>
           <div className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
             {/* Logo/Header */}
             <div className="flex items-center justify-between mb-6">

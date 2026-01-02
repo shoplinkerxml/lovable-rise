@@ -128,13 +128,22 @@ export class UserAuthService {
     }
     return await this.authMeDeduplicator.dedupe(sessionKey, async () => {
       try {
-        const resp = await invokeEdgeWithAuth<{
+        const timeoutMs = 12_000;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const resp = await Promise.race([
+          invokeEdgeWithAuth<{
           user?: UserProfile | null;
           subscription?: unknown | null;
           tariffLimits?: Array<{ limit_name: string; value: number }>;
           menuItems?: UserMenuItem[];
           userStores?: UserStoreLite[];
-        }>("auth-me", {});
+          }>("auth-me", {}),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error("auth_me_timeout")), timeoutMs);
+          }),
+        ]).finally(() => {
+          if (timeoutId) clearTimeout(timeoutId);
+        });
         const result = {
           user: (resp?.user ?? null) as UserProfile | null,
           subscription: resp?.subscription ?? null,

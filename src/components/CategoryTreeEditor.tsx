@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/i18n";
 import { CategoryService, type StoreCategory } from "@/lib/category-service";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus, Pencil, Trash2, Check, X, Loader2, RefreshCw } from "lucide-react";
 import { runOptimisticOperation, useSyncStatus } from "@/lib/optimistic-mutation";
 type Supplier = {
   id: string;
@@ -55,7 +55,6 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
   // Keep supplier id strictly as string to avoid mismatches with numeric IDs
   const [supplierId, setSupplierId] = useState<string>(defaultSupplierId ? String(defaultSupplierId) : "");
   const [storeId, setStoreId] = useState<string>(defaultStoreId || "");
-  const [search, setSearch] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -416,21 +415,6 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </div>}
       </div>;
   });
-  const filteredTree = useMemo(() => {
-    if (!search.trim()) return treeData;
-    const term = search.trim().toLowerCase();
-    const filterNode = (n: any): any | null => {
-      const childMatches = (n.children || []).map(filterNode).filter(Boolean);
-      if (n.name.toLowerCase().includes(term) || childMatches.length) {
-        return {
-          ...n,
-          children: childMatches
-        };
-      }
-      return null;
-    };
-    return treeData.map(filterNode).filter(Boolean) as any[];
-  }, [treeData, search]);
   const isLoading = false;
   const isFetching = false;
   return <Card className="border-0 shadow-none" data-testid="categoryTree_card">
@@ -533,23 +517,16 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </TabsList>
         </Tabs>
 
-        <div className="space-y-[0.5rem]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} className="pl-9" data-testid="categoryTree_searchInput" />
-          </div>
-        </div>
-
         {isLoading || isFetching ? <div className="space-y-[0.5rem]">
             <Skeleton className="h-[1.25rem] w-full" />
             <Skeleton className="h-[1.25rem] w-[80%]" />
             <Skeleton className="h-[1.25rem] w-[60%]" />
-          </div> : filteredTree.length === 0 ? <div className="rounded-md border p-[1rem] text-muted-foreground" data-testid="categoryTree_empty">
+          </div> : treeData.length === 0 ? <div className="rounded-md border p-[1rem] text-muted-foreground" data-testid="categoryTree_empty">
             <div className="font-medium">{t("no_categories_title")}</div>
             <div className="text-sm">{t("no_categories_description")}</div>
           </div> : <ScrollArea className="max-h-[50vh]">
             <div className="space-y-[0.25rem]" data-testid="categoryTree_root">
-              {filteredTree.map(n => (
+              {treeData.map(n => (
                 <TreeNode
                   key={n.id}
                   node={n}

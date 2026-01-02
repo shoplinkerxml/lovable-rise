@@ -1,4 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
 import { R2Storage } from "@/lib/r2-storage";
 import type { ProductImage } from "@/lib/product-service";
 import { invokeEdgeWithAuth, SessionValidator } from "@/lib/session-validation";
@@ -50,28 +49,25 @@ export class ProductImageService {
   static async getProductImages(productId: string): Promise<ProductImage[]> {
     await ProductImageService.ensureValidSession();
 
-    try {
-      const { data, error } = await supabase
-        .from("store_product_images")
-        .select("id,url,order_index,is_main,r2_key_original")
-        .eq("product_id", String(productId))
-        .order("order_index", { ascending: true });
-      if (error) throw error;
-      return (data || [])
-        .map((img) => ({
-          id: String(img.id),
+    const payload = await ProductImageService.invokeEdge<{ images?: Array<ProductImage & { r2_key_original?: string | null }> }>(
+      "product-edit-data",
+      { product_id: String(productId) },
+    );
+    const images = Array.isArray(payload?.images) ? payload.images : [];
+    return images
+      .map((img, idx) => {
+        const url = String((img as any)?.url || "");
+        const r2 = (img as any)?.r2_key_original;
+        const resolvedUrl = url.trim() ? url : r2 ? R2Storage.makePublicUrl(String(r2)) : "";
+        return {
+          id: (img as any)?.id != null ? String((img as any).id) : undefined,
           product_id: String(productId),
-          url: String(img.url || ""),
-          order_index: Number(img.order_index || 0),
-          is_main: !!img.is_main,
-        }))
-        .filter((img) => img.url.trim() !== "");
-    } catch {
-      const payload = await ProductImageService.invokeEdge<{ images?: ProductImage[] }>("product-edit-data", {
-        product_id: String(productId),
-      });
-      return Array.isArray(payload?.images) ? payload.images : [];
-    }
+          url: resolvedUrl,
+          order_index: (img as any)?.order_index != null ? Number((img as any).order_index) : idx,
+          is_main: !!(img as any)?.is_main,
+        } as ProductImage;
+      })
+      .filter((img) => img.url.trim() !== "");
   }
 
   static async uploadMissingObjectKeysFromUrls(
@@ -112,4 +108,3 @@ export class ProductImageService {
     return { processed, changed };
   }
 }
-

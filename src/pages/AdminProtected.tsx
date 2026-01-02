@@ -13,8 +13,11 @@ const AdminProtected = () => {
   useEffect(() => {
     const validateSession = async () => {
       try {
-        // Use enhanced session validation
-        const validation = await SessionValidator.ensureValidSession();
+        let validation = await SessionValidator.ensureValidSession();
+        for (let i = 0; i < 4 && !validation.isValid && validation.error === "No active session"; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          validation = await SessionValidator.ensureValidSession();
+        }
         
         if (validation.isValid && validation.user) {
           setAuthenticated(true);

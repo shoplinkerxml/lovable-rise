@@ -11,6 +11,20 @@ import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from 'sonner';
 
+type LookupCategory = {
+  id: string;
+  name: string;
+  external_id: string;
+  supplier_id: string;
+  parent_external_id: string | null;
+};
+
+type UserLookups = {
+  suppliers: Array<{ id: string; supplier_name: string }>;
+  currencies: Array<{ id: number; name: string; code: string; status: boolean | null }>;
+  supplierCategoriesMap: Record<string, LookupCategory[]>;
+};
+
 export const ProductEdit = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -22,10 +36,9 @@ export const ProductEdit = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryName, setCategoryName] = useState<string>('');
   const [imagesLoading, setImagesLoading] = useState<boolean>(false);
-  const aggSuppliersRef = useRef<Array<{ id: string; supplier_name: string }> | undefined>(undefined);
-  const aggCurrenciesRef = useRef<Array<{ id: number; name: string; code: string; status: boolean | null }> | undefined>(undefined);
-  const aggCategoriesRef = useRef<Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }> | undefined>(undefined);
-  const aggSupplierCategoriesMapRef = useRef<Record<string, Array<{ id: string; name: string; external_id: string; supplier_id: string; parent_external_id: string | null }>> | undefined>(undefined);
+  const [lookups, setLookups] = useState<UserLookups | null>(null);
+  const [supplierCategories, setSupplierCategories] = useState<LookupCategory[]>([]);
+  const supplierCategoriesMapRef = useRef<Record<string, LookupCategory[]>>({});
   const preloadedImagesRef = useRef<Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }> | undefined>(undefined);
   const preloadedParamsRef = useRef<Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }> | undefined>(undefined);
 
@@ -60,13 +73,17 @@ export const ProductEdit = () => {
       return await ProductService.getUserLookups();
     },
     staleTime: 900_000,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev as any,
   });
 
   useEffect(() => {
     const loadProductAgg = async () => {
-      if (!id) return;
+      if (!id) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const agg = await ProductService.getProductEditData(id);
@@ -74,6 +91,17 @@ export const ProductEdit = () => {
         preloadedImagesRef.current = (agg.images || []) as Array<{ id?: string; url: string; order_index: number; is_main: boolean; alt_text?: string }>;
         preloadedParamsRef.current = (agg.params || []) as Array<{ id?: string; name: string; value: string; order_index: number; paramid?: string; valueid?: string }>;
         if (agg.categoryName) setCategoryName(agg.categoryName);
+        if (agg.suppliers || agg.currencies || agg.supplierCategoriesMap) {
+          const nextLookups: UserLookups = {
+            suppliers: Array.isArray(agg.suppliers) ? agg.suppliers : [],
+            currencies: Array.isArray(agg.currencies) ? agg.currencies : [],
+            supplierCategoriesMap: agg.supplierCategoriesMap || {},
+          };
+          setLookups(nextLookups);
+          supplierCategoriesMapRef.current = nextLookups.supplierCategoriesMap || {};
+          const sid = agg.product?.supplier_id != null ? String(agg.product.supplier_id) : "";
+          setSupplierCategories(sid ? (nextLookups.supplierCategoriesMap?.[sid] || []) : []);
+        }
       } catch (error) {
         console.error('Failed to load product:', error);
         toast.error(t('failed_load_products'));
@@ -85,11 +113,15 @@ export const ProductEdit = () => {
   }, [id, t]);
 
   useEffect(() => {
-    const lookups = lookupsQuery.data;
-    if (!lookups) return;
-    aggSuppliersRef.current = lookups.suppliers;
-    aggCurrenciesRef.current = lookups.currencies;
-    aggSupplierCategoriesMapRef.current = lookups.supplierCategoriesMap;
+    const data = lookupsQuery.data as any;
+    if (!data) return;
+    const nextLookups: UserLookups = {
+      suppliers: Array.isArray(data.suppliers) ? data.suppliers : [],
+      currencies: Array.isArray(data.currencies) ? data.currencies : [],
+      supplierCategoriesMap: data.supplierCategoriesMap || {},
+    };
+    setLookups(nextLookups);
+    supplierCategoriesMapRef.current = nextLookups.supplierCategoriesMap || {};
   }, [lookupsQuery.data]);
 
   const supplierId = useMemo(() => {
@@ -97,9 +129,9 @@ export const ProductEdit = () => {
   }, [product?.supplier_id]);
 
   useEffect(() => {
-    const map = lookupsQuery.data?.supplierCategoriesMap || {};
-    aggCategoriesRef.current = supplierId ? (map[supplierId] || []) : [];
-  }, [lookupsQuery.data?.supplierCategoriesMap, supplierId]);
+    const map = lookups?.supplierCategoriesMap || {};
+    setSupplierCategories(supplierId ? (map[supplierId] || []) : []);
+  }, [lookups?.supplierCategoriesMap, supplierId]);
 
   useEffect(() => {
     if (categoryName) return;
@@ -183,12 +215,12 @@ export const ProductEdit = () => {
       const cidNum = formData.category_id ? Number(formData.category_id) : null;
       let catName = '';
       if (cidNum != null) {
-        const map = aggSupplierCategoriesMapRef.current || {};
+        const map = supplierCategoriesMapRef.current || {};
         const all = Object.values(map).flat();
         const found = all.find((c) => String((c as any).id) === String(cidNum));
         catName = (found as any)?.name || '';
       } else if (formData.supplier_id && formData.category_external_id) {
-        const map = aggSupplierCategoriesMapRef.current || {};
+        const map = supplierCategoriesMapRef.current || {};
         const arr = map[String(formData.supplier_id)] || [];
         const found = arr.find((c) => String(c.external_id) === String(formData.category_external_id));
         catName = found?.name || '';
@@ -256,7 +288,7 @@ export const ProductEdit = () => {
       />
 
       <ProgressiveLoader
-        isLoading={loading || lookupsQuery.isLoading}
+        isLoading={loading}
         delay={150}
         fallback={
           <FullPageLoader
@@ -275,10 +307,10 @@ export const ProductEdit = () => {
             onImagesLoadingChange={setImagesLoading}
             preloadedImages={preloadedImagesRef.current}
             preloadedParams={preloadedParamsRef.current}
-            preloadedSuppliers={aggSuppliersRef.current}
-            preloadedCurrencies={aggCurrenciesRef.current}
-            preloadedCategories={aggCategoriesRef.current}
-            preloadedSupplierCategoriesMap={aggSupplierCategoriesMapRef.current}
+            preloadedSuppliers={lookups?.suppliers}
+            preloadedCurrencies={lookups?.currencies}
+            preloadedCategories={supplierCategories}
+            preloadedSupplierCategoriesMap={lookups?.supplierCategoriesMap}
           />
         </div>
       </ProgressiveLoader>

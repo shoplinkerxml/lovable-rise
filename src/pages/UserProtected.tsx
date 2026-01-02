@@ -1,13 +1,13 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigationRefetch } from "@/hooks/useNavigationRefetch";
 import { ProductService } from "@/lib/product-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
 import type { TariffLimit } from "@/lib/tariff-service";
+import type { UserMenuItem } from "@/lib/user-menu-service";
 
 type SubscriptionEntity = {
   tariff_id?: number;
@@ -21,13 +21,6 @@ type SubscriptionEntity = {
   };
 };
 
-type AuthState = {
-  ready: boolean;
-  authenticated: boolean;
-  user: UserProfile | null;
-  error: string | null;
-};
-
 type SubscriptionState = {
   hasValidSubscription: boolean;
   subscription: SubscriptionEntity | null;
@@ -37,23 +30,37 @@ type SubscriptionState = {
 type AuthMeData = Awaited<ReturnType<typeof UserAuthService.fetchAuthMe>>;
 
 const UserProtected = () => {
-  const [prefetchState, setPrefetchState] = useState({
-    open: false,
-    progress: 0,
-  });
-
   const queryClient = useQueryClient();
   const location = useLocation();
 
   const sessionQuery = useQuery({
     queryKey: ["auth", "session"],
-    queryFn: async () => SessionValidator.ensureValidSession(),
+    queryFn: async () => {
+      let validation = await SessionValidator.ensureValidSession();
+      for (
+        let i = 0;
+        i < 6 &&
+        !validation.isValid &&
+        (validation.error === "No active session" || validation.error === "Get session timeout");
+        i++
+      ) {
+        try {
+          SessionValidator.clearCache();
+        } catch {
+          void 0;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        validation = await SessionValidator.ensureValidSession();
+      }
+      return validation;
+    },
     retry: false,
     staleTime: 30_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+  const { isFetching: sessionIsFetching } = sessionQuery;
   const sessionValidation = sessionQuery.data ?? null;
   const sessionValid = sessionValidation?.isValid === true;
 
@@ -70,7 +77,35 @@ const UserProtected = () => {
   });
 
   const authMe = authMeQuery.data ?? null;
-  const user = (authMe?.user ?? null) as UserProfile | null;
+  const fallbackUser = useMemo<UserProfile | null>(() => {
+    if (!sessionValidation?.user) return null;
+    const u: any = sessionValidation.user as any;
+    const email = typeof u.email === "string" ? u.email : "";
+    const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+    const name =
+      (typeof meta.name === "string" && meta.name) ||
+      (typeof meta.full_name === "string" && meta.full_name) ||
+      (typeof meta.display_name === "string" && meta.display_name) ||
+      (email ? email.split("@")[0] : "") ||
+      "User";
+    const avatarUrl =
+      (typeof meta.avatar_url === "string" && meta.avatar_url) ||
+      (typeof meta.picture === "string" && meta.picture) ||
+      undefined;
+    const createdAt = typeof u.created_at === "string" ? u.created_at : new Date().toISOString();
+    const updatedAt = typeof u.updated_at === "string" ? u.updated_at : createdAt;
+    return {
+      id: String(u.id),
+      email,
+      name,
+      role: "user",
+      status: "active",
+      avatar_url: avatarUrl,
+      created_at: createdAt,
+      updated_at: updatedAt,
+    };
+  }, [sessionValidation?.user]);
+  const user = (authMe?.user ?? fallbackUser ?? null) as UserProfile | null;
   const tariffLimits = useMemo<TariffLimit[]>(() => {
     return Array.isArray(authMe?.tariffLimits) ? (authMe?.tariffLimits as any) : [];
   }, [authMe?.tariffLimits]);
@@ -93,21 +128,25 @@ const UserProtected = () => {
     return true;
   }, []);
 
+  const authenticated = sessionValid && !!user;
+
   const subscriptionState = useMemo<SubscriptionState>(() => {
-    const sub = (authMe?.subscription ?? null) as SubscriptionEntity | null;
-    const valid = checkSubscriptionValidity(sub);
+    const edgeSub = (authMe?.subscription ?? null) as SubscriptionEntity | null;
+    const hasAuthMe = authMeQuery.data != null;
+    const valid = hasAuthMe ? checkSubscriptionValidity(edgeSub) : true;
+
     const isDemo =
-      !!sub &&
-      !!sub.tariffs &&
-      (sub.tariffs as any).is_free === true &&
-      (sub.tariffs as any).visible === false;
+      !!edgeSub &&
+      !!edgeSub.tariffs &&
+      (edgeSub.tariffs as any).is_free === true &&
+      (edgeSub.tariffs as any).visible === false;
 
     return {
       hasValidSubscription: valid,
-      subscription: sub,
+      subscription: edgeSub,
       isDemo,
     };
-  }, [authMe?.subscription, checkSubscriptionValidity]);
+  }, [authMe?.subscription, authMeQuery.data, checkSubscriptionValidity]);
 
   // Функция обновления данных
   const refresh = useCallback(async () => {
@@ -117,11 +156,6 @@ const UserProtected = () => {
       void 0;
     }
   }, [queryClient]);
-
-  // Hook для обновления при навигации
-  useNavigationRefetch();
-
-  const authenticated = sessionValid && !!user;
 
   // Prefetch магазинов при необходимости
   useEffect(() => {
@@ -138,9 +172,7 @@ const UserProtected = () => {
 
   const prefetchData = useCallback(async () => {
     try {
-      setPrefetchState({ open: true, progress: 10 });
-
-      const path = (typeof window !== "undefined" ? window.location.pathname : "").toLowerCase();
+      const path = location.pathname.toLowerCase();
       const shouldPrefetchTariffs = path.startsWith("/user/tariff");
       const shouldPrefetchSuppliers =
         path.startsWith("/user/suppliers") ||
@@ -154,9 +186,7 @@ const UserProtected = () => {
             queryKey: ["tariffs", "list"],
             queryFn: async () => {
               const { TariffService } = await import("@/lib/tariff-service");
-              const tariffs = await TariffService.getTariffsAggregated(false);
-              setPrefetchState((prev) => ({ ...prev, progress: 50 }));
-              return tariffs;
+              return await TariffService.getTariffsAggregated(false);
             },
             staleTime: 900_000,
           }),
@@ -169,25 +199,17 @@ const UserProtected = () => {
             queryKey: ["user", uid, "suppliers", "list"],
             queryFn: async () => {
               const { SupplierService } = await import("@/lib/supplier-service");
-              const suppliers = await SupplierService.getSuppliers();
-              setPrefetchState((prev) => ({ ...prev, progress: 80 }));
-              return suppliers;
+              return await SupplierService.getSuppliers();
             },
             staleTime: 900_000,
           }),
         );
       }
       await Promise.allSettled(tasks);
-
-      setPrefetchState((prev) => ({ ...prev, progress: 100 }));
     } catch {
       void 0;
-    } finally {
-      setTimeout(() => {
-        setPrefetchState({ open: false, progress: 0 });
-      }, 200);
     }
-  }, [queryClient]);
+  }, [location.pathname, queryClient, user?.id]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -201,41 +223,28 @@ const UserProtected = () => {
     uiUserProfile,
     subscription: subscriptionState,
     tariffLimits,
+    menuItems: (Array.isArray(authMe?.menuItems) ? (authMe?.menuItems as UserMenuItem[]) : []),
     refresh,
   }), [
     subscriptionState,
     user,
     uiUserProfile,
     tariffLimits,
+    authMe?.menuItems,
     refresh,
   ]);
 
-  // Loading state
-  const authLoading = sessionQuery.isLoading || (sessionValid && authMeQuery.isLoading);
-  if (prefetchState.open || authLoading) {
+  const sessionPending = sessionQuery.data == null && (sessionQuery.isLoading || sessionIsFetching);
+  const authMePending = sessionValid && authMeQuery.data == null && (authMeQuery.isLoading || authMeQuery.isFetching);
+
+  const authLoading = sessionPending || (authMePending && !user);
+  if (authLoading) {
     return (
-      <div className="min-h-screen">
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="w-[420px] rounded-lg border bg-card p-6 shadow-lg">
-            <div className="space-y-4">
-              <div className="text-lg font-semibold">Завантажуємо кабінет</div>
-              <div className="text-sm text-muted-foreground">
-                Будь ласка, зачекайте. Йде підготовка даних.
-              </div>
-              <div className="space-y-2">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div 
-                    className="h-full rounded-full bg-primary transition-all duration-300 ease-in-out" 
-                    style={{ width: `${prefetchState.progress}%` }} 
-                  />
-                </div>
-                <div className="text-xs text-muted-foreground text-right">
-                  {prefetchState.progress}%
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div
+        data-testid="auth_loading"
+        className="min-h-screen flex items-center justify-center text-muted-foreground"
+      >
+        Завантаження...
       </div>
     );
   }

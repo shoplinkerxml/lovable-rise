@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TariffService, type TariffWithDetails } from "@/lib/tariff-service";
+import { UserAuthService } from "@/lib/user-auth-service";
 import { toast } from "sonner";
 import {
   CheckCircle,
@@ -44,7 +45,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { useOutletContext } from "react-router-dom";
 import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 import { useQuery } from "@tanstack/react-query";
-import { UserAuthService } from "@/lib/user-auth-service";
 
 const TariffPage = () => {
   const { t } = useI18n();
@@ -54,11 +54,8 @@ const TariffPage = () => {
   const [activeTariffId, setActiveTariffId] = useState<number | null>(null);
 
   const { data: tariffsData, isLoading } = useQuery<TariffWithDetails[]>({
-    queryKey: ['tariffs','visible'],
+    queryKey: ["tariffs", "list"],
     queryFn: async () => {
-      try {
-        if (typeof window !== 'undefined') window.localStorage.removeItem('rq:tariffs:list');
-      } catch { void 0; }
       return await TariffService.getTariffsAggregated(false);
     },
     retry: false,

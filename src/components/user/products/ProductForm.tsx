@@ -132,22 +132,16 @@ export const ProductForm = ({ product, onSuccess, onCancel }: ProductFormProps) 
       setParams(paramsData || []);
 
       // Load product images
-      const { data: imagesData } = await (supabase as any)
-        .from('store_product_images')
-        .select('*')
-        .eq('product_id', product.id)
-        .order('order_index');
-      setImages((imagesData || []).map((img: any) => {
-        const directUrl = img.url || ''
-        const origKey = img.r2_key_original || ''
-        const url = directUrl || (origKey ? R2Storage.makePublicUrl(origKey) : '')
+      const imagesData = await ProductService.getProductImages(String(product.id));
+      setImages((imagesData || []).map((img: any, index: number) => {
+        const url = String(img?.url || "").trim();
         return {
           url,
-          order_index: img.order_index,
-          alt_text: img.alt_text,
-          is_main: img.is_main
-        }
-      }))
+          order_index: typeof img?.order_index === "number" ? img.order_index : index,
+          is_main: !!img?.is_main,
+          object_key: url ? (ImageHelpers.extractObjectKeyFromUrl(url) || undefined) : undefined,
+        };
+      }));
     } catch (error) {
       console.error('Load product data error:', error);
       toast.error('Помилка завантаження даних товару');

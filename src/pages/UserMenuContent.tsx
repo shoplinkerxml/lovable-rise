@@ -38,14 +38,18 @@ const UserMenuContent = () => {
 
       try {
         setLoading(true);
-        const item = await UserMenuService.getMenuItem(parseInt(id), user.id);
-        
-        if (!item) {
-          setError("Menu item not found");
+        const menuId = Number(id);
+        if (!Number.isFinite(menuId)) {
+          setError("Invalid menu item ID");
           return;
         }
 
-        setMenuItem(item);
+        const fromContext = menuItems.find((m) => m.id === menuId) ?? null;
+        if (!fromContext) {
+          setError("Menu item not found");
+          return;
+        }
+        setMenuItem(fromContext);
       } catch (err) {
         console.error("Error loading menu item:", err);
         setError("Failed to load menu item");
@@ -56,7 +60,7 @@ const UserMenuContent = () => {
     };
 
     loadMenuItem();
-  }, [id, user.id, t]);
+  }, [id, menuItems, t]);
 
   const handleEdit = () => {
     toast.error("Menu management is no longer available");

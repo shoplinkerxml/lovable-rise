@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -24,11 +24,23 @@ export const ShopDetail = () => {
   const shopId = id ? String(id) : "";
   const navigate = useNavigate();
   const location = useLocation();
+  const initialPathRef = useRef<string>(location.pathname);
   const queryClient = useQueryClient();
   const { user } = useOutletContext<{ user: { id?: string } | null }>();
   const uid = user?.id ? String(user.id) : "current";
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
+  const isReload = useMemo(() => {
+    try {
+      const entries = typeof performance !== "undefined" ? (performance.getEntriesByType("navigation") as PerformanceNavigationTiming[]) : [];
+      const navType = entries?.[0]?.type;
+      if (navType === "reload") return true;
+      const legacy = (performance as unknown as { navigation?: { type?: number } })?.navigation?.type;
+      return legacy === 1;
+    } catch {
+      return false;
+    }
+  }, []);
 
   const modalAction = useMemo(() => {
     const p = String(location.pathname || "");
@@ -48,6 +60,13 @@ export const ShopDetail = () => {
   useEffect(() => {
     if (!shopId) navigate('/user/shops');
   }, [shopId, navigate]);
+
+  useEffect(() => {
+    if (!shopId || !modalAction) return;
+    if (!isReload) return;
+    if (location.pathname !== initialPathRef.current) return;
+    navigate(`/user/shops/${shopId}`, { replace: true });
+  }, [isReload, location.pathname, modalAction, navigate, shopId]);
 
   const { data: shopsList, isLoading, isError } = useQuery<ShopAggregated[]>({
     queryKey: ["user", uid, "shops"],
