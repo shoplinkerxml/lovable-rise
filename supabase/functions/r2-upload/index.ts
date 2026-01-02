@@ -177,8 +177,9 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error('[r2-upload] Error:', e);
+    const err = e instanceof Error ? e : new Error(String(e))
     return new Response(
-      JSON.stringify({ error: 'upload_failed', message: e?.message ?? 'Upload failed' }), 
+      JSON.stringify({ error: 'upload_failed', message: err.message ?? 'Upload failed' }), 
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -314,7 +314,8 @@ Deno.serve(async (req) => {
         });
       } catch (err) {
         console.error('Unexpected error in POST /users:', err);
-        return new Response(JSON.stringify({ error: `Unexpected error: ${err.message || 'Unknown error'}` }), { 
+        const error = err instanceof Error ? err : new Error(String(err))
+        return new Response(JSON.stringify({ error: `Unexpected error: ${error.message || 'Unknown error'}` }), { 
           status: 500, 
           headers: corsHeaders 
         });
@@ -471,9 +472,10 @@ Deno.serve(async (req) => {
 
       } catch (err) {
         console.error("Unexpected error in DELETE /users:", err);
+        const error = err instanceof Error ? err : new Error(String(err))
         return new Response(JSON.stringify({
           success: false,
-          error: err.message
+          error: error.message
         }), { headers: corsHeaders, status: 500 });
       }
     }
@@ -481,7 +483,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
   } catch (error) {
     console.error('Unexpected error in main function:', error);
-    return new Response(JSON.stringify({ error: `Internal server error: ${error.message || 'Unknown error'}` }), { 
+    const err = error instanceof Error ? error : new Error(String(error))
+    return new Response(JSON.stringify({ error: `Internal server error: ${err.message || 'Unknown error'}` }), { 
       status: 500, 
       headers: corsHeaders 
     });

@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      counters: {
+        Row: {
+          count: number
+          counter_type: string
+          entity_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          count?: number
+          counter_type: string
+          entity_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          count?: number
+          counter_type?: string
+          entity_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       currencies: {
         Row: {
           code: string
@@ -127,6 +151,54 @@ export type Database = {
           },
         ]
       }
+      product_import_jobs: {
+        Row: {
+          created_at: string
+          created_count: number
+          error: string | null
+          id: string
+          payload: Json | null
+          processed_rows: number
+          skipped_count: number
+          status: string
+          store_id: string | null
+          total_rows: number
+          updated_at: string
+          updated_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_count?: number
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          processed_rows?: number
+          skipped_count?: number
+          status?: string
+          store_id?: string | null
+          total_rows?: number
+          updated_at?: string
+          updated_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_count?: number
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          processed_rows?: number
+          skipped_count?: number
+          status?: string
+          store_id?: string | null
+          total_rows?: number
+          updated_at?: string
+          updated_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -200,6 +272,13 @@ export type Database = {
             columns: ["supplier_id", "parent_external_id"]
             isOneToOne: false
             referencedRelation: "store_categories"
+            referencedColumns: ["supplier_id", "external_id"]
+          },
+          {
+            foreignKeyName: "fk_store_categories_parent_external"
+            columns: ["supplier_id", "parent_external_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_with_counts"
             referencedColumns: ["supplier_id", "external_id"]
           },
           {
@@ -339,6 +418,13 @@ export type Database = {
             foreignKeyName: "store_product_images_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "products_with_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "store_products"
             referencedColumns: ["id"]
           },
@@ -398,6 +484,13 @@ export type Database = {
             foreignKeyName: "store_product_links_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "products_with_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_product_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "store_products"
             referencedColumns: ["id"]
           },
@@ -442,6 +535,13 @@ export type Database = {
           valueid?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "store_product_params_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_with_details"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "store_product_params_product_id_fkey"
             columns: ["product_id"]
@@ -543,6 +643,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "store_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_with_counts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "store_products_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
@@ -595,6 +702,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "store_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_store_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_with_counts"
             referencedColumns: ["id"]
           },
           {
@@ -990,6 +1104,82 @@ export type Database = {
       }
     }
     Views: {
+      products_with_details: {
+        Row: {
+          article: string | null
+          available: boolean | null
+          category_external_id: string | null
+          category_id: number | null
+          category_name: string | null
+          created_at: string | null
+          currency_code: string | null
+          description: string | null
+          description_ua: string | null
+          docket: string | null
+          docket_ua: string | null
+          external_id: string | null
+          id: string | null
+          main_image_key: string | null
+          main_image_url: string | null
+          name: string | null
+          name_ua: string | null
+          owner_user_id: string | null
+          price: number | null
+          price_old: number | null
+          price_promo: number | null
+          state: string | null
+          stock_quantity: number | null
+          store_id: string | null
+          supplier_id: number | null
+          supplier_name: string | null
+          updated_at: string | null
+          vendor: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_store_products_currency_code"
+            columns: ["currency_code"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "store_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "store_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_with_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_products_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "user_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "user_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_stores_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_menu_view: {
         Row: {
           created_at: string | null
@@ -1052,6 +1242,40 @@ export type Database = {
           },
         ]
       }
+      v_categories_with_counts: {
+        Row: {
+          created_at: string | null
+          external_id: string | null
+          id: number | null
+          name: string | null
+          parent_external_id: string | null
+          subcategories_count: number | null
+          supplier_id: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_store_categories_parent_external"
+            columns: ["supplier_id", "parent_external_id"]
+            isOneToOne: false
+            referencedRelation: "store_categories"
+            referencedColumns: ["supplier_id", "external_id"]
+          },
+          {
+            foreignKeyName: "fk_store_categories_parent_external"
+            columns: ["supplier_id", "parent_external_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_with_counts"
+            referencedColumns: ["supplier_id", "external_id"]
+          },
+          {
+            foreignKeyName: "store_categories_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "user_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       activate_tariff: {
@@ -1071,13 +1295,61 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bulk_delete_store_links: {
+        Args: {
+          p_include_categories?: boolean
+          p_product_ids?: string[]
+          p_store_ids: string[]
+        }
+        Returns: Json
+      }
+      bulk_insert_product_links: { Args: { input_links: Json }; Returns: Json }
+      bulk_upsert_categories: {
+        Args: { p_categories: Json }
+        Returns: {
+          action: string
+          external_id: string
+          name: string
+          parent_external_id: string
+        }[]
+      }
+      delete_category_cascade: {
+        Args: { p_external_id: string; p_supplier_id: number }
+        Returns: {
+          deleted_count: number
+        }[]
+      }
+      get_category_path: {
+        Args: { p_external_id: string; p_supplier_id: number }
+        Returns: {
+          external_id: string
+          level: number
+          name: string
+        }[]
+      }
+      get_category_tree: {
+        Args: { p_root_external_id?: string; p_supplier_id: number }
+        Returns: {
+          external_id: string
+          id: number
+          level: number
+          name: string
+          parent_external_id: string
+          path: string[]
+        }[]
+      }
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_structured_menu: { Args: { user_uuid: string }; Returns: Json }
+      get_user_product_limit: { Args: { p_user_id: string }; Returns: number }
       is_admin: { Args: never; Returns: boolean }
       is_owner_supplier: { Args: { p_supplier_id: number }; Returns: boolean }
+      update_counter: {
+        Args: { p_counter_type: string; p_delta: number; p_entity_id: string }
+        Returns: undefined
+      }
       user_stats: {
         Args: never
         Returns: {
