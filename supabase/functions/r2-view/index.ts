@@ -50,7 +50,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'view_failed', message: e?.message ?? 'Failed to presign view URL' }), {
+    const err = e instanceof Error ? e : new Error(String(e))
+    return new Response(JSON.stringify({ error: 'view_failed', message: err.message ?? 'Failed to presign view URL' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

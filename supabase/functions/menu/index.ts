@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../_shared/database-types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +45,7 @@ Deno.serve(async (req) => {
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       // Authenticated user request
-      supabaseClient = createClient<Database>(
+      supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
         {
@@ -57,7 +56,7 @@ Deno.serve(async (req) => {
       );
     } else if (apiKey) {
       // Anonymous request
-      supabaseClient = createClient<Database>(
+      supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         apiKey,
         {}

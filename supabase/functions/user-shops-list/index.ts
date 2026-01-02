@@ -57,7 +57,7 @@ function normalizeCounts(input: any): ShopCounts {
 }
 
 async function getLimitForUser(userId: string): Promise<number> {
-  if (!SUPABASE_SERVICE_ROLE_KEY) return 0
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return 0
   try {
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
