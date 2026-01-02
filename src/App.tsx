@@ -9,6 +9,7 @@ import { createBrowserRouter, RouterProvider, Navigate, Outlet, useParams } from
 import { I18nProvider } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { removeCache, UnifiedCacheManager } from "@/lib/cache-utils";
+import { SessionValidator } from "@/lib/session-validation";
 // Dev diagnostics removed per request
 
 const Index = lazy(() => import("./pages/Index"));
@@ -86,12 +87,22 @@ const App = () => {
         (event === "USER_UPDATED" && userChanged);
       if (shouldClear) {
         try {
+          SessionValidator.clearCache();
+        } catch {
+          void 0;
+        }
+        try {
           queryClient.clear();
         } catch {
           void 0;
         }
         try {
           UnifiedCacheManager.invalidatePattern(/^rq:/);
+        } catch {
+          void 0;
+        }
+        try {
+          UnifiedCacheManager.invalidatePattern(/^auth-me(:|$)/);
         } catch {
           void 0;
         }
@@ -108,8 +119,48 @@ const App = () => {
           void 0;
         }
         try {
+          const { UserAuthService } = await import("@/lib/user-auth-service");
+          UserAuthService.clearAuthMeCache();
+        } catch {
+          void 0;
+        }
+        try {
           const { ProductService } = await import("@/lib/product-service");
           (ProductService as unknown as { clearAllProductsCaches?: () => void }).clearAllProductsCaches?.();
+        } catch {
+          void 0;
+        }
+        try {
+          if (typeof window !== "undefined") {
+            const storages: Storage[] = [];
+            try {
+              storages.push(window.localStorage);
+            } catch {
+              void 0;
+            }
+            try {
+              storages.push(window.sessionStorage);
+            } catch {
+              void 0;
+            }
+            for (const s of storages) {
+              const keys: string[] = [];
+              for (let i = 0; i < s.length; i++) {
+                const k = s.key(i);
+                if (!k) continue;
+                if (k.startsWith("user_") || k.startsWith("pending_uploads:")) {
+                  keys.push(k);
+                }
+              }
+              for (const k of keys) {
+                try {
+                  s.removeItem(k);
+                } catch {
+                  void 0;
+                }
+              }
+            }
+          }
         } catch {
           void 0;
         }

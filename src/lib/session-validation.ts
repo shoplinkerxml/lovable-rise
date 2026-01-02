@@ -49,6 +49,14 @@ export class SessionValidator {
   private static cache: { result: SessionValidationResult; timestamp: number; ttlMs: number } | null = null;
   private static inFlight: Promise<SessionValidationResult> | null = null;
   private static refreshInFlight: Promise<SessionValidationResult> | null = null;
+  private static epoch = 0;
+
+  static clearCache(): void {
+    this.epoch += 1;
+    this.cache = null;
+    this.inFlight = null;
+    this.refreshInFlight = null;
+  }
   
   /**
    * Validate current session and access token
@@ -63,6 +71,7 @@ export class SessionValidator {
       if (this.inFlight) {
         return await this.inFlight;
       }
+      const epoch = this.epoch;
       const flight = (async () => {
         const { data: { session }, error } = await supabase.auth.getSession();
         
@@ -79,7 +88,9 @@ export class SessionValidator {
             needsRefresh: false,
             error: error.message
           };
-          this.cache = { result, timestamp: Date.now(), ttlMs: this.INVALID_CACHE_TTL_MS };
+          if (epoch === this.epoch) {
+            this.cache = { result, timestamp: Date.now(), ttlMs: this.INVALID_CACHE_TTL_MS };
+          }
           return result;
         }
         
@@ -95,7 +106,9 @@ export class SessionValidator {
             needsRefresh: false,
             error: 'No active session'
           };
-          this.cache = { result, timestamp: Date.now(), ttlMs: this.INVALID_CACHE_TTL_MS };
+          if (epoch === this.epoch) {
+            this.cache = { result, timestamp: Date.now(), ttlMs: this.INVALID_CACHE_TTL_MS };
+          }
           return result;
         }
         
@@ -116,17 +129,23 @@ export class SessionValidator {
           needsRefresh,
           error: isExpired ? 'Session expired' : undefined
         };
-        this.cache = {
-          result,
-          timestamp: Date.now(),
-          ttlMs: result.isValid ? this.VALID_CACHE_TTL_MS : this.INVALID_CACHE_TTL_MS,
-        };
+        if (epoch === this.epoch) {
+          this.cache = {
+            result,
+            timestamp: Date.now(),
+            ttlMs: result.isValid ? this.VALID_CACHE_TTL_MS : this.INVALID_CACHE_TTL_MS,
+          };
+        }
         return result;
       })();
       this.inFlight = flight;
-      const res = await flight;
-      this.inFlight = null;
-      return res;
+      try {
+        return await flight;
+      } finally {
+        if (epoch === this.epoch && this.inFlight === flight) {
+          this.inFlight = null;
+        }
+      }
     } catch (error) {
       console.error('[SessionValidator] Validation error:', error);
       return {
@@ -155,6 +174,7 @@ export class SessionValidator {
       console.log('[SessionValidator] Session invalid, attempting refresh...');
       
       try {
+        const epoch = this.epoch;
         const flight = (async () => {
           const { data: { session }, error } = await supabase.auth.refreshSession({
             refresh_token: validation.session!.refresh_token
@@ -170,15 +190,21 @@ export class SessionValidator {
         
           if (session) {
             console.log('[SessionValidator] Session refreshed successfully');
-            this.cache = null;
+            if (epoch === this.epoch) {
+              this.cache = null;
+            }
             return this.validateSession();
           }
           return validation;
         })();
         this.refreshInFlight = flight;
-        const res = await flight;
-        this.refreshInFlight = null;
-        return res;
+        try {
+          return await flight;
+        } finally {
+          if (epoch === this.epoch && this.refreshInFlight === flight) {
+            this.refreshInFlight = null;
+          }
+        }
       } catch (error) {
         this.refreshInFlight = null;
         console.error('[SessionValidator] Refresh error:', error);
