@@ -4,7 +4,7 @@ import type { ProductParam } from '../types';
 
 const ParamsSection = lazy(() => import('../ParamsSection'));
 
-export function ParamsTab(props: {
+type Props = {
   t: (k: string) => string;
   readOnly?: boolean;
   forceParamsEditable?: boolean;
@@ -21,7 +21,9 @@ export function ParamsTab(props: {
   setParamForm: (v: { name: string; value: string; paramid?: string; valueid?: string }) => void;
   saveParamModal: () => void;
   editingParamIndex: number | null;
-}) {
+};
+
+export const ParamsTab = React.memo(function ParamsTab(props: Props) {
   return (
     <div className="space-y-6" data-testid="productFormTabs_paramsContent">
       <Suspense fallback={<Spinner className="mx-auto" />}>
@@ -46,4 +48,4 @@ export function ParamsTab(props: {
       </Suspense>
     </div>
   );
-}
+})

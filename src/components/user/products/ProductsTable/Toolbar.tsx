@@ -11,6 +11,17 @@ import type { ShopAggregated } from "@/lib/shop-service";
 import { useSyncStatus } from "@/lib/optimistic-mutation";
 import { useProductsTableContext } from "./context";
 
+function useDebounce<T>(value: T, delayMs: number): T {
+  const [debouncedValue, setDebouncedValue] = React.useState(value);
+
+  React.useEffect(() => {
+    const timer = globalThis.setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => globalThis.clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debouncedValue;
+}
+
 const ViewOptionsMenuLazy = React.lazy(() => import("./ViewOptionsMenu").then((m) => ({ default: m.ViewOptionsMenu })));
 const AddToStoresMenuLazy = React.lazy(() => import("./AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
 const ImportExportMenuLazy = React.lazy(() => import("./ImportExportMenu").then((m) => ({ default: m.ImportExportMenu })));
@@ -91,14 +102,27 @@ export function Toolbar({
   const createDisabled = (canCreate === false) || !!duplicating;
   const iconButtonCls = "h-8 w-8 hover:bg-transparent";
   const controlsDisabled = !!loading || !!duplicating;
+  const [nameFilterInput, setNameFilterInput] = React.useState(
+    () => ((table.getColumn("name_ua")?.getFilterValue() as string) ?? ""),
+  );
+  const debouncedNameFilterInput = useDebounce(nameFilterInput, 250);
+
+  React.useEffect(() => {
+    const col = table.getColumn("name_ua");
+    if (!col) return;
+    const current = (col.getFilterValue() as string) ?? "";
+    if (current === debouncedNameFilterInput) return;
+    col.setFilterValue(debouncedNameFilterInput ? debouncedNameFilterInput : undefined);
+  }, [debouncedNameFilterInput, table]);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-0 w-[clamp(10rem,40vw,20rem)] sm:w-[clamp(12rem,40vw,24rem)]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
+            value={nameFilterInput}
+            onChange={(event) => setNameFilterInput(event.target.value)}
             className="pl-9"
             data-testid="user_products_dataTable_filter"
             disabled={!!loading}

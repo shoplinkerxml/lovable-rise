@@ -16,13 +16,13 @@ import type {
   SupplierOption,
 } from '../types';
 
-export function InfoTab(props: {
+type Props = {
   formState: { basicData: BasicData; priceData: PriceData; stockData: StockData };
   formActions: {
     updateBasicData: (partial: Partial<BasicData>) => void;
-    setPriceData: (p: PriceData) => void;
-    setStockData: (s: StockData) => void;
-    setBasicData: (next: BasicData) => void;
+    setPriceData: React.Dispatch<React.SetStateAction<PriceData>>;
+    setStockData: React.Dispatch<React.SetStateAction<StockData>>;
+    setBasicData: React.Dispatch<React.SetStateAction<BasicData>>;
   };
   onExternalChange?: (partial: Partial<BasicData & PriceData & StockData>) => void;
   lookups: {
@@ -52,7 +52,9 @@ export function InfoTab(props: {
     photoBlockRef: React.RefObject<HTMLDivElement>;
   };
   config: { t: (k: string) => string; readOnly?: boolean; editableKeys?: Array<'price' | 'price_old' | 'price_promo' | 'stock_quantity' | 'available'>; isLargeScreen: boolean; isEditing?: boolean };
-}) {
+};
+
+export const InfoTab = React.memo(function InfoTab(props: Props) {
   const {
     formState,
     formActions,
@@ -90,7 +92,7 @@ export function InfoTab(props: {
     onResetSize,
     photoBlockRef
   } = imageHandlers;
-  const onChange = (partial: Partial<BasicData & PriceData & StockData>) => {
+  const handleBasicChange = (partial: Partial<BasicData>) => {
     updateBasicData(partial);
     props.onExternalChange?.(partial);
   };
@@ -120,7 +122,7 @@ export function InfoTab(props: {
           />
         </div>
         <div className="flex-1 min-w-0 sm:min-w-[20rem] space-y-6 px-2 sm:px-3" data-testid="productFormTabs_formContainer">
-          <NamesDescriptionSection t={t} data={basicData} onChange={updateBasicData} readOnly={readOnly} />
+          <NamesDescriptionSection t={t} data={basicData} onChange={handleBasicChange} readOnly={readOnly} />
           {readOnly && (
             <div className="space-y-2" data-testid="productFormTabs_supplierNameReadonly">
               <Label htmlFor="supplier_name_readonly">{t('supplier_name')}</Label>
@@ -139,7 +141,7 @@ export function InfoTab(props: {
         editableKeys={editableKeys}
         categories={categories}
         selectedCategoryName={selectedCategoryName}
-        onChange={onChange}
+        onChange={props.onExternalChange as any}
       />
       {!readOnly && (
         <CategoryEditorSection
@@ -153,7 +155,7 @@ export function InfoTab(props: {
           defaultOpen={!isEditing}
         />
       )}
-      <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} priceData={priceData} setPriceData={setPriceData} onChange={onChange} />
+      <PricesSection t={t} readOnly={readOnly} editableKeys={editableKeys} currencies={currencies} priceData={priceData} setPriceData={setPriceData} onChange={props.onExternalChange as any} />
     </div>
   );
-}
+})

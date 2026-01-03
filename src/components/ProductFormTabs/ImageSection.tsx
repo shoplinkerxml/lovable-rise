@@ -122,6 +122,8 @@ export function ImageSection(props: Props) {
                 }
               }}
               src={src}
+              loading="lazy"
+              decoding="async"
               alt={image.alt_text || `Изображение ${index + 1}`}
               className="w-full h-full object-contain"
               onLoad={(e) => props.onGalleryImageLoad(e, index)}
@@ -149,6 +151,8 @@ export function ImageSection(props: Props) {
             <img
               ref={(el) => (props.galleryImgRefs.current[index] = el)}
               src={src}
+              loading="lazy"
+              decoding="async"
               alt={image.alt_text || `Изображение ${index + 1}`}
               className="w-full h-full object-contain"
               onLoad={(e) => props.onGalleryImageLoad(e, index)}
@@ -198,6 +202,8 @@ export function ImageSection(props: Props) {
         ) : src ? (
           <img
             src={src}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain"
             alt={image.alt_text || ''}
             onError={() => onError()}

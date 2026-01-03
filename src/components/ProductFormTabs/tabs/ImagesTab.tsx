@@ -4,7 +4,7 @@ import type { ProductImage } from '../types';
 
 const ImageSection = lazy(() => import('../ImageSection'));
 
-export function ImagesTab(props: {
+type Props = {
   images: ProductImage[];
   readOnly?: boolean;
   isDragOver: boolean;
@@ -35,7 +35,9 @@ export function ImagesTab(props: {
   onPrev: () => void;
   onNext: () => void;
   getThumbSizeRem?: any;
-}) {
+};
+
+export const ImagesTab = React.memo(function ImagesTab(props: Props) {
   return (
     <div className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
       <Suspense fallback={<Spinner className="mx-auto" />}>
@@ -73,4 +75,4 @@ export function ImagesTab(props: {
       </Suspense>
     </div>
   );
-}
+})

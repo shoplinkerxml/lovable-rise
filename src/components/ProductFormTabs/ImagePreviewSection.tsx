@@ -58,6 +58,7 @@ export default function ImagePreviewSection(props: Props) {
                     return (
                       <img
                         src={src}
+                        decoding="async"
                         alt={props.images[props.activeIndex]?.alt_text || `Фото ${props.activeIndex + 1}`}
                         className="w-full h-full object-contain select-none"
                         onLoad={props.onMainImageLoad}
@@ -107,7 +108,16 @@ export default function ImagePreviewSection(props: Props) {
                               )
                             }
                             return (
-                              <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Превью ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
+                              <img
+                                ref={(el) => (props.galleryImgRefs.current[index] = el)}
+                                src={src}
+                                loading="lazy"
+                                decoding="async"
+                                alt={image.alt_text || `Превью ${index + 1}`}
+                                className="w-full h-full object-contain"
+                                onLoad={(e) => props.onGalleryImageLoad(e, index)}
+                                onError={(e) => props.onGalleryImageError(e, index)}
+                              />
                             )
                           })()}
                         </div>

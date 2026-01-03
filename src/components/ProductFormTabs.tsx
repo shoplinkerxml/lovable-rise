@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -15,7 +15,6 @@ import { ParamsTab } from './ProductFormTabs/tabs/ParamsTab';
 import { Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { type Product } from '@/lib/product-service';
-import { ProductService } from '@/lib/product-service';
 import { useI18n } from "@/i18n";
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useProductImages } from '@/hooks/useProductImages';
@@ -83,28 +82,9 @@ export function ProductFormTabs({
     updateBasicData,
   } = useProductForm(product, overrides);
 
-  useEffect(() => {
-    if (!product) return;
-    setBasicData(prev => {
-      const next = { ...prev };
-      if (!next.name) next.name = product.name || product.name_ua || '';
-      if (!next.name_ua) next.name_ua = product.name_ua || product.name || '';
-      if (!next.description) next.description = product.description || product.description_ua || '';
-      if (!next.description_ua) next.description_ua = product.description_ua || product.description || '';
-      const docketRu = (product as any).docket || '';
-      const docketUa = (product as any).docket_ua || '';
-      if (!next.docket) next.docket = docketRu || docketUa || '';
-      if (!next.docket_ua) next.docket_ua = docketUa || docketRu || '';
-      if (!next.external_id) next.external_id = product.external_id || '';
-      if (!next.vendor) next.vendor = product.vendor || '';
-      if (!next.article) next.article = product.article || '';
-      return next;
-    });
-  }, [product, setBasicData]);
-
   // Images state
   const pid = product?.id ? String(product.id) : '';
-  const { images, activeIndex, setActiveIndex, goPrevious, goNext, goToIndex, addImages: addImagesHook, removeImage: removeImageHook, setMainImage: setMainImageHook, reorderImages, reload } = useProductImages(pid, preloadedImages);
+  const { images, activeIndex, goPrevious, goNext, goToIndex, addImages: addImagesHook, removeImage: removeImageHook, setMainImage: setMainImageHook, reorderImages, reload } = useProductImages(pid, preloadedImages);
   const [imageUrl, setImageUrl] = useState('');
   const uploadState = useImageUpload(pid);
   const { photoBlockRef, isLargeScreen, getAdaptiveImageStyle, getThumbSizeRem, handlePhotoResizeStart, resetPhotoBlockToDefaultSize, galleryImgRefs } = usePhotoPreview(activeIndex);
@@ -133,9 +113,6 @@ export function ProductFormTabs({
   const handleSelectIndex = useCallback((i: number) => {
     goToIndex(i);
   }, [goToIndex]);
-  const handleMainImageError = (_event: React.SyntheticEvent<HTMLImageElement>) => {
-    void 0;
-  };
 
   
 
@@ -179,7 +156,7 @@ export function ProductFormTabs({
 
   
   const { markSaved } = useImageCleanup(isNewProduct, images);
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!basicData.name_ua.trim()) {
       toast.error(t('product_name_required'));
       return;
@@ -200,44 +177,121 @@ export function ProductFormTabs({
     } finally {
       setLoading(false);
     }
-  };
-  const handleCancel = () => {
+  }, [basicData.name_ua, formData, images, markSaved, onSubmit, parameters, t]);
+
+  const handleCancel = useCallback(() => {
     if (onCancel) {
       onCancel();
     } else {
       navigate('/user/products');
     }
-  };
+  }, [navigate, onCancel]);
 
   // Image handling functions
-  const addImageFromUrl = async () => {
+  const addImageFromUrlAction = imageActions.addImageFromUrl;
+  const handleFileUploadAction = imageActions.handleFileUpload;
+
+  const addImageFromUrl = useCallback(async () => {
     if (!imageUrl.trim()) return;
-    const res = await imageActions.addImageFromUrl(imageUrl.trim());
+    const res = await addImageFromUrlAction(imageUrl.trim());
     if (res.ok) {
       setImageUrl('');
       toast.success(t('image_uploaded_successfully'));
     } else {
       toast.error(mapImageErrorToToast(t, res.errorCode));
     }
-  };
+  }, [addImageFromUrlAction, imageUrl, t]);
+
+  const handleSetImageUrl = useCallback((v: string) => {
+    setImageUrl(v);
+  }, []);
 
   // Drag and drop handlers
   const handleDragOver = drop.onDragOver;
   const handleDragEnter = drop.onDragEnter;
   const handleDragLeave = drop.onDragLeave;
   // Drop handler
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     await drop.onDrop(e, images.length);
-  };
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const res = await imageActions.handleFileUpload(event);
+  }, [drop.onDrop, images.length]);
+
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const res = await handleFileUploadAction(event);
     if (res.ok) {
       toast.success(t('image_uploaded_successfully'));
     } else {
       toast.error(mapImageErrorToToast(t, res.errorCode));
     }
-  };
-  
+  }, [handleFileUploadAction, t]);
+
+  const handleDropZoneClick = useCallback(() => {
+    document.getElementById('fileUpload')?.click();
+  }, []);
+
+  const handleMainImageError = useCallback((_event: React.SyntheticEvent<HTMLImageElement>) => {
+    void 0;
+  }, []);
+
+  const infoFormState = useMemo(() => ({ basicData, priceData, stockData }), [basicData, priceData, stockData]);
+  const infoFormActions = useMemo(() => ({ updateBasicData, setPriceData, setStockData, setBasicData }), [setBasicData, setPriceData, setStockData, updateBasicData]);
+  const infoLookups = useMemo(
+    () => ({
+      currencies,
+      categories,
+      selectedCategoryName,
+      selectedSupplierName,
+      suppliers,
+      setCategories,
+      preloadedSupplierCategoriesMap,
+    }),
+    [categories, currencies, preloadedSupplierCategoriesMap, selectedCategoryName, selectedSupplierName, setCategories, suppliers],
+  );
+  const infoImageState = useMemo(() => ({ images, activeIndex, galleryImgRefs }), [activeIndex, galleryImgRefs, images]);
+  const infoImageHandlers = useMemo(
+    () => ({
+      onSelectIndex: handleSelectIndex,
+      getMainAdaptiveImageStyle: getAdaptiveImageStyle,
+      getThumbSizeRem,
+      onGalleryImageLoad: handleGalleryImageLoad,
+      onGalleryImageError: handleGalleryImageError,
+      onGalleryVideoLoaded: handleGalleryVideoLoaded,
+      onPrev: goPrevious,
+      onNext: goNext,
+      onMainImageLoad: handleImageLoad,
+      onMainImageError: handleMainImageError,
+      onMainVideoLoaded: handleMainVideoLoaded,
+      onResizeStart: handlePhotoResizeStart,
+      onResetSize: resetPhotoBlockToDefaultSize,
+      photoBlockRef,
+    }),
+    [
+      getAdaptiveImageStyle,
+      getThumbSizeRem,
+      goNext,
+      goPrevious,
+      handleGalleryImageError,
+      handleGalleryImageLoad,
+      handleGalleryVideoLoaded,
+      handleImageLoad,
+      handleMainImageError,
+      handleMainVideoLoaded,
+      handlePhotoResizeStart,
+      handleSelectIndex,
+      photoBlockRef,
+      resetPhotoBlockToDefaultSize,
+    ],
+  );
+  const infoConfig = useMemo(
+    () => ({ t, readOnly, editableKeys, isLargeScreen, isEditing: !!product }),
+    [editableKeys, isLargeScreen, product, readOnly, t],
+  );
+
+  const handleEditRow = useCallback((index: number) => openEditParamModal(index), [openEditParamModal]);
+  const handleDeleteRow = useCallback((index: number) => deleteParam(index), [deleteParam]);
+  const handleReplaceParams = useCallback((rows: ProductParam[]) => {
+    setParameters(rows);
+    onParamsChange?.(rows);
+  }, [onParamsChange, setParameters]);
 
   return <div className="container mx-auto px-2 sm:px-6 py-3 sm:py-6 max-w-7xl" data-testid="productFormTabs_container">
       <Card className="border-0 shadow-none">
@@ -253,36 +307,13 @@ export function ProductFormTabs({
 
             <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
             <InfoTab
-              formState={{ basicData, priceData, stockData }}
-              formActions={{ updateBasicData, setPriceData, setStockData, setBasicData }}
+              formState={infoFormState}
+              formActions={infoFormActions}
               onExternalChange={onChange as any}
-              lookups={{
-                currencies,
-                categories,
-                selectedCategoryName,
-                selectedSupplierName,
-                suppliers,
-                setCategories,
-                preloadedSupplierCategoriesMap,
-              }}
-              imageState={{ images, activeIndex, galleryImgRefs }}
-                imageHandlers={{
-                  onSelectIndex: handleSelectIndex,
-                  getMainAdaptiveImageStyle: getAdaptiveImageStyle,
-                  getThumbSizeRem,
-                  onGalleryImageLoad: handleGalleryImageLoad,
-                  onGalleryImageError: handleGalleryImageError,
-                  onGalleryVideoLoaded: handleGalleryVideoLoaded,
-                  onPrev: goPrevious,
-                  onNext: goNext,
-                  onMainImageLoad: handleImageLoad,
-                  onMainImageError: handleMainImageError,
-                  onMainVideoLoaded: handleMainVideoLoaded,
-                  onResizeStart: handlePhotoResizeStart,
-                  onResetSize: resetPhotoBlockToDefaultSize,
-                  photoBlockRef,
-                }}
-                config={{ t, readOnly, editableKeys, isLargeScreen, isEditing: !!product }}
+              lookups={infoLookups as any}
+              imageState={infoImageState}
+                imageHandlers={infoImageHandlers as any}
+                config={infoConfig}
               />
             </TabsContent>
 
@@ -293,15 +324,13 @@ export function ProductFormTabs({
                 isDragOver={drop.isDragOver}
                 uploading={uploadState.uploading}
                 imageUrl={imageUrl}
-                onSetImageUrl={(v) => setImageUrl(v)}
+                onSetImageUrl={handleSetImageUrl}
                 onAddImageFromUrl={addImageFromUrl}
                 onRemoveImage={imageActions.removeImageWithR2}
                 onSetMainImage={imageActions.setMain}
                 onReorderImages={imageActions.reorder}
                 onFileUpload={handleFileUpload}
-                onDropZoneClick={async () => {
-                  document.getElementById('fileUpload')?.click()
-                }}
+                onDropZoneClick={handleDropZoneClick}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -328,12 +357,12 @@ export function ProductFormTabs({
                 readOnly={readOnly}
                 forceParamsEditable={forceParamsEditable}
                 parameters={parameters}
-                onEditRow={(index) => openEditParamModal(index)}
-                onDeleteRow={(index) => deleteParam(index)}
+                onEditRow={handleEditRow}
+                onDeleteRow={handleDeleteRow}
                 onDeleteSelected={deleteSelectedParams}
                 onSelectionChange={setSelectedParamRows}
                 onAddParam={openAddParamModal}
-                onReplaceData={(rows) => { setParameters(rows); onParamsChange?.(rows) }}
+                onReplaceData={handleReplaceParams}
                 isParamModalOpen={isParamModalOpen}
                 setIsParamModalOpen={setIsParamModalOpen as any}
                 paramForm={paramForm}
@@ -344,7 +373,7 @@ export function ProductFormTabs({
             </TabsContent>
           </Tabs>
           
-          <FormActions t={t} readOnly={readOnly} loading={loading} product={product} onCancel={onCancel} onSubmit={handleSubmit} disabledSubmit={loading || !basicData.name_ua.trim()} />
+          <FormActions t={t} readOnly={readOnly} loading={loading} product={product} onCancel={handleCancel} onSubmit={handleSubmit} disabledSubmit={loading || !basicData.name_ua.trim()} />
         </CardContent>
       </Card>
     </div>;
