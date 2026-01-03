@@ -51,8 +51,6 @@ const DefaultFormTemplate = ({ formConfig, title }: { formConfig: any; title: st
       return;
     }
 
-    // Simulate form submission
-    console.log('Form submitted:', formData);
     toast({
       title: t("success"),
       description: t("form_submitted"),

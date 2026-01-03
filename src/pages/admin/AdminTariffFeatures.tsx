@@ -23,6 +23,7 @@ import { TariffService, type Tariff, type TariffFeature, type TariffLimit, type 
 import { useI18n } from '@/i18n';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 const AdminTariffFeatures = () => {
   const { t } = useI18n();
@@ -276,9 +277,11 @@ const AdminTariffFeatures = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <FullPageLoader
+        title={t("tariff_features_and_limits")}
+        subtitle={t("manage_features_and_limits_for_tariff_plans")}
+        icon={AlertTriangle}
+      />
     );
   }
 

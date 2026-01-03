@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { DialogNoOverlay, DialogNoOverlayContent, DialogNoOverlayHeader, DialogNoOverlayTitle } from "@/components/ui/dialog-no-overlay";
 // AlertDialog не используется: удаление выполняется сразу без модалки
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useI18n } from "@/i18n";
@@ -415,8 +414,6 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </div>}
       </div>;
   });
-  const isLoading = false;
-  const isFetching = false;
   return <Card className="border-0 shadow-none" data-testid="categoryTree_card">
       {/* Немодальне невелике вікно прогресу без затемнення */}
       <DialogNoOverlay modal={false} open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -517,11 +514,7 @@ export const CategoryTreeEditor: React.FC<CategoryTreeEditorProps> = ({
           </TabsList>
         </Tabs>
 
-        {isLoading || isFetching ? <div className="space-y-[0.5rem]">
-            <Skeleton className="h-[1.25rem] w-full" />
-            <Skeleton className="h-[1.25rem] w-[80%]" />
-            <Skeleton className="h-[1.25rem] w-[60%]" />
-          </div> : treeData.length === 0 ? <div className="rounded-md border p-[1rem] text-muted-foreground" data-testid="categoryTree_empty">
+        {treeData.length === 0 ? <div className="rounded-md border p-[1rem] text-muted-foreground" data-testid="categoryTree_empty">
             <div className="font-medium">{t("no_categories_title")}</div>
             <div className="text-sm">{t("no_categories_description")}</div>
           </div> : <ScrollArea className="max-h-[50vh]">

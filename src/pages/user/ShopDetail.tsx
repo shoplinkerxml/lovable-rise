@@ -132,7 +132,7 @@ export const ShopDetail = () => {
         toast.error(t('failed_remove_from_store') || 'Помилка видалення');
       }
     },
-    [shopId, queryClient, t]
+    [shopId, queryClient, t, uid]
   );
 
   if (isLoading) {

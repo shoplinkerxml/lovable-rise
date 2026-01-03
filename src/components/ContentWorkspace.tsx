@@ -4,7 +4,8 @@ import { useAdmin } from '@/providers/admin-provider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { NotFoundFallback } from '@/components/NotFoundFallback';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { ContentSkeleton, ProgressiveLoader } from '@/components/LoadingSkeletons';
+import { FullPageLoader, ProgressiveLoader } from '@/components/LoadingSkeletons';
+import { DynamicIcon } from "@/components/ui/dynamic-icon";
 
 // Import page components
 import { ContentRenderer } from '@/pages/ContentRenderer';
@@ -77,24 +78,31 @@ const ContentWorkspace: React.FC = () => {
   }, [activeMenuItem, menuItems]);
 
   // Determine content skeleton type based on active menu item and route
-  const getSkeletonType = () => {
-    // Priority given to static route patterns
-    if (adminPath === '/dashboard') return 'dashboard';
-    if (adminPath.startsWith('/forms/')) return 'form';
-    if (adminPath === '/personal') return 'default';
-    if (adminPath === '/users') return 'list';
-    if (adminPath === '/settings/currency') return 'list';
-    if (adminPath === '/settings/limits') return 'list';
-    if (adminPath === '/tariff' || adminPath === '/tariff/features') return 'list';
-    if (adminPath.startsWith('/tariff/edit/') || adminPath === '/tariff/new') return 'form';
-    
-    // Fallback to menu item page_type if available
-    if (activeMenuItem?.page_type === 'list') return 'list';
-    if (activeMenuItem?.page_type === 'form') return 'form';
-    if (activeMenuItem?.page_type === 'dashboard') return 'dashboard';
-    
-    return 'default';
-  };
+  const loaderMeta = useMemo(() => {
+    const itemTitle = String(activeMenuItem?.title || "").trim();
+    const title = itemTitle ? "Завантаження сторінки…" : "Завантаження…";
+    const subtitle = itemTitle || undefined;
+
+    if (activeMenuItem?.icon_name) {
+      return { title, subtitle, iconName: String(activeMenuItem.icon_name) };
+    }
+
+    if (adminPath === "/dashboard") return { title, subtitle, iconName: "layout-dashboard" };
+    if (adminPath === "/users") return { title, subtitle, iconName: "users" };
+    if (adminPath.startsWith("/forms/")) return { title, subtitle, iconName: "form-input" };
+    if (adminPath === "/settings/currency") return { title, subtitle, iconName: "dollar-sign" };
+    if (adminPath === "/settings/limits") return { title, subtitle, iconName: "sliders" };
+    if (adminPath === "/tariff" || adminPath.startsWith("/tariff/")) return { title, subtitle, iconName: "credit-card" };
+    if (adminPath === "/storetemplates") return { title, subtitle, iconName: "file-code" };
+    return { title, subtitle, iconName: "FileText" };
+  }, [activeMenuItem?.icon_name, activeMenuItem?.title, adminPath]);
+
+  const LoaderIcon = useMemo(() => {
+    const iconName = loaderMeta.iconName;
+    return ({ className }: { className?: string }) => (
+      <DynamicIcon name={iconName} className={className} />
+    );
+  }, [loaderMeta.iconName]);
 
   const ContentComponent = useMemo(() => {
     // Check for static components first
@@ -139,7 +147,7 @@ const ContentWorkspace: React.FC = () => {
       <ErrorBoundary>
         <ProgressiveLoader
           isLoading={contentLoading}
-          fallback={<ContentSkeleton type={getSkeletonType()} />}
+          fallback={<FullPageLoader title={loaderMeta.title} subtitle={loaderMeta.subtitle} icon={LoaderIcon} />}
           delay={50}
         >
           <ContentComponent />
@@ -151,13 +159,7 @@ const ContentWorkspace: React.FC = () => {
   // Handle loading states for dynamic content only
   if (menuLoading && !ContentComponent) {
     return (
-      <ProgressiveLoader 
-        isLoading={true} 
-        fallback={<ContentSkeleton type={getSkeletonType()} />}
-        delay={100}
-      >
-        {null}
-      </ProgressiveLoader>
+      <FullPageLoader title={loaderMeta.title} subtitle={loaderMeta.subtitle} icon={LoaderIcon} />
     );
   }
 
@@ -183,7 +185,7 @@ const ContentWorkspace: React.FC = () => {
       <ErrorBoundary>
         <ProgressiveLoader
           isLoading={contentLoading}
-          fallback={<ContentSkeleton type={getSkeletonType()} />}
+          fallback={<FullPageLoader title={loaderMeta.title} subtitle={loaderMeta.subtitle} icon={LoaderIcon} />}
           delay={50}
         >
           <div className="p-4 md:p-6">

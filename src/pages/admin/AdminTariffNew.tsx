@@ -17,7 +17,7 @@ import { TariffService, type TariffInsert, type Currency, type TariffFeature, ty
 import { LimitService, type LimitTemplate } from '@/lib/limit-service';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, FileText, Sparkles, Shield, Gift, Infinity, Power } from 'lucide-react';
-import { Spinner } from '@/components/ui/spinner';
+import { FullPageLoader } from '@/components/LoadingSkeletons';
 
 interface TariffFormData {
   name: string;
@@ -323,11 +323,7 @@ const AdminTariffNew = () => {
   };
 
   if (isInitialLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner className="h-12 w-12" />
-      </div>
-    );
+    return <FullPageLoader title="Завантаження…" subtitle={t('create_new_tariff')} icon={Shield} />;
   }
 
   return (

@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { supabase } from "@/integrations/supabase/client";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 const UserResetPassword = () => {
   const navigate = useNavigate();
@@ -39,7 +40,6 @@ const UserResetPassword = () => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.log('No active session found, redirecting to login');
           toast.error(t("session_expired") || "Session expired. Please request a new password reset.");
           navigate("/user-forgot-password");
           return;
@@ -47,7 +47,6 @@ const UserResetPassword = () => {
 
         // If we have a session, we can proceed with password reset
         setSessionValid(true);
-        console.log('Valid reset session found');
       } catch (error) {
         console.error('Error checking session:', error);
         setSessionValid(false);
@@ -95,14 +94,11 @@ const UserResetPassword = () => {
   // Show loading state while checking session
   if (sessionValid === null) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">
-            {t("validating_session") || "Validating session..."}
-          </p>
-        </div>
-      </div>
+      <FullPageLoader
+        title={t("validating_session") || "Validating session..."}
+        subtitle={t("loading") || "Завантаження…"}
+        icon={Shield}
+      />
     );
   }
 

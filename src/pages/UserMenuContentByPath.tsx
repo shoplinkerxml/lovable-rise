@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShopService, type Shop, type ShopAggregated } from "@/lib/shop-service";
 import { ShopStructureEditor } from "@/components/user/shops";
 import { ExportDialog } from "@/components/user/shops/ExportDialog";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 interface UserDashboardContextType {
   user: UserProfile;
@@ -100,6 +101,34 @@ const UserMenuContentByPath = () => {
     return { lastUpdated: Date.now(), ...dataObj } as Record<string, unknown>;
   }, [menuItem?.content_data]);
 
+  const pageMetaForLoader = useMemo(() => {
+    const currentPath = String(fullPath || path || "").replace(/^\//, "");
+    const normalizedPath = currentPath.startsWith("/") ? currentPath.substring(1) : currentPath;
+    const foundItem =
+      menuItems.find((item) => {
+        const itemPath = item.path.startsWith("/") ? item.path.substring(1) : item.path;
+        return itemPath === normalizedPath;
+      }) || menuItem;
+
+    const titleFallback = normalizedPath
+      ? normalizedPath
+          .split("/")
+          .filter((part) => part.length > 0)
+          .slice(-1)[0]
+          ?.replace(/-/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase()) || normalizedPath
+      : "";
+
+    const title = String(foundItem?.title || titleFallback || "");
+    const iconName = String(foundItem?.icon_name || (normalizedPath.includes("tariff") ? "credit-card" : "") || "FileText");
+    return { title, iconName };
+  }, [fullPath, menuItem, menuItems, path]);
+
+  const PageLoaderIcon = useMemo(() => {
+    const iconName = pageMetaForLoader.iconName;
+    return ({ className }: { className?: string }) => <DynamicIcon name={iconName} className={className} />;
+  }, [pageMetaForLoader.iconName]);
+
   useEffect(() => {
     const loadMenuItem = async () => {
       if (shopRoute) {
@@ -184,9 +213,11 @@ const UserMenuContentByPath = () => {
 
     if (shopForStructureLoading || !shopForStructure) {
       return (
-        <div className="flex h-full items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+        <FullPageLoader
+          title="Завантаження магазину…"
+          subtitle="Готуємо структуру магазину"
+          icon={({ className }) => <DynamicIcon name="Store" className={className} />}
+        />
       );
     }
 
@@ -199,9 +230,11 @@ const UserMenuContentByPath = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
+      <FullPageLoader
+        title="Завантаження сторінки…"
+        subtitle={pageMetaForLoader.title || undefined}
+        icon={PageLoaderIcon}
+      />
     );
   }
 

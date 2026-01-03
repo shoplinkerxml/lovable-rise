@@ -16,6 +16,7 @@ import { useI18n } from "@/i18n";
 import { PageHeader as PageHeaderComponent, ActionButton, PageCardHeader } from "@/components/page-header";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 interface ListPageProps {
   config: any;
@@ -245,9 +246,11 @@ export const ListPage = ({ config, title }: ListPageProps) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <FullPageLoader
+        title={isTariffPage ? "Завантаження тарифів…" : "Завантаження списку…"}
+        subtitle={isTariffPage ? t("tariff_plans_description") : pageInfo.description}
+        icon={isTariffPage ? CreditCard : Package}
+      />
     );
   }
 

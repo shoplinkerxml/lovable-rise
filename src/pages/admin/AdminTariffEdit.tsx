@@ -21,7 +21,7 @@ import { ProfileService } from '@/lib/profile-service';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Sparkles, Shield, Gift, Infinity, Power, Star, Eye, MoreVertical, Edit } from 'lucide-react';
-import { Spinner } from '@/components/ui/spinner';
+import { FullPageLoader } from '@/components/LoadingSkeletons';
 interface TariffFormData {
   name: string;
   description?: string | null;
@@ -38,7 +38,6 @@ interface TariffFormData {
   sort_order?: number | null;
 }
 const AdminTariffEdit = () => {
-  console.log('AdminTariffEdit component rendered');
   const {
     t
   } = useI18n();
@@ -60,7 +59,6 @@ const AdminTariffEdit = () => {
     label: "Редагування тарифу",
     current: true
   }]);
-  console.log('Tariff ID from params:', id);
   const [activeTab, setActiveTab] = useState('basic');
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
@@ -102,7 +100,6 @@ const AdminTariffEdit = () => {
   
   const checkUserPermissions = async () => {
     try {
-      console.log('Checking user permissions...');
       const {
         data: {
           user
@@ -112,16 +109,13 @@ const AdminTariffEdit = () => {
         try {
           const role = await ProfileService.getUserRole(user.id);
           const adminStatus = await ProfileService.isAdmin(user.id);
-          console.log('User role:', role, 'Admin status:', adminStatus);
           setUserRole(role || 'admin');
           setIsAdmin(adminStatus || true); // Default to admin if check fails
         } catch (permError) {
-          console.log('Permission check failed, defaulting to admin access');
           setIsAdmin(true);
           setUserRole('admin');
         }
       } else {
-        console.log('No user found, setting admin permissions for demo');
         setIsAdmin(true);
         setUserRole('admin');
       }
@@ -185,7 +179,6 @@ const AdminTariffEdit = () => {
     try {
       setLoading(true);
       setIsInitialLoading(true);
-      console.log('Loading tariff data for ID:', tariffId);
 
       // Use TariffService.getTariffById() for loading single tariffs with full relational data
       const tariffWithDetails = await TariffService.getTariffById(tariffId);
@@ -229,11 +222,6 @@ const AdminTariffEdit = () => {
           label: tariffWithDetails.name,
           current: true
         }]);
-        console.log('Tariff data loaded successfully:', {
-          tariff: tariffWithDetails.name,
-          features: tariffWithDetails.features?.length || 0,
-          limits: tariffWithDetails.limits?.length || 0
-        });
       }
     } catch (error) {
       console.error('Error fetching tariff data:', error);
@@ -712,18 +700,8 @@ const AdminTariffEdit = () => {
     return currency ? symbolMap[currency.code] || currency.code : '$';
   };
 
-  // Simplified rendering without loading states
-  console.log('Rendering AdminTariffEdit component. State:', {
-    tariffName,
-    formDataName: formData.name,
-    isAdmin,
-    currencies: currencies.length,
-    customBreadcrumbsLength: customBreadcrumbs.length
-  });
   if (isInitialLoading) {
-    return <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner className="h-12 w-12" />
-      </div>;
+    return <FullPageLoader title="Завантаження…" subtitle={t('edit_tariff')} icon={Shield} />;
   }
   return <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Read-only mode banner for non-admin users */}

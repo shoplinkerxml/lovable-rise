@@ -3,7 +3,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Copy, Edit, Trash2, Loader2, Search } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { Product } from "@/lib/product-service";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Table as TanTable } from "@tanstack/react-table";
@@ -90,158 +89,156 @@ export function Toolbar({
   const canDeleteSelected = selectedCount >= 1 && !duplicating;
   const createDisabled = (canCreate === false) || !!duplicating;
   const iconButtonCls = "h-8 w-8 hover:bg-transparent";
+  const controlsDisabled = !!loading || !!duplicating;
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
       <div className="flex items-center gap-2 flex-wrap">
-        {loading ? (
-          <Skeleton className="h-9 w-[clamp(12rem,40vw,28rem)] rounded-md" />
-        ) : (
-          <div className="relative flex-1 min-w-0 w-[clamp(10rem,40vw,20rem)] sm:w-[clamp(12rem,40vw,24rem)]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
-              onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
-              className="pl-9"
-              data-testid="user_products_dataTable_filter"
-            />
-          </div>
-        )}
+        <div className="relative flex-1 min-w-0 w-[clamp(10rem,40vw,20rem)] sm:w-[clamp(12rem,40vw,24rem)]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={(table.getColumn("name_ua")?.getFilterValue() as string) ?? ""}
+            onChange={(event) => table.getColumn("name_ua")?.setFilterValue(event.target.value)}
+            className="pl-9"
+            data-testid="user_products_dataTable_filter"
+            disabled={!!loading}
+          />
+        </div>
       </div>
 
       <TooltipProvider delayDuration={200}>
         <div className="flex items-center gap-2 h-9" data-testid="user_products_actions_block">
           {storeId ? null : (
-            loading ? (
-              <Skeleton className="h-8 w-8 rounded-md" />
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className={iconButtonCls} onClick={onCreateNew} aria-label={t("add_product")} disabled={createDisabled} aria-disabled={createDisabled} data-testid="user_products_dataTable_createNew">
-                    <Plus className={`h-4 w-4 transition-colors ${createDisabled ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_create">
-                  {t("add_product")}
-                </TooltipContent>
-              </Tooltip>
-            )
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={iconButtonCls}
+                  onClick={onCreateNew}
+                  aria-label={t("add_product")}
+                  disabled={createDisabled || !!loading}
+                  aria-disabled={createDisabled || !!loading}
+                  data-testid="user_products_dataTable_createNew"
+                >
+                  <Plus className={`h-4 w-4 transition-colors ${(createDisabled || !!loading) ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_create">
+                {t("add_product")}
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {hideDuplicate ? null : (
-            loading ? (
-              <Skeleton className="h-8 w-8 rounded-md" />
-            ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     className={iconButtonCls}
                     onClick={async () => {
+                      if (controlsDisabled) return;
                       if (!selectedRow) return;
                       await handleDuplicate(selectedRow);
                       table.resetRowSelection();
                       setLastSelectedProductIds?.([]);
                     }}
                     aria-label={t("duplicate")}
-                    disabled={!canDuplicate}
-                    aria-disabled={!canDuplicate}
+                    disabled={!canDuplicate || controlsDisabled}
+                    aria-disabled={!canDuplicate || controlsDisabled}
                     data-testid="user_products_dataTable_duplicateSelected"
                   >
                     {isDupPending ? (
                       <Loader2 className="h-4 w-4 animate-spin text-foreground" />
                     ) : (
-                      <Copy className={`h-4 w-4 transition-colors ${!canDuplicate ? "text-muted-foreground" : isDupError ? "text-destructive" : "text-foreground hover:text-primary"}`} />
+                      <Copy className={`h-4 w-4 transition-colors ${(!canDuplicate || controlsDisabled) ? "text-muted-foreground" : isDupError ? "text-destructive" : "text-foreground hover:text-primary"}`} />
                     )}
                   </Button>
-                  </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_duplicate">
-                  {t("duplicate")}
-                </TooltipContent>
-              </Tooltip>
-            )
-          )}
-
-          {loading ? (
-            <Skeleton className="h-8 w-8 rounded-md" />
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className={iconButtonCls} onClick={() => selectedRow && setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })} aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")} disabled={!canDeleteSelected} aria-disabled={!canDeleteSelected} data-testid="user_products_dataTable_clearSelection">
-                  <Trash2 className={`h-4 w-4 transition-colors ${!canDeleteSelected ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
-                </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_delete">
-                {selectedCount > 1 ? t("delete_selected") : t("delete")}
+              <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_duplicate">
+                {t("duplicate")}
               </TooltipContent>
             </Tooltip>
           )}
 
-          {loading ? (
-            <Skeleton className="h-8 w-8 rounded-md" />
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className={iconButtonCls} onClick={() => selectedRow && onEdit?.(selectedRow)} aria-label={t("edit")} disabled={!canEditSelected} aria-disabled={!canEditSelected} data-testid="user_products_dataTable_editSelected">
-                  <Edit className={`h-4 w-4 transition-colors ${!canEditSelected ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_edit">
-                {t("edit")}
-              </TooltipContent>
-            </Tooltip>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={iconButtonCls}
+                onClick={() => selectedRow && setDeleteDialog({ open: true, product: selectedCount === 1 ? selectedRow || null : null })}
+                aria-label={selectedCount > 1 ? t("delete_selected") : t("delete")}
+                disabled={!canDeleteSelected || controlsDisabled}
+                aria-disabled={!canDeleteSelected || controlsDisabled}
+                data-testid="user_products_dataTable_clearSelection"
+              >
+                <Trash2 className={`h-4 w-4 transition-colors ${(!canDeleteSelected || controlsDisabled) ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_delete">
+              {selectedCount > 1 ? t("delete_selected") : t("delete")}
+            </TooltipContent>
+          </Tooltip>
 
-          {loading ? (
-            <Skeleton className="h-8 w-24 rounded-md" />
-          ) : (
-            <React.Suspense fallback={null}>
-                <ViewOptionsMenuLazyTyped table={table} disabled={!!duplicating} />
-            </React.Suspense>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={iconButtonCls}
+                onClick={() => selectedRow && onEdit?.(selectedRow)}
+                aria-label={t("edit")}
+                disabled={!canEditSelected || controlsDisabled}
+                aria-disabled={!canEditSelected || controlsDisabled}
+                data-testid="user_products_dataTable_editSelected"
+              >
+                <Edit className={`h-4 w-4 transition-colors ${(!canEditSelected || controlsDisabled) ? "text-muted-foreground" : "text-foreground hover:text-primary"}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-sm" data-testid="user_products_tooltip_edit">
+              {t("edit")}
+            </TooltipContent>
+          </Tooltip>
 
-          {loading ? (
-            <Skeleton className="h-8 w-8 rounded-md" />
-          ) : (
-            <React.Suspense fallback={null}>
-              <ImportExportMenuLazyTyped
-                t={t}
-                storeId={storeId}
-                queryClient={queryClient}
-                selectedProducts={selectedProducts}
-                disabled={!!duplicating}
-              />
-            </React.Suspense>
-          )}
+          <React.Suspense fallback={null}>
+            <ViewOptionsMenuLazyTyped table={table} disabled={controlsDisabled} />
+          </React.Suspense>
+
+          <React.Suspense fallback={null}>
+            <ImportExportMenuLazyTyped
+              t={t}
+              storeId={storeId}
+              queryClient={queryClient}
+              selectedProducts={selectedProducts}
+              disabled={controlsDisabled}
+            />
+          </React.Suspense>
 
           {storeId ? null : (
-            loading ? (
-              <Skeleton className="h-8 w-28 rounded-md" />
-            ) : (
-              <React.Suspense fallback={null}>
-                <AddToStoresMenuLazyTyped
-                  open={storesMenuOpen}
-                  setOpen={setStoresMenuOpen}
-                  loadStoresForMenu={loadStoresForMenu}
-                  stores={stores}
-                  setStores={setStores}
-                  selectedStoreIds={selectedStoreIds}
-                  setSelectedStoreIds={setSelectedStoreIds}
-                  items={items}
-                  table={table}
-                  removingStores={removingStores}
-                  setRemovingStores={setRemovingStores}
-                  removingStoreId={removingStoreId}
-                  setRemovingStoreId={setRemovingStoreId}
-                  queryClient={queryClient}
-                  addingStores={addingStores}
-                  setAddingStores={setAddingStores}
-                  setProductsCached={setProductsCached}
-                  setLastSelectedProductIds={setLastSelectedProductIds}
-                  disabled={!!duplicating}
-                />
-              </React.Suspense>
-            )
+            <React.Suspense fallback={null}>
+              <AddToStoresMenuLazyTyped
+                open={storesMenuOpen}
+                setOpen={setStoresMenuOpen}
+                loadStoresForMenu={loadStoresForMenu}
+                stores={stores}
+                setStores={setStores}
+                selectedStoreIds={selectedStoreIds}
+                setSelectedStoreIds={setSelectedStoreIds}
+                items={items}
+                table={table}
+                removingStores={removingStores}
+                setRemovingStores={setRemovingStores}
+                removingStoreId={removingStoreId}
+                setRemovingStoreId={setRemovingStoreId}
+                queryClient={queryClient}
+                addingStores={addingStores}
+                setAddingStores={setAddingStores}
+                setProductsCached={setProductsCached}
+                setLastSelectedProductIds={setLastSelectedProductIds}
+                disabled={controlsDisabled}
+              />
+            </React.Suspense>
           )}
         </div>
       </TooltipProvider>

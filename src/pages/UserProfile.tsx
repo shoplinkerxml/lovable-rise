@@ -13,6 +13,7 @@ import { useI18n } from "@/i18n";
 import { ArrowLeft, User, Save, Upload, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 const UserProfile = () => {
   const navigate = useNavigate();
@@ -124,12 +125,11 @@ const UserProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">{t("profile_loading")}</p>
-        </div>
-      </div>
+      <FullPageLoader
+        title="Завантаження профілю…"
+        subtitle={t("profile_loading")}
+        icon={User}
+      />
     );
   }
 

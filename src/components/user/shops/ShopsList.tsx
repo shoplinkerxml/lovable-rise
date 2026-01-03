@@ -22,7 +22,7 @@ import { SessionValidator } from '@/lib/session-validation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FullPageLoader } from '@/components/LoadingSkeletons';
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 type ShopWithMarketplace = ShopAggregated;
 

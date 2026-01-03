@@ -6,6 +6,8 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { CreditCard, LayoutDashboard, Loader2, Package, Store, Truck, User } from "lucide-react";
 import type { TariffLimit } from "@/lib/tariff-service";
 import type { UserMenuItem } from "@/lib/user-menu-service";
 
@@ -237,14 +239,34 @@ const UserProtected = () => {
   const sessionPending = sessionQuery.data == null && (sessionQuery.isLoading || sessionIsFetching);
   const authMePending = sessionValid && authMeQuery.data == null && (authMeQuery.isLoading || authMeQuery.isFetching);
 
-  const authLoading = sessionPending || (authMePending && !user);
+  const authLoading = sessionPending || authMePending;
   if (authLoading) {
+    const path = location.pathname.toLowerCase();
+    const cfg = (() => {
+      if (path.startsWith("/user/dashboard") || path === "/user" || path === "/user/") {
+        return { title: "Завантаження панелі…", subtitle: "Готуємо дані кабінету", icon: LayoutDashboard };
+      }
+      if (path.startsWith("/user/products")) {
+        return { title: "Завантаження товарів…", subtitle: "Готуємо дані та форму", icon: Package };
+      }
+      if (path.startsWith("/user/shops")) {
+        return { title: "Завантаження магазинів…", subtitle: "Готуємо список та дані", icon: Store };
+      }
+      if (path.startsWith("/user/profile")) {
+        return { title: "Завантаження профілю…", subtitle: "Готуємо дані користувача", icon: User };
+      }
+      if (path.startsWith("/user/tariff")) {
+        return { title: "Завантаження тарифів…", subtitle: "Готуємо плани та обмеження", icon: CreditCard };
+      }
+      if (path.startsWith("/user/suppliers")) {
+        return { title: "Завантаження постачальників…", subtitle: "Готуємо список та дані", icon: Truck };
+      }
+      return { title: "Завантаження сторінки…", subtitle: "Готуємо дані", icon: Loader2 };
+    })();
+
     return (
-      <div
-        data-testid="auth_loading"
-        className="min-h-screen flex items-center justify-center text-muted-foreground"
-      >
-        Завантаження...
+      <div data-testid="auth_loading">
+        <FullPageLoader title={cfg.title} subtitle={cfg.subtitle} icon={cfg.icon} />
       </div>
     );
   }

@@ -27,7 +27,7 @@ import TariffCache from '@/lib/tariff-cache';
 import { useI18n } from '@/i18n';
 import { PageHeader } from '@/components/PageHeader';
 import { useBreadcrumbs, usePageInfo } from '@/hooks/useBreadcrumbs';
-import { Spinner } from '@/components/ui/spinner';
+import { FullPageLoader } from '@/components/LoadingSkeletons';
 
 const AdminTariffManagement = () => {
   const { t } = useI18n();
@@ -262,118 +262,12 @@ const AdminTariffManagement = () => {
 
   // Show initial green spinner during the very first load
   if (loading && isInitialLoad) {
-    return (
-      <div className="p-4 xs:p-5 sm:p-6 space-y-6">
-        {/* Page Header with Breadcrumbs */}
-        <PageHeader
-          title={t('menu_pricing')}
-          description={t('manage_tariffs_and_pricing_options')}
-          breadcrumbItems={breadcrumbs}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              {tariffs.length === 0 && (
-                <Button variant="outline" className="text-sm xs:text-base" onClick={handleCreateSampleData}>
-                  {t('create_sample_data')}
-                </Button>
-              )}
-              <Button variant="outline" className="text-sm xs:text-base" onClick={handleRefresh}>
-                {t('refresh')}
-              </Button>
-              <Button className="text-sm xs:text-base" onClick={() => navigate('/admin/tariff/new')}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('add_new_tariff')}
-              </Button>
-            </div>
-          }
-        />
-
-        {/* Initial Loader */}
-        <Card>
-          <CardContent className="p-0">
-            <div
-              className="flex items-center justify-center py-12"
-              data-testid="admin_tariff_loader"
-              aria-busy="true"
-            >
-              <Spinner className="h-12 w-12" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <FullPageLoader title="Завантаження…" subtitle={t('menu_pricing')} icon={CreditCard} />;
   }
 
   // Skeletons for subsequent refetches (filters, sorting, pagination)
   if (loading) {
-    return (
-      <div className="p-4 xs:p-5 sm:p-6 space-y-6">
-        {/* Page Header with Breadcrumbs */}
-        <PageHeader
-          title={t('menu_pricing')}
-          description={t('manage_tariffs_and_pricing_options')}
-          breadcrumbItems={breadcrumbs}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled className="text-sm xs:text-base">
-                <div className="h-3 xs:h-4 w-16 xs:w-20 bg-gray-200 rounded animate-pulse"></div>
-              </Button>
-              <Button disabled className="text-sm xs:text-base">
-                <div className="h-3 xs:h-4 w-20 xs:w-24 bg-gray-200 rounded animate-pulse"></div>
-              </Button>
-            </div>
-          }
-        />
-
-        {/* Tariff Table with Skeleton Loaders */}
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table className="min-w-[500px] xs:min-w-[600px] sm:min-w-[650px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs sm:text-sm md:text-base w-10 xs:w-12"></TableHead>
-                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[80px] xs:min-w-[100px] sm:min-w-[120px]">{t('tariff_name')}</TableHead>
-                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[100px] xs:min-w-[120px] sm:min-w-[140px]">{t('tariff_price')}</TableHead>
-                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[70px] xs:min-w-[80px] sm:min-w-[100px]">{t('tariff_term')}</TableHead>
-                  <TableHead className="text-xs sm:text-sm md:text-base min-w-[70px] xs:min-w-[80px] sm:min-w-[100px]">{t('tariff_status')}</TableHead>
-                  <TableHead className="text-center text-xs sm:text-sm md:text-base w-16 xs:w-20 sm:w-24">{t('tariff_actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Render 5 skeleton rows while loading */}
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <div className="h-4 w-4 sm:h-5 sm:w-5 bg-gray-200 rounded animate-pulse"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-3 sm:h-4 w-20 xs:w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col xs:flex-row gap-1">
-                        <div className="flex items-center gap-1">
-                          <div className="h-3 sm:h-4 w-3 xs:w-4 bg-gray-200 rounded animate-pulse"></div>
-                          <div className="h-3 sm:h-4 w-16 xs:w-20 bg-gray-200 rounded animate-pulse"></div>
-                        </div>
-                        <div className="h-3 sm:h-4 w-12 xs:w-16 bg-gray-200 rounded animate-pulse"></div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-3 sm:h-4 w-16 xs:w-20 sm:w-24 bg-gray-200 rounded animate-pulse"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-5 w-12 xs:h-6 xs:w-16 bg-gray-200 rounded animate-pulse"></div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="h-6 w-6 sm:h-8 sm:w-8 bg-gray-200 rounded animate-pulse mx-auto"></div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <FullPageLoader title="Завантаження…" subtitle={t('menu_pricing')} icon={CreditCard} />;
   }
 
   return (

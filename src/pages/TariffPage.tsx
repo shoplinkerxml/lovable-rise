@@ -45,6 +45,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { useOutletContext } from "react-router-dom";
 import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 import { useQuery } from "@tanstack/react-query";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 const TariffPage = () => {
   const { t } = useI18n();
@@ -165,86 +166,11 @@ const TariffPage = () => {
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
-        <PageHeader
-          title={t('menu_pricing')}
-          description={t('choose_your_plan_description')}
-          breadcrumbItems={breadcrumbs}
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Render 3 skeleton cards while loading */}
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card key={index} className="flex flex-col card-elevated">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-5 w-5 sm:h-6 sm:w-6 bg-gray-200 rounded animate-pulse"></div>
-                      <div className="h-6 sm:h-8 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></div>
-                    </div>
-                    <div className="h-4 w-32 sm:w-48 bg-gray-200 rounded animate-pulse mt-2"></div>
-                  </div>
-                  <div className="h-6 w-16 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-                
-                <div className="my-6">
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <div className="flex items-baseline gap-1">
-                      <div className="h-6 sm:h-8 md:h-10 lg:h-12 w-6 sm:w-8 md:w-10 lg:w-12 bg-gray-200 rounded animate-pulse"></div>
-                      <div className="h-8 sm:h-10 md:h-12 lg:h-16 w-20 sm:w-24 md:w-32 lg:w-40 bg-gray-200 rounded animate-pulse"></div>
-                    </div>
-                    <div className="flex items-baseline gap-1">
-                      <div className="h-4 sm:h-5 md:h-6 lg:h-7 w-4 sm:w-5 md:w-6 lg:w-7 bg-gray-200 rounded animate-pulse"></div>
-                      <div className="h-5 sm:h-6 md:h-8 lg:h-10 w-16 sm:w-20 md:w-24 lg:w-32 bg-gray-200 rounded animate-pulse"></div>
-                    </div>
-                  </div>
-                  <div className="h-4 sm:h-5 w-20 sm:w-24 bg-gray-200 rounded animate-pulse mt-2"></div>
-                </div>
-
-                {/* Select Plan Button Skeleton */}
-                <div className="mt-6 mb-6">
-                  <div className="h-10 sm:h-12 w-full bg-gray-200 rounded animate-pulse"></div>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Features Section Skeleton */}
-                  <div>
-                    <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-3"></div>
-                    <div className="space-y-3">
-                      {Array.from({ length: 4 }).map((_, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center gap-2 py-1">
-                          <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
-                          <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
-                          <div className="h-4 flex-1 bg-gray-200 rounded animate-pulse"></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Limits Section Skeleton */}
-                  <div>
-                    <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-3"></div>
-                    <div className="space-y-3">
-                      {Array.from({ length: 3 }).map((_, limitIndex) => (
-                        <div key={limitIndex} className="flex items-center justify-between py-1">
-                          <div className="flex items-center gap-2">
-                            <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
-                            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
-                          </div>
-                          <div className="h-6 w-10 bg-gray-200 rounded animate-pulse"></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      <FullPageLoader
+        title="Завантаження тарифів…"
+        subtitle={t("choose_your_plan_description")}
+        icon={CreditCard}
+      />
     );
   }
 

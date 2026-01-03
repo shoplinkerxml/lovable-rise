@@ -1,8 +1,9 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserAuthService } from "@/lib/user-auth-service";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { LayoutDashboard } from "lucide-react";
 
 const AdminProtected = () => {
   const [ready, setReady] = useState(false);
@@ -25,8 +26,8 @@ const AdminProtected = () => {
           
           // Check if user has admin role
           try {
-  const authMe = await UserAuthService.fetchAuthMe();
-  const isAdmin = String(authMe?.user?.role ?? "user") === "admin";
+            const authMe = await UserAuthService.fetchAuthMe();
+            const isAdmin = String(authMe?.user?.role ?? "user") === "admin";
             setHasAdminRole(isAdmin);
             
             if (!isAdmin) {
@@ -60,17 +61,15 @@ const AdminProtected = () => {
   }, []);
 
   if (!ready) {
-    return <div className="p-6 text-center text-muted-foreground">Загрузка…</div>;
+    return <FullPageLoader title="Завантаження…" subtitle="Перевіряємо доступ адміністратора" icon={LayoutDashboard} />;
   }
 
   if (!authenticated) {
-    console.log('[AdminProtected] Redirecting to login due to authentication failure:', sessionError);
     return <Navigate to="/admin-auth" replace />;
   }
 
   // If user is authenticated but doesn't have admin role, redirect to user dashboard
   if (authenticated && !hasAdminRole) {
-    console.log('[AdminProtected] Redirecting to user dashboard due to lack of admin role');
     return <Navigate to="/user/dashboard" replace />;
   }
 

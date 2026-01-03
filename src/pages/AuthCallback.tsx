@@ -2,9 +2,9 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import { useI18n } from "@/i18n";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { Shield } from "lucide-react";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -13,14 +13,11 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        console.log('Handling authentication callback...');
-        
         // Check if this is a password reset callback
         const urlParams = new URLSearchParams(window.location.search);
         const type = urlParams.get('type');
         
         if (type === 'recovery') {
-          console.log('Password reset callback detected, redirecting to reset page');
           navigate('/user-reset-password');
           return;
         }
@@ -79,24 +76,7 @@ const AuthCallback = () => {
     handleCallback();
   }, [navigate, t]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <h2 className="text-xl font-semibold">Completing Authentication</h2>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <Spinner className="mx-auto" />
-          <p className="text-muted-foreground">
-            Please wait while we complete your authentication...
-          </p>
-          <p className="text-sm text-muted-foreground">
-            This may take a moment if you're confirming your email.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <FullPageLoader title={t("loading") || "Завантаження…"} subtitle={t("auth_processing") || "Завершуємо авторизацію"} icon={Shield} />;
 };
 
 export default AuthCallback;

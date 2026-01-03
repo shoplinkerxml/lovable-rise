@@ -20,7 +20,8 @@ import { DeleteUserDialog } from "@/components/admin/DeleteUserDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
 import { useUsers, useToggleUserStatus, usePrefetchUsers } from "@/hooks/useUsers";
-import { Spinner } from "@/components/ui/spinner";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { Users } from "lucide-react";
 
 interface UserFilters {
   search: string;
@@ -140,7 +141,6 @@ export default function AdminUsersPage() {
   
   const handleExport = () => {
     // Export functionality will be implemented
-    console.log("Export users");
   };
   
   // Close dialog handlers
@@ -248,13 +248,7 @@ export default function AdminUsersPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading && isInitialLoad ? (
-            <div
-              className="flex items-center justify-center py-12"
-              data-testid="admin_users_loader"
-              aria-busy="true"
-            >
-              <Spinner className="h-12 w-12" />
-            </div>
+            <FullPageLoader title="Завантаження…" subtitle={t("sidebar_users") || "Користувачі"} icon={Users} />
           ) : (
             <UsersTable
               users={usersData?.users || []}

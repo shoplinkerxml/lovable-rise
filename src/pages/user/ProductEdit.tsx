@@ -291,11 +291,11 @@ export const ProductEdit = () => {
         isLoading={loading}
         delay={150}
         fallback={
-          <FullPageLoader
-            title="Завантаження товару…"
-            subtitle="Готуємо форму редагування, дані та зображення"
-            icon={Package}
-          />
+            <FullPageLoader
+              title="Завантаження товару…"
+              subtitle="Готуємо форму редагування, дані та зображення"
+              icon={Package}
+            />
         }
       >
         <div className="relative min-h-[clamp(12rem,50vh,24rem)]" aria-busy={loading}>

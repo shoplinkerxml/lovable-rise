@@ -12,12 +12,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/components/ui/empty';
-import { Building2, Edit, Trash2, Loader2, Globe, Link, Phone } from 'lucide-react';
+import { Building2, Edit, Trash2, Globe, Link, Phone, Truck } from 'lucide-react';
 import { useI18n } from "@/i18n";
 import { SupplierService, type Supplier } from '@/lib/supplier-service';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
+import { FullPageLoader } from '@/components/LoadingSkeletons';
 
 interface SuppliersListProps {
   onEdit?: (supplier: Supplier) => void;
@@ -63,27 +64,11 @@ export const SuppliersList = ({
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-10">
-        <div className="text-sm text-muted-foreground mb-4">{t('loading_suppliers')}</div>
-        <Card className="w-full max-w-md overflow-hidden card-elevated">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-              <div className="flex gap-1">
-                <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-                <div className="h-8 w-8 rounded bg-muted animate-pulse" />
-              </div>
-            </div>
-            <div className="mt-2 h-5 w-40 rounded bg-muted animate-pulse" />
-            <div className="mt-1 h-4 w-28 rounded bg-muted animate-pulse" />
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="h-4 w-56 rounded bg-muted animate-pulse" />
-            <div className="h-4 w-48 rounded bg-muted animate-pulse" />
-            <div className="h-4 w-40 rounded bg-muted animate-pulse" />
-          </CardContent>
-        </Card>
-      </div>
+      <FullPageLoader
+        title={t('suppliers_title')}
+        subtitle={t('suppliers_description')}
+        icon={Truck}
+      />
     );
   }
 

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 interface UserDashboardContextType {
   user: UserProfile;
@@ -95,9 +96,11 @@ const UserMenuContent = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
+      <FullPageLoader
+        title="Завантаження сторінки…"
+        subtitle="Готуємо налаштування меню"
+        icon={Edit3}
+      />
     );
   }
 

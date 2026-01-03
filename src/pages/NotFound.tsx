@@ -1,6 +1,8 @@
 import { useLocation, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useUserRole } from "@/hooks/useUserRole";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { Circle } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
@@ -45,12 +47,7 @@ const NotFound = () => {
   // Показываем загрузку пока определяется роль
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Загрузка...</p>
-        </div>
-      </div>
+      <FullPageLoader title="Завантаження…" subtitle="Перевіряємо доступ" icon={Circle} />
     );
   }
 
@@ -73,6 +70,4 @@ const NotFound = () => {
 };
 
 export default NotFound;
-
-
 

@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Plus, Edit3, Trash2 } from "lucide-react";
+import { MoreHorizontal, Plus, Edit3, Trash2, Banknote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { useBreadcrumbs, usePageInfo } from "@/hooks/useBreadcrumbs";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 interface Currency {
   id: number;
@@ -206,9 +207,11 @@ const CurrencyManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
+      <FullPageLoader
+        title="Завантаження валют…"
+        subtitle={t("currency_management_description")}
+        icon={Banknote}
+      />
     );
   }
 

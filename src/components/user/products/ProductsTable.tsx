@@ -33,10 +33,10 @@ import { toast } from "sonner";
 import { ProductService, type Product } from "@/lib/product-service";
 import { readCache, writeCache, CACHE_TTL } from "@/lib/cache-utils";
 import { runOptimisticOperation } from "@/lib/optimistic-mutation";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
  
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableHeader } from "./ProductsTable/SortableHeader";
-import { LoadingSkeleton } from "./ProductsTable/LoadingSkeleton";
 import { PaginationFooter } from "./ProductsTable/PaginationFooter";
 import { SortableContext, arrayMove } from "@dnd-kit/sortable";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -268,7 +268,7 @@ export const ProductsTable = ({
       setCopyDialog({ open: false, name: null });
       duplicatingRef.current = false;
     }
-  }, [canCreate, queryClient, storeId, t]);
+  }, [canCreate, queryClient, productsBaseKey, t]);
 
   
 
@@ -420,7 +420,7 @@ export const ProductsTable = ({
       toast.error(t('failed_remove_from_store'));
     }
     return !reverted;
-  }, [setProductsCached, queryClient, t]);
+  }, [setProductsCached, queryClient, t, uid]);
   useEffect(() => {
     try {
       const cachedAgg = queryClient.getQueryData<ShopAggregated[]>(["user", uid, "shops"]);
@@ -572,6 +572,16 @@ export const ProductsTable = ({
     );
   }
 
+  if (loading && rows.length === 0) {
+    return (
+      <FullPageLoader
+        title={t("products_title")}
+        subtitle={t("products_description")}
+        icon={Package}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 bg-background px-4 sm:px-6 py-4" data-testid="user_products_dataTable_root">
       <Toolbar
@@ -635,13 +645,7 @@ export const ProductsTable = ({
               })}
             </TableHeader>
         <TableBody>
-            {(loading && rows.length === 0) ? (
-              <>
-                {Array.from({ length: pagination.pageSize }).map((_, i) => (
-                  <LoadingSkeleton key={`loading-row-${i}`} />
-                ))}
-              </>
-            ) : table.getRowModel().rows?.length ? (
+            {table.getRowModel().rows?.length ? (
               (() => {
                 if (!enableVirtual) {
                   return table.getRowModel().rows.map((row) => (

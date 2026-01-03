@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
+import { FullPageLoader } from "@/components/LoadingSkeletons";
 interface UserProfile {
   id: string;
   email: string;
@@ -145,13 +146,10 @@ const AdminUserDetails = () => {
         .eq('user_id', id)
         .order('start_date', { ascending: false });
       
-      console.log('Subscription history query result:', { history, historyError });
-      
       if (historyError) {
         console.error('Subscription history error:', historyError);
         setSubscriptionHistory([]);
       } else if (history && history.length > 0) {
-        console.log('Found', history.length, 'subscriptions for user');
         // Load currencies for all subscriptions
         const historyWithCurrency = await Promise.all(
           history.map(async (sub: any) => {
@@ -180,10 +178,8 @@ const AdminUserDetails = () => {
             return sub;
           })
         );
-        console.log('Subscriptions with currency:', historyWithCurrency);
         setSubscriptionHistory(historyWithCurrency);
       } else {
-        console.log('No subscriptions found for user');
         setSubscriptionHistory([]);
       }
 
@@ -394,9 +390,13 @@ const AdminUserDetails = () => {
     return symbols[code] || code;
   };
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>;
+    return (
+      <FullPageLoader
+        title={t("loading") || "Завантаження…"}
+        subtitle={t("menu_users") || "Готуємо дані користувача"}
+        icon={TrendingUp}
+      />
+    );
   }
   if (!user) {
     return <div className="p-6">

@@ -69,7 +69,7 @@ export function StoresBadgeCell({ product, storeNames, storesList, prefetchStore
         setLinkedStoreIds([]);
       }
     }
-  }, [queryClient, product.id, storesList, storeNames, product.linkedStoreIds, prefetchStores]);
+  }, [queryClient, product.id, storesList, storeNames, product.linkedStoreIds, prefetchStores, uid]);
 
   useEffect(() => { if (open) loadStoresAndLinks(); }, [open, loadStoresAndLinks]);
   useEffect(() => { if (Array.isArray(storesList) && storesList.length > 0) setStores(storesList); }, [storesList]);

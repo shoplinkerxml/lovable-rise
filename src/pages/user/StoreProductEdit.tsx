@@ -367,6 +367,7 @@ export const StoreProductEdit = () => {
     pid,
     storeId,
     t,
+    uid,
     navigate,
     patchStoreProductsCached,
     queryClient,
