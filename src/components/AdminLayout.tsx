@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { useAdmin, AdminProvider } from '@/providers/admin-provider';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { AdminProvider } from '@/providers/admin-provider';
 import { useI18n } from "@/i18n";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -17,13 +17,16 @@ import AdminSidebar from '@/components/ResponsiveAdminSidebar';
 import ContentWorkspace from '@/components/ContentWorkspace';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { FullPageLoader, ProgressiveLoader } from "@/components/LoadingSkeletons";
 
 interface AdminLayoutInnerProps {
   children?: React.ReactNode;
   userProfile?: UserProfile | null;
+  contentBlocked: boolean;
+  contentLoader: { title: string; subtitle?: string; icon?: React.ComponentType<{ className?: string }> };
 }
 
-const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfile }) => {
+const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ userProfile, contentBlocked, contentLoader }) => {
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -135,7 +138,17 @@ const AdminLayoutInner: React.FC<AdminLayoutInnerProps> = ({ children, userProfi
         <main className="flex-1 overflow-y-auto bg-admin-page">
           <div className="p-4 md:p-6 min-h-full">
             <div className="bg-admin-content dark:bg-neutral-800 rounded-lg shadow-md min-h-[calc(100vh-8rem)]">
-              <ContentWorkspace />
+              {contentBlocked ? (
+                <ProgressiveLoader
+                  isLoading={true}
+                  delay={250}
+                  fallback={<FullPageLoader title={contentLoader.title} subtitle={contentLoader.subtitle} icon={contentLoader.icon} />}
+                >
+                  {null}
+                </ProgressiveLoader>
+              ) : (
+                <ContentWorkspace />
+              )}
             </div>
           </div>
         </main>
@@ -149,6 +162,10 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const outlet = useOutletContext<{
+    adminAuthLoading?: boolean;
+    adminAuthLoader?: { title: string; subtitle?: string; icon?: React.ComponentType<{ className?: string }> };
+  } | null>();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { t } = useI18n();
   const [profileLoading, setProfileLoading] = useState(true);
@@ -232,21 +249,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     loadUserProfile();
   }, []);
 
-  // Show loading state while profile is being fetched
-  if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-background dark:bg-neutral-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">{t("loading_admin_dashboard")}</p>
-        </div>
-      </div>
-    );
-  }
+  const contentBlocked = (outlet?.adminAuthLoading === true) || profileLoading;
+  const contentLoader = useMemo(() => {
+    if (outlet?.adminAuthLoading === true && outlet.adminAuthLoader) return outlet.adminAuthLoader;
+    return { title: t("loading_admin_dashboard"), subtitle: undefined };
+  }, [outlet?.adminAuthLoading, outlet?.adminAuthLoader, t]);
 
   return (
     <AdminProvider>
-      <AdminLayoutInner userProfile={userProfile}>
+      <AdminLayoutInner userProfile={userProfile} contentBlocked={contentBlocked} contentLoader={contentLoader}>
         {children}
       </AdminLayoutInner>
     </AdminProvider>

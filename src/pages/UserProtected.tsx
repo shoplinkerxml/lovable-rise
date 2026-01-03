@@ -1,12 +1,12 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useEffect, useMemo, useCallback, useRef } from "react";
+import { useEffect, useMemo, useCallback } from "react";
+import type { ComponentType } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProductService } from "@/lib/product-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
-import { FullPageLoader, ProgressiveLoader } from "@/components/LoadingSkeletons";
 import { CreditCard, LayoutDashboard, Loader2, Package, Store, Truck, User } from "lucide-react";
 import type { TariffLimit } from "@/lib/tariff-service";
 import type { UserMenuItem } from "@/lib/user-menu-service";
@@ -30,6 +30,12 @@ type SubscriptionState = {
 };
 
 type AuthMeData = Awaited<ReturnType<typeof UserAuthService.fetchAuthMe>>;
+
+type AuthLoaderMeta = {
+  title: string;
+  subtitle?: string;
+  icon?: ComponentType<{ className?: string }>;
+};
 
 const UserProtected = () => {
   const queryClient = useQueryClient();
@@ -218,7 +224,33 @@ const UserProtected = () => {
     void prefetchData();
   }, [authenticated, prefetchData]);
 
-  // Мемоизация context значения
+  const sessionPending = sessionQuery.data == null && (sessionQuery.isLoading || sessionIsFetching);
+  const authMePending = sessionValid && authMeQuery.data == null && (authMeQuery.isLoading || authMeQuery.isFetching);
+
+  const authLoading = sessionPending || authMePending;
+  const authLoader = useMemo<AuthLoaderMeta>(() => {
+    const path = location.pathname.toLowerCase();
+    if (path.startsWith("/user/dashboard") || path === "/user" || path === "/user/") {
+      return { title: "Завантаження панелі…", subtitle: "Готуємо дані кабінету", icon: LayoutDashboard };
+    }
+    if (path.startsWith("/user/products")) {
+      return { title: "Завантаження товарів…", subtitle: "Готуємо дані та форму", icon: Package };
+    }
+    if (path.startsWith("/user/shops")) {
+      return { title: "Завантаження магазинів…", subtitle: "Готуємо список та дані", icon: Store };
+    }
+    if (path.startsWith("/user/profile")) {
+      return { title: "Завантаження профілю…", subtitle: "Готуємо дані користувача", icon: User };
+    }
+    if (path.startsWith("/user/tariff")) {
+      return { title: "Завантаження тарифів…", subtitle: "Готуємо плани та обмеження", icon: CreditCard };
+    }
+    if (path.startsWith("/user/suppliers")) {
+      return { title: "Завантаження постачальників…", subtitle: "Готуємо список та дані", icon: Truck };
+    }
+    return { title: "Завантаження сторінки…", subtitle: "Готуємо дані", icon: Loader2 };
+  }, [location.pathname]);
+
   const contextValue = useMemo(() => ({
     hasAccess: subscriptionState.hasValidSubscription,
     user,
@@ -227,6 +259,8 @@ const UserProtected = () => {
     tariffLimits,
     menuItems: (Array.isArray(authMe?.menuItems) ? (authMe?.menuItems as UserMenuItem[]) : []),
     refresh,
+    authLoading,
+    authLoader,
   }), [
     subscriptionState,
     user,
@@ -234,56 +268,17 @@ const UserProtected = () => {
     tariffLimits,
     authMe?.menuItems,
     refresh,
+    authLoading,
+    authLoader,
   ]);
 
-  const sessionPending = sessionQuery.data == null && (sessionQuery.isLoading || sessionIsFetching);
-  const authMePending = sessionValid && authMeQuery.data == null && (authMeQuery.isLoading || authMeQuery.isFetching);
-
-  const authLoading = sessionPending || authMePending;
-  if (authLoading) {
-    const path = location.pathname.toLowerCase();
-    const cfg = (() => {
-      if (path.startsWith("/user/dashboard") || path === "/user" || path === "/user/") {
-        return { title: "Завантаження панелі…", subtitle: "Готуємо дані кабінету", icon: LayoutDashboard };
-      }
-      if (path.startsWith("/user/products")) {
-        return { title: "Завантаження товарів…", subtitle: "Готуємо дані та форму", icon: Package };
-      }
-      if (path.startsWith("/user/shops")) {
-        return { title: "Завантаження магазинів…", subtitle: "Готуємо список та дані", icon: Store };
-      }
-      if (path.startsWith("/user/profile")) {
-        return { title: "Завантаження профілю…", subtitle: "Готуємо дані користувача", icon: User };
-      }
-      if (path.startsWith("/user/tariff")) {
-        return { title: "Завантаження тарифів…", subtitle: "Готуємо плани та обмеження", icon: CreditCard };
-      }
-      if (path.startsWith("/user/suppliers")) {
-        return { title: "Завантаження постачальників…", subtitle: "Готуємо список та дані", icon: Truck };
-      }
-      return { title: "Завантаження сторінки…", subtitle: "Готуємо дані", icon: Loader2 };
-    })();
-
-    return (
-      <div data-testid="auth_loading">
-        <ProgressiveLoader
-          isLoading={true}
-          delay={250}
-          fallback={<FullPageLoader title={cfg.title} subtitle={cfg.subtitle} icon={cfg.icon} />}
-        >
-          {null}
-        </ProgressiveLoader>
-      </div>
-    );
-  }
-
   // Redirect to login if not authenticated
-  if (!authenticated) {
+  if (!authLoading && !authenticated) {
     return <Navigate to="/user-auth" replace />;
   }
 
   // Redirect admin/manager to admin interface
-  if (user && (user.role === 'admin' || user.role === 'manager')) {
+  if (!authLoading && user && (user.role === 'admin' || user.role === 'manager')) {
     return <Navigate to="/admin" replace />;
   }
 

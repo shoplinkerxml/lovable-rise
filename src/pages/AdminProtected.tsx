@@ -2,7 +2,6 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserAuthService } from "@/lib/user-auth-service";
-import { FullPageLoader, ProgressiveLoader } from "@/components/LoadingSkeletons";
 import { LayoutDashboard } from "lucide-react";
 
 const AdminProtected = () => {
@@ -62,13 +61,16 @@ const AdminProtected = () => {
 
   if (!ready) {
     return (
-      <ProgressiveLoader
-        isLoading={true}
-        delay={250}
-        fallback={<FullPageLoader title="Завантаження…" subtitle="Перевіряємо доступ адміністратора" icon={LayoutDashboard} />}
-      >
-        {null}
-      </ProgressiveLoader>
+      <Outlet
+        context={{
+          adminAuthLoading: true,
+          adminAuthLoader: {
+            title: "Завантаження…",
+            subtitle: "Перевіряємо доступ адміністратора",
+            icon: LayoutDashboard,
+          },
+        }}
+      />
     );
   }
 
@@ -81,7 +83,7 @@ const AdminProtected = () => {
     return <Navigate to="/user/dashboard" replace />;
   }
 
-  return <Outlet />;
+  return <Outlet context={{ adminAuthLoading: false }} />;
 };
 
 export default AdminProtected;

@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, useMemo, useCallback } from "react";
+import type { ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useNavigate, useLocation, useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MenuSection } from "@/components/user/MenuSection";
 import { MenuItemWithIcon } from "@/components/user/MenuItemWithIcon";
+import { FullPageLoader, ProgressiveLoader } from "@/components/LoadingSkeletons";
 import type { TariffLimit } from "@/lib/tariff-service";
 
 type SubscriptionEntity = {
@@ -31,6 +33,24 @@ type SubscriptionEntity = {
     duration_days?: number | null;
     is_lifetime?: boolean | null;
   };
+};
+
+type AuthLoaderMeta = {
+  title: string;
+  subtitle?: string;
+  icon?: ComponentType<{ className?: string }>;
+};
+
+type UserProtectedOutletContext = {
+  hasAccess: boolean;
+  user: UserProfile | null;
+  uiUserProfile: UIUserProfile | null;
+  subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null;
+  tariffLimits: TariffLimit[];
+  menuItems: UserMenuItem[];
+  refresh: () => Promise<void>;
+  authLoading?: boolean;
+  authLoader?: AuthLoaderMeta;
 };
 
 const STATIC_ROUTES: Record<string, Partial<UserMenuItem>> = {
@@ -258,7 +278,42 @@ const UserLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
-  const { hasAccess, user: ctxUser, uiUserProfile: ctxUiUserProfile, subscription, tariffLimits, menuItems: ctxMenuItems, refresh } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; menuItems: UserMenuItem[]; refresh: () => Promise<void> }>();
+  const outlet = useOutletContext<UserProtectedOutletContext | null>();
+  const hasAccess = outlet?.hasAccess ?? true;
+  const ctxUser = outlet?.user ?? null;
+  const ctxUiUserProfile = outlet?.uiUserProfile ?? null;
+  const subscription = outlet?.subscription ?? null;
+  const tariffLimits = outlet?.tariffLimits ?? [];
+  const ctxMenuItems = outlet?.menuItems ?? [];
+  const refresh = outlet?.refresh ?? (async () => {});
+  const authLoading = outlet?.authLoading === true;
+  const contentLoader = outlet?.authLoader ?? { title: "Завантаження…", subtitle: "Готуємо дані" };
+
+  const user: UserProfile = useMemo(() => {
+    return (
+      ctxUser ?? {
+        id: "loading",
+        email: "",
+        name: "…",
+        role: "user",
+        status: "active",
+        avatar_url: "",
+        created_at: "",
+        updated_at: "",
+      }
+    );
+  }, [ctxUser]);
+
+  const uiUserProfile: UIUserProfile = useMemo(() => {
+    return (
+      ctxUiUserProfile ?? {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        avatarUrl: user.avatar_url || "",
+      }
+    );
+  }, [ctxUiUserProfile, user.avatar_url, user.email, user.name, user.role]);
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate("/user-auth", { replace: true });
@@ -275,7 +330,7 @@ const UserLayout = () => {
   const toggleTheme = useCallback(() => {
     setTheme(theme === "light" ? "dark" : "light");
   }, [theme, setTheme]);
-  if (!ctxUser || !ctxUiUserProfile) {
+  if (!authLoading && !ctxUser) {
     return <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
@@ -283,8 +338,8 @@ const UserLayout = () => {
         </div>
       </div>;
   }
-  return <UserMenuProvider userId={ctxUser.id} hasAccess={hasAccess} menuItems={ctxMenuItems}>
-      <UserLayoutContent user={ctxUser} uiUserProfile={ctxUiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} />
+  return <UserMenuProvider userId={user.id} hasAccess={hasAccess} menuItems={ctxMenuItems}>
+      <UserLayoutContent user={user} uiUserProfile={uiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} refreshUserData={refresh} guardSubscription={subscription} guardTariffLimits={tariffLimits} contentBlocked={authLoading} contentLoader={contentLoader} />
     </UserMenuProvider>;
 };
 const UserLayoutContent = ({
@@ -301,7 +356,12 @@ const UserLayoutContent = ({
   profileSheetOpen,
   setProfileSheetOpen,
   handleProfileNavigation,
-  handleLogout
+  handleLogout,
+  refreshUserData,
+  guardSubscription,
+  guardTariffLimits,
+  contentBlocked,
+  contentLoader
 }: {
   user: UserProfile;
   uiUserProfile: UIUserProfile;
@@ -317,6 +377,11 @@ const UserLayoutContent = ({
   setProfileSheetOpen: (open: boolean) => void;
   handleProfileNavigation: (path: string) => void;
   handleLogout: () => void;
+  refreshUserData: () => Promise<void>;
+  guardSubscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null;
+  guardTariffLimits: TariffLimit[];
+  contentBlocked: boolean;
+  contentLoader: AuthLoaderMeta;
 }) => {
   const {
     menuItems,
@@ -326,7 +391,6 @@ const UserLayoutContent = ({
     refreshMenuItems,
     hasAccess
   } = useUserMenu();
-  const { refresh: refreshUserData, subscription: guardSubscription, tariffLimits: guardTariffLimits } = useOutletContext<{ hasAccess: boolean; user: UserProfile; uiUserProfile: UIUserProfile; subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null; tariffLimits: TariffLimit[]; refresh: () => Promise<void> }>();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -341,6 +405,7 @@ const UserLayoutContent = ({
   }, [setSidebarCollapsed]);
 
   useEffect(() => {
+    if (contentBlocked) return;
     const hasValid = guardSubscription?.hasValidSubscription ?? true;
     const path = location.pathname.toLowerCase();
     const isTariffPage = path.startsWith("/user/tariff");
@@ -352,7 +417,7 @@ const UserLayoutContent = ({
     if (!hasValid && !isTariffPage && !isDashboardPage && !isShopsPage) {
       navigate("/user/tariff", { replace: true });
     }
-  }, [guardSubscription?.hasValidSubscription, location.pathname, navigate]);
+  }, [contentBlocked, guardSubscription?.hasValidSubscription, location.pathname, navigate]);
 
   const staticMenuItems = useMemo<UserMenuItem[]>(() => {
     const existingPaths = new Set(
@@ -626,14 +691,24 @@ const UserLayoutContent = ({
         {/* Content - Scrollable */}
         <main className="flex-1 overflow-y-auto bg-background dark:bg-neutral-950">
           <div className="h-full">
-            <Outlet context={{
-            user,
-            menuItems,
-            onMenuUpdate: refreshMenuItems,
-            refetch: refreshUserData,
-            subscription: guardSubscription,
-            tariffLimits: guardTariffLimits
-          }} />
+            {contentBlocked ? (
+              <ProgressiveLoader
+                isLoading={true}
+                delay={250}
+                fallback={<FullPageLoader title={contentLoader.title} subtitle={contentLoader.subtitle} icon={contentLoader.icon} />}
+              >
+                {null}
+              </ProgressiveLoader>
+            ) : (
+              <Outlet context={{
+                user,
+                menuItems,
+                onMenuUpdate: refreshMenuItems,
+                refetch: refreshUserData,
+                subscription: guardSubscription,
+                tariffLimits: guardTariffLimits
+              }} />
+            )}
           </div>
         </main>
       </div>
