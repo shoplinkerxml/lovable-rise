@@ -14,6 +14,7 @@ export function useImageActions(
   reload: () => Promise<void>,
   uploadFromUrl: (url: string) => Promise<Uploaded>,
   uploadFile: (file: File) => Promise<Uploaded>,
+  uploadFiles: ((files: File[]) => Promise<Array<PromiseSettledResult<Uploaded>>>) | undefined,
   removeImage: (index: number) => Promise<void>,
   setMainImage: (index: number) => Promise<void>,
   reorderImages: (list: ProductImage[]) => Promise<void>,
@@ -57,11 +58,35 @@ export function useImageActions(
     }
   }, [images, addImages, reload, uploadFile]);
 
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<{ ok: boolean; errorCode?: string }> => {
-    const file = event.target.files?.[0];
-    if (!file) return { ok: false, errorCode: 'no_file' };
-    return uploadFileDirect(file);
-  }, [uploadFileDirect]);
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<{ ok: boolean; errorCode?: string; uploadedCount?: number; failedCount?: number }> => {
+    const files = Array.from(event.target.files || []).filter(Boolean);
+    event.target.value = '';
+    if (files.length === 0) return { ok: false, errorCode: 'no_file' };
+
+    try {
+      const baseIndex = images.length;
+      const settled = uploadFiles ? await uploadFiles(files) : await Promise.allSettled(files.map((f) => uploadFile(f)));
+      const fulfilled: Uploaded[] = settled
+        .filter((r): r is PromiseFulfilledResult<Uploaded> => r.status === 'fulfilled')
+        .map((r) => r.value);
+      const failedCount = settled.length - fulfilled.length;
+      if (fulfilled.length > 0) {
+        const newImages: ProductImage[] = fulfilled.map((u, i) => ({
+          url: u.url,
+          order_index: baseIndex + i,
+          is_main: baseIndex === 0 && i === 0,
+          object_key: u.object_key,
+        }));
+        addImages(newImages);
+        await reload();
+      }
+      if (fulfilled.length === 0) return { ok: false, errorCode: 'failed_upload', uploadedCount: 0, failedCount };
+      return { ok: failedCount === 0, errorCode: failedCount ? 'failed_upload' : undefined, uploadedCount: fulfilled.length, failedCount };
+    } catch (e: any) {
+      const code = e?.code as string | undefined;
+      return { ok: false, errorCode: code || 'unknown' };
+    }
+  }, [addImages, images.length, reload, uploadFile, uploadFiles]);
 
   const removeImageWithR2 = useCallback(async (index: number): Promise<{ ok: boolean; errorCode?: string }> => {
     const target = images[index];

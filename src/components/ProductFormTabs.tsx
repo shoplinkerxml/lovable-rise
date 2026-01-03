@@ -95,7 +95,7 @@ export function ProductFormTabs({
     uploadFromUrl: uploadState.uploadFromUrl,
     reload,
   });
-  const imageActions = useImageActions(pid, images, addImagesHook, reload, uploadState.uploadFromUrl, uploadState.uploadFile, removeImageHook, setMainImageHook, reorderImages);
+  const imageActions = useImageActions(pid, images, addImagesHook, reload, uploadState.uploadFromUrl, uploadState.uploadFile, uploadState.uploadFiles, removeImageHook, setMainImageHook, reorderImages);
   const { updateDimensions, getGalleryAdaptiveImageStyle } = useImageDimensions();
   // removed unused maxContainerSize state
   // Refs for cleanup lifecycle

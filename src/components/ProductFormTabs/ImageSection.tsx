@@ -407,7 +407,7 @@ export function ImageSection(props: Props) {
       )}
 
       {props.readOnly ? null : (
-        <input type="file" accept="image/*,.avif,image/avif" onChange={props.onFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
+        <input type="file" accept="image/*,.avif,image/avif" multiple onChange={props.onFileUpload} className="hidden" id="fileUpload" data-testid="productFormTabs_fileInput" />
       )}
 
       <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
