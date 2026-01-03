@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,32 @@ import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 import { useQuery } from "@tanstack/react-query";
 import { FullPageLoader } from "@/components/LoadingSkeletons";
 
+const SYMBOL_BY_CURRENCY: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+  UAH: "₴",
+};
+
+function getTariffCurrencyCode(tariff: TariffWithDetails): string {
+  const code = (tariff.currency_data as any)?.code ?? (tariff as any)?.currency_code;
+  return typeof code === "string" && code.trim() ? code.trim().toUpperCase() : "USD";
+}
+
+function formatMoneyNumber(value: number, currencyCode: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+    })
+      .format(value)
+      .replace(/^[^\d]*/, "");
+  } catch {
+    return Number.isFinite(value) ? String(value) : "";
+  }
+}
+
 const TariffPage = () => {
   const { t } = useI18n();
   const breadcrumbs = useBreadcrumbs();
@@ -54,7 +80,12 @@ const TariffPage = () => {
   
   const [activeTariffId, setActiveTariffId] = useState<number | null>(null);
 
-  const { data: tariffsData, isLoading } = useQuery<TariffWithDetails[]>({
+  const {
+    data: tariffsData,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<TariffWithDetails[]>({
     queryKey: ["tariffs", "list"],
     queryFn: async () => {
       return await TariffService.getTariffsAggregated(false);
@@ -67,11 +98,35 @@ const TariffPage = () => {
     placeholderData: (prev) => prev as TariffWithDetails[] | undefined,
   });
 
-  const normalizedTariffs: TariffWithDetails[] = Array.isArray(tariffsData) ? tariffsData : [];
-  const visibleTariffs: TariffWithDetails[] = normalizedTariffs.filter((t) => {
-    const name = String(t.name || '').toLowerCase();
-    return !(name.includes('демо') || name.includes('demo'));
-  });
+  useEffect(() => {
+    if (!isError) return;
+    const msg = String((error as any)?.message || "").trim();
+    toast.error(msg ? msg : t("failed_load_currencies"));
+  }, [error, isError, t]);
+
+  const normalizedTariffs: TariffWithDetails[] = useMemo(() => {
+    if (!Array.isArray(tariffsData)) return [];
+    return tariffsData.map((row) => {
+      const anyRow = row as any;
+      const features = Array.isArray(anyRow?.features) ? anyRow.features : [];
+      const limits = Array.isArray(anyRow?.limits) ? anyRow.limits : [];
+      const currencyData = anyRow?.currency_data ?? null;
+      return {
+        ...row,
+        name: String((row as any)?.name || ""),
+        features,
+        limits,
+        currency_data: currencyData,
+      } as TariffWithDetails;
+    });
+  }, [tariffsData]);
+
+  const visibleTariffs: TariffWithDetails[] = useMemo(() => {
+    return normalizedTariffs.filter((t) => {
+      const name = String((t as any)?.name || "").toLowerCase();
+      return !(name.includes("демо") || name.includes("demo"));
+    });
+  }, [normalizedTariffs]);
 
   type SubscriptionEntity = { tariff_id?: number; end_date?: string | null; is_active?: boolean | null };
   const { subscription: subscriptionCtx } = useOutletContext<{ subscription: { hasValidSubscription: boolean; subscription: SubscriptionEntity | null; isDemo: boolean } | null }>();
@@ -173,6 +228,22 @@ const TariffPage = () => {
       />
     );
   }
+  if (isError) {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <PageHeader
+          title={t("menu_pricing")}
+          description={t("choose_your_plan_description")}
+          breadcrumbItems={breadcrumbs}
+        />
+        <Card>
+          <CardContent className="p-6 text-muted-foreground">
+            {t("failed_load_currencies")}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -189,6 +260,10 @@ const TariffPage = () => {
           </div>
         ) : visibleTariffs.map((tariff: TariffWithDetails) => {
           const isPopular = tariff.popular === true;
+          const currencyCode = getTariffCurrencyCode(tariff);
+          const currencySymbol = SYMBOL_BY_CURRENCY[currencyCode] || "$";
+          const features = Array.isArray((tariff as any).features) ? (tariff as any).features : [];
+          const limits = Array.isArray((tariff as any).limits) ? (tariff as any).limits : [];
           return (
             <Card 
               key={tariff.id} 
@@ -227,16 +302,9 @@ const TariffPage = () => {
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg text-muted-foreground line-through flex items-baseline gap-1">
                           <span className="text-base">
-                            {tariff.currency_data?.code === 'USD' ? '$' : 
-                             tariff.currency_data?.code === 'EUR' ? '€' : 
-                             tariff.currency_data?.code === 'GBP' ? '£' : 
-                             tariff.currency_data?.code === 'JPY' ? '¥' : 
-                             tariff.currency_data?.code === 'UAH' ? '₴' : '$'}
+                            {currencySymbol}
                           </span>
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: tariff.currency_data.code,
-                          }).format(tariff.old_price).replace(/^[^\d]*/, '')}
+                          {formatMoneyNumber(tariff.old_price, currencyCode)}
                         </span>
                       </div>
                       
@@ -252,19 +320,12 @@ const TariffPage = () => {
                   {/* New Price */}
                   <div className="flex flex-wrap items-baseline gap-1 mb-1">
                     <span className="text-2xl sm:text-3xl font-bold" style={{ color: '#069668' }}>
-                      {tariff.currency_data?.code === 'USD' ? '$' : 
-                       tariff.currency_data?.code === 'EUR' ? '€' : 
-                       tariff.currency_data?.code === 'GBP' ? '£' : 
-                       tariff.currency_data?.code === 'JPY' ? '¥' : 
-                       tariff.currency_data?.code === 'UAH' ? '₴' : '$'}
+                      {currencySymbol}
                     </span>
                     {tariff.new_price !== null && tariff.currency_data ? (
                       <>
                         <span className="text-3xl sm:text-4xl font-bold" style={{ color: '#069668' }}>
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: tariff.currency_data.code,
-                          }).format(tariff.new_price).replace(/^[^\d]*/, '')}
+                          {formatMoneyNumber(tariff.new_price, currencyCode)}
                         </span>
                         {!tariff.is_lifetime && !tariff.is_free && (
                           <span className="text-sm sm:text-base text-muted-foreground ml-1">
@@ -299,8 +360,8 @@ const TariffPage = () => {
                       {t('features') || 'Features'}
                     </h4>
                     <div className="space-y-2">
-                      {tariff.features.length > 0 ? (
-                        tariff.features.slice(0, 5).map((feature: TariffWithDetails['features'][number]) => {
+                      {features.length > 0 ? (
+                        features.slice(0, 5).map((feature: TariffWithDetails["features"][number]) => {
                           const IconComponent = getFeatureIcon(feature.feature_name);
                           return (
                             <div key={feature.id} className="flex items-start gap-2">
@@ -331,17 +392,17 @@ const TariffPage = () => {
                       {t('limits') || 'Limits'}
                     </h4>
                     <div className="space-y-2">
-                      {tariff.limits.length > 0 ? (
-                        tariff.limits.map((limit: TariffWithDetails['limits'][number]) => {
-                          const IconComponent = getLimitIcon(limit.limit_name);
+                      {limits.length > 0 ? (
+                        limits.map((limit: TariffWithDetails["limits"][number]) => {
+                          const IconComponent = getLimitIcon(String((limit as any)?.limit_name || ""));
                           return (
                             <div key={limit.id} className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                <span className="text-sm">{limit.limit_name}</span>
+                                <span className="text-sm">{String((limit as any)?.limit_name || "")}</span>
                               </div>
                               <Badge variant="outline" className="font-semibold">
-                                {limit.value}
+                                {String((limit as any)?.value ?? "")}
                               </Badge>
                             </div>
                           );

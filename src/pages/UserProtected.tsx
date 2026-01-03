@@ -6,7 +6,7 @@ import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
-import { FullPageLoader } from "@/components/LoadingSkeletons";
+import { FullPageLoader, ProgressiveLoader } from "@/components/LoadingSkeletons";
 import { CreditCard, LayoutDashboard, Loader2, Package, Store, Truck, User } from "lucide-react";
 import type { TariffLimit } from "@/lib/tariff-service";
 import type { UserMenuItem } from "@/lib/user-menu-service";
@@ -266,7 +266,13 @@ const UserProtected = () => {
 
     return (
       <div data-testid="auth_loading">
-        <FullPageLoader title={cfg.title} subtitle={cfg.subtitle} icon={cfg.icon} />
+        <ProgressiveLoader
+          isLoading={true}
+          delay={250}
+          fallback={<FullPageLoader title={cfg.title} subtitle={cfg.subtitle} icon={cfg.icon} />}
+        >
+          {null}
+        </ProgressiveLoader>
       </div>
     );
   }
