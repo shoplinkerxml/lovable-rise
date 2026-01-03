@@ -146,7 +146,17 @@ const UserProtected = () => {
   const checkSubscriptionValidity = useCallback((sub: SubscriptionEntity | null): boolean => {
     if (!sub) return false;
     if (sub.is_active === false) return false;
-    return true;
+    if (sub.tariffs?.is_lifetime === true) return true;
+    const rawEndDate = typeof sub.end_date === "string" ? sub.end_date.trim() : "";
+    if (!rawEndDate) return true;
+    const parsedEndDate = (() => {
+      const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(rawEndDate);
+      const value = dateOnly ? `${rawEndDate}T23:59:59.999` : rawEndDate;
+      const d = new Date(value);
+      return Number.isFinite(d.getTime()) ? d : null;
+    })();
+    if (!parsedEndDate) return true;
+    return parsedEndDate.getTime() >= Date.now();
   }, []);
 
   const authenticated = sessionValid && !!user;
