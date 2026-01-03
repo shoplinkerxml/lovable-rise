@@ -55,6 +55,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/query-sync-storage-persister": "^5.90.14",
+    "@tanstack/react-virtual": "^3.13.12",
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-query-persist-client": "^5.90.14",
     "@tanstack/react-table": "^8.21.3",

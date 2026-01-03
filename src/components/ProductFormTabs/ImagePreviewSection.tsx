@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { ProductPlaceholder } from '@/components/ProductPlaceholder'
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
 import { R2Storage } from '@/lib/r2-storage'
@@ -31,6 +32,24 @@ type Props = {
 }
 
 export default function ImagePreviewSection(props: Props) {
+  const isVirtualThumbs = props.images.length > 40
+  const thumbsParentRef = React.useRef<HTMLDivElement>(null)
+  const thumbSizeRem = props.getThumbSizeRem(props.isLargeScreen)
+  const thumbsVirtualizer = useVirtualizer({
+    count: props.images.length,
+    getScrollElement: () => thumbsParentRef.current,
+    estimateSize: () => Math.round(thumbSizeRem * 16) + 16,
+    horizontal: true,
+    overscan: 6,
+  })
+
+  React.useEffect(() => {
+    if (!isVirtualThumbs) return
+    try {
+      thumbsVirtualizer.scrollToIndex(props.activeIndex, { align: 'center' })
+    } catch {}
+  }, [isVirtualThumbs, props.activeIndex, thumbsVirtualizer])
+
   return (
     <div className="mx-auto w-full space-y-3 md:space-y-4" style={{ maxWidth: `calc(${props.getMainAdaptiveImageStyle().width} + clamp(0.5rem, 2vw, 1rem))` }}>
       {props.images.length > 0 ? (
@@ -90,43 +109,109 @@ export default function ImagePreviewSection(props: Props) {
             </Card>
           </div>
           <div className="relative w-full">
-            <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
-              <CarouselContent className="-ml-2 mr-2">
-                {props.images.map((image, index) => (
-                  <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${props.getThumbSizeRem(props.isLargeScreen)}rem` }}>
-                    <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)}>
-                      <CardContent className="p-2">
-                        <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
-                          {(() => {
-                            const original = image.url || ''
-                            const isVid = isVideoUrl(original)
-                            const src = isVid ? getImageUrl(original) : getImageUrl(original)
-                            if (!src) return null
-                            if (isVid) {
-                              return (
-                                <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
-                              )
-                            }
-                            return (
-                              <img
-                                ref={(el) => (props.galleryImgRefs.current[index] = el)}
-                                src={src}
-                                loading="lazy"
-                                decoding="async"
-                                alt={image.alt_text || `Превью ${index + 1}`}
-                                className="w-full h-full object-contain"
-                                onLoad={(e) => props.onGalleryImageLoad(e, index)}
-                                onError={(e) => props.onGalleryImageError(e, index)}
-                              />
-                            )
-                          })()}
+            {isVirtualThumbs ? (
+              <div
+                ref={thumbsParentRef}
+                className="w-full overflow-x-auto overflow-y-hidden"
+                style={{ height: Math.round(thumbSizeRem * 16) + 32 }}
+              >
+                <div
+                  style={{
+                    width: thumbsVirtualizer.getTotalSize(),
+                    height: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {thumbsVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const index = virtualItem.index
+                    const image = props.images[index]
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          transform: `translateX(${virtualItem.start}px)`,
+                          width: virtualItem.size,
+                          height: '100%',
+                        }}
+                      >
+                        <div className="h-full flex items-center pl-2">
+                          <Card className="relative group cursor-pointer transition-all border-0 shadow-none" onClick={() => props.onSelectIndex(index)}>
+                            <CardContent className="p-2">
+                              <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
+                                {(() => {
+                                  const original = image.url || ''
+                                  const isVid = isVideoUrl(original)
+                                  const src = isVid ? getImageUrl(original) : getImageUrl(original)
+                                  if (!src) return null
+                                  if (isVid) {
+                                    return (
+                                      <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+                                    )
+                                  }
+                                  return (
+                                    <img
+                                      ref={(el) => (props.galleryImgRefs.current[index] = el)}
+                                      src={src}
+                                      loading="lazy"
+                                      decoding="async"
+                                      alt={image.alt_text || `Превью ${index + 1}`}
+                                      className="w-full h-full object-contain"
+                                      onLoad={(e) => props.onGalleryImageLoad(e, index)}
+                                      onError={(e) => props.onGalleryImageError(e, index)}
+                                    />
+                                  )
+                                })()}
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <Carousel className="w-full" opts={{ align: 'start', dragFree: true }}>
+                <CarouselContent className="-ml-2 mr-2">
+                  {props.images.map((image, index) => (
+                    <CarouselItem key={index} className="pl-2" style={{ flex: `0 0 ${props.getThumbSizeRem(props.isLargeScreen)}rem` }}>
+                      <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)}>
+                        <CardContent className="p-2">
+                          <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
+                            {(() => {
+                              const original = image.url || ''
+                              const isVid = isVideoUrl(original)
+                              const src = isVid ? getImageUrl(original) : getImageUrl(original)
+                              if (!src) return null
+                              if (isVid) {
+                                return (
+                                  <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+                                )
+                              }
+                              return (
+                                <img
+                                  ref={(el) => (props.galleryImgRefs.current[index] = el)}
+                                  src={src}
+                                  loading="lazy"
+                                  decoding="async"
+                                  alt={image.alt_text || `Превью ${index + 1}`}
+                                  className="w-full h-full object-contain"
+                                  onLoad={(e) => props.onGalleryImageLoad(e, index)}
+                                  onError={(e) => props.onGalleryImageError(e, index)}
+                                />
+                              )
+                            })()}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+              </Carousel>
+            )}
           </div>
         </div>
       ) : (

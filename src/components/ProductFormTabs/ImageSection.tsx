@@ -15,7 +15,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DialogDescription } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { FixedSizeList as List } from 'react-window'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ProductImage } from './types'
 
 type Props = {
@@ -63,6 +63,15 @@ export function ImageSection(props: Props) {
     fallbackUrl: activeUrl,
   })
   const [isLarge, setIsLarge] = React.useState(false)
+  const isVirtualThumbs = props.images.length > 50
+  const thumbsParentRef = React.useRef<HTMLDivElement>(null)
+  const thumbsVirtualizer = useVirtualizer({
+    count: props.images.length,
+    getScrollElement: () => thumbsParentRef.current,
+    estimateSize: () => (isLarge ? 80 : 64) + 8,
+    horizontal: true,
+    overscan: 6,
+  })
   React.useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
     const h = (e: MediaQueryListEvent | MediaQueryList) => {
@@ -74,13 +83,19 @@ export function ImageSection(props: Props) {
     return () => mq.removeEventListener('change', h)
   }, [])
   React.useEffect(() => {
+    if (isVirtualThumbs) {
+      try {
+        thumbsVirtualizer.scrollToIndex(props.activeIndex, { align: 'center' })
+      } catch {}
+      return
+    }
     const el = props.galleryImgRefs.current[props.activeIndex];
     if (el && typeof el.scrollIntoView === 'function') {
       try {
         el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       } catch {}
     }
-  }, [props.activeIndex, props.galleryImgRefs]);
+  }, [isVirtualThumbs, props.activeIndex, props.galleryImgRefs, thumbsVirtualizer]);
   const getThumbFlexBasis = (count: number): string => {
     if (count <= 4) return '25%'
     if (count === 5) return '20%'
@@ -298,23 +313,49 @@ export function ImageSection(props: Props) {
           <>
           <div className="relative w-full">
             {props.images.length > 50 ? (
-              <List
-                height={isLarge ? 100 : 92}
-                itemCount={props.images.length}
-                itemSize={isLarge ? 80 : 64}
-                width={'100%'}
-                layout="horizontal"
+              <div
+                ref={thumbsParentRef}
+                className="w-full overflow-x-auto overflow-y-hidden"
+                style={{ height: isLarge ? 100 : 92 }}
               >
-                {({ index, style }) => (
-                  <div style={{ ...style, paddingLeft: '0.5rem' }}>
-                    <Card className={`relative group cursor-pointer transition-all border-0 shadow-none`} onClick={() => props.onSelectIndex(index)} data-testid={`productFormTabs_imageCard_${index}`}>
-                      <CardContent className="p-2">
-                        <Thumb image={props.images[index]} index={index} />
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </List>
+                <div
+                  style={{
+                    width: thumbsVirtualizer.getTotalSize(),
+                    height: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {thumbsVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const index = virtualItem.index
+                    const image = props.images[index]
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          transform: `translateX(${virtualItem.start}px)`,
+                          width: virtualItem.size,
+                          height: '100%',
+                        }}
+                      >
+                        <div className="h-full flex items-center pl-2">
+                          <Card
+                            className="relative group cursor-pointer transition-all border-0 shadow-none"
+                            onClick={() => props.onSelectIndex(index)}
+                            data-testid={`productFormTabs_imageCard_${index}`}
+                          >
+                            <CardContent className="p-2">
+                              <Thumb image={image} index={index} />
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             ) : (
               <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                 <SortableContext items={props.images.map((im, idx) => String(im.object_key || im.url || idx))} strategy={horizontalListSortingStrategy}>
