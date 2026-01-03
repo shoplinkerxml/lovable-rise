@@ -51,6 +51,56 @@ export class SessionValidator {
   private static refreshInFlight: Promise<SessionValidationResult> | null = null;
   private static epoch = 0;
 
+  private static purgeAuthStorage(): void {
+    try {
+      if (typeof window === "undefined") return;
+      const storages: Storage[] = [];
+      try {
+        storages.push(window.localStorage);
+      } catch {
+        void 0;
+      }
+      try {
+        storages.push(window.sessionStorage);
+      } catch {
+        void 0;
+      }
+      for (const s of storages) {
+        try {
+          s.removeItem("supabase.auth.token");
+        } catch {
+          void 0;
+        }
+        try {
+          const urlObj = new URL(SUPABASE_URL);
+          const projectRef = urlObj.host.split(".")[0];
+          s.removeItem(`sb-${projectRef}-auth-token`);
+        } catch {
+          void 0;
+        }
+        try {
+          const keys: string[] = [];
+          for (let i = 0; i < s.length; i++) {
+            const k = s.key(i);
+            if (!k) continue;
+            if (k.startsWith("sb-") && k.endsWith("-auth-token")) keys.push(k);
+          }
+          for (const k of keys) {
+            try {
+              s.removeItem(k);
+            } catch {
+              void 0;
+            }
+          }
+        } catch {
+          void 0;
+        }
+      }
+    } catch {
+      void 0;
+    }
+  }
+
   static clearCache(): void {
     this.epoch += 1;
     this.cache = null;
@@ -320,6 +370,7 @@ export class SessionValidator {
             } catch {
               void 0;
             } finally {
+              this.purgeAuthStorage();
               this.clearCache();
             }
             return {
@@ -353,6 +404,7 @@ export class SessionValidator {
               } catch {
                 void 0;
               } finally {
+                this.purgeAuthStorage();
                 this.clearCache();
               }
               return {

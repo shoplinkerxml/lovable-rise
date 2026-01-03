@@ -54,5 +54,11 @@ export default tseslint.config(
     rules: {
       "react-refresh/only-export-components": "off",
     },
+  },
+  {
+    files: ["src/components/user/products/ProductsTable/context.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
   }
 );

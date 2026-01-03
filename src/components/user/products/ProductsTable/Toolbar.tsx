@@ -9,6 +9,7 @@ import type { Table as TanTable } from "@tanstack/react-table";
 import type { ProductRow } from "./columns";
 import type { ShopAggregated } from "@/lib/shop-service";
 import { useSyncStatus } from "@/lib/optimistic-mutation";
+import { useProductsTableContext } from "./context";
 
 const ViewOptionsMenuLazy = React.lazy(() => import("./ViewOptionsMenu").then((m) => ({ default: m.ViewOptionsMenu })));
 const AddToStoresMenuLazy = React.lazy(() => import("./AddToStoresMenu").then((m) => ({ default: m.AddToStoresMenu })));
@@ -243,5 +244,69 @@ export function Toolbar({
         </div>
       </TooltipProvider>
     </div>
+  );
+}
+
+export function ToolbarFromContext() {
+  const {
+    t,
+    table,
+    storeId,
+    onCreateNew,
+    onEdit,
+    canCreate,
+    hideDuplicate,
+    setDeleteDialog,
+    handleDuplicate,
+    duplicating,
+    storesMenuOpen,
+    setStoresMenuOpen,
+    loadStoresForMenu,
+    stores,
+    setStores,
+    selectedStoreIds,
+    setSelectedStoreIds,
+    items,
+    removingStores,
+    setRemovingStores,
+    removingStoreId,
+    setRemovingStoreId,
+    queryClient,
+    addingStores,
+    setAddingStores,
+    setProductsCached,
+    loading,
+  } = useProductsTableContext();
+
+  return (
+    <Toolbar
+      t={t}
+      table={table}
+      storeId={storeId}
+      onCreateNew={onCreateNew}
+      onEdit={onEdit}
+      canCreate={canCreate}
+      hideDuplicate={hideDuplicate}
+      setDeleteDialog={setDeleteDialog}
+      handleDuplicate={handleDuplicate}
+      duplicating={duplicating}
+      storesMenuOpen={storesMenuOpen}
+      setStoresMenuOpen={setStoresMenuOpen}
+      loadStoresForMenu={loadStoresForMenu}
+      stores={stores}
+      setStores={setStores}
+      selectedStoreIds={selectedStoreIds}
+      setSelectedStoreIds={setSelectedStoreIds}
+      items={items}
+      removingStores={removingStores}
+      setRemovingStores={setRemovingStores}
+      removingStoreId={removingStoreId}
+      setRemovingStoreId={setRemovingStoreId}
+      queryClient={queryClient}
+      addingStores={addingStores}
+      setAddingStores={setAddingStores}
+      setProductsCached={setProductsCached}
+      loading={loading}
+    />
   );
 }

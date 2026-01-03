@@ -223,7 +223,7 @@ export const ShopDetail = () => {
           }
         />
 
-        <div className="bg-background border rounded-md">
+        <div className="bg-background rounded-md">
           {productsCount === 0 ? (
             <div className="p-6">
               <Empty>

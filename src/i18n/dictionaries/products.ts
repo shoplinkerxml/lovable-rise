@@ -61,6 +61,14 @@ export const productsDictionary: Dictionary = {
     uk: "Йде видалення товарів…",
     en: "Deleting products…",
   },
+  delete_product_confirm: {
+    uk: "Підтвердити видалення товару",
+    en: "Confirm product deletion",
+  },
+  failed_delete_product: {
+    uk: "Не вдалося видалити товар",
+    en: "Failed to delete product",
+  },
   product_tab_main: { uk: "Основні дані", en: "Main Data" },
   product_tab_description: { uk: "Опис", en: "Description" },
   product_tab_images: { uk: "Зображення", en: "Images" },

@@ -16,7 +16,7 @@ export function CopyProgressDialog({ open, name, t }: { open: boolean; name: str
       <DialogNoOverlayContent
         position="top-right"
         variant="info"
-        className="p-4 w-[min(24rem,92vw)]"
+        className="p-4 w-[min(24rem,92vw)] border-0"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         data-testid="user_products_copy_progress"
@@ -43,7 +43,7 @@ export function DeleteProgressDialog({ open, t }: { open: boolean; t: (k: string
       <DialogNoOverlayContent
         position="top-right"
         variant="info"
-        className="p-4 w-[min(24rem,92vw)]"
+        className="p-4 w-[min(24rem,92vw)] border-0"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         data-testid="user_products_delete_progress"

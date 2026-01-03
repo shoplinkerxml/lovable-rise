@@ -159,6 +159,100 @@ function toProductExportRow(args: {
   return row;
 }
 
+function indexBaseProducts(baseProducts: ProductAggregated[]): { ids: string[]; byId: Map<string, ProductAggregated> } {
+  const base = Array.isArray(baseProducts) ? baseProducts : [];
+  const byId = new Map<string, ProductAggregated>();
+  for (const p of base) {
+    if (!p?.id) continue;
+    byId.set(String(p.id), p);
+  }
+  return { ids: Array.from(byId.keys()), byId };
+}
+
+function buildLookupsMaps(lookups: any): {
+  suppliersById: Map<string, string>;
+  categoriesById: Map<string, string>;
+  catsMap: Record<string, unknown>;
+} {
+  const suppliersById = new Map<string, string>();
+  for (const s of (lookups?.suppliers || []) as any[]) {
+    const sid = String((s as any)?.id || "").trim();
+    if (!sid) continue;
+    suppliersById.set(sid, String((s as any)?.supplier_name || ""));
+  }
+
+  const categoriesById = new Map<string, string>();
+  const catsMap = (lookups?.supplierCategoriesMap || {}) as Record<string, unknown>;
+  for (const supplierId of Object.keys(catsMap)) {
+    const arr = Array.isArray((catsMap as any)[supplierId]) ? ((catsMap as any)[supplierId] as any[]) : [];
+    for (const c of arr) {
+      const cid = String((c as any)?.id || "").trim();
+      if (!cid) continue;
+      categoriesById.set(cid, String((c as any)?.name || ""));
+    }
+  }
+
+  return { suppliersById, categoriesById, catsMap };
+}
+
+async function loadDetailsById(
+  ids: string[],
+  storeId?: string | null,
+): Promise<Map<string, { product: Product; images: ProductImage[]; params: ProductParam[] }>> {
+  const items = await ProductImportExportService.getProductsEditDataBatch(ids, storeId ? String(storeId) : undefined);
+  const byDetailId = new Map<string, { product: Product; images: ProductImage[]; params: ProductParam[] }>();
+  for (const it of items || []) {
+    const pid = String(it?.product?.id || "");
+    if (!pid) continue;
+    byDetailId.set(pid, { product: it.product, images: it.images || [], params: it.params || [] });
+  }
+  return byDetailId;
+}
+
+function getMaxParams(ids: string[], byDetailId: Map<string, { params: ProductParam[] }>): number {
+  let maxParams = 0;
+  for (const id of ids) {
+    const d = byDetailId.get(String(id));
+    const cnt = Array.isArray(d?.params) ? d.params.length : 0;
+    if (cnt > maxParams) maxParams = cnt;
+  }
+  return maxParams;
+}
+
+function buildLookupsRows(lookups: any, catsMap: Record<string, unknown>): LookupsExportRow[] {
+  const lookupsRows: LookupsExportRow[] = [];
+  for (const s of (lookups?.suppliers || []) as any[]) {
+    lookupsRows.push({
+      type: "supplier",
+      id: String((s as any)?.id || ""),
+      name: String((s as any)?.supplier_name || ""),
+      external_id: "",
+      supplier_id: "",
+    });
+  }
+  for (const supplierId of Object.keys(catsMap)) {
+    const arr = Array.isArray((catsMap as any)[supplierId]) ? ((catsMap as any)[supplierId] as any[]) : [];
+    for (const c of arr) {
+      lookupsRows.push({
+        type: "category",
+        id: String((c as any)?.id || ""),
+        name: String((c as any)?.name || ""),
+        external_id: String((c as any)?.external_id || ""),
+        supplier_id: String((c as any)?.supplier_id || supplierId || ""),
+      });
+    }
+  }
+  return lookupsRows;
+}
+
+function buildMetaRows(storeId?: string | null): MetaExportRow[] {
+  return [
+    { key: "format", value: "v2" },
+    { key: "store_id", value: storeId ? String(storeId) : "" },
+    { key: "exported_at", value: new Date().toISOString() },
+  ];
+}
+
 export async function buildFullExportData(args: {
   baseProducts: ProductAggregated[];
   storeId?: string | null;
@@ -168,13 +262,7 @@ export async function buildFullExportData(args: {
   lookupsRows: LookupsExportRow[];
   metaRows: MetaExportRow[];
 }> {
-  const base = args.baseProducts || [];
-  const byId = new Map<string, ProductAggregated>();
-  for (const p of base) {
-    if (!p?.id) continue;
-    byId.set(String(p.id), p);
-  }
-  const ids = Array.from(byId.keys());
+  const { ids, byId } = indexBaseProducts(args.baseProducts);
   if (ids.length === 0) {
     return { productRows: [], productsColumns: [], lookupsRows: [], metaRows: [] };
   }
@@ -183,38 +271,9 @@ export async function buildFullExportData(args: {
   const t = useI18nStore.getState().t;
 
   const lookups = await ProductImportExportService.getUserLookups();
-  const suppliersById = new Map<string, string>();
-  for (const s of lookups?.suppliers || []) {
-    const sid = String((s as any)?.id || "").trim();
-    if (!sid) continue;
-    suppliersById.set(sid, String((s as any)?.supplier_name || ""));
-  }
-  const categoriesById = new Map<string, string>();
-  const catsMap = lookups?.supplierCategoriesMap || {};
-  for (const supplierId of Object.keys(catsMap)) {
-    const arr = Array.isArray(catsMap[supplierId]) ? catsMap[supplierId] : [];
-    for (const c of arr) {
-      const cid = String((c as any)?.id || "").trim();
-      if (!cid) continue;
-      categoriesById.set(cid, String((c as any)?.name || ""));
-    }
-  }
-
-  const items = await ProductImportExportService.getProductsEditDataBatch(ids, args.storeId ? String(args.storeId) : undefined);
-  const byDetailId = new Map<string, { product: Product; images: ProductImage[]; params: ProductParam[] }>();
-  for (const it of items || []) {
-    const pid = String(it?.product?.id || "");
-    if (!pid) continue;
-    byDetailId.set(pid, { product: it.product, images: it.images || [], params: it.params || [] });
-  }
-
-  let maxParams = 0;
-  for (const id of ids) {
-    const d = byDetailId.get(String(id));
-    if (!d) continue;
-    const cnt = Array.isArray(d.params) ? d.params.length : 0;
-    if (cnt > maxParams) maxParams = cnt;
-  }
+  const { suppliersById, categoriesById, catsMap } = buildLookupsMaps(lookups);
+  const byDetailId = await loadDetailsById(ids, args.storeId);
+  const maxParams = getMaxParams(ids, byDetailId);
 
   const productsColumns = buildProductColumns(lang, maxParams);
   const productRows: ProductExportRow[] = [];
@@ -238,34 +297,8 @@ export async function buildFullExportData(args: {
     );
   }
 
-  const lookupsRows: LookupsExportRow[] = [];
-  for (const s of lookups?.suppliers || []) {
-    lookupsRows.push({
-      type: "supplier",
-      id: String((s as any)?.id || ""),
-      name: String((s as any)?.supplier_name || ""),
-      external_id: "",
-      supplier_id: "",
-    });
-  }
-  for (const supplierId of Object.keys(catsMap)) {
-    const arr = Array.isArray(catsMap[supplierId]) ? catsMap[supplierId] : [];
-    for (const c of arr) {
-      lookupsRows.push({
-        type: "category",
-        id: String((c as any)?.id || ""),
-        name: String((c as any)?.name || ""),
-        external_id: String((c as any)?.external_id || ""),
-        supplier_id: String((c as any)?.supplier_id || supplierId || ""),
-      });
-    }
-  }
-
-  const metaRows: MetaExportRow[] = [
-    { key: "format", value: "v2" },
-    { key: "store_id", value: args.storeId ? String(args.storeId) : "" },
-    { key: "exported_at", value: new Date().toISOString() },
-  ];
+  const lookupsRows = buildLookupsRows(lookups, catsMap);
+  const metaRows = buildMetaRows(args.storeId);
 
   return { productRows, productsColumns, lookupsRows, metaRows };
 }

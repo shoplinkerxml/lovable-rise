@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ProductImage } from '@/components/ProductFormTabs/types';
 import { ProductService } from '@/lib/product-service';
 import { ImageHelpers } from '@/utils/imageHelpers';
+import { getImageUrl } from '@/lib/imageUtils';
 
 export function useProductImages(productId?: string, preloadedImages?: ProductImage[]) {
   const [images, setImages] = useState<ProductImage[]>(preloadedImages || []);
@@ -120,4 +121,46 @@ export function useProductImages(productId?: string, preloadedImages?: ProductIm
     reorderImages,
     reload,
   };
+}
+
+export function useResolvedImageSrc(args: { url?: string | null; objectKey?: string | null; width?: number; fallbackUrl?: string | null }) {
+  const rawUrl = String(args.url || '').trim();
+  const fallbackUrl = String(args.fallbackUrl || '').trim();
+  const width = args.width;
+
+  const initial = useMemo(() => (rawUrl ? getImageUrl(rawUrl, width) : ''), [rawUrl, width]);
+  const [src, setSrc] = useState<string>(initial);
+  const [fallbackUsed, setFallbackUsed] = useState(false);
+
+  useEffect(() => {
+    setSrc(initial);
+    setFallbackUsed(false);
+  }, [initial]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!rawUrl) return;
+
+    ImageHelpers.resolveDisplayUrl({ url: rawUrl, objectKey: args.objectKey })
+      .then((resolved) => {
+        if (cancelled) return;
+        const next = String(resolved || '').trim();
+        if (next) setSrc(next);
+      })
+      .catch(() => void 0);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawUrl, args.objectKey]);
+
+  const onError = useCallback(() => {
+    if (fallbackUsed) return;
+    const fb = fallbackUrl || rawUrl;
+    if (!fb) return;
+    setFallbackUsed(true);
+    setSrc(getImageUrl(fb, width));
+  }, [fallbackUsed, fallbackUrl, rawUrl, width]);
+
+  return { src, onError, fallbackUsed };
 }

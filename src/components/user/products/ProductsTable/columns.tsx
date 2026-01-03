@@ -4,7 +4,6 @@ import type { Table as TanTable } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getImageUrl, IMAGE_SIZES } from "@/lib/imageUtils";
-import { ImageHelpers } from "@/utils/imageHelpers";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { SortToggle } from "./SortToggle";
@@ -12,7 +11,7 @@ import { ColumnFilterMenu } from "./ColumnFilterMenu";
 import { StoresBadgeCell } from "./StoresBadgeCell";
 import { ProductStatusBadge } from "./ProductStatusBadge";
 import { Image as ImageIcon } from "lucide-react";
-import { loadImageUrl } from "@/lib/imageLoader";
+import { useResolvedImageSrc } from "@/hooks/useProductImages";
 const ProductActionsDropdownLazy = React.lazy(() =>
   import("./RowActionsDropdown").then((m) => ({ default: m.ProductActionsDropdown }))
 );
@@ -45,38 +44,7 @@ const ProductThumbnail = React.memo(({
     : "h-[clamp(1.75rem,3vw,2.5rem)] w-[clamp(1.75rem,3vw,2.5rem)]";
 
   const baseUrl = product.mainImageUrl || "";
-  const initialUrl = baseUrl ? getImageUrl(baseUrl, IMAGE_SIZES.THUMB) : "";
-  const [src, setSrc] = React.useState<string>(initialUrl);
-  const [error, setError] = React.useState(false);
-
-  React.useEffect(() => {
-    const isAbsolute = /^https?:\/\//i.test(initialUrl);
-    if (isAbsolute && initialUrl) {
-      setSrc(initialUrl);
-      return;
-    }
-
-    const key = baseUrl ? ImageHelpers.extractObjectKeyFromUrl(baseUrl) || baseUrl : "";
-    if (!key) {
-      setSrc("");
-      return;
-    }
-
-    let cancelled = false;
-
-    loadImageUrl(key)
-      .then((viewUrl) => {
-        if (!cancelled && viewUrl) setSrc(viewUrl);
-      })
-      .catch((err) => {
-        console.error("Failed to load image:", err);
-        if (!cancelled) setError(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [baseUrl, initialUrl]);
+  const { src, onError } = useResolvedImageSrc({ url: baseUrl, width: IMAGE_SIZES.THUMB, fallbackUrl: baseUrl });
 
   return (
     <button type="button" onClick={onClick} className="inline-flex">
@@ -85,12 +53,7 @@ const ProductThumbnail = React.memo(({
           src={src}
           alt={product.name_ua || product.name || ""}
           className="object-contain"
-          onError={() => {
-            if (!error && baseUrl) {
-              setSrc(baseUrl);
-              setError(true);
-            }
-          }}
+          onError={onError}
         />
         <AvatarFallback className="bg-primary/5 text-primary rounded-md flex items-center justify-center">
           <ImageIcon className="w-4 h-4" />
@@ -364,303 +327,64 @@ function createActionsColumn(config: ColumnConfig): ColumnDef<ProductRow> {
 }
 
 export function useProductColumns(config: ColumnConfig): ColumnDef<ProductRow>[] {
-  const { t, storeId, categoryFilterOptions } = config;
-
-  const selectColumn = React.useMemo(() => createSelectColumn(config), [config]);
-  const photoColumn = React.useMemo(() => createPhotoColumn(config), [config]);
-  const nameColumn = React.useMemo(() => createNameColumn(config), [config]);
-  const priceColumn = React.useMemo(
-    () => createPriceColumn("price", "table_price", config),
-    [config]
-  );
-  const priceOldColumn = React.useMemo(
-    () => createPriceColumn("price_old", "old_price", config),
-    [config]
-  );
-  const pricePromoColumn = React.useMemo(
-    () => createPriceColumn("price_promo", "promo_price", config),
-    [config]
-  );
-
-  const statusColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      id: "status",
-      accessorFn: (row) => row.state ?? "",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("table_status"), column, table),
-      cell: ({ row }) => <ProductStatusBadge state={row.original.state} />,
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const supplierColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      id: "supplier",
-      accessorFn: (row) => row.supplierName ?? "",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("supplier"), column, table),
-      cell: ({ row }) => {
-        const name = row.original.supplierName;
-        return name ? (
-          <span className="text-sm" data-testid="user_products_supplier">
-            {name}
-          </span>
-        ) : (
-          <span
-            className="text-muted-foreground"
-            data-testid="user_products_supplier_empty"
-          >
-            —
-          </span>
-        );
-      },
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const categoryColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      id: "category",
-      accessorFn: (row) => row.categoryName ?? "",
-      filterFn: stringFilter,
-      header: ({ column, table }) =>
-        renderHeader(
-          t("category"),
-          column,
-          table,
-          <ColumnFilterMenu
-            column={column}
-            extraOptions={storeId ? categoryFilterOptions : []}
-          />
-        ),
-      cell: ({ row }) => {
-        const name = row.original.categoryName;
-        return name ? (
-          <span className="text-sm">{name}</span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        );
-      },
-    }),
-    [t, storeId, categoryFilterOptions]
-  );
-
-  const stockColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      id: "stock_quantity",
-      accessorFn: (row) =>
-        typeof row.stock_quantity === "number"
-          ? row.stock_quantity
-          : Number.NEGATIVE_INFINITY,
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("table_stock"), column, table),
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          {row.original.stock_quantity != null ? (
-            <span className="tabular-nums">{row.original.stock_quantity}</span>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </div>
-      ),
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const dateColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      id: "created_at",
-      accessorFn: (row) => {
-        try {
-          return row.created_at ? new Date(row.created_at).getTime() : 0;
-        } catch {
-          return 0;
-        }
-      },
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("table_created"), column, table),
-      cell: ({ row }) =>
-        row.original.created_at ? (
-          <div className="flex flex-col">
-            <span className="tabular-nums">
-              {format(new Date(row.original.created_at), "yyyy-MM-dd")}
-            </span>
-            <span className="text-muted-foreground hidden sm:block tabular-nums">
-              {format(new Date(row.original.created_at), "HH:mm")}
-            </span>
-          </div>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const articleColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      accessorKey: "article",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("article"), column, table),
-      cell: ({ row }) => (
-        <span className="text-sm text-foreground">{row.original.article || ""}</span>
-      ),
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const vendorColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      accessorKey: "vendor",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("vendor"), column, table),
-      cell: ({ row }) => (
-        <span className="text-sm text-foreground">{row.original.vendor || ""}</span>
-      ),
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const docketColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      accessorKey: "docket_ua",
-      filterFn: stringFilter,
-      header: ({ column, table }) => renderHeader(t("short_name_ua"), column, table),
-      cell: ({ row }) => {
-        const shortName = row.original.docket_ua || "";
-        return (
-          <div
-            className="text-sm text-foreground max-w-[clamp(8rem,20vw,16rem)] truncate"
-            title={shortName}
-            data-testid="user_products_docketUa"
-          >
-            {shortName}
-          </div>
-        );
-      },
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const descriptionColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      accessorKey: "description_ua",
-      filterFn: stringFilter,
-      header: ({ column, table }) =>
-        renderHeader(t("product_description_ua"), column, table),
-      cell: ({ row }) => {
-        const desc = row.original.description_ua || "";
-        return (
-          <div
-            className="text-sm text-foreground max-w-[clamp(10rem,22vw,18rem)] line-clamp-2 break-words"
-            title={desc}
-            data-testid="user_products_descriptionUa"
-          >
-            {desc}
-          </div>
-        );
-      },
-      enableHiding: true,
-    }),
-    [t]
-  );
-
-  const storesColumn = React.useMemo(
-    () => createStoresColumn(config),
-    [config]
-  );
-
-  const activeColumn = React.useMemo<ColumnDef<ProductRow>>(
-    () => ({
-      id: "active",
-      header: t("table_active"),
-      enableSorting: false,
-      enableHiding: false,
-      size: 64,
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          <Switch
-            checked={!!row.original.available}
-            onCheckedChange={(checked) =>
-              config.handleToggleAvailable(row.original.id, checked)
-            }
-            aria-label={t("table_active")}
-            data-testid={`user_store_products_active_${row.original.id}`}
-          />
-        </div>
-      ),
-    }),
-    [t, config]
-  );
-
-  const actionsColumn = React.useMemo(
-    () => createActionsColumn(config),
-    [
-      config,
-    ]
-  );
-
-  return React.useMemo(() => {
-    const cols: ColumnDef<ProductRow>[] = [
-      selectColumn,
-      photoColumn,
-      nameColumn,
-      statusColumn,
-      supplierColumn,
-      priceColumn,
-      priceOldColumn,
-      pricePromoColumn,
-      categoryColumn,
-      stockColumn,
-      dateColumn,
-      articleColumn,
-      vendorColumn,
-      docketColumn,
-      descriptionColumn,
-    ];
-
-    if (!storeId) {
-      cols.push(storesColumn);
-    }
-
-    if (storeId) {
-      cols.push(activeColumn);
-    }
-
-    cols.push(actionsColumn);
-
-    return cols;
-  }, [
-    selectColumn,
-    photoColumn,
-    nameColumn,
-    statusColumn,
-    supplierColumn,
-    priceColumn,
-    priceOldColumn,
-    pricePromoColumn,
-    categoryColumn,
-    stockColumn,
-    dateColumn,
-    articleColumn,
-    vendorColumn,
-    docketColumn,
-    descriptionColumn,
-    storesColumn,
-    activeColumn,
-    actionsColumn,
+  const {
+    t,
     storeId,
-  ]);
+    categoryFilterOptions,
+    storeNames,
+    stores,
+    loadStoresForMenu,
+    handleRemoveStoreLink,
+    handleStoresUpdate,
+    onEdit,
+    setDeleteDialog,
+    handleDuplicate,
+    canCreate,
+    hideDuplicate,
+    handleToggleAvailable,
+    duplicating,
+  } = config;
+
+  return React.useMemo(
+    () =>
+      createColumns({
+        t,
+        storeId,
+        categoryFilterOptions,
+        storeNames,
+        stores,
+        loadStoresForMenu,
+        handleRemoveStoreLink,
+        handleStoresUpdate,
+        onEdit,
+        setDeleteDialog,
+        handleDuplicate,
+        canCreate,
+        hideDuplicate,
+        handleToggleAvailable,
+        duplicating,
+      }),
+    [
+      t,
+      storeId,
+      categoryFilterOptions,
+      storeNames,
+      stores,
+      loadStoresForMenu,
+      handleRemoveStoreLink,
+      handleStoresUpdate,
+      onEdit,
+      setDeleteDialog,
+      handleDuplicate,
+      canCreate,
+      hideDuplicate,
+      handleToggleAvailable,
+      duplicating,
+    ],
+  );
 }
 
 export function createColumns(config: ColumnConfig): ColumnDef<ProductRow>[] {
-  console.warn("createColumns is deprecated, use useProductColumns hook instead");
   const { t, storeId, categoryFilterOptions } = config;
 
   const columns: ColumnDef<ProductRow>[] = [

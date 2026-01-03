@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Image as ImageIcon, Check, X, Link as LinkIcon, Loader2, ChevronLeft, ChevronRight, ListOrdered } from 'lucide-react'
 import { useI18n } from "@/i18n";
 import { getImageUrl, IMAGE_SIZES, isVideoUrl } from '@/lib/imageUtils'
+import { useResolvedImageSrc } from '@/hooks/useProductImages'
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel'
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
@@ -14,15 +15,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DialogDescription } from '@/components/ui/dialog'
 import { FixedSizeList as List } from 'react-window'
-
-export type ProductImage = {
-  id?: string
-  url: string
-  alt_text?: string
-  order_index: number
-  is_main: boolean
-  object_key?: string
-}
+import type { ProductImage } from './types'
 
 type Props = {
   images: ProductImage[]
@@ -58,10 +51,22 @@ type Props = {
 
 export function ImageSection(props: Props) {
   const { t } = useI18n()
+  const activeImage = props.images[props.activeIndex]
+  const activeUrl = activeImage?.url || ''
+  const activeIsVideo = isVideoUrl(activeUrl)
+  const { src: activeSrc, onError: onActiveError } = useResolvedImageSrc({
+    url: activeUrl,
+    objectKey: activeImage?.object_key,
+    width: IMAGE_SIZES.LARGE,
+    fallbackUrl: activeUrl,
+  })
   const [isLarge, setIsLarge] = React.useState(false)
   React.useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
-    const h = (e: any) => setIsLarge(e.matches ?? mq.matches)
+    const h = (e: MediaQueryListEvent | MediaQueryList) => {
+      const matches = 'matches' in e ? e.matches : mq.matches
+      setIsLarge(!!matches)
+    }
     h(mq)
     mq.addEventListener('change', h)
     return () => mq.removeEventListener('change', h)
@@ -98,27 +103,33 @@ export function ImageSection(props: Props) {
     }
     const original = image.url
     const isVid = isVideoUrl(original)
-    const src = isVid ? getImageUrl(original) : getImageUrl(original)
+    const { src, onError } = useResolvedImageSrc({ url: original, objectKey: image.object_key, width: IMAGE_SIZES.THUMB, fallbackUrl: original })
     return (
       <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
         <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
-          {src ? (
-            isVid ? (
-              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
-            ) : (
-              <img
-                ref={(el) => {
-                  if (props.galleryImgRefs.current[index] !== el) {
-                    props.galleryImgRefs.current[index] = el
-                  }
-                }}
-                src={src}
-                alt={image.alt_text || `Изображение ${index + 1}`}
-                className="w-full h-full object-contain"
-                onLoad={(e) => props.onGalleryImageLoad(e, index)}
-                onError={(e) => props.onGalleryImageError(e, index)}
-              />
-            )
+          {isVid ? (
+            <video
+              src={getImageUrl(original)}
+              className="w-full h-full object-contain"
+              preload="metadata"
+              onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)}
+            />
+          ) : src ? (
+            <img
+              ref={(el) => {
+                if (props.galleryImgRefs.current[index] !== el) {
+                  props.galleryImgRefs.current[index] = el
+                }
+              }}
+              src={src}
+              alt={image.alt_text || `Изображение ${index + 1}`}
+              className="w-full h-full object-contain"
+              onLoad={(e) => props.onGalleryImageLoad(e, index)}
+              onError={(e) => {
+                onError()
+                props.onGalleryImageError(e, index)
+              }}
+            />
           ) : null}
         </div>
       </div>
@@ -128,16 +139,24 @@ export function ImageSection(props: Props) {
   function Thumb({ image, index }: { image: ProductImage; index: number }) {
     const original = image.url
     const isVid = isVideoUrl(original)
-    const src = isVid ? getImageUrl(original) : getImageUrl(original)
+    const { src, onError } = useResolvedImageSrc({ url: original, objectKey: image.object_key, width: IMAGE_SIZES.THUMB, fallbackUrl: original })
     return (
       <div>
         <div className={`aspect-square relative overflow-hidden rounded-md bg-white ${index === props.activeIndex ? 'border-2 border-emerald-500' : ''}`}>
-          {src ? (
-            isVid ? (
-              <video src={src} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
-            ) : (
-              <img ref={(el) => (props.galleryImgRefs.current[index] = el)} src={src} alt={image.alt_text || `Изображение ${index + 1}`} className="w-full h-full object-contain" onLoad={(e) => props.onGalleryImageLoad(e, index)} onError={(e) => props.onGalleryImageError(e, index)} />
-            )
+          {isVid ? (
+            <video src={getImageUrl(original)} className="w-full h-full object-contain" preload="metadata" onLoadedMetadata={(e) => props.onGalleryVideoLoaded(e, index)} />
+          ) : src ? (
+            <img
+              ref={(el) => (props.galleryImgRefs.current[index] = el)}
+              src={src}
+              alt={image.alt_text || `Изображение ${index + 1}`}
+              className="w-full h-full object-contain"
+              onLoad={(e) => props.onGalleryImageLoad(e, index)}
+              onError={(e) => {
+                onError()
+                props.onGalleryImageError(e, index)
+              }}
+            />
           ) : null}
         </div>
       </div>
@@ -171,14 +190,19 @@ export function ImageSection(props: Props) {
     const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition }
     const original = image.url
     const isVid = isVideoUrl(original)
-    const src = isVid ? getImageUrl(original) : getImageUrl(original)
+    const { src, onError } = useResolvedImageSrc({ url: original, objectKey: image.object_key, width: IMAGE_SIZES.THUMB, fallbackUrl: original })
     return (
       <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="aspect-square rounded-md overflow-hidden border">
-        {src ? (isVid ? (
-          <video src={src} className="w-full h-full object-contain" preload="metadata" />
-        ) : (
-          <img src={src} className="w-full h-full object-contain" alt={image.alt_text || ''} />
-        )) : null}
+        {isVid ? (
+          <video src={getImageUrl(original)} className="w-full h-full object-contain" preload="metadata" />
+        ) : src ? (
+          <img
+            src={src}
+            className="w-full h-full object-contain"
+            alt={image.alt_text || ''}
+            onError={() => onError()}
+          />
+        ) : null}
       </div>
     )
   }
@@ -193,35 +217,25 @@ export function ImageSection(props: Props) {
                 className="relative overflow-hidden rounded-md flex items-center justify-center aspect-square cursor-pointer p-0"
                 style={props.getMainAdaptiveImageStyle()}
               >
-                {(() => {
-                  const original = props.images[props.activeIndex]?.url || ''
-                  const isVid = isVideoUrl(original)
-                  const src = isVid ? getImageUrl(original) : getImageUrl(original)
-                  if (!src) return null
-                  if (isVid) {
-                    return (
-                      <video
-                        src={src}
-                        className="w-full h-full object-contain select-none"
-                        controls
-                        onLoadedMetadata={props.onMainVideoLoaded}
-                      />
-                    )
-                  }
-                  return (
-                    <img
-                      src={src}
-                      alt={props.images[props.activeIndex]?.alt_text || `Фото ${props.activeIndex + 1}`}
-                      className="w-full h-full object-contain select-none"
-                      onLoad={props.onMainImageLoad}
-                      onError={(e) => {
-                        const el = e.target as HTMLImageElement
-                        if (original) el.src = original
-                        props.onMainImageError(e)
-                      }}
-                    />
-                  )
-                })()}
+                {activeIsVideo ? (
+                  <video
+                    src={getImageUrl(activeUrl)}
+                    className="w-full h-full object-contain select-none"
+                    controls
+                    onLoadedMetadata={props.onMainVideoLoaded}
+                  />
+                ) : activeSrc ? (
+                  <img
+                    src={activeSrc}
+                    alt={activeImage?.alt_text || `Фото ${props.activeIndex + 1}`}
+                    className="w-full h-full object-contain select-none"
+                    onLoad={props.onMainImageLoad}
+                    onError={(e) => {
+                      onActiveError()
+                      props.onMainImageError(e)
+                    }}
+                  />
+                ) : null}
               </div>
               {!props.readOnly && (
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">

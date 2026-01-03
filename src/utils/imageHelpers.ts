@@ -88,4 +88,15 @@ export const ImageHelpers = {
       return url;
     }
   },
+
+  async resolveDisplayUrl(args: { url?: string | null; objectKey?: string | null }): Promise<string> {
+    const rawUrl = String(args.url || '').trim();
+    const rawKey = String(args.objectKey || '').trim();
+    if (!rawUrl && !rawKey) return '';
+
+    const normalizedUrl = this.normalizeImageUrl(rawUrl);
+    const fromUrl = normalizedUrl ? (this.extractObjectKeyFromUrl(normalizedUrl) || undefined) : undefined;
+    const key = this.normalizeObjectKeyExt(rawKey || fromUrl);
+    return await this.ensureAbsoluteUrl(normalizedUrl, key || fromUrl);
+  },
 };
