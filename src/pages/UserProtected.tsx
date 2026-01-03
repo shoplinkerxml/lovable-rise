@@ -1,13 +1,14 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useCallback, useState } from "react";
 import type { ComponentType } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProductService } from "@/lib/product-service";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { UserProfile } from "@/lib/user-auth-schemas";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserProfile as UIUserProfile } from "@/components/ui/profile-types";
 import { CreditCard, LayoutDashboard, Loader2, Package, Store, Truck, User } from "lucide-react";
+import { PageLoadingModal } from "@/components/LoadingSkeletons";
 import type { TariffLimit } from "@/lib/tariff-service";
 import type { UserMenuItem } from "@/lib/user-menu-service";
 
@@ -40,6 +41,18 @@ type AuthLoaderMeta = {
 const UserProtected = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const isHardReload = useMemo(() => {
+    try {
+      const navEntry = (performance.getEntriesByType?.("navigation")?.[0] ??
+        null) as PerformanceNavigationTiming | null;
+      if (navEntry?.type === "reload") return true;
+      const legacyType = (performance as any)?.navigation?.type;
+      return legacyType === 1;
+    } catch {
+      return false;
+    }
+  }, []);
+  const [reloadBootstrapping, setReloadBootstrapping] = useState(isHardReload);
 
   const sessionQuery = useQuery({
     queryKey: ["auth", "session"],
@@ -181,25 +194,12 @@ const UserProtected = () => {
   const prefetchData = useCallback(async () => {
     try {
       const path = location.pathname.toLowerCase();
-      const shouldPrefetchTariffs = path.startsWith("/user/tariff");
       const shouldPrefetchSuppliers =
         path.startsWith("/user/suppliers") ||
         path.includes("/user/products/new") ||
         path.includes("/user/products/edit");
 
       const tasks: Promise<unknown>[] = [];
-      if (shouldPrefetchTariffs) {
-        tasks.push(
-          queryClient.prefetchQuery({
-            queryKey: ["tariffs", "list"],
-            queryFn: async () => {
-              const { TariffService } = await import("@/lib/tariff-service");
-              return await TariffService.getTariffsAggregated(false);
-            },
-            staleTime: 900_000,
-          }),
-        );
-      }
       if (shouldPrefetchSuppliers) {
         const uid = user?.id ? String(user.id) : "current";
         tasks.push(
@@ -228,6 +228,11 @@ const UserProtected = () => {
   const authMePending = sessionValid && authMeQuery.data == null && (authMeQuery.isLoading || authMeQuery.isFetching);
 
   const authLoading = sessionPending || authMePending;
+  const fetchingCount = useIsFetching();
+  const bootstrapPending = authLoading || fetchingCount > 0;
+  const overlayVisible = isHardReload && reloadBootstrapping && bootstrapPending;
+  const bootstrapping = isHardReload && reloadBootstrapping;
+  const layoutContentBlocked = !isHardReload && authLoading;
   const authLoader = useMemo<AuthLoaderMeta>(() => {
     const path = location.pathname.toLowerCase();
     if (path.startsWith("/user/dashboard") || path === "/user" || path === "/user/") {
@@ -259,7 +264,9 @@ const UserProtected = () => {
     tariffLimits,
     menuItems: (Array.isArray(authMe?.menuItems) ? (authMe?.menuItems as UserMenuItem[]) : []),
     refresh,
-    authLoading,
+    authLoading: layoutContentBlocked,
+    contentBlocked: layoutContentBlocked,
+    bootstrapping,
     authLoader,
   }), [
     subscriptionState,
@@ -268,9 +275,15 @@ const UserProtected = () => {
     tariffLimits,
     authMe?.menuItems,
     refresh,
-    authLoading,
+    layoutContentBlocked,
+    bootstrapping,
     authLoader,
   ]);
+
+  useEffect(() => {
+    if (!reloadBootstrapping) return;
+    if (!bootstrapPending) setReloadBootstrapping(false);
+  }, [bootstrapPending, reloadBootstrapping]);
 
   // Redirect to login if not authenticated
   if (!authLoading && !authenticated) {
@@ -285,6 +298,7 @@ const UserProtected = () => {
   return (
     <div className="min-h-screen">
       <Outlet context={contextValue} />
+      {overlayVisible ? <PageLoadingModal title={authLoader.title} subtitle={authLoader.subtitle} icon={authLoader.icon} /> : null}
     </div>
   );
 };

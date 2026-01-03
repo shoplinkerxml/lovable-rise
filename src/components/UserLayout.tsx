@@ -50,6 +50,8 @@ type UserProtectedOutletContext = {
   menuItems: UserMenuItem[];
   refresh: () => Promise<void>;
   authLoading?: boolean;
+  contentBlocked?: boolean;
+  bootstrapping?: boolean;
   authLoader?: AuthLoaderMeta;
 };
 
@@ -286,7 +288,8 @@ const UserLayout = () => {
   const tariffLimits = outlet?.tariffLimits ?? [];
   const ctxMenuItems = outlet?.menuItems ?? [];
   const refresh = outlet?.refresh ?? (async () => {});
-  const authLoading = outlet?.authLoading === true;
+  const bootstrapping = outlet?.bootstrapping === true;
+  const contentBlocked = outlet?.contentBlocked === true || outlet?.authLoading === true;
   const contentLoader = outlet?.authLoader ?? { title: "Завантаження…", subtitle: "Готуємо дані" };
 
   const user: UserProfile = useMemo(() => {
@@ -330,7 +333,7 @@ const UserLayout = () => {
   const toggleTheme = useCallback(() => {
     setTheme(theme === "light" ? "dark" : "light");
   }, [theme, setTheme]);
-  if (!authLoading && !ctxUser) {
+  if (!bootstrapping && !contentBlocked && !ctxUser) {
     return <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
@@ -339,7 +342,7 @@ const UserLayout = () => {
       </div>;
   }
   return <UserMenuProvider userId={user.id} hasAccess={hasAccess} menuItems={ctxMenuItems}>
-      <UserLayoutContent user={user} uiUserProfile={uiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} refreshUserData={refresh} guardSubscription={subscription} guardTariffLimits={tariffLimits} contentBlocked={authLoading} contentLoader={contentLoader} />
+      <UserLayoutContent user={user} uiUserProfile={uiUserProfile} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} toggleTheme={toggleTheme} lang={lang} setLang={setLang} t={t} profileSheetOpen={profileSheetOpen} setProfileSheetOpen={setProfileSheetOpen} handleProfileNavigation={handleProfileNavigation} handleLogout={handleLogout} refreshUserData={refresh} guardSubscription={subscription} guardTariffLimits={tariffLimits} contentBlocked={contentBlocked} contentLoader={contentLoader} />
     </UserMenuProvider>;
 };
 const UserLayoutContent = ({

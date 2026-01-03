@@ -1,14 +1,40 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SessionValidator } from "@/lib/session-validation";
 import { UserAuthService } from "@/lib/user-auth-service";
 import { LayoutDashboard } from "lucide-react";
+import { PageLoadingModal } from "@/components/LoadingSkeletons";
 
 const AdminProtected = () => {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [hasAdminRole, setHasAdminRole] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const isHardReload = useMemo(() => {
+    try {
+      const navEntry = (performance.getEntriesByType?.("navigation")?.[0] ??
+        null) as PerformanceNavigationTiming | null;
+      if (navEntry?.type === "reload") return true;
+      const legacyType = (performance as any)?.navigation?.type;
+      return legacyType === 1;
+    } catch {
+      return false;
+    }
+  }, []);
+  const [hardReloadCover, setHardReloadCover] = useState(isHardReload);
+
+  useEffect(() => {
+    if (!isHardReload) {
+      setHardReloadCover(false);
+      return;
+    }
+    if (ready) {
+      setHardReloadCover(false);
+      return;
+    }
+    const timer = setTimeout(() => setHardReloadCover(false), 6000);
+    return () => clearTimeout(timer);
+  }, [isHardReload, ready]);
 
   useEffect(() => {
     const validateSession = async () => {
@@ -60,6 +86,15 @@ const AdminProtected = () => {
   }, []);
 
   if (!ready) {
+    if (isHardReload && hardReloadCover) {
+      return (
+        <PageLoadingModal
+          title="Завантаження…"
+          subtitle="Перевіряємо доступ адміністратора"
+          icon={LayoutDashboard}
+        />
+      );
+    }
     return (
       <Outlet
         context={{

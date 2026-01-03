@@ -1,63 +1,47 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { UserAuthService } from "@/lib/user-auth-service";
 import { ProfileService } from "@/lib/profile-service";
 import { UserProfile as UserProfileType } from "@/lib/user-auth-schemas";
 import { useI18n } from "@/i18n";
-import { ArrowLeft, User, Save, Upload, TrendingUp } from "lucide-react";
+import { ArrowLeft, Save, Upload, User } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FullPageLoader } from "@/components/LoadingSkeletons";
 
 const UserProfile = () => {
   const navigate = useNavigate();
-  const { t, lang, setLang } = useI18n();
-  const [user, setUser] = useState<UserProfileType | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { t } = useI18n();
+  const { user, refetch } = useOutletContext<{ user: UserProfileType | null; refetch: () => Promise<void> }>();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const initialValuesSetRef = useRef(false);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { user: currentUser, error } = await UserAuthService.getCurrentUser();
-        if (error) {
-          console.error("Error fetching user:", error);
-          navigate("/user-auth");
-          return;
-        }
-        if (currentUser) {
-          // Ensure the user has the correct role for the user profile page
-          if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-            // Redirect admin/manager users to admin profile
-            navigate("/admin/personal");
-            return;
-          }
-          
-          setUser(currentUser);
-          setName(currentUser.name || "");
-          setPhone(currentUser.phone || "");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        navigate("/user-auth");
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!user) return;
+    if (user.role === "admin" || user.role === "manager") {
+      navigate("/admin/personal");
+    }
+  }, [navigate, user]);
 
-    fetchUser();
-  }, [navigate]);
+  useEffect(() => {
+    if (!user) return;
+    if (initialValuesSetRef.current) return;
+    setName(user.name || "");
+    setPhone(user.phone || "");
+    setAvatarUrl(user.avatar_url || undefined);
+    initialValuesSetRef.current = true;
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -70,8 +54,7 @@ const UserProfile = () => {
       });
 
       if (updatedProfile) {
-        // Update local state
-        setUser({ ...user, name: name.trim(), phone: phone.trim() || undefined });
+        await refetch();
         toast.success(t("profile_updated_success"));
       } else {
         throw new Error(t("failed_update_profile"));
@@ -106,7 +89,8 @@ const UserProfile = () => {
       const updatedProfile = await ProfileService.updateProfile(user.id, { avatar_url: publicUrl });
 
       if (updatedProfile) {
-        setUser({ ...user, avatar_url: publicUrl });
+        setAvatarUrl(publicUrl);
+        await refetch();
         toast.success(t("avatar_updated_success"));
       } else {
         throw new Error(t("failed_upload_avatar"));
@@ -123,7 +107,7 @@ const UserProfile = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  if (loading) {
+  if (!user) {
     return (
       <FullPageLoader
         title="Завантаження профілю…"
@@ -163,18 +147,18 @@ const UserProfile = () => {
               {/* Avatar Section */}
               <div className="flex items-center space-x-4">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={user?.avatar_url} alt={user?.name} />
+                  <AvatarImage src={avatarUrl} alt={name} />
                   <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xl">
-                    {user?.name ? getUserInitials(user.name) : "U"}
+                    {name ? getUserInitials(name) : "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
-                      {user?.role}
+                      {user.role}
                     </Badge>
-                    <Badge variant={user?.status === 'active' ? 'default' : 'secondary'}>
-                      {user?.status}
+                    <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
+                      {user.status}
                     </Badge>
                   </div>
                   <div>
@@ -214,7 +198,7 @@ const UserProfile = () => {
                   <Label htmlFor="email">{t("profile_email")}</Label>
                   <Input
                     id="email"
-                    value={user?.email || ""}
+                    value={user.email || ""}
                     disabled
                     className="bg-gray-50"
                   />
@@ -234,7 +218,7 @@ const UserProfile = () => {
                 <div className="space-y-2">
                   <Label>{t("profile_member_since")}</Label>
                   <Input
-                    value={user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                    value={user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                     disabled
                     className="bg-gray-50"
                   />
