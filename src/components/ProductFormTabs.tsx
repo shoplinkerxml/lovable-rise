@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -9,10 +9,7 @@ import { useTabsScroll } from '@/hooks/useTabsScroll';
 import { useImageGallery } from '@/hooks/useImageGallery';
 import { useImageDimensions } from '@/hooks/useImageDimensions';
 import { useImageLoadHandlers } from '@/hooks/useImageLoadHandlers';
-import { InfoTab } from './ProductFormTabs/tabs/InfoTab';
-import { ImagesTab } from './ProductFormTabs/tabs/ImagesTab';
-import { ParamsTab } from './ProductFormTabs/tabs/ParamsTab';
-import { Package } from 'lucide-react';
+import { Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { type Product } from '@/lib/product-service';
 import { useI18n } from "@/i18n";
@@ -26,6 +23,25 @@ import { useImageDrop } from '@/hooks/useImageDrop';
 import { useImageActions } from '@/hooks/useImageActions';
 import { mapImageErrorToToast } from '@/utils/imageErrorHelpers';
 import type { SupplierOption, CategoryOption, CurrencyOption, ProductImage, ProductParam, FormData } from './ProductFormTabs/types';
+
+const InfoTab = lazy(async () => {
+  const mod = await import('./ProductFormTabs/tabs/InfoTab');
+  return { default: mod.InfoTab };
+});
+const ImagesTab = lazy(async () => {
+  const mod = await import('./ProductFormTabs/tabs/ImagesTab');
+  return { default: mod.ImagesTab };
+});
+const ParamsTab = lazy(async () => {
+  const mod = await import('./ProductFormTabs/tabs/ParamsTab');
+  return { default: mod.ParamsTab };
+});
+
+const tabFallback = (
+  <div className="flex items-center justify-center py-10">
+    <Loader2 className="h-5 w-5 animate-spin" />
+  </div>
+);
 interface ProductFormTabsProps {
   product?: Product | null;
   onSubmit?: (data: any) => void;
@@ -307,71 +323,77 @@ export function ProductFormTabs({
             <TabsHeader t={t} tabsOverflow={tabsOverflow} tabsScrollRef={tabsScrollRef} />
 
             <TabsContent value="info" className="space-y-6" data-testid="productFormTabs_infoContent">
-            <InfoTab
-              formState={infoFormState}
-              formActions={infoFormActions}
-              onExternalChange={onChange as any}
-              lookups={infoLookups as any}
-              imageState={infoImageState}
-                imageHandlers={infoImageHandlers as any}
-                config={infoConfig}
-              />
+              <Suspense fallback={tabFallback}>
+                <InfoTab
+                  formState={infoFormState}
+                  formActions={infoFormActions}
+                  onExternalChange={onChange as any}
+                  lookups={infoLookups as any}
+                  imageState={infoImageState}
+                  imageHandlers={infoImageHandlers as any}
+                  config={infoConfig}
+                />
+              </Suspense>
             </TabsContent>
 
             <TabsContent value="images" className="space-y-5 md:space-y-6" data-testid="productFormTabs_imagesContent">
-              <ImagesTab
-                images={images}
-                readOnly={readOnly}
-                isDragOver={drop.isDragOver}
-                uploading={uploadState.uploading}
-                uploadProgress={uploadState.uploadProgress}
-                imageUrl={imageUrl}
-                onSetImageUrl={handleSetImageUrl}
-                onAddImageFromUrl={addImageFromUrl}
-                onRemoveImage={imageActions.removeImageWithR2}
-                onSetMainImage={imageActions.setMain}
-                onReorderImages={imageActions.reorder}
-                onFileUpload={handleFileUpload}
-                onDropZoneClick={handleDropZoneClick}
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                getGalleryAdaptiveImageStyle={getGalleryAdaptiveImageStyle}
-                galleryImgRefs={galleryImgRefs}
-                onGalleryImageLoad={handleGalleryImageLoad}
-                onGalleryImageError={handleGalleryImageError}
-                onGalleryVideoLoaded={handleGalleryVideoLoaded}
-                activeIndex={activeIndex}
-                onSelectIndex={handleSelectIndex}
-                getMainAdaptiveImageStyle={getAdaptiveImageStyle}
-                onMainImageLoad={handleImageLoad}
-                onMainImageError={handleMainImageError}
-                onMainVideoLoaded={handleMainVideoLoaded}
-                onPrev={goPrevious}
-                onNext={goNext}
-              />
+              <Suspense fallback={tabFallback}>
+                <ImagesTab
+                  images={images}
+                  readOnly={readOnly}
+                  isDragOver={drop.isDragOver}
+                  uploading={uploadState.uploading}
+                  uploadProgress={uploadState.uploadProgress}
+                  imageUrl={imageUrl}
+                  onSetImageUrl={handleSetImageUrl}
+                  onAddImageFromUrl={addImageFromUrl}
+                  onRemoveImage={imageActions.removeImageWithR2}
+                  onSetMainImage={imageActions.setMain}
+                  onReorderImages={imageActions.reorder}
+                  onFileUpload={handleFileUpload}
+                  onDropZoneClick={handleDropZoneClick}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  getGalleryAdaptiveImageStyle={getGalleryAdaptiveImageStyle}
+                  galleryImgRefs={galleryImgRefs}
+                  onGalleryImageLoad={handleGalleryImageLoad}
+                  onGalleryImageError={handleGalleryImageError}
+                  onGalleryVideoLoaded={handleGalleryVideoLoaded}
+                  activeIndex={activeIndex}
+                  onSelectIndex={handleSelectIndex}
+                  getMainAdaptiveImageStyle={getAdaptiveImageStyle}
+                  onMainImageLoad={handleImageLoad}
+                  onMainImageError={handleMainImageError}
+                  onMainVideoLoaded={handleMainVideoLoaded}
+                  onPrev={goPrevious}
+                  onNext={goNext}
+                />
+              </Suspense>
             </TabsContent>
 
             <TabsContent value="params" className="space-y-6" data-testid="productFormTabs_paramsContent">
-              <ParamsTab
-                t={t}
-                readOnly={readOnly}
-                forceParamsEditable={forceParamsEditable}
-                parameters={parameters}
-                onEditRow={handleEditRow}
-                onDeleteRow={handleDeleteRow}
-                onDeleteSelected={deleteSelectedParams}
-                onSelectionChange={setSelectedParamRows}
-                onAddParam={openAddParamModal}
-                onReplaceData={handleReplaceParams}
-                isParamModalOpen={isParamModalOpen}
-                setIsParamModalOpen={setIsParamModalOpen as any}
-                paramForm={paramForm}
-                setParamForm={setParamForm as any}
-                saveParamModal={saveParamModal}
-                editingParamIndex={editingParamIndex}
-              />
+              <Suspense fallback={tabFallback}>
+                <ParamsTab
+                  t={t}
+                  readOnly={readOnly}
+                  forceParamsEditable={forceParamsEditable}
+                  parameters={parameters}
+                  onEditRow={handleEditRow}
+                  onDeleteRow={handleDeleteRow}
+                  onDeleteSelected={deleteSelectedParams}
+                  onSelectionChange={setSelectedParamRows}
+                  onAddParam={openAddParamModal}
+                  onReplaceData={handleReplaceParams}
+                  isParamModalOpen={isParamModalOpen}
+                  setIsParamModalOpen={setIsParamModalOpen as any}
+                  paramForm={paramForm}
+                  setParamForm={setParamForm as any}
+                  saveParamModal={saveParamModal}
+                  editingParamIndex={editingParamIndex}
+                />
+              </Suspense>
             </TabsContent>
           </Tabs>
           

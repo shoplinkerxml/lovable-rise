@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useOutletContext } from 'react-router-dom';
 import type { BasicData } from '@/components/ProductFormTabs/types';
 import type { SupplierOption, CategoryOption, CurrencyOption } from '@/components/ProductFormTabs/types';
+import { ProductService } from '@/lib/product-service';
 
 export function useProductLookups(
   productStoreId?: string,
@@ -12,6 +15,59 @@ export function useProductLookups(
   preloadedCategories?: CategoryOption[],
   preloadedSupplierCategoriesMap?: Record<string, CategoryOption[]>,
 ) {
+  const outlet = useOutletContext<any>();
+  const uid = outlet?.user?.id ? String(outlet.user.id) : 'current';
+
+  const lookupsQuery = useQuery({
+    queryKey: ['user', uid, 'lookups'],
+    queryFn: async () => await ProductService.getUserLookups(),
+    staleTime: 900_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as any,
+    enabled:
+      preloadedSuppliers === undefined ||
+      preloadedCurrencies === undefined ||
+      preloadedSupplierCategoriesMap === undefined,
+  });
+
+  const querySuppliers = useMemo<SupplierOption[]>(() => {
+    const list = (lookupsQuery.data as any)?.suppliers;
+    if (!Array.isArray(list)) return [];
+    return (list || []).map((s: any) => ({
+      id: String(s?.id ?? ''),
+      supplier_name: String(s?.supplier_name ?? ''),
+    }));
+  }, [lookupsQuery.data]);
+
+  const queryCurrencies = useMemo<CurrencyOption[]>(() => {
+    const list = (lookupsQuery.data as any)?.currencies;
+    if (!Array.isArray(list)) return [];
+    return (list || []).map((c: any) => ({
+      id: Number(c?.id ?? 0),
+      name: String(c?.name ?? ''),
+      code: String(c?.code ?? ''),
+      status: c?.status ?? null,
+    }));
+  }, [lookupsQuery.data]);
+
+  const querySupplierCategoriesMap = useMemo<Record<string, CategoryOption[]>>(() => {
+    const raw = (lookupsQuery.data as any)?.supplierCategoriesMap;
+    if (!raw || typeof raw !== 'object') return {};
+    const entries = Object.entries(raw as Record<string, any[]>);
+    return Object.fromEntries(
+      entries.map(([sid, list]) => [
+        String(sid),
+        (Array.isArray(list) ? list : []).map((c: any) => ({
+          id: String(c?.id ?? ''),
+          name: String(c?.name ?? ''),
+          external_id: String(c?.external_id ?? ''),
+          supplier_id: String(c?.supplier_id ?? ''),
+          parent_external_id: c?.parent_external_id == null ? null : String(c.parent_external_id),
+        })),
+      ]),
+    );
+  }, [lookupsQuery.data]);
+
   const [suppliers, setSuppliers] = useState<SupplierOption[]>(preloadedSuppliers || []);
   const [currencies, setCurrencies] = useState<CurrencyOption[]>(preloadedCurrencies || []);
   const [categories, setCategories] = useState<CategoryOption[]>(preloadedCategories || []);
@@ -38,28 +94,26 @@ export function useProductLookups(
 
   // ✅ Стабільна функція getCategoriesFromMap
   const getCategoriesFromMap = useCallback((sid: string): CategoryOption[] => {
-    return preloadedSupplierCategoriesMap?.[String(sid || '')] || [];
-  }, [preloadedSupplierCategoriesMap]);
-
-  // ✅ ЕФЕКТ 1: Ініціалізація suppliers та currencies (тільки один раз при зміні preloaded даних)
-  useEffect(() => {
-    if (preloadedSuppliers?.length) {
-      setSuppliers(preloadedSuppliers);
-    }
-  }, [preloadedSuppliers]);
+    const map = preloadedSupplierCategoriesMap ?? querySupplierCategoriesMap;
+    return map?.[String(sid || '')] || [];
+  }, [preloadedSupplierCategoriesMap, querySupplierCategoriesMap]);
 
   useEffect(() => {
-    if (preloadedCurrencies?.length) {
-      setCurrencies(preloadedCurrencies);
-    }
-  }, [preloadedCurrencies]);
+    const next = preloadedSuppliers ?? querySuppliers;
+    if (next !== suppliers) setSuppliers(next);
+  }, [preloadedSuppliers, querySuppliers, suppliers]);
 
   useEffect(() => {
-    if (!productStoreId && !supplierId && preloadedSuppliers?.length) {
-      const firstId = String(preloadedSuppliers[0].id);
+    const next = preloadedCurrencies ?? queryCurrencies;
+    if (next !== currencies) setCurrencies(next);
+  }, [preloadedCurrencies, queryCurrencies, currencies]);
+
+  useEffect(() => {
+    if (!productStoreId && !supplierId && suppliers.length) {
+      const firstId = String(suppliers[0].id);
       setBasicRef.current?.((prev: BasicData) => ({ ...prev, supplier_id: firstId }));
     }
-  }, [productStoreId, supplierId, preloadedSuppliers]);
+  }, [productStoreId, supplierId, suppliers]);
 
   // ✅ ЕФЕКТ 3: Оновлення categories при зміні supplier_id
   useEffect(() => {
