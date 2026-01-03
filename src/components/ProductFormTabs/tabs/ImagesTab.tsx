@@ -9,6 +9,7 @@ type Props = {
   readOnly?: boolean;
   isDragOver: boolean;
   uploading: boolean;
+  uploadProgress?: number | null;
   imageUrl: string;
   onSetImageUrl: (v: string) => void;
   onAddImageFromUrl: () => void;
@@ -46,6 +47,7 @@ export const ImagesTab = React.memo(function ImagesTab(props: Props) {
           readOnly={props.readOnly}
           isDragOver={props.isDragOver}
           uploading={props.uploading}
+          uploadProgress={props.uploadProgress}
           imageUrl={props.imageUrl}
           onSetImageUrl={props.onSetImageUrl}
           onAddImageFromUrl={props.onAddImageFromUrl}

@@ -14,6 +14,7 @@ import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy,
 import { CSS } from '@dnd-kit/utilities'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DialogDescription } from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
 import { FixedSizeList as List } from 'react-window'
 import type { ProductImage } from './types'
 
@@ -22,6 +23,7 @@ type Props = {
   readOnly?: boolean
   isDragOver: boolean
   uploading?: boolean
+  uploadProgress?: number | null
   imageUrl: string
   onSetImageUrl: (v: string) => void
   onAddImageFromUrl: () => void
@@ -395,9 +397,19 @@ export function ImageSection(props: Props) {
               </p>
               {props.uploading ? (
                 <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-10">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
-                    <span className="text-sm text-emerald-700">{t('uploading_image')}</span>
+                  <div className="w-[min(22rem,90%)]">
+                    <div className="flex items-center gap-2 justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+                      <span className="text-sm text-emerald-700">{t('uploading_image')}</span>
+                      {typeof props.uploadProgress === 'number' ? (
+                        <span className="text-sm text-emerald-700 tabular-nums">{props.uploadProgress}%</span>
+                      ) : null}
+                    </div>
+                    {typeof props.uploadProgress === 'number' ? (
+                      <div className="mt-2">
+                        <Progress value={props.uploadProgress} className="h-2" />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

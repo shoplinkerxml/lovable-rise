@@ -217,9 +217,10 @@ export function ProductFormTabs({
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const res = await handleFileUploadAction(event);
-    if (res.ok) {
+    if (res.uploadedCount && res.uploadedCount > 0) {
       toast.success(t('image_uploaded_successfully'));
-    } else {
+    }
+    if (!res.ok) {
       toast.error(mapImageErrorToToast(t, res.errorCode));
     }
   }, [handleFileUploadAction, t]);
@@ -323,6 +324,7 @@ export function ProductFormTabs({
                 readOnly={readOnly}
                 isDragOver={drop.isDragOver}
                 uploading={uploadState.uploading}
+                uploadProgress={uploadState.uploadProgress}
                 imageUrl={imageUrl}
                 onSetImageUrl={handleSetImageUrl}
                 onAddImageFromUrl={addImageFromUrl}

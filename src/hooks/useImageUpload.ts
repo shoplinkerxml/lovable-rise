@@ -12,6 +12,7 @@ type WorkerResponse =
 export function useImageUpload(productId?: string) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const workerStateRef = useRef<{
     worker: Worker | null;
@@ -115,6 +116,7 @@ self.onmessage = async (event) => {
     const u = String(url || '').trim();
     if (!u) return { url: '', object_key: undefined };
     setUploading(true);
+    setUploadProgress(null);
     try {
       if (productId) {
         const res = await R2Storage.uploadProductImageFromUrl(productId, u);
@@ -124,6 +126,7 @@ self.onmessage = async (event) => {
       return { url: u, object_key: key || undefined };
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }, [productId]);
 
@@ -138,11 +141,15 @@ self.onmessage = async (event) => {
 
   const uploadFile = useCallback(async (file: File): Promise<Uploaded> => {
     setUploading(true);
+    setUploadProgress(0);
     try {
       const processed = await processFile(file);
+      setUploadProgress(40);
       return await uploadFileRaw(processed);
     } finally {
+      setUploadProgress(100);
       setUploading(false);
+      setUploadProgress(null);
     }
   }, [processFile, uploadFileRaw]);
 
@@ -150,11 +157,20 @@ self.onmessage = async (event) => {
     const list = Array.isArray(files) ? files.filter(Boolean) : [];
     if (list.length === 0) return [];
     setUploading(true);
+    setUploadProgress(0);
     try {
-      const tasks = list.map(async (f) => uploadFileRaw(await processFile(f)));
+      let completed = 0;
+      const total = list.length;
+      const tasks = list.map(async (f) => {
+        const res = await uploadFileRaw(await processFile(f));
+        completed += 1;
+        setUploadProgress(Math.round((completed / total) * 100));
+        return res;
+      });
       return await Promise.allSettled(tasks);
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }, [processFile, uploadFileRaw]);
 
@@ -162,6 +178,7 @@ self.onmessage = async (event) => {
     isDragOver,
     setIsDragOver,
     uploading,
+    uploadProgress,
     uploadFromUrl,
     uploadFile,
     uploadFiles,
